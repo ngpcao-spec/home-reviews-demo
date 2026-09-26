@@ -17,10 +17,12 @@ body{background:radial-gradient(circle at 82% 9%,rgba(71,69,215,.18),transparent
 
 /* Final iPhone density pass: the five reference screens keep their primary content above the tab bar. */
 @media(max-width:759px){
-  .reference-intro{margin:18px 3px 14px}.reference-intro h1{font-size:1.9rem}.reference-intro p{font-size:.96rem;line-height:1.4;margin-top:6px}.home-intro{margin-bottom:14px}.analytics-intro{margin:15px 3px 8px}
+  .brand-header{height:68px}
+  .reference-intro{margin:14px 3px 12px}.reference-intro h1{font-size:1.9rem}.reference-intro p{font-size:.96rem;line-height:1.4;margin-top:5px}.home-intro{margin-bottom:12px}.analytics-intro{margin:15px 3px 8px}
+  .attention-card{min-height:84px;padding-top:12px;padding-bottom:12px}
   .kpi-card{min-height:104px;padding:10px 6px}.kpi-icon{height:27px;margin-bottom:4px}.kpi-icon svg{width:26px;height:26px}.kpi-card strong{font-size:1.62rem;margin:3px 0 5px}.kpi-card small{font-size:.7rem}.section-heading{margin:16px 3px 7px}.section-heading h2{font-size:1.24rem}
-  .review-row-compact{min-height:76px;padding-top:7px;padding-bottom:7px}.review-row-compact .est-avatar{width:58px;height:58px}.review-row-compact p{font-size:.77rem}.review-row-compact .numeric-rating{font-size:1.1rem}
+  .review-row-compact{min-height:72px;padding-top:6px;padding-bottom:6px}.review-row-compact .est-avatar{width:56px;height:56px}.review-row-compact p{font-size:.77rem;margin-top:4px;margin-bottom:4px}.review-row-compact .numeric-rating{font-size:1.1rem}
   .home-intro~.demo-button,.demo-button{display:none}
   .analytics-filters{margin-bottom:7px}.analytics-filters select{height:31px;font-size:.68rem}.chart-card,.issues-card{padding:12px}.chart-heading strong{font-size:1.48rem}.chart-wrap{height:146px;margin:5px -8px -5px}.issues-card{margin-top:8px}.issue-bars{gap:7px;margin-top:10px}.issue-row{font-size:.68rem}.issue-row>div{height:10px}.primary-analytics-kpis{margin-top:8px}.analytics-kpi{min-height:112px;padding:11px}
 }
-.review-row .est-avatar{display:block;min-width:74px;min-height:74px}.review-row-compact .est-avatar{min-width:58px;min-height:58px}
+.review-row .est-avatar{display:block;min-width:74px;min-height:74px}.review-row-compact .est-avatar{min-width:56px;min-height:56px}
