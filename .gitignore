@@ -1,0 +1,11 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+artifacts/
+.gcm-auth/
+.env
+.env.local
+.npm-cache/
+.DS_Store
+*.log
