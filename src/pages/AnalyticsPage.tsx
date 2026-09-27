@@ -8,7 +8,8 @@ export function AnalyticsPage() {
   const { reviews, establishments } = useApp()
   const [period, setPeriod] = useState('30')
   const [establishment, setEstablishment] = useState('all')
-  const cutoff = Date.now() - Number(period) * 86_400_000
+  const [now] = useState(() => Date.now())
+  const cutoff = now - Number(period) * 86_400_000
   const filtered = useMemo(() => reviews.filter((review) =>
     (establishment === 'all' || review.establishmentId === establishment)
     && new Date(review.publishedAt).getTime() >= cutoff),
