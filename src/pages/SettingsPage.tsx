@@ -3,6 +3,16 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
+import {
+  currentPushSubscription,
+  disablePushNotifications,
+  enablePushNotifications,
+  getPushUiState,
+  isIosDevice,
+  isStandalonePwa,
+  pushIsSupported,
+  type PushUiState,
+} from '../lib/push-notifications'
 
 type MonitoringIntervalHours = 1 | 3 | 6 | 12 | 24
 
@@ -29,7 +39,12 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 export function SettingsPage() {
   const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval } = useApp()
   const [inApp, setInApp] = useState(true)
-  const [pushState, setPushState] = useState<NotificationPermission>(typeof Notification === 'undefined' ? 'denied' : Notification.permission)
+  const [pushState, setPushState] = useState<PushUiState>(() => getPushUiState(
+    typeof window !== 'undefined' && pushIsSupported(),
+    typeof Notification === 'undefined' ? 'default' : Notification.permission,
+    false,
+  ))
+  const [pushBusy, setPushBusy] = useState(false)
   const [monitoringInterval, setMonitoringInterval] = useState<MonitoringIntervalHours>(() => demoMode ? getStoredMonitoringInterval() : (isMonitoringInterval(monitoringIntervalHours) ? monitoringIntervalHours : 12))
   const [savingMonitoring, setSavingMonitoring] = useState(false)
   const lastSyncTimestamp = Math.max(...establishments.map((item) => new Date(item.lastSyncedAt).getTime()))
@@ -39,14 +54,54 @@ export function SettingsPage() {
     if (isMonitoringInterval(monitoringIntervalHours)) setMonitoringInterval(monitoringIntervalHours)
   }, [monitoringIntervalHours])
 
-  const requestPush = async () => {
-    if (!('Notification' in window)) {
+  useEffect(() => {
+    let active = true
+    if (!pushIsSupported()) return
+    void currentPushSubscription().then((subscription) => {
+      if (active) setPushState(getPushUiState(true, Notification.permission, Boolean(subscription)))
+    }).catch(() => {
+      if (active) setPushState(getPushUiState(true, Notification.permission, false))
+    })
+    return () => { active = false }
+  }, [])
+
+  const togglePush = async () => {
+    if (!pushIsSupported()) {
       pushToast('Notifications push non prises en charge')
       return
     }
-    const value = await Notification.requestPermission()
-    setPushState(value)
-    if (value === 'granted') pushToast('Notifications push activées')
+    if (isIosDevice() && !isStandalonePwa()) {
+      pushToast('Sur iPhone, ajoutez HOME Reviews à l’écran d’accueil pour activer les notifications')
+      return
+    }
+    if (Notification.permission === 'denied') {
+      setPushState('denied')
+      pushToast('Permission refusée dans les réglages du navigateur')
+      return
+    }
+
+    setPushBusy(true)
+    try {
+      if (pushState === 'enabled') {
+        await disablePushNotifications()
+        setPushState('disabled')
+        pushToast('Notifications push désactivées')
+        return
+      }
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setPushState(permission === 'denied' ? 'denied' : 'disabled')
+        return
+      }
+      await enablePushNotifications()
+      setPushState('enabled')
+      pushToast('Notifications push activées')
+    } catch {
+      setPushState(getPushUiState(true, Notification.permission, false))
+      pushToast('Impossible d’activer les notifications push')
+    } finally {
+      setPushBusy(false)
+    }
   }
 
   const updateMonitoringInterval = async (value: MonitoringIntervalHours) => {
@@ -70,7 +125,7 @@ export function SettingsPage() {
   <section className="profile-card card"><div className="profile-avatar">LN</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>HOME France</span></div></section>
   {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>Mode démonstration</strong><span>Données locales, aucun service externe requis.</span></div></div>}
   <SettingsSection title="Compte"><SettingLink icon={<User/>} title="Profil" detail="Nom et adresse email"/><SettingLink icon={<Building2/>} title="Organisation" detail="HOME France · Propriétaire"/><SettingLink icon={<LogOut/>} title="Déconnexion" detail="Fermer la session"/></SettingsSection>
-  <SettingsSection title="Notifications"><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>Notifications in-app</strong><span>Alertes visibles dans l’application</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={requestPush}><div className="setting-icon"><Bell/></div><div><strong>Notifications push</strong><span>État : {pushState==='granted'?'autorisées':pushState==='denied'?'refusées':'à activer'}</span></div><ChevronRight/></button></SettingsSection>
+  <SettingsSection title="Notifications"><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>Notifications in-app</strong><span>Alertes visibles dans l’application</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={() => void togglePush()} disabled={pushBusy}><div className="setting-icon"><Bell/></div><div><strong>{pushState === 'enabled' ? 'Désactiver les notifications' : 'Activer les notifications'}</strong><span>État : {pushState === 'enabled' ? 'Activées' : pushState === 'denied' ? 'Permission refusée par le navigateur' : pushState === 'unsupported' ? 'Non prises en charge' : 'Désactivées'}</span>{isIosDevice() && !isStandalonePwa() && <span>Sur iPhone : ajoutez d’abord l’app à l’écran d’accueil.</span>}</div><ChevronRight/></button></SettingsSection>
   <SettingsSection title="Surveillance des avis">
     <div className="settings-info card">
       <label htmlFor="monitoring-interval">Fréquence de vérification</label>
