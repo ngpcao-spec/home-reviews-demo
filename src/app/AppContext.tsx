@@ -21,7 +21,12 @@ interface AppContextValue {
   actions: ReviewAction[]
   toasts: ToastMessage[]
   demoMode: boolean
+  authReady: boolean
+  isAuthenticated: boolean
   dataLoading: boolean
+  dataReady: boolean
+  dataError: string | null
+  monitoringIntervalHours: number
   currentUser: { name: string; email: string }
   plan: typeof demoPlan
   aiUsage: number
@@ -38,6 +43,8 @@ interface AppContextValue {
   removeEstablishment: (id: string) => void
   injectNegativeReview: () => string
   pushToast: (text: string) => void
+  retryData: () => Promise<void>
+  updateMonitoringInterval: (hours: number) => Promise<void>
 }
 
 interface EstablishmentRow {
@@ -92,12 +99,17 @@ interface AddPayload {
   error?: string
 }
 
+interface OrganizationRow {
+  monitoring_interval_hours: number
+}
+
 const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
-const allowDemo = import.meta.env.VITE_DEMO_MODE !== 'false'
+const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
+const emptyState: StoredState = { establishments: [], reviews: [], notifications: [], actions: [] }
 
 function demoState(): StoredState {
   if (typeof window !== 'undefined') {
@@ -165,10 +177,13 @@ async function functionErrorCode(error: unknown, payload: unknown): Promise<stri
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [initial] = useState(() => demoState())
+  const [initial] = useState(() => allowDemo ? demoState() : emptyState)
   const [authUser, setAuthUser] = useState<User | null>(null)
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
   const [dataLoading, setDataLoading] = useState(false)
+  const [dataReady, setDataReady] = useState(allowDemo)
+  const [dataError, setDataError] = useState<string | null>(() => !allowDemo && !isSupabaseConfigured ? 'Supabase n’est pas configuré pour ce déploiement.' : null)
+  const [monitoringIntervalHours, setMonitoringIntervalHours] = useState(12)
   const [establishments, setEstablishments] = useState(initial.establishments)
   const [reviews, setReviews] = useState(initial.reviews)
   const [notifications, setNotifications] = useState(initial.notifications)
@@ -183,21 +198,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const loadRealData = useCallback(async () => {
-    if (!supabase) return
+    if (!supabase) {
+      setDataError('Supabase n’est pas configuré pour ce déploiement.')
+      setDataReady(true)
+      return
+    }
     setDataLoading(true)
-    const [establishmentsResult, reviewsResult] = await Promise.all([
+    setDataReady(false)
+    setDataError(null)
+    const [establishmentsResult, reviewsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
       supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,requires_attention,status').order('published_at', { ascending: false, nullsFirst: false }),
+      supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
     ])
     setDataLoading(false)
-    if (establishmentsResult.error || reviewsResult.error) {
-      pushToast('Impossible de charger les données réelles')
+    setDataReady(true)
+    if (establishmentsResult.error || reviewsResult.error || organizationResult.error) {
+      setEstablishments([])
+      setReviews([])
+      setNotifications([])
+      setActions([])
+      setDataError('Impossible de charger vos données Supabase. Vérifiez votre connexion puis réessayez.')
       return
     }
     setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
     setReviews((reviewsResult.data as ReviewRow[]).map(mapReview))
     setNotifications([])
-  }, [pushToast])
+    setActions([])
+    const organization = organizationResult.data as OrganizationRow | null
+    if (organization?.monitoring_interval_hours) setMonitoringIntervalHours(organization.monitoring_interval_hours)
+  }, [])
 
   useEffect(() => {
     if (!supabase) return
@@ -235,6 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setReviews([])
         setNotifications([])
         setActions([])
+        setDataReady(true)
       }
     }, 0)
     return () => window.clearTimeout(timer)
@@ -369,6 +400,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const injectNegativeReview = () => {
+    if (!demoMode) return ''
     const establishment = establishments[0]
     if (!establishment) return ''
     const id = crypto.randomUUID()
@@ -385,16 +417,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const currentUser = useMemo(() => ({
-    name: authUser?.user_metadata?.display_name ?? authUser?.email?.split('@')[0] ?? 'Linh Nguyen',
-    email: authUser?.email ?? 'linh@home-reviews.fr',
-  }), [authUser])
+    name: authUser?.user_metadata?.display_name ?? authUser?.email?.split('@')[0] ?? (demoMode ? 'Linh Nguyen' : 'Utilisateur'),
+    email: authUser?.email ?? (demoMode ? 'linh@home-reviews.fr' : ''),
+  }), [authUser, demoMode])
+
+  const updateMonitoringInterval = async (hours: number) => {
+    if (demoMode) {
+      setMonitoringIntervalHours(hours)
+      return
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { error } = await supabase.rpc('set_monitoring_interval', { p_hours: hours })
+    if (error) throw error
+    setMonitoringIntervalHours(hours)
+  }
 
   const value: AppContextValue = {
-    establishments, reviews, notifications, actions, toasts, demoMode, dataLoading, currentUser,
-    plan: demoPlan, aiUsage: actions.filter((action) => action.actionType === 'response_generated').length + 38,
+    establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, monitoringIntervalHours, currentUser,
+    plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
     resolveEstablishment, addEstablishment, refreshEstablishment, toggleMonitoring, removeEstablishment,
-    injectNegativeReview, pushToast,
+    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
