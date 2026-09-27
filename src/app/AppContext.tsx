@@ -262,14 +262,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDataReady(false)
     setDataError(null)
 
-    const provisionResult = await supabase.rpc('ensure_home_user')
-    if (provisionResult.error) {
-      setDataLoading(false)
-      setDataReady(true)
-      setDataError('Impossible d’initialiser votre espace HOME Reviews.')
-      return
-    }
-
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
       supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error').order('published_at', { ascending: false, nullsFirst: false }),
