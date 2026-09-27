@@ -333,13 +333,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!supabase || !authUser || demoMode) return
-    const channel = supabase
+    const client = supabase
+    const channel = client
       .channel(`notifications:${authUser.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${authUser.id}` }, () => {
         void loadRealData()
       })
       .subscribe()
-    return () => { void supabase.removeChannel(channel) }
+    return () => { void client.removeChannel(channel) }
   }, [authUser, demoMode, loadRealData])
 
   const logAction = (reviewId: string, actionType: ReviewAction['actionType']) => {
