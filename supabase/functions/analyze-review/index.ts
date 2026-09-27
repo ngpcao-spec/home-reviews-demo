@@ -4,7 +4,7 @@ import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { sendPushToUser } from '../_shared/push.ts'
-import { shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
+import { isDuplicateNotificationError, runNonBlockingNotification, shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
 
 interface ReviewRow {
   id: string
@@ -47,7 +47,7 @@ async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary
       body: shortSummary,
     }).select('id').maybeSingle()
 
-    if (inserted.error?.code === '23505') continue
+    if (isDuplicateNotificationError(inserted.error?.code)) continue
     if (inserted.error || !inserted.data) continue
 
     try {
@@ -171,11 +171,8 @@ Deno.serve(async (request) => {
     if (saveError) throw saveError
 
     if (automatic) {
-      try {
-        await notifyNewReview(admin, review, result.ai_summary)
-      } catch {
-        // Notification and push failures must never fail review analysis or synchronization.
-      }
+      // Notification and push failures must never fail review analysis or synchronization.
+      await runNonBlockingNotification(() => notifyNewReview(admin, review, result.ai_summary))
     }
 
     if (userId) {
