@@ -19,7 +19,12 @@ export async function assertMembership(client:SupabaseClient,userId:string,organ
 }
 
 export async function organizationForEstablishment(client:SupabaseClient,id:string){
-  const {data,error}=await client.from('establishments').select('id,organization_id,name,provider_place_ref,google_maps_url,last_synced_at').eq('id',id).single()
+  const {data,error}=await client
+    .from('establishments')
+    .select('id,organization_id,google_id,google_maps_url,last_review_id,last_review_at')
+    .eq('id',id)
+    .eq('active',true)
+    .single()
   if(error||!data)throw new Error('ESTABLISHMENT_NOT_FOUND')
   return data
 }

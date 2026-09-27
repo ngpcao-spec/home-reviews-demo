@@ -12,11 +12,10 @@ Compte local : `demo@home-reviews.fr` / `demohome`.
 
 ## Fournisseurs d’avis
 
-- `REVIEW_PROVIDER=outscraper` utilise Outscraper en principal et SerpApi en fallback si sa clé est disponible.
-- `REVIEW_PROVIDER=serpapi` utilise SerpApi en principal, puis le mock.
+- `REVIEW_PROVIDER=outscraper` appelle l’API Google Maps Reviews d’Outscraper depuis une Edge Function authentifiée.
 - `REVIEW_PROVIDER=mock` ne fait aucun appel externe.
 
-Les adaptateurs sont centralisés dans `functions/_shared/review-provider.ts`. Ils appliquent timeout, retry limité, backoff, journalisation structurée et circuit breaker simple. Aucun secret n’est lu par le frontend.
+La fonction `fetch-google-reviews` limite la première récupération à 20 avis, demande le tri `newest` et normalise les données avant de les renvoyer. `OUTSCRAPER_API_KEY` est lu exclusivement depuis Supabase Secrets ; il ne doit être placé ni dans `.env.local`, ni dans une variable `VITE_*`. SerpApi n’est pas branché à ce flux.
 
 ## IA
 

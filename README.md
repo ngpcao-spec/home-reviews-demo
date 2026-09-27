@@ -29,7 +29,7 @@ Les tests E2E utilisent les viewports iPhone 14 (390×844), petit mobile (360×8
 - PWA installable avec service worker, cache du shell, état hors ligne et support Web Push.
 - État de démo persistant dans `localStorage`; aucun secret et aucune fausse donnée dynamique inscrite dans les composants.
 - Supabase Auth, PostgreSQL/RLS, Edge Functions et seed local dans [`supabase/`](./supabase/README.md).
-- Adaptateur `ReviewProvider` commun avec Outscraper principal, SerpApi fallback et MockProvider. Timeout, retry/backoff, logs structurés et circuit breaker sont centralisés côté serveur.
+- Adaptateur `ReviewProvider` commun avec Outscraper et MockProvider. L’appel Outscraper est isolé dans une Edge Function authentifiée et sa réponse est normalisée côté serveur.
 - Abstraction `BillingProvider` avec implémentation mock.
 
 ## Variables d’environnement
@@ -42,9 +42,8 @@ Copier `.env.example` vers `.env.local` pour le frontend. Les secrets backend se
 | `VITE_SUPABASE_ANON_KEY` | Non | Clé publishable/anon Supabase |
 | `VITE_DEMO_MODE` | Oui (`true`) | Active les données et actions locales |
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend réel | Accès serveur pour sync/IA |
-| `REVIEW_PROVIDER` | Oui (`mock`) | `outscraper`, `serpapi` ou `mock` |
-| `OUTSCRAPER_API_KEY` | Production Outscraper | Fournisseur principal |
-| `SERPAPI_API_KEY` | Fallback réel | Fournisseur de secours |
+| `REVIEW_PROVIDER` | Oui (`mock`) | `outscraper` ou `mock` ; secret Supabase côté serveur |
+| `OUTSCRAPER_API_KEY` | Production Outscraper | Secret Supabase uniquement, jamais `VITE_*` |
 | `OPENAI_API_KEY` + `OPENAI_MODEL` | IA réelle | Analyse et génération côté Edge Function |
 | `WEB_PUSH_PUBLIC_KEY` + `WEB_PUSH_PRIVATE_KEY` | Push réel | Notifications Web Push |
 | `BILLING_PROVIDER` | Oui (`mock`) | Abstraction de facturation |
@@ -52,7 +51,7 @@ Copier `.env.example` vers `.env.local` pour le frontend. Les secrets backend se
 
 ## Sécurité et multi-tenant
 
-La migration active RLS sur toutes les tables exposées, révoque les droits par défaut, accorde seulement les opérations nécessaires et isole chaque ligne par appartenance à l’organisation. Les vérifications de rôle sont effectuées par des fonctions privées `security definer` avec `search_path` vide et contrôle explicite de `auth.uid()`. Les clés Outscraper, SerpApi, OpenAI, Web Push et `service_role` sont lues uniquement par les Edge Functions.
+La migration active RLS sur toutes les tables exposées, révoque les droits par défaut, accorde seulement les opérations nécessaires et isole chaque ligne par appartenance à l’organisation. Les vérifications de rôle sont effectuées par des fonctions privées `security definer` avec `search_path` vide et contrôle explicite de `auth.uid()`. Les clés Outscraper, OpenAI, Web Push et `service_role` sont lues uniquement par les Edge Functions.
 
 Une suite pgTAP vérifie qu’une organisation B ne peut ni lire ni modifier les établissements de l’organisation A. Les listes d’avis sont préparées pour une pagination par curseur `(published_at, id)` en production.
 
