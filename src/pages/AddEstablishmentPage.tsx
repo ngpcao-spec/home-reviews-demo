@@ -135,14 +135,20 @@ export function AddEstablishmentPage() {
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
       <span className="flow-icon success"><CheckCircle2 /></span>
       <h2>Établissement ajouté</h2>
-      <p><strong>{result.inserted} avis nécessitant une attention</strong> ont été trouvés.</p>
+      {result.importStatus === 'failed'
+        ? <p><strong>L’établissement est bien enregistré.</strong> L’import des avis a échoué temporairement et pourra être relancé.</p>
+        : <p><strong>{result.inserted} avis nécessitant une attention</strong> ont été trouvés.</p>}
       <div className="import-summary">
         <span>1★ <b>{result.distribution['1']}</b></span>
         <span>2★ <b>{result.distribution['2']}</b></span>
         <span>3★ <b>{result.distribution['3']}</b></span>
       </div>
-      <button className="primary-button full-width" onClick={() => navigate(`/avis?etablissement=${result.establishmentId}&statut=to_process`)}>
-        Voir les avis
+      <button className="primary-button full-width" onClick={() => navigate(
+        result.importStatus === 'failed'
+          ? `/etablissements/${result.establishmentId}`
+          : `/avis?etablissement=${result.establishmentId}&statut=to_process`,
+      )}>
+        {result.importStatus === 'failed' ? 'Voir l’établissement' : 'Voir les avis'}
       </button>
     </section>}
   </>
