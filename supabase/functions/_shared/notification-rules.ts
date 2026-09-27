@@ -9,3 +9,16 @@ export function shouldCreateReviewNotification(review: NotificationEligibleRevie
     && review.rating >= 1
     && review.rating <= 3
 }
+
+export function isDuplicateNotificationError(code?: string) {
+  return code === '23505'
+}
+
+export async function runNonBlockingNotification(task: () => Promise<void>) {
+  try {
+    await task()
+    return 'completed' as const
+  } catch {
+    return 'failed' as const
+  }
+}
