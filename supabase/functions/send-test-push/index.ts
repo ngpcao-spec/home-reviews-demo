@@ -34,7 +34,7 @@ Deno.serve(async (request: Request) => {
 
     const { data: previous, error: previousError } = await admin
       .from('push_test_deliveries')
-      .select('status,test_type')
+      .select('status,test_type,push_attempted,provider_status')
       .eq('user_id', context.user.id)
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle()
@@ -44,6 +44,8 @@ Deno.serve(async (request: Request) => {
         ok: previous.status === 'sent',
         status: previous.status,
         test_type: previous.test_type,
+        pushAttempted: previous.push_attempted,
+        provider_status: previous.provider_status,
         reused: true,
       })
     }
@@ -64,6 +66,21 @@ Deno.serve(async (request: Request) => {
     }
 
     if (testType === 'deep_link') {
+      const { data: simpleSuccess, error: simpleError } = await admin
+        .from('push_test_deliveries')
+        .select('id')
+        .eq('user_id', context.user.id)
+        .eq('test_type', 'simple')
+        .eq('status', 'sent')
+        .eq('push_attempted', true)
+        .gte('provider_status', 200)
+        .lt('provider_status', 300)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (simpleError) throw simpleError
+      if (!simpleSuccess) return json({ error: 'SIMPLE_PUSH_SUCCESS_REQUIRED' }, 409)
+
       const { data: establishment, error: establishmentError } = await context.client
         .from('establishments')
         .select('id,name')
@@ -91,7 +108,7 @@ Deno.serve(async (request: Request) => {
         title: 'HOME Reviews',
         body: '⭐ Nouvel avis 2★ — Green Home Restaurant\nRéponse prête à être vérifiée.',
         url: `#/avis/${review.id}`,
-        tag: `home-reviews-test-review-${review.id}`,
+        tag: `home-reviews-test-review-${review.id}-${idempotencyKey}`,
       }
     }
 
@@ -102,6 +119,7 @@ Deno.serve(async (request: Request) => {
         idempotency_key: idempotencyKey,
         test_type: testType,
         review_id: reviewId,
+        subscription_count: count,
       })
       .select('id')
       .single()
@@ -115,7 +133,9 @@ Deno.serve(async (request: Request) => {
     deliveryId = created.id
 
     const result = await sendPushToUser(admin, context.user.id, payload)
-    const delivered = result.sent > 0
+    const providerStatus = result.providerStatusCodes[0] ?? null
+    const delivered = result.sent > 0 && providerStatus !== null && providerStatus >= 200 && providerStatus < 300
+    const pushAttempted = result.attempted > 0
 
     await admin
       .from('push_test_deliveries')
@@ -123,26 +143,27 @@ Deno.serve(async (request: Request) => {
         status: delivered ? 'sent' : 'failed',
         error: delivered ? null : 'PUSH_DELIVERY_FAILED',
         sent_at: delivered ? new Date().toISOString() : null,
+        push_attempted: pushAttempted,
+        provider_called: pushAttempted,
+        provider_status: providerStatus,
+        subscription_count: result.subscriptionCount,
+        expired_subscriptions_removed: result.expiredRemoved,
       })
       .eq('id', deliveryId)
 
-    if (!delivered) {
-      return json({
-        error: 'PUSH_DELIVERY_FAILED',
-        sent: result.sent,
-        failed: result.failed,
-        test_type: testType,
-      }, 502)
-    }
-
-    return json({
-      ok: true,
-      status: 'sent',
+    const response = {
+      ok: delivered,
+      status: delivered ? 'sent' : 'failed',
       sent: result.sent,
       failed: result.failed,
       test_type: testType,
+      pushAttempted,
+      provider_status: providerStatus,
+      expired_subscription_removed: result.expiredRemoved > 0,
       reused: false,
-    })
+    }
+
+    return delivered ? json(response) : json({ ...response, error: 'PUSH_DELIVERY_FAILED' }, 502)
   } catch (error) {
     if (admin && deliveryId) {
       await admin
