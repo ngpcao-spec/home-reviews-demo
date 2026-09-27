@@ -28,11 +28,11 @@ function scriptHint(text: string) {
 
 function assertReplyScript(original: string, result: ReviewAiResult) {
   const checks = [
-    { original: /\\p{Script=Hangul}/u, reply: /\\p{Script=Hangul}/u, language: 'ko' },
-    { original: /\\p{Script=Cyrillic}/u, reply: /\\p{Script=Cyrillic}/u },
-    { original: /\\p{Script=Arabic}/u, reply: /\\p{Script=Arabic}/u },
-    { original: /\\p{Script=Hebrew}/u, reply: /\\p{Script=Hebrew}/u },
-    { original: /\\p{Script=Hiragana}|\\p{Script=Katakana}/u, reply: /\\p{Script=Hiragana}|\\p{Script=Katakana}/u, language: 'ja' },
+    { original: /\p{Script=Hangul}/u, reply: /\p{Script=Hangul}/u, language: 'ko' },
+    { original: /\p{Script=Cyrillic}/u, reply: /\p{Script=Cyrillic}/u },
+    { original: /\p{Script=Arabic}/u, reply: /\p{Script=Arabic}/u },
+    { original: /\p{Script=Hebrew}/u, reply: /\p{Script=Hebrew}/u },
+    { original: /\p{Script=Hiragana}|\p{Script=Katakana}/u, reply: /\p{Script=Hiragana}|\p{Script=Katakana}/u, language: 'ja' },
   ]
   const expected = checks.find((check) => check.original.test(original))
   if (!expected) return
