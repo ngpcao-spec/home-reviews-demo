@@ -20,3 +20,6 @@
 .notification-onboarding-actions{display:grid;gap:5px;margin-top:21px}
 .notification-onboarding-actions .text-button{min-height:44px}
 @media(min-width:760px){.notification-onboarding-backdrop{align-items:center;padding:24px}.notification-onboarding{padding:28px}}
+
+.notification-onboarding-info span{display:block}
+.notification-onboarding-info ol{margin:11px 0 0;padding-left:20px;display:grid;gap:7px;color:#f0f1f8}
