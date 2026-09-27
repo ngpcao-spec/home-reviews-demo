@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getOAuthRedirectUrl } from '../lib/auth-redirect'
+import { getGoogleOAuthOptions } from '../lib/auth-redirect'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 
 function GoogleMark() {
@@ -20,9 +20,7 @@ export function AuthPage() {
     setBusy(true)
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: getOAuthRedirectUrl(),
-      },
+      options: getGoogleOAuthOptions(),
     })
 
     if (oauthError) {
