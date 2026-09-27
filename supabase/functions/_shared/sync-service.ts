@@ -146,13 +146,42 @@ async function fetchInitialization(query: string): Promise<GoogleReviewsResult> 
   })
 }
 
+export async function resolveEstablishmentCandidate(query: string) {
+  const provider = providerName()
+  const result = provider === 'mock'
+    ? getMockGoogleReviews(query)
+    : await fetchOutscraperReviews({
+      query,
+      apiKey: outscraperKey(),
+      reviewsLimit: 1,
+      sort: 'newest',
+      timeoutMs: 30_000,
+    })
+
+  return { provider, establishment: result.establishment }
+}
+
 export async function initializeEstablishment(
   admin: SupabaseClient,
   organizationId: string,
   query: string,
+  expectedGoogleId?: string,
 ) {
   const provider = providerName()
   const result = await fetchInitialization(query)
+  if (expectedGoogleId && result.establishment.googleId !== expectedGoogleId) {
+    throw new Error('ESTABLISHMENT_MISMATCH')
+  }
+
+  const { data: existing, error: existingError } = await admin
+    .from('establishments')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('google_id', result.establishment.googleId)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existing) throw new Error('ESTABLISHMENT_ALREADY_ADDED')
+
   const negativeReviews = result.reviews
     .filter((review) => review.rating >= 1 && review.rating <= 3)
     .sort((left, right) => {
@@ -161,29 +190,34 @@ export async function initializeEstablishment(
       return rightTime - leftTime
     })
 
+  const now = new Date().toISOString()
+  const newestReview = negativeReviews[0]
   const { data: establishment, error: establishmentError } = await admin
     .from('establishments')
-    .upsert({
+    .insert({
       organization_id: organizationId,
       name: result.establishment.name,
       google_id: result.establishment.googleId,
       place_id: result.establishment.placeId,
-      google_maps_url: query,
+      google_maps_url: result.establishment.locationLink ?? query,
       address: result.establishment.fullAddress,
       rating: result.establishment.rating,
       total_reviews: result.establishment.totalReviews,
       photo_url: result.establishment.photo,
       active: true,
-      initialized_at: new Date().toISOString(),
-      last_sync_at: new Date().toISOString(),
+      initialized_at: now,
+      last_sync_at: now,
+      last_review_id: newestReview?.externalReviewId ?? null,
+      last_review_at: newestReview?.publishedAt ?? null,
       sync_status: 'syncing',
       sync_error: null,
-    }, {
-      onConflict: 'organization_id,google_id',
     })
     .select('id,organization_id,google_id,google_maps_url,last_review_id,last_review_at')
     .single()
-  if (establishmentError) throw establishmentError
+  if (establishmentError) {
+    if (establishmentError.code === '23505') throw new Error('ESTABLISHMENT_ALREADY_ADDED')
+    throw establishmentError
+  }
 
   const runId = await createRun(admin, establishment, 'initialization', provider)
   try {
@@ -193,7 +227,9 @@ export async function initializeEstablishment(
       .update({
         sync_status: 'ok',
         sync_error: null,
-        last_sync_at: new Date().toISOString(),
+        last_sync_status: 'ok',
+        last_sync_error: null,
+        last_sync_at: now,
       })
       .eq('id', establishment.id)
     if (updateError) throw updateError
@@ -226,8 +262,8 @@ export async function initializeEstablishment(
     }
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 120) : 'INITIALIZATION_FAILED'
-    await admin.from('establishments').update({ sync_status: 'error', sync_error: code }).eq('id', establishment.id)
     await finishRun(admin, runId, { status: 'failed', provider_requests: 1, error_code: code })
+    await admin.from('establishments').delete().eq('id', establishment.id)
     throw error
   }
 }
