@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldCreateReviewNotification } from './notification-rules'
+import { isDuplicateNotificationError, runNonBlockingNotification, shouldCreateReviewNotification } from './notification-rules'
 
 describe('notification après analyse IA', () => {
   it.each([
@@ -13,5 +13,13 @@ describe('notification après analyse IA', () => {
 
   it('exclut les imports historiques', () => {
     expect(shouldCreateReviewNotification({ rating: 1, historical_import: true })).toBe(false)
+  })
+  it('reconnaît une insertion déjà dédupliquée', () => {
+    expect(isDuplicateNotificationError('23505')).toBe(true)
+    expect(isDuplicateNotificationError('PUSH_FAILED')).toBe(false)
+  })
+
+  it('absorbe un échec push sans propager l’erreur', async () => {
+    await expect(runNonBlockingNotification(async () => { throw new Error('PUSH_FAILED') })).resolves.toBe('failed')
   })
 })
