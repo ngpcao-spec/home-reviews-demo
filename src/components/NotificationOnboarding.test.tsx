@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationOnboarding } from './NotificationOnboarding'
 
 const mocks = vi.hoisted(() => ({
@@ -39,6 +39,8 @@ vi.mock('../lib/push-notifications', () => ({
   isStandalonePwa: mocks.isStandalone,
   pushIsSupported: mocks.isSupported,
 }))
+
+afterEach(() => cleanup())
 
 describe('onboarding notifications', () => {
   const requestPermission = vi.fn()
