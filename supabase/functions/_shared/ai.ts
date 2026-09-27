@@ -57,9 +57,17 @@ function assertReplyScript(original: string, result: ReviewAiResult) {
   }
 }
 
-export async function analyzeReviewWithOpenAI(rating: number, text: string): Promise<ReviewAiResult> {
+export interface ReviewAiUsage {
+  input_tokens?: number
+  output_tokens?: number
+  total_tokens?: number
+  input_tokens_details?: { cached_tokens?: number }
+  output_tokens_details?: { reasoning_tokens?: number }
+}
+
+export async function analyzeReviewWithOpenAI(rating: number, text: string): Promise<ReviewAiResult & { model: string; usage?: ReviewAiUsage }> {
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
-  const model = Deno.env.get('OPENAI_MODEL')?.trim() || 'gpt-4o-mini'
+  const model = 'gpt-5.6-terra'
   if (!key) throw new Error('AI_NOT_CONFIGURED')
 
   const response = await fetch('https://api.openai.com/v1/responses', {
@@ -70,6 +78,7 @@ export async function analyzeReviewWithOpenAI(rating: number, text: string): Pro
     },
     body: JSON.stringify({
       model,
+      reasoning: { effort: 'low' },
       store: false,
       max_output_tokens: 500,
       input: [
@@ -120,5 +129,5 @@ export async function analyzeReviewWithOpenAI(rating: number, text: string): Pro
   const result = reviewAiSchema.parse(JSON.parse(output))
   assertFrenchSummary(result)
   assertReplyScript(text, result)
-  return result
+  return { ...result, model, usage: data.usage as ReviewAiUsage | undefined }
 }
