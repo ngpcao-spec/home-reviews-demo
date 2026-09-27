@@ -9,12 +9,12 @@ const pageLoadedAt = Date.now()
 
 export function HomePage() {
   const navigate = useNavigate()
-  const { establishments, reviews, demoMode, injectNegativeReview } = useApp()
+  const { establishments, reviews, demoMode, injectNegativeReview, currentUser } = useApp()
   const active = establishments.filter((item) => item.isActive)
   const pending = reviews.filter((item) => item.status === 'to_process')
   const weightedRating = active.length ? active.reduce((sum, item) => sum + item.currentRating * item.currentReviewCount, 0) / active.reduce((sum, item) => sum + item.currentReviewCount, 0) : 0
 
-  if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="home-greeting"><span className="eyebrow">Votre réputation, en clair</span><h2>Bonjour Linh</h2></div><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>Ajoutez votre premier établissement</h2><p>Surveillez les nouveaux avis et identifiez immédiatement ceux qui demandent une action.</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>Ajouter un établissement</button></div></>
+  if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="home-greeting"><span className="eyebrow">Votre réputation, en clair</span><h2>Bonjour {currentUser.name.split(' ')[0]}</h2></div><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>Ajoutez votre premier établissement</h2><p>Surveillez les nouveaux avis et identifiez immédiatement ceux qui demandent une action.</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>Ajouter un établissement</button></div></>
 
   return <>
     <BrandHeader />

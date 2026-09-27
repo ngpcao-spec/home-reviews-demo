@@ -9,7 +9,7 @@ export function BrandMark() {
 
 export function BrandHeader({ addAction, trailing, title }: { addAction?: () => void; trailing?: ReactNode; title?: ReactNode }) {
   const navigate = useNavigate()
-  const { notifications } = useApp()
+  const { notifications, currentUser } = useApp()
   const unread = notifications.filter((item) => !item.readAt).length
 
   return <header className="brand-header">
@@ -18,7 +18,7 @@ export function BrandHeader({ addAction, trailing, title }: { addAction?: () => 
     <div className="brand-actions">
       {trailing ?? <>
         {addAction ? <button className="header-add" onClick={addAction}><Plus />Ajouter</button> : <button className="bare-icon notification-button" onClick={() => navigate('/notifications')} aria-label={`${unread} notifications non lues`}><Bell />{unread > 0 && <span className="notification-count">{unread > 99 ? '99+' : unread}</span>}</button>}
-        {!addAction && <button className="mini-avatar" onClick={() => navigate('/plus')} aria-label="Ouvrir le profil">LN</button>}
+        {!addAction && <button className="mini-avatar" onClick={() => navigate('/plus')} aria-label="Ouvrir le profil">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</button>}
       </>}
     </div>
   </header>

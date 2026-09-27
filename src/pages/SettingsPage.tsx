@@ -38,8 +38,9 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 }
 
 export function SettingsPage() {
-  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval } = useApp()
+  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval, signOut } = useApp()
   const [inApp, setInApp] = useState(true)
+  const [signingOut, setSigningOut] = useState(false)
   const [pushState, setPushState] = useState<PushUiState>(() => getPushUiState(
     typeof window !== 'undefined' && pushIsSupported(),
     typeof Notification === 'undefined' ? 'default' : Notification.permission,
@@ -109,6 +110,16 @@ export function SettingsPage() {
     }
   }
 
+  const disconnect = async () => {
+    setSigningOut(true)
+    try {
+      await signOut()
+    } catch {
+      pushToast('Impossible de fermer la session')
+      setSigningOut(false)
+    }
+  }
+
   const updateMonitoringInterval = async (value: MonitoringIntervalHours) => {
     const previousValue = monitoringInterval
     setMonitoringInterval(value)
@@ -127,9 +138,9 @@ export function SettingsPage() {
   }
 
   return <><PageHeader title="Plus"/>
-  <section className="profile-card card"><div className="profile-avatar">LN</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>HOME France</span></div></section>
+  <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>HOME France</span></div></section>
   {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>Mode démonstration</strong><span>Données locales, aucun service externe requis.</span></div></div>}
-  <SettingsSection title="Compte"><SettingLink icon={<User/>} title="Profil" detail="Nom et adresse email"/><SettingLink icon={<Building2/>} title="Organisation" detail="HOME France · Propriétaire"/><SettingLink icon={<LogOut/>} title="Déconnexion" detail="Fermer la session"/></SettingsSection>
+  <SettingsSection title="Compte"><SettingLink icon={<User/>} title="Profil" detail="Nom et adresse email"/><SettingLink icon={<Building2/>} title="Organisation" detail="HOME France · Propriétaire"/><button className="setting-row clickable" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</strong><span>Fermer cette session uniquement</span></div><ChevronRight/></button></SettingsSection>
   <SettingsSection title="Notifications"><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>Notifications in-app</strong><span>Alertes visibles dans l’application</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={() => void togglePush()} disabled={pushBusy}><div className="setting-icon"><Bell/></div><div><strong>{pushState === 'enabled' ? 'Désactiver les notifications' : 'Activer les notifications'}</strong><span>État : {pushState === 'enabled' ? 'Activées' : pushState === 'denied' ? 'Permission refusée par le navigateur' : pushState === 'unsupported' ? 'Non prises en charge' : 'Désactivées'}</span>{isIosDevice() && !isStandalonePwa() && <span>Sur iPhone : ajoutez d’abord l’app à l’écran d’accueil.</span>}</div><ChevronRight/></button></SettingsSection>
   <SettingsSection title="Surveillance des avis">
     <div className="settings-info card">
