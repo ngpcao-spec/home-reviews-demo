@@ -1,7 +1,7 @@
 import { z } from 'npm:zod@4.6.5'
 
 export const reviewAiSchema = z.object({
-  ai_summary: z.string().min(1).max(400),
+  ai_summary: z.string().min(1).max(800),
   ai_suggested_reply: z.string().min(1).max(1200),
   detected_language: z.string().min(2).max(32),
 })
