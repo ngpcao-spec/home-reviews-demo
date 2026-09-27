@@ -27,7 +27,7 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 }
 
 export function SettingsPage() {
-  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval } = useApp()
+  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval } = useApp()
   const [inApp, setInApp] = useState(true)
   const [pushState, setPushState] = useState<NotificationPermission>(typeof Notification === 'undefined' ? 'denied' : Notification.permission)
   const [monitoringInterval, setMonitoringInterval] = useState<MonitoringIntervalHours>(() => demoMode ? getStoredMonitoringInterval() : (isMonitoringInterval(monitoringIntervalHours) ? monitoringIntervalHours : 12))
@@ -55,7 +55,7 @@ export function SettingsPage() {
     setSavingMonitoring(true)
 
     try {
-      await updateMonitoringInterval(value)
+      await persistMonitoringInterval(value)
       if (demoMode) window.localStorage.setItem(MONITORING_STORAGE_KEY, String(value))
       pushToast(`Surveillance réglée toutes les ${value} heure${value > 1 ? 's' : ''}`)
     } catch {
