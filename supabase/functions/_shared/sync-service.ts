@@ -262,9 +262,47 @@ export async function initializeEstablishment(
     }
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 120) : 'INITIALIZATION_FAILED'
-    await finishRun(admin, runId, { status: 'failed', provider_requests: 1, error_code: code })
-    await admin.from('establishments').delete().eq('id', establishment.id)
-    throw error
+    await finishRun(admin, runId, {
+      status: 'failed',
+      provider_requests: 1,
+      reviews_fetched: result.reviews.length,
+      reviews_inserted: 0,
+      error_code: code,
+    })
+    await admin
+      .from('establishments')
+      .update({
+        sync_status: 'error',
+        sync_error: code,
+        last_sync_status: 'error',
+        last_sync_error: code,
+        last_review_id: null,
+        last_review_at: null,
+      })
+      .eq('id', establishment.id)
+
+    const distribution = negativeReviews.reduce<Record<'1' | '2' | '3', number>>(
+      (counts, review) => {
+        if (review.rating === 1 || review.rating === 2 || review.rating === 3) {
+          counts[String(review.rating) as '1' | '2' | '3'] += 1
+        }
+        return counts
+      },
+      { '1': 0, '2': 0, '3': 0 },
+    )
+
+    return {
+      establishmentId: establishment.id as string,
+      establishment: result.establishment,
+      provider,
+      providerRequests: 1,
+      fetched: result.reviews.length,
+      inserted: 0,
+      distribution,
+      importStatus: 'failed' as const,
+      retryable: true,
+      importError: code,
+    }
   }
 }
 
