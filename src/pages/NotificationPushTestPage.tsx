@@ -11,12 +11,13 @@ export function NotificationPushTestPage() {
   const initialError = !testType || !supabase ? 'Test push invalide ou Supabase indisponible.' : ''
   const [status, setStatus] = useState<Status>(initialError ? 'error' : 'sending')
   const [error, setError] = useState(initialError)
+  const [providerStatus, setProviderStatus] = useState<number | null>(null)
 
   useEffect(() => {
     if (started.current || !testType || !supabase) return
     started.current = true
 
-    const storageKey = `home-reviews-push-test-${testType}`
+    const storageKey = `home-reviews-push-e2e-v2-${testType}`
     let idempotencyKey = sessionStorage.getItem(storageKey)
     if (!idempotencyKey) {
       idempotencyKey = crypto.randomUUID()
@@ -26,7 +27,8 @@ export function NotificationPushTestPage() {
     void supabase.functions.invoke('send-test-push', {
       body: { test_type: testType, idempotency_key: idempotencyKey },
     }).then(({ data, error: invokeError }) => {
-      if (invokeError || !data?.ok) {
+      if (typeof data?.provider_status === 'number') setProviderStatus(data.provider_status)
+      if (invokeError || !data?.ok || data?.pushAttempted !== true) {
         setError(data?.error || invokeError?.message || 'Échec de l’envoi push.')
         setStatus('error')
         return
@@ -44,8 +46,8 @@ export function NotificationPushTestPage() {
     </div>
     <div className="card empty-card" role="status" aria-live="polite">
       {status === 'sending' && <><h2>Envoi en cours…</h2><p>La notification est envoyée une seule fois.</p></>}
-      {status === 'sent' && <><h2>Push envoyé</h2><p>Quittez HOME Reviews, puis touchez la notification reçue pour vérifier son ouverture.</p></>}
-      {status === 'error' && <><h2>Échec du test</h2><p>{error}</p></>}
+      {status === 'sent' && <><h2>Push réellement envoyé</h2><p>Le fournisseur push a répondu HTTP {providerStatus}. Quittez HOME Reviews, puis touchez la notification reçue.</p></>}
+      {status === 'error' && <><h2>Échec du test</h2><p>{error}{providerStatus ? ` (HTTP ${providerStatus})` : ''}</p></>}
     </div>
   </section>
 }
