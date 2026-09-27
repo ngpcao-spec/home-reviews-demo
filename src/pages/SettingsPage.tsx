@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
 
 type MonitoringIntervalHours = 1 | 3 | 6 | 12 | 24
 
@@ -28,34 +27,17 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 }
 
 export function SettingsPage() {
-  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast } = useApp()
+  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval } = useApp()
   const [inApp, setInApp] = useState(true)
   const [pushState, setPushState] = useState<NotificationPermission>(typeof Notification === 'undefined' ? 'denied' : Notification.permission)
-  const [monitoringInterval, setMonitoringInterval] = useState<MonitoringIntervalHours>(getStoredMonitoringInterval)
+  const [monitoringInterval, setMonitoringInterval] = useState<MonitoringIntervalHours>(() => demoMode ? getStoredMonitoringInterval() : (isMonitoringInterval(monitoringIntervalHours) ? monitoringIntervalHours : 12))
   const [savingMonitoring, setSavingMonitoring] = useState(false)
-  const lastSync = new Date(Math.max(...establishments.map((item) => new Date(item.lastSyncedAt).getTime()))).toISOString()
+  const lastSyncTimestamp = Math.max(...establishments.map((item) => new Date(item.lastSyncedAt).getTime()))
+  const lastSync = Number.isFinite(lastSyncTimestamp) ? new Date(lastSyncTimestamp).toISOString() : null
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return
-
-    let active = true
-    void supabase
-      .from('organizations')
-      .select('monitoring_interval_hours')
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        const value = Number(data?.monitoring_interval_hours)
-        if (active && isMonitoringInterval(value)) {
-          setMonitoringInterval(value)
-          window.localStorage.setItem(MONITORING_STORAGE_KEY, String(value))
-        }
-      })
-
-    return () => {
-      active = false
-    }
-  }, [])
+    if (isMonitoringInterval(monitoringIntervalHours)) setMonitoringInterval(monitoringIntervalHours)
+  }, [monitoringIntervalHours])
 
   const requestPush = async () => {
     if (!('Notification' in window)) {
@@ -73,12 +55,8 @@ export function SettingsPage() {
     setSavingMonitoring(true)
 
     try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.rpc('set_monitoring_interval', { p_hours: value })
-        if (error) throw error
-      }
-
-      window.localStorage.setItem(MONITORING_STORAGE_KEY, String(value))
+      await persistMonitoringInterval(value)
+      if (demoMode) window.localStorage.setItem(MONITORING_STORAGE_KEY, String(value))
       pushToast(`Surveillance réglée toutes les ${value} heure${value > 1 ? 's' : ''}`)
     } catch {
       setMonitoringInterval(previousValue)
@@ -108,12 +86,12 @@ export function SettingsPage() {
       </select>
       <span style={{ gridColumn: '1 / -1', lineHeight: 1.5 }}>HOME Reviews vérifie automatiquement les nouveaux avis Google selon cette fréquence.</span>
       {monitoringInterval <= 3 && <span style={{ gridColumn: '1 / -1', color: 'var(--orange)' }}>Test / consommation API plus élevée</span>}
-      <span>Dernière synchronisation globale</span><strong>{relativeTime(lastSync)}</strong>
+      <span>Dernière synchronisation globale</span><strong>{lastSync ? relativeTime(lastSync) : 'Jamais'}</strong>
     </div>
   </SettingsSection>
   <SettingsSection title="Abonnement"><div className="subscription-card card"><div><span>Plan actuel</span><strong>Professionnel</strong><em>Statut actif</em></div><CreditCard/><div className="quota"><span>Établissements <b>{establishments.length} / {plan.maxEstablishments}</b></span><i><b style={{width:`${establishments.length/plan.maxEstablishments*100}%`}}/></i><span>Réponses IA <b>{aiUsage} / {plan.maxAiResponsesMonth}</b></span><i><b style={{width:`${aiUsage/plan.maxAiResponsesMonth*100}%`}}/></i></div><button className="secondary-button full-width" onClick={()=>pushToast('Gestion du plan simulée en mode démo')}>Changer de plan</button></div></SettingsSection>
   <SettingsSection title="Données & confidentialité"><SettingLink icon={<Shield/>} title="Confidentialité" detail="Politique et gestion des données"/><SettingLink icon={<Database/>} title="Supprimer mon compte" detail="Demande avec confirmation forte" danger/></SettingsSection>
-  <p className="version">HOME Reviews v1.0 · Données de démonstration</p>
+  <p className="version">HOME Reviews v1.0 · {demoMode ? 'Données de démonstration' : 'Données Supabase sécurisées'}</p>
   </>}
 
 function SettingsSection({title,children}:{title:string;children:React.ReactNode}){return <section className="settings-section"><h2>{title}</h2><div className="settings-group card">{children}</div></section>}

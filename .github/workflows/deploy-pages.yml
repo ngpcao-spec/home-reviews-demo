@@ -21,10 +21,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     env:
-      VITE_DEMO_MODE: "true"
+      VITE_DEMO_MODE: "false"
       VITE_SUPABASE_URL: https://ihuztjkblywzjdruusdj.supabase.co
       VITE_SUPABASE_ANON_KEY: sb_publishable_JmaR5pwfuLSyrMNdvWE3Qw_bZAFUYLf
-      REVIEW_PROVIDER: mock
       VITE_ROUTER_MODE: hash
       VITE_BASE_PATH: /home-reviews-demo/
     steps:
