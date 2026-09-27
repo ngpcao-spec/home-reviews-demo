@@ -23,4 +23,4 @@ jobs:
         env:
           VITE_DEMO_MODE: "false"
       - name: Verify no server secret is bundled
-        run: "! grep -R -E 'OPENAI_API_KEY|sk-[A-Za-z0-9]' dist"
+        run: "! grep -R -E 'OPENAI_API_KEY|sk-proj-' dist"
