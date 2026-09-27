@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
-import { analyzeReviewWithOpenAI } from '../_shared/ai.ts'
+import { analyzeReviewWithOpenAI, ReviewAiValidationError } from '../_shared/ai.ts'
 import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
@@ -111,6 +111,10 @@ Deno.serve(async (request) => {
       ai_output_tokens: result.usage?.output_tokens ?? null,
       ai_reasoning_tokens: result.usage?.output_tokens_details?.reasoning_tokens ?? null,
       ai_total_tokens: result.usage?.total_tokens ?? null,
+      ai_last_rejected_summary: null,
+      ai_last_rejected_reply: null,
+      ai_last_rejected_language: null,
+      ai_validation_error: null,
     }).eq('id', review.id)
     if (saveError) throw saveError
 
@@ -130,10 +134,15 @@ Deno.serve(async (request) => {
     })
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 500) : 'AI_ANALYSIS_FAILED'
+    const rejected = error instanceof ReviewAiValidationError ? error.result : null
     if (reviewId) {
       await admin.from('reviews').update({
         ai_status: 'failed',
         ai_error: code,
+        ai_last_rejected_summary: rejected?.ai_summary ?? null,
+        ai_last_rejected_reply: rejected?.ai_suggested_reply ?? null,
+        ai_last_rejected_language: rejected?.detected_language ?? null,
+        ai_validation_error: rejected ? code : null,
       }).eq('id', reviewId)
     }
     return json({ error: code }, code === 'UNAUTHORIZED' ? 401 : code === 'RATE_LIMITED' ? 429 : 500)
