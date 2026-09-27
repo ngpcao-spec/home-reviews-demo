@@ -89,9 +89,9 @@ export async function analyzeReviewWithOpenAI(rating: number, text: string): Pro
             additionalProperties: false,
             required: ['ai_summary', 'ai_suggested_reply', 'detected_language'],
             properties: {
-              ai_summary: { type: 'string' },
-              ai_suggested_reply: { type: 'string' },
-              detected_language: { type: 'string' },
+              ai_summary: { type: 'string', description: 'Résumé en français uniquement, une ou deux phrases, sans invention.' },
+              ai_suggested_reply: { type: 'string', description: 'Réponse dans la langue originale de l’avis, sans promesse ni action corrective inventée.' },
+              detected_language: { type: 'string', description: 'Code ISO 639-1 de la langue originale de l’avis.' },
             },
           },
         },
