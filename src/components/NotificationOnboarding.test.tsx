@@ -87,6 +87,13 @@ describe('onboarding notifications', () => {
     expect(mocks.enablePush).not.toHaveBeenCalled()
   })
 
+  it('ne revient pas après le choix Plus tard enregistré', async () => {
+    mocks.loadPreference.mockResolvedValue({ seen: true, status: 'unknown' })
+    render(<NotificationOnboarding />)
+    await waitFor(() => expect(mocks.loadPreference).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('reste absent pour un utilisateur déjà activé', async () => {
     mocks.currentSubscription.mockResolvedValue({ endpoint: 'https://push.example/subscription' })
     render(<NotificationOnboarding />)
