@@ -53,7 +53,17 @@ export async function sendPushToUser(admin: SupabaseClient, userId: string, payl
   if (error) throw error
 
   const subscriptions = (data ?? []) as PushSubscriptionRow[]
-  if (!subscriptions.length) return { sent: 0, failed: 0, skipped: true }
+  if (!subscriptions.length) {
+    return {
+      sent: 0,
+      failed: 0,
+      skipped: true,
+      attempted: 0,
+      subscriptionCount: 0,
+      providerStatusCodes: [] as number[],
+      expiredRemoved: 0,
+    }
+  }
 
   const keys = await getOrCreateVapidKeys(admin)
   webpush.setVapidDetails(
@@ -64,9 +74,14 @@ export async function sendPushToUser(admin: SupabaseClient, userId: string, payl
 
   let sent = 0
   let failed = 0
+  let attempted = 0
+  let expiredRemoved = 0
+  const providerStatusCodes: number[] = []
+
   await Promise.all(subscriptions.map(async (subscription) => {
+    attempted += 1
     try {
-      await webpush.sendNotification(
+      const response = await webpush.sendNotification(
         {
           endpoint: subscription.endpoint,
           keys: { p256dh: subscription.p256dh, auth: subscription.auth },
@@ -74,17 +89,29 @@ export async function sendPushToUser(admin: SupabaseClient, userId: string, payl
         JSON.stringify(payload),
         { TTL: 60 * 60, urgency: 'normal' },
       )
+      const statusCode = Number(response?.statusCode)
+      if (Number.isInteger(statusCode) && statusCode > 0) providerStatusCodes.push(statusCode)
       sent += 1
     } catch (error) {
       failed += 1
       const statusCode = typeof error === 'object' && error && 'statusCode' in error
         ? Number((error as { statusCode?: unknown }).statusCode)
         : 0
+      if (Number.isInteger(statusCode) && statusCode > 0) providerStatusCodes.push(statusCode)
       if (statusCode === 404 || statusCode === 410) {
-        await admin.from('push_subscriptions').delete().eq('id', subscription.id)
+        const removed = await admin.from('push_subscriptions').delete().eq('id', subscription.id)
+        if (!removed.error) expiredRemoved += 1
       }
     }
   }))
 
-  return { sent, failed, skipped: false }
+  return {
+    sent,
+    failed,
+    skipped: false,
+    attempted,
+    subscriptionCount: subscriptions.length,
+    providerStatusCodes,
+    expiredRemoved,
+  }
 }
