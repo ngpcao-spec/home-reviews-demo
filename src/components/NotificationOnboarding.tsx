@@ -55,7 +55,7 @@ export function NotificationOnboarding() {
     })()
 
     return () => { active = false }
-  }, [dataReady, demoMode, isAuthenticated])
+  }, [dataReady, demoMode, iosNeedsInstall, isAuthenticated])
 
   const postpone = async () => {
     setBusy(true)
