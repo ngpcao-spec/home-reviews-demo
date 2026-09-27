@@ -12,6 +12,8 @@ export interface AddEstablishmentResult {
   establishmentId: string
   inserted: number
   distribution: { '1': number; '2': number; '3': number }
+  importStatus?: 'completed' | 'failed'
+  retryable?: boolean
 }
 
 interface AppContextValue {
@@ -127,6 +129,8 @@ interface AddPayload {
   establishmentId?: string
   inserted?: number
   distribution?: { '1': number; '2': number; '3': number }
+  importStatus?: 'completed' | 'failed'
+  retryable?: boolean
   error?: string
 }
 
@@ -472,6 +476,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       establishmentId: data.establishmentId,
       inserted: data.inserted ?? 0,
       distribution: data.distribution,
+      importStatus: data.importStatus ?? 'completed',
+      retryable: data.retryable ?? false,
     }
   }
 
