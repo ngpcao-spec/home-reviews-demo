@@ -7,3 +7,6 @@
 .rating-line .stars{color:var(--orange)}
 
 .import-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:18px 0 22px}.import-summary span{display:grid;gap:4px;padding:12px;border:1px solid var(--border);border-radius:13px;background:#0d1122;color:var(--muted);font-size:.74rem}.import-summary b{color:var(--text);font-size:1.05rem}
+
+.notification-meta{display:flex;align-items:center;gap:4px;margin-top:5px;color:var(--orange);font-size:.72rem}
+.setting-row:disabled{opacity:.6;cursor:wait}
