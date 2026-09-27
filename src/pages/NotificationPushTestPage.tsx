@@ -7,19 +7,14 @@ type Status = 'sending' | 'sent' | 'error'
 export function NotificationPushTestPage() {
   const { type } = useParams<{ type: string }>()
   const started = useRef(false)
-  const [status, setStatus] = useState<Status>('sending')
-  const [error, setError] = useState('')
+  const testType = type === 'deep-link' ? 'deep_link' : type === 'simple' ? 'simple' : null
+  const initialError = !testType || !supabase ? 'Test push invalide ou Supabase indisponible.' : ''
+  const [status, setStatus] = useState<Status>(initialError ? 'error' : 'sending')
+  const [error, setError] = useState(initialError)
 
   useEffect(() => {
-    if (started.current) return
+    if (started.current || !testType || !supabase) return
     started.current = true
-
-    const testType = type === 'deep-link' ? 'deep_link' : type === 'simple' ? 'simple' : null
-    if (!testType || !supabase) {
-      setError('Test push invalide ou Supabase indisponible.')
-      setStatus('error')
-      return
-    }
 
     const storageKey = `home-reviews-push-test-${testType}`
     let idempotencyKey = sessionStorage.getItem(storageKey)
@@ -38,7 +33,7 @@ export function NotificationPushTestPage() {
       }
       setStatus('sent')
     })
-  }, [type])
+  }, [testType])
 
   return <section className="page page-with-nav">
     <div className="section-heading">
