@@ -1,4 +1,4 @@
-import { Bell, Check } from 'lucide-react'
+import { Bell, Check, Share2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import {
@@ -21,7 +21,8 @@ export function NotificationOnboarding() {
   const { dataReady, demoMode, isAuthenticated, pushToast } = useApp()
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [iosInstallMessage, setIosInstallMessage] = useState(false)
+  const [showInstallSteps, setShowInstallSteps] = useState(false)
+  const iosNeedsInstall = requiresIosInstallation(isIosDevice(), isStandalonePwa())
 
   useEffect(() => {
     if (!dataReady || demoMode || !isAuthenticated) return
@@ -30,7 +31,6 @@ export function NotificationOnboarding() {
     void (async () => {
       try {
         const preference = await loadNotificationPreference()
-        const iosNeedsInstall = requiresIosInstallation(isIosDevice(), isStandalonePwa())
         if (!pushIsSupported() && !iosNeedsInstall) return
 
         const subscription = pushIsSupported() ? await currentPushSubscription() : null
@@ -71,7 +71,7 @@ export function NotificationOnboarding() {
 
   const activate = async () => {
     if (requiresIosInstallation(isIosDevice(), isStandalonePwa())) {
-      setIosInstallMessage(true)
+      setShowInstallSteps(true)
       return
     }
     if (!pushIsSupported()) {
@@ -115,10 +115,23 @@ export function NotificationOnboarding() {
       <div className="notification-onboarding-icon"><Bell aria-hidden="true" /></div>
       <h2 id="notification-onboarding-title">Restez informé des nouveaux avis</h2>
       <p>HOME Reviews peut vous prévenir lorsqu'un nouvel avis 1★ à 3★ arrive et que votre réponse est prête.</p>
-      {iosInstallMessage && <div className="notification-onboarding-info" role="status">{IOS_INSTALL_MESSAGE}</div>}
+      {iosNeedsInstall && <div className="notification-onboarding-info" role="status">
+        <span>{IOS_INSTALL_MESSAGE}</span>
+        {showInstallSteps && <ol>
+          <li>Appuyez sur le bouton Partager de Safari.</li>
+          <li>Choisissez « Sur l'écran d'accueil ».</li>
+          <li>Appuyez sur « Ajouter ».</li>
+          <li>Ouvrez ensuite HOME Reviews depuis la nouvelle icône.</li>
+        </ol>}
+      </div>}
       <div className="notification-onboarding-actions">
-        <button className="primary-button full-width" onClick={() => void activate()} disabled={busy}>
-          <Check size={18} /> Activer les notifications
+        <button
+          className="primary-button full-width"
+          onClick={iosNeedsInstall ? () => setShowInstallSteps(true) : () => void activate()}
+          disabled={busy}
+        >
+          {iosNeedsInstall ? <Share2 size={18} /> : <Check size={18} />}
+          {iosNeedsInstall ? "Comment l'installer" : 'Activer les notifications'}
         </button>
         <button className="text-button full-width" onClick={() => void postpone()} disabled={busy}>Plus tard</button>
       </div>
