@@ -103,13 +103,30 @@ describe('onboarding notifications', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('explique l’installation PWA sur iPhone sans demander la permission', async () => {
+  it('propose l’installation dans Safari iPhone sans demander la permission', async () => {
     mocks.isIos.mockReturnValue(true)
     mocks.isStandalone.mockReturnValue(false)
     render(<NotificationOnboarding />)
-    await userEvent.click(await screen.findByRole('button', { name: /Activer les notifications/ }))
     expect(await screen.findByText(/ajoutez HOME Reviews à votre écran d'accueil/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Activer les notifications/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Comment l'installer/ }))
+    expect(await screen.findByText('Appuyez sur le bouton Partager de Safari.')).toBeInTheDocument()
+    expect(screen.getByText(/Sur l'écran d'accueil/)).toBeInTheDocument()
+    expect(screen.getByText('Appuyez sur « Ajouter ».')).toBeInTheDocument()
     expect(requestPermission).not.toHaveBeenCalled()
     expect(mocks.enablePush).not.toHaveBeenCalled()
+  })
+
+  it('propose l’activation et demande réellement la permission dans la PWA iPhone', async () => {
+    mocks.isIos.mockReturnValue(true)
+    mocks.isStandalone.mockReturnValue(true)
+    render(<NotificationOnboarding />)
+    const button = await screen.findByRole('button', { name: /Activer les notifications/ })
+    expect(screen.queryByRole('button', { name: /Comment l'installer/ })).not.toBeInTheDocument()
+    expect(requestPermission).not.toHaveBeenCalled()
+    await userEvent.click(button)
+    expect(requestPermission).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(mocks.enablePush).toHaveBeenCalledTimes(1))
+    expect(mocks.savePreference).toHaveBeenCalledWith('granted')
   })
 })
