@@ -14,7 +14,7 @@ interface ReviewRow {
   ai_suggested_reply: string | null
   ai_detected_language: string | null
   ai_analyzed_at: string | null
-  ai_status: 'pending' | 'completed' | 'failed' | null
+  ai_status: 'pending' | 'processing' | 'completed' | 'failed' | null
 }
 
 async function sameSecret(left: string, right: string) {
@@ -69,7 +69,7 @@ Deno.serve(async (request) => {
 
     const review = data as ReviewRow
     if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
-    if (automatic && review.ai_status === 'completed' && !body.regenerate) {
+    if (review.ai_status === 'completed' && !body.regenerate) {
       return json({
         ai_summary: review.ai_summary,
         ai_suggested_reply: review.ai_suggested_reply,
@@ -80,8 +80,12 @@ Deno.serve(async (request) => {
       })
     }
 
+    if (review.ai_status === 'processing' && !body.regenerate) {
+      return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
+    }
+
     const { error: pendingError } = await admin.from('reviews').update({
-      ai_status: 'pending',
+      ai_status: 'processing',
       ai_error: null,
     }).eq('id', review.id)
     if (pendingError) throw pendingError
@@ -95,6 +99,11 @@ Deno.serve(async (request) => {
       ai_analyzed_at: analyzedAt,
       ai_status: 'completed',
       ai_error: null,
+      ai_model: result.model,
+      ai_input_tokens: result.usage?.input_tokens ?? null,
+      ai_output_tokens: result.usage?.output_tokens ?? null,
+      ai_reasoning_tokens: result.usage?.output_tokens_details?.reasoning_tokens ?? null,
+      ai_total_tokens: result.usage?.total_tokens ?? null,
     }).eq('id', review.id)
     if (saveError) throw saveError
 
