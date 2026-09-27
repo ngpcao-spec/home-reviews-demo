@@ -26,6 +26,11 @@ function scriptHint(text: string) {
   return 'No decisive script hint; identify the original language from the review text.'
 }
 
+function assertFrenchSummary(result: ReviewAiResult) {
+  const nonFrenchScript = /\p{Script=Hangul}|\p{Script=Cyrillic}|\p{Script=Arabic}|\p{Script=Hebrew}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u
+  if (nonFrenchScript.test(result.ai_summary)) throw new Error('AI_SUMMARY_LANGUAGE_MISMATCH')
+}
+
 function assertReplyScript(original: string, result: ReviewAiResult) {
   const checks = [
     { original: /\p{Script=Hangul}/u, reply: /\p{Script=Hangul}/u, language: 'ko' },
@@ -98,6 +103,7 @@ export async function analyzeReviewWithOpenAI(rating: number, text: string): Pro
   const output = outputText(data)
   if (!output) throw new Error('OPENAI_EMPTY_RESPONSE')
   const result = reviewAiSchema.parse(JSON.parse(output))
+  assertFrenchSummary(result)
   assertReplyScript(text, result)
   return result
 }
