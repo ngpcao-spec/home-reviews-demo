@@ -33,9 +33,9 @@ function assertFrenchSummary(result: ReviewAiResult) {
 
 function assertNoUnexpectedLatinWords(original: string, reply: string) {
   const originalLatinWords = new Set(
-    (original.match(/\\p{Script=Latin}+/gu) ?? []).map((word) => word.toLocaleLowerCase()),
+    (original.match(/\p{Script=Latin}+/gu) ?? []).map((word) => word.toLocaleLowerCase()),
   )
-  const unexpectedLatinWords = (reply.match(/\\p{Script=Latin}+/gu) ?? [])
+  const unexpectedLatinWords = (reply.match(/\p{Script=Latin}+/gu) ?? [])
     .filter((word) => !originalLatinWords.has(word.toLocaleLowerCase()))
   if (unexpectedLatinWords.length > 0) throw new Error('AI_LANGUAGE_MISMATCH')
 }
@@ -52,7 +52,7 @@ function assertReplyScript(original: string, result: ReviewAiResult) {
   if (!expected) return
   if (!expected.reply.test(result.ai_suggested_reply)) throw new Error('AI_LANGUAGE_MISMATCH')
   if (expected.language && result.detected_language.toLowerCase() !== expected.language) throw new Error('AI_LANGUAGE_MISMATCH')
-  if (/\\p{Script=Cyrillic}|\\p{Script=Hangul}|\\p{Script=Arabic}|\\p{Script=Hebrew}|\\p{Script=Hiragana}|\\p{Script=Katakana}|\\p{Script=Han}/u.test(original)) {
+  if (/\p{Script=Cyrillic}|\p{Script=Hangul}|\p{Script=Arabic}|\p{Script=Hebrew}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(original)) {
     assertNoUnexpectedLatinWords(original, result.ai_suggested_reply)
   }
 }
