@@ -18,8 +18,8 @@ function outputText(data: {
 
 export async function analyzeReviewWithOpenAI(rating: number, text: string): Promise<ReviewAiResult> {
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
-  const model = Deno.env.get('OPENAI_MODEL')?.trim()
-  if (!key || !model) throw new Error('AI_NOT_CONFIGURED')
+  const model = Deno.env.get('OPENAI_MODEL')?.trim() || 'gpt-4o-mini'
+  if (!key) throw new Error('AI_NOT_CONFIGURED')
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
