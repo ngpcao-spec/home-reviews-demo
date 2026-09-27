@@ -63,8 +63,10 @@ export async function enablePushNotifications() {
     body: {
       action: 'subscribe',
       endpoint: subscription.endpoint,
-      p256dh: keyToBase64(subscription.getKey('p256dh')),
-      auth: keyToBase64(subscription.getKey('auth')),
+      keys: {
+        p256dh: keyToBase64(subscription.getKey('p256dh')),
+        auth: keyToBase64(subscription.getKey('auth')),
+      },
     },
   })
   if (error) throw error
