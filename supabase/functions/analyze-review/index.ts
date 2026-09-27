@@ -4,6 +4,7 @@ import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { sendPushToUser } from '../_shared/push.ts'
+import { shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
 
 interface ReviewRow {
   id: string
@@ -24,7 +25,7 @@ interface ReviewRow {
 }
 
 async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary: string) {
-  if (review.historical_import || review.rating < 1 || review.rating > 3) return
+  if (!shouldCreateReviewNotification(review)) return
 
   const [{ data: establishment }, { data: members }] = await Promise.all([
     admin.from('establishments').select('name').eq('id', review.establishment_id).single(),
