@@ -71,7 +71,7 @@ begin
   where config.singleton;
 
   perform net.http_post(
-    url := 'https://eaoefvnpqymngiwiwuff.supabase.co/functions/v1/analyze-review',
+    url := 'https://ihuztjkblywzjdruusdj.supabase.co/functions/v1/analyze-review',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'x-home-reviews-webhook', webhook_secret
