@@ -76,8 +76,22 @@ interface ReviewRow {
   created_at: string
   review_url: string | null
   historical_import: boolean
-  requires_attention: boolean
   status: ReviewStatus
+  ai_summary: string | null
+  ai_suggested_reply: string | null
+  ai_detected_language: string | null
+  ai_analyzed_at: string | null
+  ai_status: 'pending' | 'completed' | 'failed' | null
+  ai_error: string | null
+}
+
+interface AnalyzePayload {
+  ai_summary?: string
+  ai_suggested_reply?: string
+  detected_language?: string
+  ai_analyzed_at?: string
+  ai_status?: 'completed'
+  error?: string
 }
 
 interface ResolvePayload {
@@ -160,8 +174,14 @@ function mapReview(row: ReviewRow): Review {
     publishedAt: row.published_at ?? row.created_at,
     sourceUrl: row.review_url ?? '',
     isHistoricalImport: row.historical_import,
-    requiresAction: row.requires_attention || row.rating <= 3,
+    requiresAction: row.rating <= 3,
     status,
+    aiSummary: row.ai_summary ?? undefined,
+    aiSuggestedReply: row.ai_suggested_reply ?? undefined,
+    aiDetectedLanguage: row.ai_detected_language ?? undefined,
+    aiAnalyzedAt: row.ai_analyzed_at ?? undefined,
+    aiStatus: row.ai_status ?? undefined,
+    aiError: row.ai_error ?? undefined,
   }
 }
 
@@ -211,7 +231,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDataError(null)
     const [establishmentsResult, reviewsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
-      supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,requires_attention,status').order('published_at', { ascending: false, nullsFirst: false }),
+      supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error').order('published_at', { ascending: false, nullsFirst: false }),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
     ])
     setDataLoading(false)
@@ -310,13 +330,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const generateResponse = async (reviewId: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 650))
     const review = reviews.find((item) => item.id === reviewId)
     if (!review) throw new Error('REVIEW_NOT_FOUND')
-    const response = `Bonjour ${review.authorName.split(' ')[0]}, merci d’avoir pris le temps de partager votre expérience. Nous sommes désolés qu’elle n’ait pas été à la hauteur de vos attentes. Votre retour a été transmis à notre équipe afin que nous puissions comprendre la situation et nous améliorer. Nous espérons avoir l’occasion de vous accueillir à nouveau dans de meilleures conditions.`
-    setReviews((items) => items.map((item) => item.id === reviewId && item.analysis ? { ...item, analysis: { ...item.analysis, suggestedResponse: response } } : item))
-    logAction(reviewId, 'response_generated')
-    return response
+    if (demoMode) {
+      await new Promise((resolve) => setTimeout(resolve, 650))
+      const response = review.aiSuggestedReply ?? `Bonjour, merci d’avoir pris le temps de partager votre expérience. Nous sommes désolés qu’elle n’ait pas été à la hauteur de vos attentes et prenons votre retour au sérieux.`
+      setReviews((items) => items.map((item) => item.id === reviewId ? { ...item, aiSuggestedReply: response, aiStatus: 'completed' } : item))
+      logAction(reviewId, 'response_generated')
+      return response
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<AnalyzePayload>('analyze-review', {
+      body: { review_id: reviewId, regenerate: true },
+    })
+    if (error || !data?.ai_suggested_reply) throw new Error(await functionErrorCode(error, data))
+    await loadRealData()
+    return data.ai_suggested_reply
   }
 
   const markNotificationRead = (id: string) => setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item))
@@ -412,7 +441,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id, organizationId: establishment.organizationId, establishmentId: establishment.id, externalReviewId: `mock-${id}`,
       authorName: 'Alex M.', rating: 1, reviewText: "Nous avons attendu une heure et personne n'est venu nous expliquer la situation.",
       reviewLanguage: 'fr', publishedAt: new Date().toISOString(), sourceUrl: establishment.googleMapsUrl, isHistoricalImport: false,
-      requiresAction: true, status: 'to_process', analysis: { requiresAction: true, sentiment: 'negative', primaryCategory: 'waiting_time', secondaryCategories: ['service'], urgency: 'high', summary: "Le client signale une attente d'une heure sans information de l'équipe.", keyPoints: ["Attente d'une heure", "Manque d'information"], responseLanguage: 'fr', analysisStatus: 'ok' },
+      requiresAction: true, status: 'to_process', aiSummary: "Le client signale une attente d’une heure sans information de l’équipe.", aiSuggestedReply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés pour cette longue attente sans information et prenons votre retour au sérieux.", aiDetectedLanguage: 'fr', aiAnalyzedAt: new Date().toISOString(), aiStatus: 'completed',
     }
     setReviews((items) => [review, ...items])
     setNotifications((items) => [{ id: crypto.randomUUID(), establishmentId: establishment.id, reviewId: id, type: 'new_negative_review', title: `Nouvel avis 1★ — ${establishment.name}`, body: "Le client signale un problème d'attente.", severity: 'high', createdAt: new Date().toISOString() }, ...items])
