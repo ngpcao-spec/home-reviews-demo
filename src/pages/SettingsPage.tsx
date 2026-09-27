@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
+import { saveNotificationPreference } from '../lib/notification-preferences'
 import {
   currentPushSubscription,
   disablePushNotifications,
@@ -76,6 +77,7 @@ export function SettingsPage() {
     }
     if (Notification.permission === 'denied') {
       setPushState('denied')
+      await saveNotificationPreference('denied')
       pushToast('Permission refusée dans les réglages du navigateur')
       return
     }
@@ -84,16 +86,19 @@ export function SettingsPage() {
     try {
       if (pushState === 'enabled') {
         await disablePushNotifications()
+        await saveNotificationPreference('unknown')
         setPushState('disabled')
         pushToast('Notifications push désactivées')
         return
       }
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
+        await saveNotificationPreference(permission === 'denied' ? 'denied' : 'unknown')
         setPushState(permission === 'denied' ? 'denied' : 'disabled')
         return
       }
       await enablePushNotifications()
+      await saveNotificationPreference('granted')
       setPushState('enabled')
       pushToast('Notifications push activées')
     } catch {
