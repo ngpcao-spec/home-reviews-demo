@@ -26,6 +26,20 @@ function scriptHint(text: string) {
   return 'No decisive script hint; identify the original language from the review text.'
 }
 
+function assertReplyScript(original: string, result: ReviewAiResult) {
+  const checks = [
+    { original: /\\p{Script=Hangul}/u, reply: /\\p{Script=Hangul}/u, language: 'ko' },
+    { original: /\\p{Script=Cyrillic}/u, reply: /\\p{Script=Cyrillic}/u },
+    { original: /\\p{Script=Arabic}/u, reply: /\\p{Script=Arabic}/u },
+    { original: /\\p{Script=Hebrew}/u, reply: /\\p{Script=Hebrew}/u },
+    { original: /\\p{Script=Hiragana}|\\p{Script=Katakana}/u, reply: /\\p{Script=Hiragana}|\\p{Script=Katakana}/u, language: 'ja' },
+  ]
+  const expected = checks.find((check) => check.original.test(original))
+  if (!expected) return
+  if (!expected.reply.test(result.ai_suggested_reply)) throw new Error('AI_LANGUAGE_MISMATCH')
+  if (expected.language && result.detected_language.toLowerCase() !== expected.language) throw new Error('AI_LANGUAGE_MISMATCH')
+}
+
 export async function analyzeReviewWithOpenAI(rating: number, text: string): Promise<ReviewAiResult> {
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
   const model = Deno.env.get('OPENAI_MODEL')?.trim() || 'gpt-4o-mini'
@@ -83,5 +97,7 @@ export async function analyzeReviewWithOpenAI(rating: number, text: string): Pro
   const data = await response.json()
   const output = outputText(data)
   if (!output) throw new Error('OPENAI_EMPTY_RESPONSE')
-  return reviewAiSchema.parse(JSON.parse(output))
+  const result = reviewAiSchema.parse(JSON.parse(output))
+  assertReplyScript(text, result)
+  return result
 }
