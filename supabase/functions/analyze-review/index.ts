@@ -123,6 +123,9 @@ Deno.serve(async (request) => {
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
 
     const review = data as ReviewRow
+    if (automatic && review.historical_import) {
+      return json({ ai_status: review.ai_status, skipped: true, reason: 'HISTORICAL_IMPORT' })
+    }
     if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
     if (review.ai_status === 'completed' && !body.regenerate) {
       return json({
