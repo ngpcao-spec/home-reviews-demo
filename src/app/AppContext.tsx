@@ -219,22 +219,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!authReady) return
-    if (authUser) {
-      void loadRealData()
-      return
-    }
-    if (allowDemo) {
-      const state = demoState()
-      setEstablishments(state.establishments)
-      setReviews(state.reviews)
-      setNotifications(state.notifications)
-      setActions(state.actions)
-    } else {
-      setEstablishments([])
-      setReviews([])
-      setNotifications([])
-      setActions([])
-    }
+    const timer = window.setTimeout(() => {
+      if (authUser) {
+        void loadRealData()
+        return
+      }
+      if (allowDemo) {
+        const state = demoState()
+        setEstablishments(state.establishments)
+        setReviews(state.reviews)
+        setNotifications(state.notifications)
+        setActions(state.actions)
+      } else {
+        setEstablishments([])
+        setReviews([])
+        setNotifications([])
+        setActions([])
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [authReady, authUser, loadRealData])
 
   useEffect(() => {
