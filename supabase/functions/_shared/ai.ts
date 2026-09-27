@@ -26,34 +26,43 @@ function scriptHint(text: string) {
   return 'No decisive script hint; identify the original language from the review text.'
 }
 
-function assertFrenchSummary(result: ReviewAiResult) {
-  const nonFrenchScript = /\p{Script=Hangul}|\p{Script=Cyrillic}|\p{Script=Arabic}|\p{Script=Hebrew}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u
-  if (nonFrenchScript.test(result.ai_summary)) throw new Error('AI_SUMMARY_LANGUAGE_MISMATCH')
+export class ReviewAiValidationError extends Error {
+  constructor(public readonly result: ReviewAiResult, code: 'AI_SUMMARY_LANGUAGE_MISMATCH' | 'AI_LANGUAGE_MISMATCH') {
+    super(code)
+    this.name = 'ReviewAiValidationError'
+  }
 }
 
-function assertNoUnexpectedLatinWords(original: string, reply: string) {
-  const originalLatinWords = new Set(
-    (original.match(/\p{Script=Latin}+/gu) ?? []).map((word) => word.toLocaleLowerCase()),
-  )
-  const unexpectedLatinWords = (reply.match(/\p{Script=Latin}+/gu) ?? [])
-    .filter((word) => !originalLatinWords.has(word.toLocaleLowerCase()))
-  if (unexpectedLatinWords.length > 0) throw new Error('AI_LANGUAGE_MISMATCH')
+function letterShare(text: string, expectedScript: RegExp) {
+  const letters = [...text].filter((character) => /\p{Letter}/u.test(character))
+  if (letters.length === 0) return 0
+  return letters.filter((character) => expectedScript.test(character)).length / letters.length
+}
+
+function assertFrenchSummary(result: ReviewAiResult) {
+  // French is Latin-script, but proper names, dishes and quoted foreign words are allowed.
+  if (letterShare(result.ai_summary, /\p{Script=Latin}/u) < 0.65) {
+    throw new ReviewAiValidationError(result, 'AI_SUMMARY_LANGUAGE_MISMATCH')
+  }
 }
 
 function assertReplyScript(original: string, result: ReviewAiResult) {
   const checks = [
-    { original: /\p{Script=Hangul}/u, reply: /\p{Script=Hangul}/u, language: 'ko' },
-    { original: /\p{Script=Cyrillic}/u, reply: /\p{Script=Cyrillic}/u },
-    { original: /\p{Script=Arabic}/u, reply: /\p{Script=Arabic}/u },
-    { original: /\p{Script=Hebrew}/u, reply: /\p{Script=Hebrew}/u },
-    { original: /\p{Script=Hiragana}|\p{Script=Katakana}/u, reply: /\p{Script=Hiragana}|\p{Script=Katakana}/u, language: 'ja' },
+    { original: /\p{Script=Hangul}/u, replyLetter: /\p{Script=Hangul}|\p{Script=Han}/u, language: 'ko' },
+    { original: /\p{Script=Cyrillic}/u, replyLetter: /\p{Script=Cyrillic}/u },
+    { original: /\p{Script=Arabic}/u, replyLetter: /\p{Script=Arabic}/u },
+    { original: /\p{Script=Hebrew}/u, replyLetter: /\p{Script=Hebrew}/u },
+    { original: /\p{Script=Hiragana}|\p{Script=Katakana}/u, replyLetter: /\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u, language: 'ja' },
+    { original: /\p{Script=Han}/u, replyLetter: /\p{Script=Han}/u },
   ]
   const expected = checks.find((check) => check.original.test(original))
   if (!expected) return
-  if (!expected.reply.test(result.ai_suggested_reply)) throw new Error('AI_LANGUAGE_MISMATCH')
-  if (expected.language && result.detected_language.toLowerCase() !== expected.language) throw new Error('AI_LANGUAGE_MISMATCH')
-  if (/\p{Script=Cyrillic}|\p{Script=Hangul}|\p{Script=Arabic}|\p{Script=Hebrew}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(original)) {
-    assertNoUnexpectedLatinWords(original, result.ai_suggested_reply)
+  // A native-language majority is required; isolated proper names, brands and quoted terms remain valid.
+  if (letterShare(result.ai_suggested_reply, expected.replyLetter) < 0.65) {
+    throw new ReviewAiValidationError(result, 'AI_LANGUAGE_MISMATCH')
+  }
+  if (expected.language && result.detected_language.toLowerCase() !== expected.language) {
+    throw new ReviewAiValidationError(result, 'AI_LANGUAGE_MISMATCH')
   }
 }
 
