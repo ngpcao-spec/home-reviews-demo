@@ -28,7 +28,7 @@ interface AppContextValue {
   dataError: string | null
   passwordRecovery: boolean
   monitoringIntervalHours: number
-  currentUser: { name: string; email: string }
+  currentUser: { name: string; email: string; avatarUrl?: string; initials: string }
   plan: typeof demoPlan
   aiUsage: number
   markProcessed: (reviewId: string) => void
@@ -47,6 +47,7 @@ interface AppContextValue {
   retryData: () => Promise<void>
   updateMonitoringInterval: (hours: number) => Promise<void>
   completePasswordRecovery: (password: string) => Promise<void>
+  signOut: () => Promise<void>
 }
 
 interface EstablishmentRow {
@@ -260,6 +261,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDataLoading(true)
     setDataReady(false)
     setDataError(null)
+
+    const provisionResult = await supabase.rpc('ensure_home_user')
+    if (provisionResult.error) {
+      setDataLoading(false)
+      setDataReady(true)
+      setDataError('Impossible d’initialiser votre espace HOME Reviews.')
+      return
+    }
+
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
       supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error').order('published_at', { ascending: false, nullsFirst: false }),
@@ -514,10 +524,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return id
   }
 
-  const currentUser = useMemo(() => ({
-    name: authUser?.user_metadata?.display_name ?? authUser?.email?.split('@')[0] ?? (demoMode ? 'Linh Nguyen' : 'Utilisateur'),
-    email: authUser?.email ?? (demoMode ? 'linh@home-reviews.fr' : ''),
-  }), [authUser, demoMode])
+  const currentUser = useMemo(() => {
+    const metadata = authUser?.user_metadata ?? {}
+    const name = metadata.full_name ?? metadata.name ?? metadata.display_name ?? authUser?.email?.split('@')[0] ?? (demoMode ? 'Linh Nguyen' : 'Utilisateur')
+    const initials = String(name).split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'HR'
+    return {
+      name: String(name),
+      email: authUser?.email ?? (demoMode ? 'linh@home-reviews.fr' : ''),
+      avatarUrl: metadata.avatar_url ?? metadata.picture ?? undefined,
+      initials,
+    }
+  }, [authUser, demoMode])
 
   const updateMonitoringInterval = async (hours: number) => {
     if (demoMode) {
@@ -528,6 +545,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.rpc('set_monitoring_interval', { p_hours: hours })
     if (error) throw error
     setMonitoringIntervalHours(hours)
+  }
+
+  const signOut = async () => {
+    if (!supabase) return
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) throw error
+    setEstablishments([])
+    setReviews([])
+    setNotifications([])
+    setActions([])
+    setDataReady(true)
   }
 
   const completePasswordRecovery = async (password: string) => {
@@ -543,7 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
     resolveEstablishment, addEstablishment, refreshEstablishment, toggleMonitoring, removeEstablishment,
-    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, completePasswordRecovery,
+    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, completePasswordRecovery, signOut,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
