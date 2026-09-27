@@ -1,11 +1,17 @@
 {
+  "id": "./",
   "name": "HOME Reviews",
   "short_name": "HOME",
   "description": "Surveillez et traitez les avis clients qui demandent une action.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#080b16",
   "theme_color": "#080b16",
   "lang": "fr",
-  "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
 }

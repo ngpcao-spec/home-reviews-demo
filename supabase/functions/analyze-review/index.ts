@@ -3,10 +3,13 @@ import { analyzeReviewWithOpenAI, ReviewAiValidationError } from '../_shared/ai.
 import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
+import { sendPushToUser } from '../_shared/push.ts'
 
 interface ReviewRow {
   id: string
   organization_id: string
+  establishment_id: string
+  historical_import: boolean
   rating: number
   text: string
   language: string | null
@@ -18,6 +21,54 @@ interface ReviewRow {
   ai_error: string | null
   ai_error_history: Array<{ error: string; at: string }> | null
   ai_attempt_count: number | null
+}
+
+async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary: string) {
+  if (review.historical_import || review.rating < 1 || review.rating > 3) return
+
+  const [{ data: establishment }, { data: members }] = await Promise.all([
+    admin.from('establishments').select('name').eq('id', review.establishment_id).single(),
+    admin.from('organization_members').select('user_id').eq('organization_id', review.organization_id),
+  ])
+  if (!establishment?.name || !members?.length) return
+
+  const shortSummary = summary.length > 220 ? `${summary.slice(0, 217).trimEnd()}…` : summary
+  const title = `⭐ Nouvel avis ${review.rating}★ — ${establishment.name}`
+
+  for (const member of members as Array<{ user_id: string }>) {
+    const inserted = await admin.from('notifications').insert({
+      organization_id: review.organization_id,
+      user_id: member.user_id,
+      review_id: review.id,
+      establishment_id: review.establishment_id,
+      type: 'new_negative_review',
+      title,
+      body: shortSummary,
+    }).select('id').maybeSingle()
+
+    if (inserted.error?.code === '23505') continue
+    if (inserted.error || !inserted.data) continue
+
+    try {
+      const push = await sendPushToUser(admin, member.user_id, {
+        title: 'HOME Reviews',
+        body: `${title}\n“${shortSummary}”\nRéponse prête à être vérifiée.`,
+        url: `#/avis/${review.id}`,
+        tag: `review-${review.id}`,
+      })
+      const status = push.skipped ? 'skipped' : push.sent > 0 ? 'sent' : 'failed'
+      await admin.from('notifications').update({
+        push_status: status,
+        push_error: push.failed > 0 ? 'PUSH_DELIVERY_PARTIAL_OR_FAILED' : null,
+        pushed_at: push.sent > 0 ? new Date().toISOString() : null,
+      }).eq('id', inserted.data.id)
+    } catch {
+      await admin.from('notifications').update({
+        push_status: 'failed',
+        push_error: 'PUSH_DELIVERY_FAILED',
+      }).eq('id', inserted.data.id)
+    }
+  }
 }
 
 async function sameSecret(left: string, right: string) {
@@ -65,7 +116,7 @@ Deno.serve(async (request) => {
 
     const { data, error } = await reader
       .from('reviews')
-      .select('id,organization_id,rating,text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count')
+      .select('id,organization_id,establishment_id,historical_import,rating,text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count')
       .eq('id', reviewId)
       .single()
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
@@ -117,6 +168,14 @@ Deno.serve(async (request) => {
       ai_validation_error: null,
     }).eq('id', review.id)
     if (saveError) throw saveError
+
+    if (automatic) {
+      try {
+        await notifyNewReview(admin, review, result.ai_summary)
+      } catch {
+        // Notification and push failures must never fail review analysis or synchronization.
+      }
+    }
 
     if (userId) {
       await admin.from('review_actions').insert({

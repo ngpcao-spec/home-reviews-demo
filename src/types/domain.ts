@@ -1,5 +1,5 @@
 export type ReviewStatus = 'new' | 'to_process' | 'processed' | 'ignored'
-export type AiStatus = 'pending' | 'completed' | 'failed'
+export type AiStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
 export interface Establishment {
   id: string
@@ -42,6 +42,8 @@ export interface Review {
 
 export interface AppNotification {
   id: string
+  organizationId?: string
+  userId?: string
   establishmentId?: string
   reviewId?: string
   type: string
@@ -49,6 +51,7 @@ export interface AppNotification {
   body: string
   severity: 'info' | 'warning' | 'high' | 'critical'
   readAt?: string
+  pushStatus?: 'pending' | 'sent' | 'failed' | 'skipped'
   createdAt: string
 }
 

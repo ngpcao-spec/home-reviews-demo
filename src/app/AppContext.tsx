@@ -35,8 +35,8 @@ interface AppContextValue {
   reopenReview: (reviewId: string) => void
   generateResponse: (reviewId: string) => Promise<string>
   logAction: (reviewId: string, actionType: ReviewAction['actionType']) => void
-  markNotificationRead: (notificationId: string) => void
-  markAllNotificationsRead: () => void
+  markNotificationRead: (notificationId: string) => Promise<void>
+  markAllNotificationsRead: () => Promise<void>
   resolveEstablishment: (input: string) => Promise<PlaceCandidate>
   addEstablishment: (input: string, candidate: PlaceCandidate) => Promise<AddEstablishmentResult>
   refreshEstablishment: (id: string) => Promise<void>
@@ -83,6 +83,20 @@ interface ReviewRow {
   ai_analyzed_at: string | null
   ai_status: 'pending' | 'completed' | 'failed' | null
   ai_error: string | null
+}
+
+interface NotificationRow {
+  id: string
+  organization_id: string
+  user_id: string
+  review_id: string
+  establishment_id: string
+  type: string
+  title: string
+  body: string
+  read_at: string | null
+  push_status: 'pending' | 'sent' | 'failed' | 'skipped'
+  created_at: string
 }
 
 interface AnalyzePayload {
@@ -185,6 +199,23 @@ function mapReview(row: ReviewRow): Review {
   }
 }
 
+function mapNotification(row: NotificationRow): AppNotification {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    userId: row.user_id,
+    establishmentId: row.establishment_id,
+    reviewId: row.review_id,
+    type: row.type,
+    title: row.title,
+    body: row.body,
+    severity: 'high',
+    readAt: row.read_at ?? undefined,
+    pushStatus: row.push_status,
+    createdAt: row.created_at,
+  }
+}
+
 async function functionErrorCode(error: unknown, payload: unknown): Promise<string> {
   if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
     return payload.error
@@ -229,14 +260,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDataLoading(true)
     setDataReady(false)
     setDataError(null)
-    const [establishmentsResult, reviewsResult, organizationResult] = await Promise.all([
+    const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
       supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error').order('published_at', { ascending: false, nullsFirst: false }),
+      supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
     ])
     setDataLoading(false)
     setDataReady(true)
-    if (establishmentsResult.error || reviewsResult.error || organizationResult.error) {
+    if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error) {
       setEstablishments([])
       setReviews([])
       setNotifications([])
@@ -246,7 +278,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
     setReviews((reviewsResult.data as ReviewRow[]).map(mapReview))
-    setNotifications([])
+    setNotifications((notificationsResult.data as NotificationRow[]).map(mapNotification))
     setActions([])
     const organization = organizationResult.data as OrganizationRow | null
     if (organization?.monitoring_interval_hours) setMonitoringIntervalHours(organization.monitoring_interval_hours)
@@ -299,6 +331,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (demoMode) localStorage.setItem(STORAGE_KEY, JSON.stringify({ establishments, reviews, notifications, actions }))
   }, [demoMode, establishments, reviews, notifications, actions])
 
+  useEffect(() => {
+    if (!supabase || !authUser || demoMode) return
+    const client = supabase
+    const channel = client
+      .channel(`notifications:${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${authUser.id}` }, () => {
+        void loadRealData()
+      })
+      .subscribe()
+    return () => { void client.removeChannel(channel) }
+  }, [authUser, demoMode, loadRealData])
+
   const logAction = (reviewId: string, actionType: ReviewAction['actionType']) => {
     setActions((items) => [...items, { id: crypto.randomUUID(), reviewId, actionType, createdAt: new Date().toISOString() }])
   }
@@ -348,8 +392,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return data.ai_suggested_reply
   }
 
-  const markNotificationRead = (id: string) => setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item))
-  const markAllNotificationsRead = () => setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })))
+  const markNotificationRead = async (id: string) => {
+    const readAt = new Date().toISOString()
+    setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt } : item))
+    if (!demoMode && supabase) {
+      const { error } = await supabase.from('notifications').update({ read_at: readAt }).eq('id', id).is('read_at', null)
+      if (error) {
+        pushToast('Impossible de marquer la notification comme lue')
+        await loadRealData()
+      }
+    }
+  }
+
+  const markAllNotificationsRead = async () => {
+    const readAt = new Date().toISOString()
+    setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? readAt })))
+    if (!demoMode && supabase) {
+      const { error } = await supabase.from('notifications').update({ read_at: readAt }).is('read_at', null)
+      if (error) {
+        pushToast('Impossible de marquer les notifications comme lues')
+        await loadRealData()
+      }
+    }
+  }
 
   const resolveEstablishment = async (input: string): Promise<PlaceCandidate> => {
     if (demoMode) {
