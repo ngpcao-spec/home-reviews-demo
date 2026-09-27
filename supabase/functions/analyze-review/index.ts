@@ -15,6 +15,9 @@ interface ReviewRow {
   ai_detected_language: string | null
   ai_analyzed_at: string | null
   ai_status: 'pending' | 'processing' | 'completed' | 'failed' | null
+  ai_error: string | null
+  ai_error_history: Array<{ error: string; at: string }> | null
+  ai_attempt_count: number | null
 }
 
 async function sameSecret(left: string, right: string) {
@@ -62,7 +65,7 @@ Deno.serve(async (request) => {
 
     const { data, error } = await reader
       .from('reviews')
-      .select('id,organization_id,rating,text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status')
+      .select('id,organization_id,rating,text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count')
       .eq('id', reviewId)
       .single()
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
@@ -84,9 +87,13 @@ Deno.serve(async (request) => {
       return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
     }
 
+    const errorHistory = Array.isArray(review.ai_error_history) ? [...review.ai_error_history] : []
+    if (review.ai_error) errorHistory.push({ error: review.ai_error, at: new Date().toISOString() })
     const { error: pendingError } = await admin.from('reviews').update({
       ai_status: 'processing',
       ai_error: null,
+      ai_error_history: errorHistory,
+      ai_attempt_count: (review.ai_attempt_count ?? 0) + 1,
     }).eq('id', review.id)
     if (pendingError) throw pendingError
 
@@ -122,7 +129,7 @@ Deno.serve(async (request) => {
       ai_status: 'completed',
     })
   } catch (error) {
-    const code = error instanceof Error ? error.message.slice(0, 120) : 'AI_ANALYSIS_FAILED'
+    const code = error instanceof Error ? error.message.slice(0, 500) : 'AI_ANALYSIS_FAILED'
     if (reviewId) {
       await admin.from('reviews').update({
         ai_status: 'failed',
