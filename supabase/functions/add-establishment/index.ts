@@ -7,6 +7,8 @@ import { initializeEstablishment } from '../_shared/sync-service.ts'
 interface RequestBody {
   organizationId?: unknown
   query?: unknown
+  confirmed?: unknown
+  expectedGoogleId?: unknown
 }
 
 Deno.serve(async (request) => {
@@ -21,6 +23,10 @@ Deno.serve(async (request) => {
     const body = await request.json() as RequestBody
     if (typeof body.query !== 'string' || body.query.trim().length < 2 || body.query.length > 500) {
       return json({ error: 'INVALID_INPUT' }, 400)
+    }
+    if (body.confirmed !== true) return json({ error: 'CONFIRMATION_REQUIRED' }, 400)
+    if (typeof body.expectedGoogleId !== 'string' || body.expectedGoogleId.length < 2) {
+      return json({ error: 'INVALID_ESTABLISHMENT' }, 400)
     }
 
     let organizationId = typeof body.organizationId === 'string' ? body.organizationId : null
@@ -37,7 +43,12 @@ Deno.serve(async (request) => {
     }
 
     await assertMembership(admin, user.id, organizationId, ['owner', 'admin', 'manager'])
-    const result = await initializeEstablishment(admin, organizationId, body.query.trim())
+    const result = await initializeEstablishment(
+      admin,
+      organizationId,
+      body.query.trim(),
+      body.expectedGoogleId,
+    )
     return json(result, 201)
   } catch (error) {
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)
@@ -46,6 +57,8 @@ Deno.serve(async (request) => {
     if (code === 'UNAUTHORIZED') return json({ error: code }, 401)
     if (code === 'FORBIDDEN') return json({ error: code }, 403)
     if (code === 'RATE_LIMITED') return json({ error: code }, 429)
+    if (code === 'ESTABLISHMENT_ALREADY_ADDED') return json({ error: code }, 409)
+    if (code === 'ESTABLISHMENT_MISMATCH') return json({ error: code }, 409)
     return json({ error: 'INITIALIZATION_FAILED' }, 500)
   }
 })
