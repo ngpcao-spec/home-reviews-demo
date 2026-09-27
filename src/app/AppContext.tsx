@@ -26,6 +26,7 @@ interface AppContextValue {
   dataLoading: boolean
   dataReady: boolean
   dataError: string | null
+  passwordRecovery: boolean
   monitoringIntervalHours: number
   currentUser: { name: string; email: string }
   plan: typeof demoPlan
@@ -45,6 +46,7 @@ interface AppContextValue {
   pushToast: (text: string) => void
   retryData: () => Promise<void>
   updateMonitoringInterval: (hours: number) => Promise<void>
+  completePasswordRecovery: (password: string) => Promise<void>
 }
 
 interface EstablishmentRow {
@@ -183,6 +185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dataLoading, setDataLoading] = useState(false)
   const [dataReady, setDataReady] = useState(allowDemo)
   const [dataError, setDataError] = useState<string | null>(() => !allowDemo && !isSupabaseConfigured ? 'Supabase n’est pas configuré pour ce déploiement.' : null)
+  const [passwordRecovery, setPasswordRecovery] = useState(() => window.location.hash.includes('type=recovery'))
   const [monitoringIntervalHours, setMonitoringIntervalHours] = useState(12)
   const [establishments, setEstablishments] = useState(initial.establishments)
   const [reviews, setReviews] = useState(initial.reviews)
@@ -237,9 +240,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAuthUser(data.session?.user ?? null)
       setAuthReady(true)
     })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user ?? null)
       setAuthReady(true)
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
     })
     return () => {
       active = false
@@ -432,12 +436,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMonitoringIntervalHours(hours)
   }
 
+  const completePasswordRecovery = async (password: string) => {
+    if (!supabase || !authUser) throw new Error('RECOVERY_SESSION_MISSING')
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw error
+    setPasswordRecovery(false)
+    window.location.hash = '/'
+  }
+
   const value: AppContextValue = {
-    establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, monitoringIntervalHours, currentUser,
+    establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, currentUser,
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
     resolveEstablishment, addEstablishment, refreshEstablishment, toggleMonitoring, removeEstablishment,
-    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval,
+    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, completePasswordRecovery,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
