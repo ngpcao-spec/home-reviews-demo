@@ -384,6 +384,18 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+[functions.fetch-google-reviews]
+verify_jwt = true
+
+[functions.add-establishment]
+verify_jwt = true
+
+[functions.resolve-establishment]
+verify_jwt = true
+
+[functions.sync-google-reviews]
+verify_jwt = true
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

@@ -1,7 +1,65 @@
-import {assertMembership,requireUser} from '../_shared/auth.ts'
-import {json,preflight} from '../_shared/cors.ts'
-import {enforceRateLimit} from '../_shared/rate-limit.ts'
-import {createReviewProvider} from '../_shared/review-provider.ts'
-import {syncEstablishment} from '../_shared/sync-service.ts'
+import { assertMembership, requireUser } from '../_shared/auth.ts'
+import { json, preflight } from '../_shared/cors.ts'
+import { OutscraperError } from '../_shared/outscraper.ts'
+import { enforceRateLimit } from '../_shared/rate-limit.ts'
+import { initializeEstablishment } from '../_shared/sync-service.ts'
 
-Deno.serve(async(request)=>{const pre=preflight(request);if(pre)return pre;try{const {user,admin}=await requireUser(request);enforceRateLimit(`add:${user.id}`,5,3600000);const {organizationId,placeRef,confirmed}=await request.json();if(!confirmed)return json({error:'AUTHORIZATION_CONFIRMATION_REQUIRED'},400);await assertMembership(admin,user.id,organizationId,['owner','admin','manager']);const {data:subscription}=await admin.from('subscriptions').select('plan_key').eq('organization_id',organizationId).single();const {data:entitlement}=await admin.from('plan_entitlements').select('max_establishments').eq('plan_key',subscription?.plan_key??'starter').single();const {count}=await admin.from('establishments').select('id',{count:'exact',head:true}).eq('organization_id',organizationId).eq('is_active',true);if((count??0)>=(entitlement?.max_establishments??1))return json({error:'PLAN_QUOTA_REACHED'},403);const provider=createReviewProvider();const place=await provider.getPlace(placeRef);const {data:establishment,error}=await admin.from('establishments').insert({organization_id:organizationId,name:place.name,address:place.address,google_maps_url:place.googleMapsUrl,google_place_ref:place.placeRef,source_provider:provider.name,provider_place_ref:place.placeRef,photo_url:place.photoUrl,current_rating:place.rating,current_review_count:place.reviewCount,sync_status:'syncing'}).select().single();if(error)throw error;const sync=await syncEstablishment(admin,establishment,true);return json({establishment,sync},201)}catch(error){const code=error instanceof Error?error.message:'UNKNOWN';return json({error:code},code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:500)}})
+interface RequestBody {
+  organizationId?: unknown
+  query?: unknown
+  confirmed?: unknown
+  expectedGoogleId?: unknown
+}
+
+Deno.serve(async (request) => {
+  const preflightResponse = preflight(request)
+  if (preflightResponse) return preflightResponse
+  if (request.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED' }, 405)
+
+  try {
+    const { user, admin } = await requireUser(request)
+    enforceRateLimit(`add-establishment:${user.id}`, 5, 60 * 60_000)
+
+    const body = await request.json() as RequestBody
+    if (typeof body.query !== 'string' || body.query.trim().length < 2 || body.query.length > 500) {
+      return json({ error: 'INVALID_INPUT' }, 400)
+    }
+    if (body.confirmed !== true) return json({ error: 'CONFIRMATION_REQUIRED' }, 400)
+    if (typeof body.expectedGoogleId !== 'string' || body.expectedGoogleId.length < 2) {
+      return json({ error: 'INVALID_ESTABLISHMENT' }, 400)
+    }
+
+    let organizationId = typeof body.organizationId === 'string' ? body.organizationId : null
+    if (!organizationId) {
+      const { data, error } = await admin
+        .from('organization_members')
+        .select('organization_id,role')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+      if (error || !data) throw new Error('FORBIDDEN')
+      organizationId = data.organization_id
+    }
+
+    await assertMembership(admin, user.id, organizationId, ['owner', 'admin', 'manager'])
+    const result = await initializeEstablishment(
+      admin,
+      organizationId,
+      body.query.trim(),
+      body.expectedGoogleId,
+    )
+    return json(result, 201)
+  } catch (error) {
+    if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)
+    if (error instanceof SyntaxError) return json({ error: 'INVALID_JSON' }, 400)
+    const code = error instanceof Error ? error.message : 'UNKNOWN'
+    if (code === 'UNAUTHORIZED') return json({ error: code }, 401)
+    if (code === 'FORBIDDEN') return json({ error: code }, 403)
+    if (code === 'RATE_LIMITED') return json({ error: code }, 429)
+    if (code === 'ESTABLISHMENT_ALREADY_ADDED') return json({ error: code }, 409)
+    if (code === 'ESTABLISHMENT_MISMATCH') return json({ error: code }, 409)
+    return json({ error: 'INITIALIZATION_FAILED' }, 500)
+  }
+})
+

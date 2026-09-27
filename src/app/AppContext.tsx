@@ -1,10 +1,18 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { demoPlan, seedEstablishments, seedNotifications, seedReviews } from '../data/mock-data'
-import type { AppNotification, Establishment, Review, ReviewAction } from '../types/domain'
-import type { PlaceCandidate } from '../services/review-provider'
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
+import type { AppNotification, Establishment, Review, ReviewAction, ReviewStatus } from '../types/domain'
 
 interface ToastMessage { id: number; text: string }
+
+export interface AddEstablishmentResult {
+  establishmentId: string
+  inserted: number
+  distribution: { '1': number; '2': number; '3': number }
+}
 
 interface AppContextValue {
   establishments: Establishment[]
@@ -13,6 +21,7 @@ interface AppContextValue {
   actions: ReviewAction[]
   toasts: ToastMessage[]
   demoMode: boolean
+  dataLoading: boolean
   currentUser: { name: string; email: string }
   plan: typeof demoPlan
   aiUsage: number
@@ -22,7 +31,8 @@ interface AppContextValue {
   logAction: (reviewId: string, actionType: ReviewAction['actionType']) => void
   markNotificationRead: (notificationId: string) => void
   markAllNotificationsRead: () => void
-  addEstablishment: (candidate: PlaceCandidate) => Establishment
+  resolveEstablishment: (input: string) => Promise<PlaceCandidate>
+  addEstablishment: (input: string, candidate: PlaceCandidate) => Promise<AddEstablishmentResult>
   refreshEstablishment: (id: string) => Promise<void>
   toggleMonitoring: (id: string) => void
   removeEstablishment: (id: string) => void
@@ -30,12 +40,66 @@ interface AppContextValue {
   pushToast: (text: string) => void
 }
 
-const AppContext = createContext<AppContextValue | null>(null)
+interface EstablishmentRow {
+  id: string
+  organization_id: string
+  name: string
+  address: string
+  google_maps_url: string
+  photo_url: string | null
+  rating: number | string
+  total_reviews: number
+  active: boolean
+  last_sync_at: string | null
+  sync_status: 'pending' | 'syncing' | 'ok' | 'error'
+}
 
+interface ReviewRow {
+  id: string
+  organization_id: string
+  establishment_id: string
+  external_review_id: string
+  author_name: string
+  rating: number
+  text: string
+  language: string | null
+  published_at: string | null
+  created_at: string
+  review_url: string | null
+  historical_import: boolean
+  requires_attention: boolean
+  status: ReviewStatus
+}
+
+interface ResolvePayload {
+  candidate?: {
+    name: string
+    fullAddress: string
+    rating: number
+    totalReviews: number
+    placeId: string | null
+    googleId: string
+    locationLink: string | null
+    photo: string | null
+  }
+  error?: string
+}
+
+interface AddPayload {
+  establishmentId?: string
+  inserted?: number
+  distribution?: { '1': number; '2': number; '3': number }
+  error?: string
+}
+
+const AppContext = createContext<AppContextValue | null>(null)
+const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
+const allowDemo = import.meta.env.VITE_DEMO_MODE !== 'false'
+
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
 
-function getInitialState(): StoredState {
+function demoState(): StoredState {
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -45,36 +109,167 @@ function getInitialState(): StoredState {
   return { establishments: seedEstablishments, reviews: seedReviews, notifications: seedNotifications, actions: [] }
 }
 
+function cityFromAddress(address: string): string {
+  return address.split(',').map((part) => part.trim()).filter(Boolean)[1] ?? address
+}
+
+function mapEstablishment(row: EstablishmentRow): Establishment {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    name: row.name,
+    address: row.address,
+    city: cityFromAddress(row.address),
+    category: 'Établissement',
+    googleMapsUrl: row.google_maps_url,
+    photoUrl: row.photo_url ?? undefined,
+    currentRating: Number(row.rating),
+    currentReviewCount: row.total_reviews,
+    isActive: row.active,
+    syncEnabled: row.active,
+    lastSyncedAt: row.last_sync_at ?? new Date().toISOString(),
+    syncStatus: row.sync_status,
+  }
+}
+
+function mapReview(row: ReviewRow): Review {
+  const status = row.rating <= 3 && row.status === 'new' ? 'to_process' : row.status
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    establishmentId: row.establishment_id,
+    externalReviewId: row.external_review_id,
+    authorName: row.author_name,
+    rating: row.rating,
+    reviewText: row.text,
+    reviewLanguage: row.language ?? 'fr',
+    publishedAt: row.published_at ?? row.created_at,
+    sourceUrl: row.review_url ?? '',
+    isHistoricalImport: row.historical_import,
+    requiresAction: row.requires_attention || row.rating <= 3,
+    status,
+  }
+}
+
+async function functionErrorCode(error: unknown, payload: unknown): Promise<string> {
+  if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
+    return payload.error
+  }
+  if (error && typeof error === 'object' && 'context' in error && error.context instanceof Response) {
+    try {
+      const body = await error.context.clone().json() as { error?: unknown }
+      if (typeof body.error === 'string') return body.error
+    } catch { /* fall through */ }
+  }
+  return error instanceof Error ? error.message : 'UNKNOWN'
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [initial] = useState(() => getInitialState())
+  const [initial] = useState(() => demoState())
+  const [authUser, setAuthUser] = useState<User | null>(null)
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
+  const [dataLoading, setDataLoading] = useState(false)
   const [establishments, setEstablishments] = useState(initial.establishments)
   const [reviews, setReviews] = useState(initial.reviews)
   const [notifications, setNotifications] = useState(initial.notifications)
   const [actions, setActions] = useState(initial.actions)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const demoMode = !authUser && allowDemo
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ establishments, reviews, notifications, actions }))
-  }, [establishments, reviews, notifications, actions])
-
-  const pushToast = (text: string) => {
+  const pushToast = useCallback((text: string) => {
     const id = Date.now()
     setToasts((items) => [...items, { id, text }])
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 2800)
-  }
+  }, [])
+
+  const loadRealData = useCallback(async () => {
+    if (!supabase) return
+    setDataLoading(true)
+    const [establishmentsResult, reviewsResult] = await Promise.all([
+      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
+      supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,requires_attention,status').order('published_at', { ascending: false, nullsFirst: false }),
+    ])
+    setDataLoading(false)
+    if (establishmentsResult.error || reviewsResult.error) {
+      pushToast('Impossible de charger les données réelles')
+      return
+    }
+    setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
+    setReviews((reviewsResult.data as ReviewRow[]).map(mapReview))
+    setNotifications([])
+  }, [pushToast])
+
+  useEffect(() => {
+    if (!supabase) return
+    let active = true
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      setAuthUser(data.session?.user ?? null)
+      setAuthReady(true)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null)
+      setAuthReady(true)
+    })
+    return () => {
+      active = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!authReady) return
+    const timer = window.setTimeout(() => {
+      if (authUser) {
+        void loadRealData()
+        return
+      }
+      if (allowDemo) {
+        const state = demoState()
+        setEstablishments(state.establishments)
+        setReviews(state.reviews)
+        setNotifications(state.notifications)
+        setActions(state.actions)
+      } else {
+        setEstablishments([])
+        setReviews([])
+        setNotifications([])
+        setActions([])
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [authReady, authUser, loadRealData])
+
+  useEffect(() => {
+    if (demoMode) localStorage.setItem(STORAGE_KEY, JSON.stringify({ establishments, reviews, notifications, actions }))
+  }, [demoMode, establishments, reviews, notifications, actions])
 
   const logAction = (reviewId: string, actionType: ReviewAction['actionType']) => {
     setActions((items) => [...items, { id: crypto.randomUUID(), reviewId, actionType, createdAt: new Date().toISOString() }])
   }
 
+  const updateReviewStatus = (reviewId: string, status: ReviewStatus) => {
+    setReviews((items) => items.map((review) => review.id === reviewId
+      ? { ...review, status, requiresAction: status === 'to_process' }
+      : review))
+    if (!demoMode && supabase) {
+      void supabase.from('reviews').update({ status }).eq('id', reviewId).then(({ error }) => {
+        if (error) {
+          pushToast('La modification n’a pas pu être enregistrée')
+          void loadRealData()
+        }
+      })
+    }
+  }
+
   const markProcessed = (reviewId: string) => {
-    setReviews((items) => items.map((review) => review.id === reviewId ? { ...review, status: 'processed', requiresAction: false } : review))
+    updateReviewStatus(reviewId, 'processed')
     logAction(reviewId, 'marked_processed')
     pushToast('Avis marqué comme traité')
   }
 
   const reopenReview = (reviewId: string) => {
-    setReviews((items) => items.map((review) => review.id === reviewId ? { ...review, status: 'to_process', requiresAction: true } : review))
+    updateReviewStatus(reviewId, 'to_process')
     logAction(reviewId, 'reopened')
     pushToast('Avis rouvert')
   }
@@ -92,20 +287,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const markNotificationRead = (id: string) => setNotifications((items) => items.map((item) => item.id === id ? { ...item, readAt: new Date().toISOString() } : item))
   const markAllNotificationsRead = () => setNotifications((items) => items.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })))
 
-  const addEstablishment = (candidate: PlaceCandidate) => {
-    const establishment: Establishment = {
-      id: crypto.randomUUID(), organizationId: seedEstablishments[0].organizationId, name: candidate.name, address: candidate.address,
-      city: candidate.address.split(',').at(-1)?.trim() ?? '', category: 'Établissement', googleMapsUrl: candidate.googleMapsUrl,
-      photoUrl: candidate.photoUrl, currentRating: candidate.rating, currentReviewCount: candidate.reviewCount,
-      isActive: true, syncEnabled: true, lastSyncedAt: new Date().toISOString(), syncStatus: 'ok',
+  const resolveEstablishment = async (input: string): Promise<PlaceCandidate> => {
+    if (demoMode) {
+      const candidates = await mockProvider.resolvePlace(input)
+      if (!candidates[0]) throw new Error('ESTABLISHMENT_NOT_FOUND')
+      return candidates[0]
     }
-    setEstablishments((items) => [...items, establishment])
-    pushToast('Surveillance activée')
-    return establishment
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<ResolvePayload>('resolve-establishment', { body: { input } })
+    if (error || !data?.candidate) throw new Error(await functionErrorCode(error, data))
+    return {
+      placeRef: data.candidate.googleId,
+      name: data.candidate.name,
+      address: data.candidate.fullAddress,
+      rating: data.candidate.rating,
+      reviewCount: data.candidate.totalReviews,
+      googleMapsUrl: data.candidate.locationLink ?? input,
+      photoUrl: data.candidate.photo ?? undefined,
+      confidence: 1,
+    }
+  }
+
+  const addEstablishment = async (input: string, candidate: PlaceCandidate): Promise<AddEstablishmentResult> => {
+    if (demoMode) {
+      const establishment: Establishment = {
+        id: crypto.randomUUID(),
+        organizationId: seedEstablishments[0].organizationId,
+        name: candidate.name,
+        address: candidate.address,
+        city: cityFromAddress(candidate.address),
+        category: 'Établissement',
+        googleMapsUrl: candidate.googleMapsUrl,
+        photoUrl: candidate.photoUrl,
+        currentRating: candidate.rating,
+        currentReviewCount: candidate.reviewCount,
+        isActive: true,
+        syncEnabled: true,
+        lastSyncedAt: new Date().toISOString(),
+        syncStatus: 'ok',
+      }
+      setEstablishments((items) => [...items, establishment])
+      return { establishmentId: establishment.id, inserted: 0, distribution: { '1': 0, '2': 0, '3': 0 } }
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<AddPayload>('add-establishment', {
+      body: { query: input, confirmed: true, expectedGoogleId: candidate.placeRef },
+    })
+    if (error || !data?.establishmentId || !data.distribution) {
+      throw new Error(await functionErrorCode(error, data))
+    }
+    await loadRealData()
+    return {
+      establishmentId: data.establishmentId,
+      inserted: data.inserted ?? 0,
+      distribution: data.distribution,
+    }
   }
 
   const refreshEstablishment = async (id: string) => {
     setEstablishments((items) => items.map((item) => item.id === id ? { ...item, syncStatus: 'syncing' } : item))
+    if (!demoMode && supabase) {
+      const { error } = await supabase.functions.invoke('sync-google-reviews', { body: { establishmentId: id } })
+      if (error) pushToast('Synchronisation impossible')
+      await loadRealData()
+      return
+    }
     await new Promise((resolve) => setTimeout(resolve, 700))
     setEstablishments((items) => items.map((item) => item.id === id ? { ...item, syncStatus: 'ok', lastSyncedAt: new Date().toISOString() } : item))
     pushToast('Avis actualisés')
@@ -113,6 +359,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleMonitoring = (id: string) => setEstablishments((items) => items.map((item) => item.id === id ? { ...item, syncEnabled: !item.syncEnabled } : item))
   const removeEstablishment = (id: string) => {
+    if (!demoMode) {
+      pushToast('Suppression indisponible dans cette version')
+      return
+    }
     setEstablishments((items) => items.filter((item) => item.id !== id))
     setReviews((items) => items.filter((item) => item.establishmentId !== id))
     pushToast('Établissement supprimé')
@@ -120,6 +370,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const injectNegativeReview = () => {
     const establishment = establishments[0]
+    if (!establishment) return ''
     const id = crypto.randomUUID()
     const review: Review = {
       id, organizationId: establishment.organizationId, establishmentId: establishment.id, externalReviewId: `mock-${id}`,
@@ -133,12 +384,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return id
   }
 
+  const currentUser = useMemo(() => ({
+    name: authUser?.user_metadata?.display_name ?? authUser?.email?.split('@')[0] ?? 'Linh Nguyen',
+    email: authUser?.email ?? 'linh@home-reviews.fr',
+  }), [authUser])
+
   const value: AppContextValue = {
-    establishments, reviews, notifications, actions, toasts,
-    demoMode: import.meta.env.VITE_DEMO_MODE !== 'false', currentUser: { name: 'Linh Nguyen', email: 'linh@home-reviews.fr' },
+    establishments, reviews, notifications, actions, toasts, demoMode, dataLoading, currentUser,
     plan: demoPlan, aiUsage: actions.filter((action) => action.actionType === 'response_generated').length + 38,
     markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
-    addEstablishment, refreshEstablishment, toggleMonitoring, removeEstablishment, injectNegativeReview, pushToast,
+    resolveEstablishment, addEstablishment, refreshEstablishment, toggleMonitoring, removeEstablishment,
+    injectNegativeReview, pushToast,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

@@ -6,6 +6,8 @@ artifacts/
 .gcm-auth/
 .env
 .env.local
+supabase/functions/.env
+supabase/.temp/
 .npm-cache/
 .DS_Store
 *.log
