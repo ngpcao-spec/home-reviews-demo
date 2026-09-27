@@ -69,7 +69,7 @@ Deno.serve(async (request) => {
 
     const review = data as ReviewRow
     if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
-    if (automatic && review.ai_status === 'completed') {
+    if (automatic && review.ai_status === 'completed' && !body.regenerate) {
       return json({
         ai_summary: review.ai_summary,
         ai_suggested_reply: review.ai_suggested_reply,
