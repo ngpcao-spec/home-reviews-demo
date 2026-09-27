@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useApp } from './app/AppContext'
 import { AppShell } from './components/ui/AppShell'
+import { NotificationOnboarding } from './components/NotificationOnboarding'
 
 const AddEstablishmentPage=lazy(()=>import('./pages/AddEstablishmentPage').then(m=>({default:m.AddEstablishmentPage})))
 const AnalyticsPage=lazy(()=>import('./pages/AnalyticsPage').then(m=>({default:m.AnalyticsPage})))
@@ -44,7 +45,7 @@ function ProtectedApp() {
   if (!authReady || dataLoading || (isAuthenticated && !dataReady)) return <div className="route-loading" aria-label="Chargement des données"><span/></div>
   if (dataError) return <main className="auth-page"><section className="auth-card card"><span className="eyebrow">Connexion aux données</span><h1>Données indisponibles</h1><p>{dataError}</p><button className="primary-button full-width" onClick={() => void retryData()}>Réessayer</button></section></main>
   if (!demoMode && !isAuthenticated) return <Navigate to="/connexion" replace />
-  return <AppShell />
+  return <><AppShell /><NotificationOnboarding /></>
 }
 
 export default function App(){const { passwordRecovery }=useApp();if(passwordRecovery)return <PasswordRecoveryScreen/>;return <Suspense fallback={<div className="route-loading" aria-label="Chargement"><span/></div>}><Routes><Route path="/connexion" element={<AuthPage/>}/><Route element={<ProtectedApp/>}><Route index element={<HomePage/>}/><Route path="etablissements" element={<EstablishmentsPage/>}/><Route path="etablissements/ajouter" element={<AddEstablishmentPage/>}/><Route path="etablissements/:id" element={<EstablishmentDetailPage/>}/><Route path="avis" element={<ReviewsPage/>}/><Route path="avis/:id" element={<ReviewDetailPage/>}/><Route path="analyses" element={<AnalyticsPage/>}/><Route path="notifications" element={<NotificationsPage/>}/><Route path="plus" element={<SettingsPage/>}/><Route path="reglages" element={<Navigate to="/plus" replace/>}/><Route path="*" element={<NotFoundPage/>}/></Route></Routes></Suspense>}

@@ -10,3 +10,13 @@
 
 .notification-meta{display:flex;align-items:center;gap:4px;margin-top:5px;color:var(--orange);font-size:.72rem}
 .setting-row:disabled{opacity:.6;cursor:wait}
+
+.notification-onboarding-backdrop{position:fixed;z-index:110;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:16px 12px calc(12px + var(--safe-bottom));background:rgba(2,4,12,.78);backdrop-filter:blur(9px)}
+.notification-onboarding{width:min(100%,460px);padding:24px 20px 18px;border-radius:26px;background:radial-gradient(circle at 90% 0,rgba(139,92,246,.17),transparent 42%),linear-gradient(155deg,#171d35,#10152a);box-shadow:0 28px 75px rgba(0,0,0,.52)}
+.notification-onboarding-icon{width:54px;height:54px;display:grid;place-items:center;border-radius:18px;color:#c4b5fd;background:rgba(139,92,246,.14);border:1px solid rgba(139,92,246,.22)}
+.notification-onboarding h2{margin:17px 0 9px;font-size:1.3rem;letter-spacing:-.025em}
+.notification-onboarding>p{margin:0;color:var(--muted);font-size:.88rem;line-height:1.58}
+.notification-onboarding-info{margin-top:15px;padding:13px;border-radius:14px;color:#d9dcef;background:rgba(100,140,255,.1);border:1px solid rgba(100,140,255,.2);font-size:.79rem;line-height:1.5}
+.notification-onboarding-actions{display:grid;gap:5px;margin-top:21px}
+.notification-onboarding-actions .text-button{min-height:44px}
+@media(min-width:760px){.notification-onboarding-backdrop{align-items:center;padding:24px}.notification-onboarding{padding:28px}}
