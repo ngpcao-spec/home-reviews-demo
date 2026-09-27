@@ -70,6 +70,7 @@ export async function analyzeReviewWithOpenAI(rating: number, text: string): Pro
             'ai_suggested_reply MUST be written entirely in the original review language identified in detected_language. French is forbidden unless the original review itself is French.',
             'The reply must be short, professional, natural and respectful. Thank the customer and acknowledge the stated problem without disputing it.',
             'Never invent facts, causes, corrective actions or promises. Never promise compensation and never make a serious legal admission.',
+            'Do not claim that the business will improve, investigate, take the comment into account, work on quality, change a process, or perform any other future action. A safe reply may only thank the customer, acknowledge the explicitly stated problem and express regret.',
             'Before returning JSON, verify that the writing system and language of ai_suggested_reply match the original review, independently from the French summary.',
           ].join(' '),
         },
