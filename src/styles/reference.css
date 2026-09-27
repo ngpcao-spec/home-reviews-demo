@@ -26,3 +26,12 @@ body{background:radial-gradient(circle at 82% 9%,rgba(71,69,215,.18),transparent
   .analytics-filters{margin-bottom:7px}.analytics-filters select{height:31px;font-size:.68rem}.chart-card,.issues-card{padding:12px}.chart-heading strong{font-size:1.48rem}.chart-wrap{height:146px;margin:5px -8px -5px}.issues-card{margin-top:8px}.issue-bars{gap:7px;margin-top:10px}.issue-row{font-size:.68rem}.issue-row>div{height:10px}.primary-analytics-kpis{margin-top:8px}.analytics-kpi{min-height:112px;padding:11px}
 }
 .review-row .est-avatar{display:block;min-width:74px;min-height:74px}.review-row-compact .est-avatar{min-width:56px;min-height:56px}
+
+.ai-ready{display:inline-flex;align-items:center;gap:4px;color:#b99aff;font-size:.68rem;white-space:nowrap}
+.ai-ready svg{color:#b99aff}
+.review-section-label{margin:0 0 8px;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em}
+.ai-empty{display:grid;gap:12px;margin-top:10px}
+.ai-empty p{margin:0}
+.response-title h2{display:flex;align-items:center;gap:7px}
+.response-title h2 svg{color:#c4b5fd}
+.response-map-button{grid-column:1/-1}

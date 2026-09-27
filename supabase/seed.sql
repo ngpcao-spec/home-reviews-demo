@@ -15,9 +15,9 @@ insert into public.establishments(id,organization_id,name,address,city,country_c
 (e4,org,'L''Indochine','4 place des Vosges','Paris','FR','https://www.google.com/maps/search/?api=1&query=Indochine','mock-indochine','mock','mock-indochine',4.7,412,now(),now()+interval '1 hour','ok')
 on conflict(id) do nothing;
 
-insert into public.reviews(organization_id,establishment_id,source_provider,external_review_id,author_name,rating,review_text,review_language,published_at,source_url,is_historical_import,requires_action,status)
+insert into public.reviews(organization_id,establishment_id,source_provider,external_review_id,author_name,rating,review_text,review_language,published_at,source_url,is_historical_import,requires_attention,requires_ai_analysis,status,ai_status)
 select org,(array[e1,e2,e3,e4])[(n%4)+1],'mock','seed-'||n,(array['Camille D.','Minh T.','Sophie L.','Julien R.','Anna P.'])[(n%5)+1],(array[1,2,3,4,5])[(n%5)+1],
 (array['Attente beaucoup trop longue et aucune explication.','La salle manquait de propreté.','Cuisine correcte mais service très lent.','Bonne expérience dans l''ensemble.','Excellent accueil, nous reviendrons !'])[(n%5)+1],
-'fr',now()-(n||' hours')::interval,'https://maps.google.com',true,((n%5)+1)<=2,case when ((n%5)+1)<=2 then 'to_process'::public.review_status else 'ignored'::public.review_status end
+'fr',now()-(n||' hours')::interval,'https://maps.google.com',true,((n%5)+1)<=3,((n%5)+1)<=3,case when ((n%5)+1)<=3 then 'to_process'::public.review_status else 'ignored'::public.review_status end,case when ((n%5)+1)<=3 then 'pending' else null end
 from generate_series(1,20)n on conflict do nothing;
 end $$;

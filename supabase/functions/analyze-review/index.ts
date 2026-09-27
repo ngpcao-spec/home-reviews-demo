@@ -1,6 +1,125 @@
-import {requireUser} from '../_shared/auth.ts'
-import {analyzeWithOpenAI} from '../_shared/ai.ts'
-import {json,preflight} from '../_shared/cors.ts'
-import {enforceRateLimit} from '../_shared/rate-limit.ts'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
+import { analyzeReviewWithOpenAI } from '../_shared/ai.ts'
+import { requireUser } from '../_shared/auth.ts'
+import { json, preflight } from '../_shared/cors.ts'
+import { enforceRateLimit } from '../_shared/rate-limit.ts'
 
-Deno.serve(async(request)=>{const pre=preflight(request);if(pre)return pre;try{const {user,client,admin}=await requireUser(request);enforceRateLimit(`analyze:${user.id}`,20,3600000);const {reviewId}=await request.json();const {data:review,error}=await client.from('reviews').select('id,organization_id,rating,review_text,is_historical_import').eq('id',reviewId).single();if(error||!review)return json({error:'REVIEW_NOT_FOUND'},404);if(review.rating>3)return json({error:'ANALYSIS_NOT_REQUIRED'},400);const analysis=await analyzeWithOpenAI(review.rating,review.review_text??'');const requires=review.rating<=2||analysis.requires_action;const urgency=review.rating===1&&['low','medium'].includes(analysis.urgency)?'high':analysis.urgency;await admin.from('review_ai_analyses').upsert({review_id:review.id,model:Deno.env.get('OPENAI_MODEL')??'mock',sentiment:analysis.sentiment,primary_category:analysis.primary_category,secondary_categories:analysis.secondary_categories,urgency,summary:analysis.summary,key_points:analysis.key_points,response_language:analysis.response_language,analysis_status:'ok',error_code:null},{onConflict:'review_id'});await admin.from('reviews').update({requires_action:requires,status:requires?'to_process':'ignored'}).eq('id',review.id);return json({...analysis,requires_action:requires,urgency})}catch(error){const code=error instanceof Error?error.message:'UNKNOWN';return json({error:code},code==='UNAUTHORIZED'?401:code==='RATE_LIMITED'?429:500)}})
+interface ReviewRow {
+  id: string
+  organization_id: string
+  rating: number
+  text: string
+  language: string | null
+  ai_summary: string | null
+  ai_suggested_reply: string | null
+  ai_detected_language: string | null
+  ai_analyzed_at: string | null
+  ai_status: 'pending' | 'completed' | 'failed' | null
+}
+
+async function sameSecret(left: string, right: string) {
+  const encoder = new TextEncoder()
+  const [leftHash, rightHash] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(left)),
+    crypto.subtle.digest('SHA-256', encoder.encode(right)),
+  ])
+  const leftBytes = new Uint8Array(leftHash)
+  const rightBytes = new Uint8Array(rightHash)
+  return leftBytes.every((value, index) => value === rightBytes[index])
+}
+
+async function webhookAuthorized(admin: SupabaseClient, provided: string | null) {
+  if (!provided) return false
+  const { data, error } = await admin.from('ai_webhook_config').select('secret').eq('singleton', true).single()
+  if (error || !data?.secret) return false
+  return sameSecret(provided, data.secret)
+}
+
+Deno.serve(async (request) => {
+  const preflightResponse = preflight(request)
+  if (preflightResponse) return preflightResponse
+
+  const url = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+  let reviewId = ''
+
+  try {
+    const body = await request.json() as { review_id?: string; regenerate?: boolean }
+    reviewId = body.review_id?.trim() ?? ''
+    if (!reviewId) return json({ error: 'REVIEW_ID_REQUIRED' }, 400)
+
+    const automatic = await webhookAuthorized(admin, request.headers.get('x-home-reviews-webhook'))
+    let reader: SupabaseClient = admin
+    let userId: string | null = null
+
+    if (!automatic) {
+      const context = await requireUser(request)
+      enforceRateLimit(`analyze:${context.user.id}`, 10, 3_600_000)
+      reader = context.client
+      userId = context.user.id
+    }
+
+    const { data, error } = await reader
+      .from('reviews')
+      .select('id,organization_id,rating,text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status')
+      .eq('id', reviewId)
+      .single()
+    if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
+
+    const review = data as ReviewRow
+    if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
+    if (automatic && review.ai_status === 'completed' && !body.regenerate) {
+      return json({
+        ai_summary: review.ai_summary,
+        ai_suggested_reply: review.ai_suggested_reply,
+        detected_language: review.ai_detected_language,
+        ai_analyzed_at: review.ai_analyzed_at,
+        ai_status: review.ai_status,
+        reused: true,
+      })
+    }
+
+    const { error: pendingError } = await admin.from('reviews').update({
+      ai_status: 'pending',
+      ai_error: null,
+    }).eq('id', review.id)
+    if (pendingError) throw pendingError
+
+    const result = await analyzeReviewWithOpenAI(review.rating, review.text)
+    const analyzedAt = new Date().toISOString()
+    const { error: saveError } = await admin.from('reviews').update({
+      ai_summary: result.ai_summary,
+      ai_suggested_reply: result.ai_suggested_reply,
+      ai_detected_language: result.detected_language,
+      ai_analyzed_at: analyzedAt,
+      ai_status: 'completed',
+      ai_error: null,
+    }).eq('id', review.id)
+    if (saveError) throw saveError
+
+    if (userId) {
+      await admin.from('review_actions').insert({
+        review_id: review.id,
+        organization_id: review.organization_id,
+        user_id: userId,
+        action_type: 'response_generated',
+      })
+    }
+
+    return json({
+      ...result,
+      ai_analyzed_at: analyzedAt,
+      ai_status: 'completed',
+    })
+  } catch (error) {
+    const code = error instanceof Error ? error.message.slice(0, 120) : 'AI_ANALYSIS_FAILED'
+    if (reviewId) {
+      await admin.from('reviews').update({
+        ai_status: 'failed',
+        ai_error: code,
+      }).eq('id', reviewId)
+    }
+    return json({ error: code }, code === 'UNAUTHORIZED' ? 401 : code === 'RATE_LIMITED' ? 429 : 500)
+  }
+})

@@ -1,6 +1,5 @@
 export type ReviewStatus = 'new' | 'to_process' | 'processed' | 'ignored'
-export type Urgency = 'low' | 'medium' | 'high' | 'critical'
-export type Category = 'waiting_time' | 'service' | 'staff' | 'product_quality' | 'cleanliness' | 'price' | 'reservation' | 'delivery' | 'availability' | 'billing' | 'other'
+export type AiStatus = 'pending' | 'completed' | 'failed'
 
 export interface Establishment {
   id: string
@@ -19,19 +18,6 @@ export interface Establishment {
   syncStatus: 'pending' | 'syncing' | 'ok' | 'warning' | 'error'
 }
 
-export interface ReviewAnalysis {
-  requiresAction: boolean
-  sentiment: 'negative' | 'neutral' | 'positive'
-  primaryCategory: Category
-  secondaryCategories: Category[]
-  urgency: Urgency
-  summary: string
-  keyPoints: string[]
-  suggestedResponse?: string
-  responseLanguage: string
-  analysisStatus: 'pending' | 'ok' | 'error'
-}
-
 export interface Review {
   id: string
   organizationId: string
@@ -46,7 +32,12 @@ export interface Review {
   isHistoricalImport: boolean
   requiresAction: boolean
   status: ReviewStatus
-  analysis?: ReviewAnalysis
+  aiSummary?: string
+  aiSuggestedReply?: string
+  aiDetectedLanguage?: string
+  aiAnalyzedAt?: string
+  aiStatus?: AiStatus
+  aiError?: string
 }
 
 export interface AppNotification {
