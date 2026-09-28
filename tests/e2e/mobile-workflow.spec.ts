@@ -55,56 +55,44 @@ test('garde l’accueil lisible pendant le défilement',async({page})=>{
   expect(bottomClearance).toBeGreaterThanOrEqual(0)
 })
 
-test('affiche le vrai prochain contrôle de l’établissement mis en avant',async({page})=>{
+test('affiche le carrousel principal en pleine largeur sans carte surveillance',async({page})=>{
   await page.goto('/')
   await expect(page.locator('.featured-slide[aria-current="true"] .featured-establishment')).toBeVisible()
-  await page.evaluate(()=>{
-    const key='home-reviews-demo-v1'
-    const stored=localStorage.getItem(key)
-    if(!stored) throw new Error('État de démonstration absent')
-    const state=JSON.parse(stored)
-    state.establishments[0].nextSyncAt=new Date(Date.now()+72*60_000).toISOString()
-    localStorage.setItem(key,JSON.stringify(state))
-    sessionStorage.setItem('preserve-demo-state','1')
+  await expect(page.locator('.home-sync-card')).toHaveCount(0)
+  const layout=await page.evaluate(()=>{
+    const region=document.querySelector('.home-feature-grid')!.getBoundingClientRect()
+    const carousel=document.querySelector('.featured-carousel')!.getBoundingClientRect()
+    const image=document.querySelector('.featured-slide[aria-current="true"] .featured-establishment > img') as HTMLImageElement
+    const imageStyle=getComputedStyle(image)
+    return {
+      widthDifference:Math.abs(region.width-carousel.width),
+      height:carousel.height,
+      objectFit:imageStyle.objectFit,
+      objectPosition:imageStyle.objectPosition,
+    }
   })
-  await page.reload()
-  await expect(page.locator('.home-sync-card')).toContainText('Prochain contrôle')
-  await expect(page.locator('.home-sync-card')).toContainText(/Dans environ 1 h 1[12] min/)
+  expect(layout.widthDifference).toBeLessThanOrEqual(1)
+  expect(layout.height).toBeGreaterThanOrEqual(190)
+  expect(layout.height).toBeLessThanOrEqual(250)
+  expect(layout.objectFit).toBe('cover')
+  expect(layout.objectPosition).toBe('50% 50%')
 })
 
 test('parcourt tous les établissements sans mélanger leurs données',async({page},testInfo)=>{
   await page.goto('/')
   await expect(page.locator('.featured-slide')).toHaveCount(4)
   const summary=await page.locator('.home-summary').textContent()
-  await page.evaluate(()=>{
-    const key='home-reviews-demo-v1'
-    const state=JSON.parse(localStorage.getItem(key) as string)
-    state.establishments[0].nextSyncAt=new Date(Date.now()+60*60_000).toISOString()
-    state.establishments[1].nextSyncAt=new Date(Date.now()+120*60_000).toISOString()
-    state.establishments[1].syncStatus='error'
-    localStorage.setItem(key,JSON.stringify(state))
-    sessionStorage.setItem('preserve-demo-state','1')
-  })
-  await page.reload()
   const viewport=page.locator('.featured-carousel-viewport')
   const current=()=>page.locator('.featured-slide[aria-current="true"]')
-  const featureBoxes=()=>page.evaluate(()=>{
+  const carouselBox=()=>page.evaluate(()=>{
+    const region=document.querySelector('.home-feature-grid')!.getBoundingClientRect()
     const carousel=document.querySelector('.featured-carousel')!.getBoundingClientRect()
-    const surveillance=document.querySelector('.home-sync-card')!.getBoundingClientRect()
-    return {
-      viewportWidth:window.innerWidth,
-      carousel:{top:carousel.top,bottom:carousel.bottom,height:carousel.height},
-      surveillance:{top:surveillance.top,bottom:surveillance.bottom,height:surveillance.height},
-    }
+    return {height:carousel.height,widthDifference:Math.abs(region.width-carousel.width)}
   })
   await expect(current()).toContainText('Le Petit Hanoi')
   await expect(current().locator('.featured-position')).toHaveText('1 / 4')
-  const initialBoxes=await featureBoxes()
-  expect(Math.abs(initialBoxes.carousel.height-initialBoxes.surveillance.height)).toBeLessThanOrEqual(1)
-  if(initialBoxes.viewportWidth>370){
-    expect(Math.abs(initialBoxes.carousel.top-initialBoxes.surveillance.top)).toBeLessThanOrEqual(1)
-    expect(Math.abs(initialBoxes.carousel.bottom-initialBoxes.surveillance.bottom)).toBeLessThanOrEqual(1)
-  }
+  const initialBox=await carouselBox()
+  expect(initialBox.widthDifference).toBeLessThanOrEqual(1)
 
   if(testInfo.project.name==='desktop'){
     await page.getByRole('button',{name:'Établissement suivant'}).click()
@@ -117,12 +105,10 @@ test('parcourt tous les établissements sans mélanger leurs données',async({pa
   await expect(current()).toContainText('1 avis à traiter')
   await expect(current().locator('img')).toHaveAttribute('src',/saigon\.png/)
   await expect(current().locator('.featured-position')).toHaveText('2 / 4')
-  await expect(page.locator('.home-sync-card')).toContainText('Erreur')
-  await expect(page.locator('.home-sync-card')).toContainText(/Dans environ 2 h/)
   expect(await page.locator('.home-summary').textContent()).toBe(summary)
-  const nextBoxes=await featureBoxes()
-  expect(Math.abs(nextBoxes.carousel.height-initialBoxes.carousel.height)).toBeLessThanOrEqual(1)
-  expect(Math.abs(nextBoxes.surveillance.height-initialBoxes.surveillance.height)).toBeLessThanOrEqual(1)
+  const nextBox=await carouselBox()
+  expect(Math.abs(nextBox.height-initialBox.height)).toBeLessThanOrEqual(1)
+  expect(nextBox.widthDifference).toBeLessThanOrEqual(1)
 
   await viewport.evaluate((element)=>element.scrollTo({left:-element.clientWidth,behavior:'auto'}))
   await expect(current()).toContainText('Le Petit Hanoi')

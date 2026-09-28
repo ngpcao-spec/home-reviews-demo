@@ -5,7 +5,6 @@ import { useApp } from '../app/AppContext'
 import { ReviewRow } from '../components/reviews/ReviewRow'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { PageHeader } from '../components/ui/PageHeader'
-import { timeUntil } from '../lib/format'
 import { isNegativeReview, recentNegativeReviews } from '../lib/review-list'
 
 export function HomePage() {
@@ -20,7 +19,6 @@ export function HomePage() {
   const featuredId = active.some((item) => item.id === selectedEstablishmentId) ? selectedEstablishmentId : active[0]?.id
   const featuredIndex = Math.max(0, active.findIndex((item) => item.id === featuredId))
   const featured = active[featuredIndex]
-  const [clock, setClock] = useState(() => Date.now())
   const carouselRef = useRef<HTMLDivElement>(null)
   const scrollTimerRef = useRef<number | undefined>(undefined)
   const gestureRef = useRef({ startX: 0, startY: 0, moved: false })
@@ -35,26 +33,6 @@ export function HomePage() {
   useEffect(() => () => {
     if (scrollTimerRef.current !== undefined) window.clearTimeout(scrollTimerRef.current)
   }, [])
-
-  useEffect(() => {
-    if (!featured?.nextSyncAt) return
-    const refresh = () => setClock(Date.now())
-    let intervalId: number | undefined
-    const timeoutId = window.setTimeout(() => {
-      refresh()
-      intervalId = window.setInterval(refresh, 60_000)
-    }, 60_000 - (Date.now() % 60_000))
-    return () => {
-      window.clearTimeout(timeoutId)
-      if (intervalId !== undefined) window.clearInterval(intervalId)
-    }
-  }, [featured?.nextSyncAt])
-
-  const syncStatus = featured?.syncStatus === 'ok' ? 'À jour'
-    : featured?.syncStatus === 'syncing' ? 'En cours'
-      : featured?.syncStatus === 'error' ? 'Erreur'
-        : featured?.syncStatus === 'pending' ? 'En attente'
-          : 'Statut inconnu'
 
   const selectEstablishment = (index: number) => {
     const carousel = carouselRef.current
@@ -134,7 +112,6 @@ export function HomePage() {
           <button className="featured-carousel-control next" type="button" disabled={featuredIndex === active.length - 1} onClick={() => selectEstablishment(featuredIndex + 1)} aria-label="Établissement suivant"><ArrowRight /></button>
         </>}
       </div>
-      <div className="home-sync-card card"><Sparkles/><strong>Surveillance</strong><span className={`home-sync-state ${featured.syncStatus}`}>● {syncStatus}</span><small>Prochain contrôle</small><span className="home-sync-next">{featured.nextSyncAt ? timeUntil(featured.nextSyncAt, clock) : 'Non planifié'}</span></div>
     </section>}
     <div className="home-summary" aria-label="Résumé"><span>{active.length} établissement{active.length > 1 ? 's' : ''}</span><span>{pending.length} avis à traiter</span><span>Note {weightedRating.toFixed(1)}</span></div>
     <div className="section-heading home-section-heading"><h2>Accès rapides</h2><button className="text-button" onClick={() => navigate('/etablissements')}>Voir tout <ChevronRight /></button></div>
