@@ -14,6 +14,7 @@ export interface AddEstablishmentResult {
   distribution: { '1': number; '2': number; '3': number }
   importStatus?: 'completed' | 'failed'
   retryable?: boolean
+  nextSyncAt?: string
 }
 
 interface AppContextValue {
@@ -131,6 +132,7 @@ interface AddPayload {
   distribution?: { '1': number; '2': number; '3': number }
   importStatus?: 'completed' | 'failed'
   retryable?: boolean
+  nextSyncAt?: string
   error?: string
 }
 
@@ -142,6 +144,8 @@ const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
 const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
+const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error'
+const REVIEW_LOAD_PAGE_SIZE = 500
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
 const emptyState: StoredState = { establishments: [], reviews: [], notifications: [], actions: [] }
@@ -221,6 +225,21 @@ function mapNotification(row: NotificationRow): AppNotification {
   }
 }
 
+async function fetchAllReviewRows() {
+  if (!supabase) return { data: [] as ReviewRow[], error: new Error('SUPABASE_NOT_CONFIGURED') }
+  const rows: ReviewRow[] = []
+  for (let from = 0; ; from += REVIEW_LOAD_PAGE_SIZE) {
+    const result = await supabase
+      .from('reviews')
+      .select(REVIEW_SELECT)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .range(from, from + REVIEW_LOAD_PAGE_SIZE - 1)
+    if (result.error) return { data: [] as ReviewRow[], error: result.error }
+    rows.push(...(result.data as ReviewRow[]))
+    if (result.data.length < REVIEW_LOAD_PAGE_SIZE) return { data: rows, error: null }
+  }
+}
+
 async function functionErrorCode(error: unknown, payload: unknown): Promise<string> {
   if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') {
     return payload.error
@@ -268,7 +287,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
-      supabase.from('reviews').select('id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error').order('published_at', { ascending: false, nullsFirst: false }),
+      fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
     ])
@@ -478,6 +497,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       distribution: data.distribution,
       importStatus: data.importStatus ?? 'completed',
       retryable: data.retryable ?? false,
+      nextSyncAt: data.nextSyncAt,
     }
   }
 

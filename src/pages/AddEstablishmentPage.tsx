@@ -32,7 +32,7 @@ function messageFor(error: unknown): string {
 
 export function AddEstablishmentPage() {
   const navigate = useNavigate()
-  const { resolveEstablishment, addEstablishment, establishments, plan } = useApp()
+  const { resolveEstablishment, addEstablishment, establishments, plan, monitoringIntervalHours } = useApp()
   const [step, setStep] = useState<Step>('input')
   const [query, setQuery] = useState('')
   const [candidate, setCandidate] = useState<PlaceCandidate>()
@@ -129,7 +129,7 @@ export function AddEstablishmentPage() {
     {step === 'import' && <section className="flow-card import-card card" aria-live="polite">
       <span className="flow-icon"><LoaderCircle className="spin" /></span>
       <h2>Analyse de votre établissement…</h2>
-      <p>Nous récupérons les avis Google nécessitant votre attention.</p>
+      <p>Nous récupérons vos avis récents et préparons votre espace.</p>
     </section>}
 
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
@@ -143,6 +143,13 @@ export function AddEstablishmentPage() {
         <span>2★ <b>{result.distribution['2']}</b></span>
         <span>3★ <b>{result.distribution['3']}</b></span>
       </div>
+      {result.importStatus !== 'failed' && <p>
+        Surveillance activée toutes les {monitoringIntervalHours} h.
+        {result.nextSyncAt && <> Prochain contrôle planifié le {new Intl.DateTimeFormat('fr-FR', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(result.nextSyncAt))}.</>}
+      </p>}
       <button className="primary-button full-width" onClick={() => navigate(
         result.importStatus === 'failed'
           ? `/etablissements/${result.establishmentId}`

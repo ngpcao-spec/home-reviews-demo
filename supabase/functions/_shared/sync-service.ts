@@ -6,10 +6,15 @@ import {
   type NormalizedReview,
 } from './outscraper.ts'
 import { reviewClassification } from './review-classification.ts'
+import {
+  HISTORICAL_NEGATIVE_LIMIT,
+  historicalRecentWindowDays,
+  initialImportCutoffSeconds,
+  mergeInitialReviewPasses,
+} from './initial-import.ts'
 
 const INCREMENTAL_WINDOW = 20
 const MAX_INCREMENTAL_PAGES = 5
-const INITIAL_RECENT_WINDOW_DAYS = 90
 const INITIAL_RECENT_PAGE_SIZE = 100
 const MAX_INITIAL_RECENT_PAGES = 100
 
@@ -148,39 +153,27 @@ function sortNewest(reviews: NormalizedReview[]): NormalizedReview[] {
   })
 }
 
-function deduplicateReviews(reviews: NormalizedReview[]): NormalizedReview[] {
-  const unique = new Map<string, NormalizedReview>()
-  for (const review of reviews) {
-    if (review.externalReviewId && !unique.has(review.externalReviewId)) {
-      unique.set(review.externalReviewId, review)
-    }
-  }
-  return sortNewest([...unique.values()])
-}
-
 async function fetchInitialization(query: string): Promise<InitializationFetchResult> {
   const provider = providerName()
+  const recentWindowDays = historicalRecentWindowDays(Deno.env.get('HISTORICAL_RECENT_WINDOW_DAYS'))
+  const cutoffSeconds = initialImportCutoffSeconds(Date.now(), recentWindowDays)
+  const cutoffMilliseconds = cutoffSeconds * 1_000
   if (provider === 'mock') {
     const result = getMockGoogleReviews(query)
-    const recentNegative = result.reviews.filter((review) => review.rating >= 1 && review.rating <= 3)
-    const reviews = deduplicateReviews(recentNegative)
+    const merged = mergeInitialReviewPasses(result.reviews, result.reviews, cutoffMilliseconds)
     return {
       ...result,
-      reviews,
-      count: reviews.length,
-      providerRequests: 1,
-      recentFetched: result.reviews.length,
-      recentNegative: recentNegative.length,
-      historicalFetched: recentNegative.length,
-      finalAfterDeduplication: reviews.length,
+      reviews: merged.reviews,
+      count: merged.reviews.length,
+      providerRequests: 2,
+      recentFetched: merged.recentFetched,
+      recentNegative: merged.recentNegative,
+      historicalFetched: Math.min(result.reviews.length, HISTORICAL_NEGATIVE_LIMIT),
+      finalAfterDeduplication: merged.reviews.length,
     }
   }
 
   const apiKey = outscraperKey()
-  const cutoffSeconds = Math.floor(
-    (Date.now() - INITIAL_RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1_000) / 1_000,
-  )
-  const cutoffMilliseconds = cutoffSeconds * 1_000
   const recentReviews: NormalizedReview[] = []
   const seenCursors = new Set<string>()
   let cursor: string | undefined
@@ -236,27 +229,25 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
   const historical = await fetchOutscraperReviews({
     query,
     apiKey,
-    reviewsLimit: 100,
+    reviewsLimit: HISTORICAL_NEGATIVE_LIMIT,
     sort: 'lowest_rating',
     cutoffRating: 3,
     timeoutMs: 90_000,
   })
   providerRequests += 1
 
-  const recentNegative = recentReviews.filter((review) => review.rating >= 1 && review.rating <= 3)
-  const historicalNegative = historical.reviews.filter((review) => review.rating >= 1 && review.rating <= 3)
-  const reviews = deduplicateReviews([...recentNegative, ...historicalNegative])
+  const merged = mergeInitialReviewPasses(recentReviews, historical.reviews, cutoffMilliseconds)
 
   return {
     provider: 'outscraper',
     establishment: recentEstablishment ?? historical.establishment,
-    reviews,
-    count: reviews.length,
+    reviews: merged.reviews,
+    count: merged.reviews.length,
     providerRequests,
-    recentFetched: recentReviews.length,
-    recentNegative: recentNegative.length,
+    recentFetched: merged.recentFetched,
+    recentNegative: merged.recentNegative,
     historicalFetched: historical.reviews.length,
-    finalAfterDeduplication: reviews.length,
+    finalAfterDeduplication: merged.reviews.length,
   }
 }
 
@@ -322,7 +313,7 @@ export async function initializeEstablishment(
       sync_status: 'syncing',
       sync_error: null,
     })
-    .select('id,organization_id,google_id,google_maps_url,last_review_id,last_review_at')
+    .select('id,organization_id,google_id,google_maps_url,last_review_id,last_review_at,next_sync_at')
     .single()
   if (establishmentError) {
     if (establishmentError.code === '23505') throw new Error('ESTABLISHMENT_ALREADY_ADDED')
@@ -369,6 +360,7 @@ export async function initializeEstablishment(
       fetched: result.reviews.length,
       inserted,
       distribution,
+      nextSyncAt: establishment.next_sync_at as string,
       recentFetched: result.recentFetched,
       recentNegative: result.recentNegative,
       historicalFetched: result.historicalFetched,
@@ -413,6 +405,7 @@ export async function initializeEstablishment(
       fetched: result.reviews.length,
       inserted: 0,
       distribution,
+      nextSyncAt: establishment.next_sync_at as string,
       importStatus: 'failed' as const,
       retryable: true,
       importError: code,

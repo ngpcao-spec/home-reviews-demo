@@ -5,6 +5,7 @@ import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { sendPushToUser } from '../_shared/push.ts'
 import { isDuplicateNotificationError, runNonBlockingNotification, shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
+import { shouldAutomaticallyAnalyzeReview } from '../_shared/ai-rules.ts'
 
 interface ReviewRow {
   id: string
@@ -123,7 +124,7 @@ Deno.serve(async (request) => {
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
 
     const review = data as ReviewRow
-    if (automatic && review.historical_import) {
+    if (automatic && !shouldAutomaticallyAnalyzeReview(review)) {
       return json({ ai_status: review.ai_status, skipped: true, reason: 'HISTORICAL_IMPORT' })
     }
     if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
