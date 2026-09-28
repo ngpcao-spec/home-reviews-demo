@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { User } from '@supabase/supabase-js'
 import { demoPlan, seedEstablishments, seedNotifications, seedReviews } from '../data/mock-data'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { nextSyncAtFromLastSync } from '../lib/monitoring-schedule'
 import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
 import type { AppNotification, Establishment, Review, ReviewAction, ReviewStatus } from '../types/domain'
 
@@ -66,6 +67,7 @@ interface EstablishmentRow {
   total_reviews: number
   active: boolean
   last_sync_at: string | null
+  next_sync_at: string | null
   sync_status: 'pending' | 'syncing' | 'ok' | 'error'
 }
 
@@ -188,6 +190,7 @@ function mapEstablishment(row: EstablishmentRow): Establishment {
     isActive: row.active,
     syncEnabled: row.active,
     lastSyncedAt: row.last_sync_at ?? new Date().toISOString(),
+    nextSyncAt: row.next_sync_at ?? undefined,
     syncStatus: row.sync_status,
   }
 }
@@ -298,7 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
-      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
+      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
@@ -496,6 +499,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isActive: true,
         syncEnabled: true,
         lastSyncedAt: new Date().toISOString(),
+        nextSyncAt: nextSyncAtFromLastSync(undefined, monitoringIntervalHours),
         syncStatus: 'ok',
       }
       setEstablishments((items) => [...items, establishment])
@@ -541,7 +545,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return
     }
     await new Promise((resolve) => setTimeout(resolve, 700))
-    setEstablishments((items) => items.map((item) => item.id === id ? { ...item, syncStatus: 'ok', lastSyncedAt: new Date().toISOString() } : item))
+    setEstablishments((items) => items.map((item) => {
+      if (item.id !== id) return item
+      const lastSyncedAt = new Date().toISOString()
+      return { ...item, syncStatus: 'ok', lastSyncedAt, nextSyncAt: nextSyncAtFromLastSync(lastSyncedAt, monitoringIntervalHours) }
+    }))
     pushToast('Avis actualisés')
   }
 
@@ -588,12 +596,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateMonitoringInterval = async (hours: number) => {
     if (demoMode) {
       setMonitoringIntervalHours(hours)
+      setEstablishments((items) => items.map((item) => item.isActive
+        ? { ...item, nextSyncAt: nextSyncAtFromLastSync(item.lastSyncedAt, hours) }
+        : item))
       return
     }
     if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
     const { error } = await supabase.rpc('set_monitoring_interval', { p_hours: hours })
     if (error) throw error
     setMonitoringIntervalHours(hours)
+    await loadRealData({ background: true })
   }
 
   const signOut = async () => {
