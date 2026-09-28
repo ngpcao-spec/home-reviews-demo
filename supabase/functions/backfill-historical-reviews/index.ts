@@ -5,19 +5,33 @@ import {
   type EstablishmentRow,
 } from '../_shared/sync-service.ts'
 
+async function sameSecret(left: string, right: string) {
+  const encoder = new TextEncoder()
+  const [leftHash, rightHash] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(left)),
+    crypto.subtle.digest('SHA-256', encoder.encode(right)),
+  ])
+  const leftBytes = new Uint8Array(leftHash)
+  const rightBytes = new Uint8Array(rightHash)
+  return leftBytes.length === rightBytes.length
+    && leftBytes.every((value, index) => value === rightBytes[index])
+}
+
 Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED' }, 405)
 
   const url = Deno.env.get('SUPABASE_URL')!
   const service = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(url, service, { auth: { persistSession: false } })
-  const token = request.headers.get('x-home-reviews-scheduler') ?? ''
-
-  const { data: authorized, error: authError } = await admin.rpc(
-    'verify_review_scheduler_token',
-    { p_token: token },
-  )
-  if (authError || authorized !== true) return json({ error: 'UNAUTHORIZED' }, 401)
+  const provided = request.headers.get('x-home-reviews-webhook') ?? ''
+  const { data: config, error: configError } = await admin
+    .from('ai_webhook_config')
+    .select('secret')
+    .eq('singleton', true)
+    .single()
+  if (configError || !config?.secret || !provided || !await sameSecret(provided, config.secret)) {
+    return json({ error: 'UNAUTHORIZED' }, 401)
+  }
 
   try {
     const body = await request.json() as { establishmentId?: unknown }
