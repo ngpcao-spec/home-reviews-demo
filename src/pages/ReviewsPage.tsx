@@ -13,7 +13,10 @@ const tabs = [{ key: 'to_process', label: 'À traiter' }, { key: 'processed', la
 export function ReviewsPage() {
   const { reviews, establishments } = useApp()
   const [params] = useSearchParams()
-  const [tab, setTab] = useState<'to_process'|'processed'|'all'>(params.get('statut') === 'to_process' ? 'to_process' : 'to_process')
+  const requestedStatus = params.get('statut')
+  const [tab, setTab] = useState<'to_process'|'processed'|'all'>(
+    requestedStatus === 'processed' || requestedStatus === 'all' ? requestedStatus : 'to_process',
+  )
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [establishment, setEstablishment] = useState(params.get('etablissement') ?? 'all')
   const [rating, setRating] = useState('all')

@@ -1,6 +1,6 @@
 import { CheckCircle2, Link2, LoaderCircle, MapPin, Search } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp, type AddEstablishmentResult } from '../app/AppContext'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -8,6 +8,14 @@ import { Stars } from '../components/ui/Stars'
 import type { PlaceCandidate } from '../services/review-provider'
 
 type Step = 'input' | 'confirm' | 'import' | 'success'
+
+interface AddWizardLocationState {
+  addEstablishmentSuccess?: {
+    query: string
+    candidate: PlaceCandidate
+    result: AddEstablishmentResult
+  }
+}
 
 const errorMessages: Record<string, string> = {
   INVALID_GOOGLE_MAPS_LINK: 'Ce lien Google Maps n’est pas valide.',
@@ -32,12 +40,22 @@ function messageFor(error: unknown): string {
 
 export function AddEstablishmentPage() {
   const navigate = useNavigate()
-  const { resolveEstablishment, addEstablishment, establishments, plan, monitoringIntervalHours } = useApp()
-  const [step, setStep] = useState<Step>('input')
-  const [query, setQuery] = useState('')
-  const [candidate, setCandidate] = useState<PlaceCandidate>()
-  const [result, setResult] = useState<AddEstablishmentResult>()
+  const location = useLocation()
+  const restored = (location.state as AddWizardLocationState | null)?.addEstablishmentSuccess
+  const {
+    resolveEstablishment,
+    addEstablishment,
+    retryEstablishmentImport,
+    establishments,
+    plan,
+    monitoringIntervalHours,
+  } = useApp()
+  const [step, setStep] = useState<Step>(restored ? 'success' : 'input')
+  const [query, setQuery] = useState(restored?.query ?? '')
+  const [candidate, setCandidate] = useState<PlaceCandidate | undefined>(restored?.candidate)
+  const [result, setResult] = useState<AddEstablishmentResult | undefined>(restored?.result)
   const [loading, setLoading] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
   const quotaReached = establishments.length >= plan.maxEstablishments
 
@@ -67,11 +85,46 @@ export function AddEstablishmentPage() {
       const imported = await addEstablishment(query.trim(), candidate)
       setResult(imported)
       setStep('success')
+      navigate('/etablissements/ajouter', {
+        replace: true,
+        state: { addEstablishmentSuccess: { query: query.trim(), candidate, result: imported } },
+      })
     } catch (importError) {
       setError(messageFor(importError))
       setStep('confirm')
     }
   }
+
+  const retryImport = async () => {
+    if (!candidate || !result) return
+    setRetrying(true)
+    setError('')
+    try {
+      const retried = await retryEstablishmentImport(result.establishmentId)
+      const updated: AddEstablishmentResult = {
+        ...result,
+        importStatus: 'completed',
+        retryable: false,
+        negativeReviewCount: retried.negativeReviewCount,
+        inserted: retried.negativeReviewCount,
+        nextSyncAt: retried.nextSyncAt ?? result.nextSyncAt,
+      }
+      setResult(updated)
+      navigate('/etablissements/ajouter', {
+        replace: true,
+        state: { addEstablishmentSuccess: { query, candidate, result: updated } },
+      })
+    } catch (retryError) {
+      setError(messageFor(retryError))
+    } finally {
+      setRetrying(false)
+    }
+  }
+
+  const nextCheckHours = result?.nextSyncAt
+    ? Math.max(1, Math.round((new Date(result.nextSyncAt).getTime() - Date.now()) / 3_600_000))
+    : monitoringIntervalHours
+  const negativeReviewCount = result?.negativeReviewCount ?? result?.inserted ?? 0
 
   return <>
     <PageHeader title="Ajouter un établissement" back />
@@ -79,6 +132,7 @@ export function AddEstablishmentPage() {
       <i className="done" />
       <i className={step !== 'input' ? 'done' : ''} />
       <i className={step === 'import' || step === 'success' ? 'done' : ''} />
+      <i className={step === 'success' ? 'done' : ''} />
     </div>
 
     {quotaReached && <div className="quota-alert"><MapPin /><div><strong>Quota atteint</strong><span>Votre plan autorise {plan.maxEstablishments} établissements.</span></div></div>}
@@ -121,42 +175,43 @@ export function AddEstablishmentPage() {
       </div>
       {error && <p className="field-error" role="alert">{error}</p>}
       <div className="button-row">
-        <button className="secondary-button" onClick={() => { setStep('input'); setCandidate(undefined); setError('') }}>Annuler</button>
+        <button className="secondary-button" onClick={() => { setStep('input'); setCandidate(undefined); setError(''); navigate('/etablissements/ajouter', { replace: true, state: null }) }}>Annuler</button>
         <button className="primary-button" onClick={() => void confirm()}>Ajouter cet établissement</button>
       </div>
     </section>}
 
     {step === 'import' && <section className="flow-card import-card card" aria-live="polite">
       <span className="flow-icon"><LoaderCircle className="spin" /></span>
-      <h2>Analyse de votre établissement…</h2>
+      <h2>Import en cours…</h2>
       <p>Nous récupérons vos avis récents et préparons votre espace.</p>
     </section>}
 
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
       <span className="flow-icon success"><CheckCircle2 /></span>
-      <h2>Établissement ajouté</h2>
-      {result.importStatus === 'failed'
-        ? <p><strong>L’établissement est bien enregistré.</strong> L’import des avis a échoué temporairement et pourra être relancé.</p>
-        : <p><strong>{result.inserted} avis nécessitant une attention</strong> ont été trouvés.</p>}
-      <div className="import-summary">
-        <span>1★ <b>{result.distribution['1']}</b></span>
-        <span>2★ <b>{result.distribution['2']}</b></span>
-        <span>3★ <b>{result.distribution['3']}</b></span>
+      <h2>✓ Établissement ajouté</h2>
+      <div className="confirm-place">
+        <EstablishmentAvatar id={candidate.placeRef} name={candidate.name} photoUrl={candidate.photoUrl} large />
+        <div>
+          <strong>{candidate.name}</strong>
+          <span className="rating-line"><b>{candidate.rating.toFixed(1)}</b><Stars rating={Math.round(candidate.rating)} compact /><em>{candidate.reviewCount} avis Google</em></span>
+        </div>
       </div>
+      {result.importStatus === 'failed'
+        ? <p><strong>Certains avis n’ont pas encore pu être importés.</strong></p>
+        : <p><strong>{negativeReviewCount} avis négatifs importés</strong> dans HOME Reviews.</p>}
       {result.importStatus !== 'failed' && <p>
-        Surveillance activée toutes les {monitoringIntervalHours} h.
-        {result.nextSyncAt && <> Prochain contrôle planifié le {new Intl.DateTimeFormat('fr-FR', {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        }).format(new Date(result.nextSyncAt))}.</>}
+        Surveillance activée.<br />
+        Surveillance toutes les {monitoringIntervalHours} heures.<br />
+        Prochain contrôle dans environ {nextCheckHours} h.
       </p>}
-      <button className="primary-button full-width" onClick={() => navigate(
-        result.importStatus === 'failed'
-          ? `/etablissements/${result.establishmentId}`
-          : `/avis?etablissement=${result.establishmentId}&statut=to_process`,
-      )}>
-        {result.importStatus === 'failed' ? 'Voir l’établissement' : 'Voir les avis'}
-      </button>
+      {error && <p className="field-error" role="alert">{error}</p>}
+      {result.importStatus === 'failed' ? <button className="primary-button full-width" disabled={retrying} onClick={() => void retryImport()}>
+        {retrying ? <LoaderCircle className="spin" /> : null}
+        {retrying ? 'Nouvelle tentative…' : 'Réessayer l’import'}
+      </button> : <div className="button-row">
+        <button className="primary-button" onClick={() => navigate(`/avis?etablissement=${result.establishmentId}&statut=all`)}>Voir les avis</button>
+        <button className="secondary-button" onClick={() => navigate('/etablissements')}>Retour aux établissements</button>
+      </div>}
     </section>}
   </>
 }

@@ -15,6 +15,7 @@ export interface AddEstablishmentResult {
   importStatus?: 'completed' | 'failed'
   retryable?: boolean
   nextSyncAt?: string
+  negativeReviewCount?: number
 }
 
 interface AppContextValue {
@@ -42,6 +43,7 @@ interface AppContextValue {
   markAllNotificationsRead: () => Promise<void>
   resolveEstablishment: (input: string) => Promise<PlaceCandidate>
   addEstablishment: (input: string, candidate: PlaceCandidate) => Promise<AddEstablishmentResult>
+  retryEstablishmentImport: (establishmentId: string) => Promise<{ negativeReviewCount: number; nextSyncAt?: string }>
   refreshEstablishment: (id: string) => Promise<void>
   toggleMonitoring: (id: string) => void
   removeEstablishment: (id: string) => void
@@ -132,6 +134,13 @@ interface AddPayload {
   distribution?: { '1': number; '2': number; '3': number }
   importStatus?: 'completed' | 'failed'
   retryable?: boolean
+  nextSyncAt?: string
+  negativeReviewCount?: number
+  error?: string
+}
+
+interface RetryImportPayload {
+  negativeReviewCount?: number
   nextSyncAt?: string
   error?: string
 }
@@ -275,15 +284,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 2800)
   }, [])
 
-  const loadRealData = useCallback(async () => {
+  const loadRealData = useCallback(async (options?: { background?: boolean }) => {
+    const background = options?.background === true
     if (!supabase) {
       setDataError('Supabase n’est pas configuré pour ce déploiement.')
       setDataReady(true)
       return
     }
-    setDataLoading(true)
-    setDataReady(false)
-    setDataError(null)
+    if (!background) {
+      setDataLoading(true)
+      setDataReady(false)
+      setDataError(null)
+    }
 
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,sync_status').eq('active', true).order('created_at'),
@@ -291,14 +303,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
     ])
-    setDataLoading(false)
-    setDataReady(true)
+    if (!background) {
+      setDataLoading(false)
+      setDataReady(true)
+    }
     if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error) {
-      setEstablishments([])
-      setReviews([])
-      setNotifications([])
-      setActions([])
-      setDataError('Impossible de charger vos données Supabase. Vérifiez votre connexion puis réessayez.')
+      if (background) {
+        pushToast('Les données seront actualisées à la prochaine ouverture.')
+      } else {
+        setEstablishments([])
+        setReviews([])
+        setNotifications([])
+        setActions([])
+        setDataError('Impossible de charger vos données Supabase. Vérifiez votre connexion puis réessayez.')
+      }
       return
     }
     setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
@@ -307,7 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActions([])
     const organization = organizationResult.data as OrganizationRow | null
     if (organization?.monitoring_interval_hours) setMonitoringIntervalHours(organization.monitoring_interval_hours)
-  }, [])
+  }, [pushToast])
 
   useEffect(() => {
     if (!supabase) return
@@ -490,7 +508,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error || !data?.establishmentId || !data.distribution) {
       throw new Error(await functionErrorCode(error, data))
     }
-    await loadRealData()
+    await loadRealData({ background: true })
     return {
       establishmentId: data.establishmentId,
       inserted: data.inserted ?? 0,
@@ -498,7 +516,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importStatus: data.importStatus ?? 'completed',
       retryable: data.retryable ?? false,
       nextSyncAt: data.nextSyncAt,
+      negativeReviewCount: data.negativeReviewCount ?? data.inserted ?? 0,
     }
+  }
+
+  const retryEstablishmentImport = async (establishmentId: string) => {
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<RetryImportPayload>('retry-establishment-import', {
+      body: { establishmentId },
+    })
+    if (error || typeof data?.negativeReviewCount !== 'number') {
+      throw new Error(await functionErrorCode(error, data))
+    }
+    await loadRealData({ background: true })
+    return { negativeReviewCount: data.negativeReviewCount, nextSyncAt: data.nextSyncAt }
   }
 
   const refreshEstablishment = async (id: string) => {
@@ -588,7 +619,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, currentUser,
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
-    resolveEstablishment, addEstablishment, refreshEstablishment, toggleMonitoring, removeEstablishment,
+    resolveEstablishment, addEstablishment, retryEstablishmentImport, refreshEstablishment, toggleMonitoring, removeEstablishment,
     injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, completePasswordRecovery, signOut,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
