@@ -57,7 +57,7 @@ test('garde l’accueil lisible pendant le défilement',async({page})=>{
 
 test('affiche le vrai prochain contrôle de l’établissement mis en avant',async({page})=>{
   await page.goto('/')
-  await expect(page.locator('.featured-establishment')).toBeVisible()
+  await expect(page.locator('.featured-slide[aria-current="true"] .featured-establishment')).toBeVisible()
   await page.evaluate(()=>{
     const key='home-reviews-demo-v1'
     const stored=localStorage.getItem(key)
@@ -70,4 +70,90 @@ test('affiche le vrai prochain contrôle de l’établissement mis en avant',asy
   await page.reload()
   await expect(page.locator('.home-sync-card')).toContainText('Prochain contrôle')
   await expect(page.locator('.home-sync-card')).toContainText(/Dans environ 1 h 1[12] min/)
+})
+
+test('parcourt tous les établissements sans mélanger leurs données',async({page},testInfo)=>{
+  await page.goto('/')
+  await expect(page.locator('.featured-slide')).toHaveCount(4)
+  const summary=await page.locator('.home-summary').textContent()
+  await page.evaluate(()=>{
+    const key='home-reviews-demo-v1'
+    const state=JSON.parse(localStorage.getItem(key) as string)
+    state.establishments[0].nextSyncAt=new Date(Date.now()+60*60_000).toISOString()
+    state.establishments[1].nextSyncAt=new Date(Date.now()+120*60_000).toISOString()
+    state.establishments[1].syncStatus='error'
+    localStorage.setItem(key,JSON.stringify(state))
+    sessionStorage.setItem('preserve-demo-state','1')
+  })
+  await page.reload()
+  const viewport=page.locator('.featured-carousel-viewport')
+  const current=()=>page.locator('.featured-slide[aria-current="true"]')
+  await expect(current()).toContainText('Le Petit Hanoi')
+  await expect(current().locator('.featured-position')).toHaveText('1 / 4')
+
+  if(testInfo.project.name==='desktop'){
+    await page.getByRole('button',{name:'Établissement suivant'}).click()
+  }else{
+    await viewport.evaluate((element)=>element.scrollTo({left:element.clientWidth,behavior:'auto'}))
+  }
+  await expect(current()).toContainText('Saigon Bistro')
+  await expect(current()).toContainText('4.5')
+  await expect(current()).toContainText('(186 avis)')
+  await expect(current()).toContainText('1 avis à traiter')
+  await expect(current().locator('img')).toHaveAttribute('src',/saigon\.png/)
+  await expect(current().locator('.featured-position')).toHaveText('2 / 4')
+  await expect(page.locator('.home-sync-card')).toContainText('Erreur')
+  await expect(page.locator('.home-sync-card')).toContainText(/Dans environ 2 h/)
+  expect(await page.locator('.home-summary').textContent()).toBe(summary)
+
+  await viewport.evaluate((element)=>element.scrollTo({left:-element.clientWidth,behavior:'auto'}))
+  await expect(current()).toContainText('Le Petit Hanoi')
+  await viewport.evaluate((element)=>element.scrollTo({left:element.scrollWidth*2,behavior:'auto'}))
+  await expect(current()).toContainText("L'Indochine")
+  await expect(current().locator('.featured-position')).toHaveText('4 / 4')
+  await viewport.evaluate((element)=>element.scrollTo({left:element.clientWidth,behavior:'auto'}))
+  await expect(current()).toContainText('Saigon Bistro')
+
+  const beforeSwipe=page.url()
+  await viewport.evaluate((element)=>{
+    const card=element.querySelector('.featured-slide[aria-current="true"] .featured-establishment') as HTMLButtonElement
+    element.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,clientX:250,clientY:150,pointerType:'touch'}))
+    element.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,clientX:120,clientY:153,pointerType:'touch'}))
+    element.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,clientX:120,clientY:153,pointerType:'touch'}))
+    card.click()
+  })
+  expect(page.url()).toBe(beforeSwipe)
+  await page.waitForTimeout(20)
+  await current().locator('.featured-establishment').click()
+  await expect(page).toHaveURL(/\/etablissements\/est-2$/)
+})
+
+test('gère une carte unique, une photo absente et l’état vide',async({page})=>{
+  await page.goto('/')
+  await page.evaluate(()=>{
+    const key='home-reviews-demo-v1'
+    const state=JSON.parse(localStorage.getItem(key) as string)
+    state.establishments=state.establishments.slice(0,1)
+    state.establishments[0].name='Établissement avec un nom volontairement très long pour le mobile'
+    delete state.establishments[0].photoUrl
+    localStorage.setItem(key,JSON.stringify(state))
+    sessionStorage.setItem('preserve-demo-state','1')
+  })
+  await page.reload()
+  await expect(page.locator('.featured-slide')).toHaveCount(1)
+  await expect(page.locator('.featured-position')).toHaveCount(0)
+  await expect(page.locator('.featured-carousel-control')).toHaveCount(0)
+  await expect(page.locator('.featured-photo-placeholder')).toBeVisible()
+  await expect(page.locator('.featured-slide[aria-current="true"] .featured-copy > strong')).toHaveText('Établissement avec un nom volontairement très long pour le mobile')
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth)).toBe(false)
+
+  await page.evaluate(()=>{
+    const key='home-reviews-demo-v1'
+    const state=JSON.parse(localStorage.getItem(key) as string)
+    state.establishments=[]
+    localStorage.setItem(key,JSON.stringify(state))
+  })
+  await page.reload()
+  await expect(page.getByText('Ajoutez votre premier établissement')).toBeVisible()
+  await expect(page.locator('.featured-carousel')).toHaveCount(0)
 })
