@@ -22,11 +22,19 @@ vi.mock('../app/AppContext', () => ({
       nextSyncAt: '2026-09-28T08:00:00.000Z',
       syncStatus: 'ok',
     }],
-    reviews: [],
+    reviews: [{
+      id: 'negative-review', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'negative-review',
+      authorName: 'Client négatif', rating: 2, reviewText: 'Service lent.', reviewLanguage: 'fr',
+      publishedAt: '2026-09-28T06:00:00.000Z', sourceUrl: '', isHistoricalImport: true,
+      requiresAction: true, status: 'to_process',
+    }, {
+      id: 'positive-review', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'positive-review',
+      authorName: 'Client positif', rating: 5, reviewText: 'Excellent restaurant.', reviewLanguage: 'fr',
+      publishedAt: '2026-09-28T07:00:00.000Z', sourceUrl: '', isHistoricalImport: false,
+      requiresAction: false, status: 'to_process',
+    }],
     notifications: [],
     monitoringIntervalHours: 3,
-    refreshEstablishment: vi.fn(),
-    toggleMonitoring: vi.fn(),
     removeEstablishment: vi.fn(),
   }),
 }))
@@ -46,5 +54,10 @@ describe('EstablishmentDetailPage', () => {
       'src',
       'https://lh3.googleusercontent.com/green-home-photo',
     )
+    expect(screen.queryByRole('button', { name: 'Actualiser' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.getByText('Service lent.')).toBeVisible()
+    expect(screen.queryByText('Excellent restaurant.')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Google Maps' })).toBeVisible()
   })
 })

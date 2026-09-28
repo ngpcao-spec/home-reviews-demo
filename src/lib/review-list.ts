@@ -2,6 +2,14 @@ import type { Review } from '../types/domain'
 
 export const REVIEWS_PAGE_SIZE = 25
 
+export function isNegativeReview(review: Review): boolean {
+  return review.rating >= 1 && review.rating <= 3
+}
+
+export function negativeReviews(reviews: Review[]): Review[] {
+  return reviews.filter(isNegativeReview)
+}
+
 export function sortReviewsNewest(reviews: Review[]): Review[] {
   return [...reviews].sort(
     (left, right) => new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime(),
@@ -9,7 +17,7 @@ export function sortReviewsNewest(reviews: Review[]): Review[] {
 }
 
 export function recentNegativeReviews(reviews: Review[], limit = 5): Review[] {
-  return sortReviewsNewest(reviews.filter((review) => review.rating >= 1 && review.rating <= 3))
+  return sortReviewsNewest(negativeReviews(reviews))
     .slice(0, limit)
 }
 

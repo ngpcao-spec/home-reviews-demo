@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextVisibleReviewCount, recentNegativeReviews, visibleReviewBatch } from './review-list'
+import { isNegativeReview, negativeReviews, nextVisibleReviewCount, recentNegativeReviews, visibleReviewBatch } from './review-list'
 import type { Review } from '../types/domain'
 
 const makeReview = (id: string, rating: number, day: number): Review => ({
@@ -31,6 +31,16 @@ describe('affichage des listes d’avis', () => {
     ]
     expect(recentNegativeReviews(reviews).map((review) => review.id))
       .toEqual(['six', 'five', 'four', 'three', 'two'])
+  })
+
+  it('exclut toujours les avis 4★ et 5★ même si leur statut demande une action', () => {
+    const reviews = [
+      makeReview('negative', 3, 1),
+      makeReview('positive-four', 4, 2),
+      makeReview('positive-five', 5, 3),
+    ]
+    expect(reviews.map(isNegativeReview)).toEqual([true, false, false])
+    expect(negativeReviews(reviews).map((review) => review.id)).toEqual(['negative'])
   })
 
   it('rend tous les avis accessibles par chargement progressif', () => {

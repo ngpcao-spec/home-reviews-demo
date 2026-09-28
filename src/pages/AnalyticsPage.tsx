@@ -37,7 +37,7 @@ export function AnalyticsPage() {
     }, {})
     return Object.entries(grouped).map(([day, item]) => ({ day, rating: Number((item.total / item.count).toFixed(2)) })).slice(-12)
   }, [filtered])
-  const actionRate = Math.round(filtered.filter((item) => item.status === 'to_process').length / Math.max(1, filtered.length) * 100)
+  const actionRate = Math.round(negative.filter((item) => item.status === 'to_process').length / Math.max(1, negative.length) * 100)
 
   return <><BrandHeader trailing={<select className="header-period" value={period} onChange={(event)=>setPeriod(event.target.value)} aria-label="Période"><option value="7">7 derniers jours</option><option value="30">30 derniers jours</option><option value="90">90 derniers jours</option></select>}/>
     <section className="reference-intro analytics-intro"><h1>Statistiques</h1><p>Analysez les retours de vos clients.</p></section>

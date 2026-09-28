@@ -4,7 +4,7 @@ import { useApp } from '../app/AppContext'
 import { ReviewRow } from '../components/reviews/ReviewRow'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { PageHeader } from '../components/ui/PageHeader'
-import { recentNegativeReviews } from '../lib/review-list'
+import { isNegativeReview, recentNegativeReviews } from '../lib/review-list'
 
 const pageLoadedAt = Date.now()
 
@@ -12,7 +12,7 @@ export function HomePage() {
   const navigate = useNavigate()
   const { establishments, reviews, demoMode, injectNegativeReview, currentUser } = useApp()
   const active = establishments.filter((item) => item.isActive)
-  const pending = reviews.filter((item) => item.status === 'to_process')
+  const pending = reviews.filter((item) => isNegativeReview(item) && item.status === 'to_process')
   const latestNegative = recentNegativeReviews(reviews)
   const weightedRating = active.length ? active.reduce((sum, item) => sum + item.currentRating * item.currentReviewCount, 0) / active.reduce((sum, item) => sum + item.currentReviewCount, 0) : 0
 
