@@ -15,6 +15,7 @@ export interface Establishment {
   isActive: boolean
   syncEnabled: boolean
   lastSyncedAt: string
+  nextSyncAt?: string
   syncStatus: 'pending' | 'syncing' | 'ok' | 'warning' | 'error'
 }
 
