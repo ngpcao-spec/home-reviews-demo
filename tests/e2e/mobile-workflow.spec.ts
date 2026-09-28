@@ -88,8 +88,23 @@ test('parcourt tous les établissements sans mélanger leurs données',async({pa
   await page.reload()
   const viewport=page.locator('.featured-carousel-viewport')
   const current=()=>page.locator('.featured-slide[aria-current="true"]')
+  const featureBoxes=()=>page.evaluate(()=>{
+    const carousel=document.querySelector('.featured-carousel')!.getBoundingClientRect()
+    const surveillance=document.querySelector('.home-sync-card')!.getBoundingClientRect()
+    return {
+      viewportWidth:window.innerWidth,
+      carousel:{top:carousel.top,bottom:carousel.bottom,height:carousel.height},
+      surveillance:{top:surveillance.top,bottom:surveillance.bottom,height:surveillance.height},
+    }
+  })
   await expect(current()).toContainText('Le Petit Hanoi')
   await expect(current().locator('.featured-position')).toHaveText('1 / 4')
+  const initialBoxes=await featureBoxes()
+  expect(Math.abs(initialBoxes.carousel.height-initialBoxes.surveillance.height)).toBeLessThanOrEqual(1)
+  if(initialBoxes.viewportWidth>370){
+    expect(Math.abs(initialBoxes.carousel.top-initialBoxes.surveillance.top)).toBeLessThanOrEqual(1)
+    expect(Math.abs(initialBoxes.carousel.bottom-initialBoxes.surveillance.bottom)).toBeLessThanOrEqual(1)
+  }
 
   if(testInfo.project.name==='desktop'){
     await page.getByRole('button',{name:'Établissement suivant'}).click()
@@ -105,6 +120,9 @@ test('parcourt tous les établissements sans mélanger leurs données',async({pa
   await expect(page.locator('.home-sync-card')).toContainText('Erreur')
   await expect(page.locator('.home-sync-card')).toContainText(/Dans environ 2 h/)
   expect(await page.locator('.home-summary').textContent()).toBe(summary)
+  const nextBoxes=await featureBoxes()
+  expect(Math.abs(nextBoxes.carousel.height-initialBoxes.carousel.height)).toBeLessThanOrEqual(1)
+  expect(Math.abs(nextBoxes.surveillance.height-initialBoxes.surveillance.height)).toBeLessThanOrEqual(1)
 
   await viewport.evaluate((element)=>element.scrollTo({left:-element.clientWidth,behavior:'auto'}))
   await expect(current()).toContainText('Le Petit Hanoi')
