@@ -56,6 +56,7 @@ describe('EstablishmentDetailPage', () => {
     )
     expect(screen.queryByRole('button', { name: 'Actualiser' })).not.toBeInTheDocument()
     expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Avis négatifs récents', level: 2 })).toBeVisible()
     expect(screen.getByText('Service lent.')).toBeVisible()
     expect(screen.queryByText('Excellent restaurant.')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Google Maps' })).toBeVisible()

@@ -19,7 +19,7 @@ const makeReview = (id: string, rating: number, day: number): Review => ({
 })
 
 describe('affichage des listes d’avis', () => {
-  it('limite l’accueil aux cinq avis négatifs les plus récents', () => {
+  it('limite la fiche aux cinq avis négatifs les plus récents', () => {
     const reviews = [
       makeReview('one', 1, 1),
       makeReview('two', 2, 2),
