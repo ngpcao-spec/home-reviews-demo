@@ -143,6 +143,7 @@ interface InitializationFetchResult extends GoogleReviewsResult {
   recentNegative: number
   historicalFetched: number
   finalAfterDeduplication: number
+  checkpointReview: NormalizedReview | null
 }
 
 function sortNewest(reviews: NormalizedReview[]): NormalizedReview[] {
@@ -170,6 +171,7 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
       recentNegative: merged.recentNegative,
       historicalFetched: Math.min(result.reviews.length, HISTORICAL_NEGATIVE_LIMIT),
       finalAfterDeduplication: merged.reviews.length,
+      checkpointReview: sortNewest([...result.reviews])[0] ?? null,
     }
   }
 
@@ -237,6 +239,7 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
   providerRequests += 1
 
   const merged = mergeInitialReviewPasses(recentReviews, historical.reviews, cutoffMilliseconds)
+  const checkpointReview = sortNewest([...recentReviews])[0] ?? null
 
   return {
     provider: 'outscraper',
@@ -248,6 +251,7 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
     recentNegative: merged.recentNegative,
     historicalFetched: historical.reviews.length,
     finalAfterDeduplication: merged.reviews.length,
+    checkpointReview,
   }
 }
 
@@ -292,7 +296,9 @@ export async function initializeEstablishment(
   )
 
   const now = new Date().toISOString()
-  const newestReview = negativeReviews[0]
+  // The Google stream checkpoint must include positive reviews even though HOME
+  // Reviews only persists 1-3 star history.
+  const newestReview = result.checkpointReview
   const { data: establishment, error: establishmentError } = await admin
     .from('establishments')
     .insert({
@@ -427,7 +433,7 @@ export async function backfillHistoricalReviews(
   }
 
   const inserted = await insertReviews(admin, establishment, result.reviews, true)
-  const newestReview = result.reviews[0]
+  const newestReview = result.checkpointReview
   const currentNewestAt = establishment.last_review_at ? Date.parse(establishment.last_review_at) : 0
   const importedNewestAt = newestReview?.publishedAt ? Date.parse(newestReview.publishedAt) : 0
 
@@ -454,7 +460,7 @@ export async function backfillHistoricalReviews(
   }
 }
 
-async function fetchNewest(
+export async function fetchIncrementalPage(
   establishment: EstablishmentRow,
   cursor?: string,
 ): Promise<GoogleReviewsResult> {
@@ -491,7 +497,7 @@ export async function syncEstablishment(
 
   try {
     for (let pageNumber = 0; pageNumber < MAX_INCREMENTAL_PAGES; pageNumber += 1) {
-      const page = await fetchNewest(establishment, cursor)
+      const page = await fetchIncrementalPage(establishment, cursor)
       providerRequests += 1
       fetched += page.reviews.length
       if (!newestReview) newestReview = page.reviews[0]

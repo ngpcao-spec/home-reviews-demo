@@ -1,5 +1,0 @@
-import {createClient} from 'npm:@supabase/supabase-js@2.117.2'
-import {json,preflight} from '../_shared/cors.ts'
-import {syncEstablishment} from '../_shared/sync-service.ts'
-
-Deno.serve(async(request)=>{const pre=preflight(request);if(pre)return pre;const expected=Deno.env.get('CRON_SECRET');if(!expected||request.headers.get('x-cron-secret')!==expected)return json({error:'UNAUTHORIZED'},401);const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});const {data,error}=await admin.from('establishments').select('id,organization_id,provider_place_ref,last_synced_at').eq('is_active',true).eq('sync_enabled',true).lte('next_sync_at',new Date().toISOString()).limit(25);if(error)return json({error:'DB_ERROR'},500);const results=[];for(const establishment of data??[]){try{results.push({id:establishment.id,ok:true,...await syncEstablishment(admin,establishment,false)})}catch(error){results.push({id:establishment.id,ok:false,error:error instanceof Error?error.message:'SYNC_ERROR'})}}return json({processed:results.length,results})})

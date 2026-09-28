@@ -377,7 +377,7 @@ enabled = true
 # `oneshot` — fallback mode if hot reload causes issues (e.g. in large repos or with symlinks).
 policy = "per_worker"
 
-[functions.sync-reviews-cron]
+[functions.schedule-google-reviews]
 verify_jwt = false
 # Port to attach the Chrome inspector for debugging edge functions.
 inspector_port = 8083
@@ -395,6 +395,9 @@ verify_jwt = true
 
 [functions.sync-google-reviews]
 verify_jwt = true
+
+[functions.process-review-sync-jobs]
+verify_jwt = false
 
 # Custom authentication supports authenticated users and the private database webhook.
 [functions.analyze-review]
