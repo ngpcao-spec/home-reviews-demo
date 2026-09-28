@@ -168,7 +168,7 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
       ...result,
       reviews,
       count: reviews.length,
-      providerRequests: result.providerRequests,
+      providerRequests: 1,
       recentFetched: result.reviews.length,
       recentNegative: recentNegative.length,
       historicalFetched: recentNegative.length,
