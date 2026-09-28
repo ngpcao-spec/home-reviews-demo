@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, Building2, ChevronRight, CircleAlert, MessageSquareText, Plus, Sparkles, Star } from 'lucide-react'
+import { ArrowRight, BarChart3, Building2, ChevronRight, MessageSquareText, Plus, Sparkles, Star } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../app/AppContext'
@@ -8,11 +8,9 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { timeUntil } from '../lib/format'
 import { isNegativeReview, recentNegativeReviews } from '../lib/review-list'
 
-const pageLoadedAt = Date.now()
-
 export function HomePage() {
   const navigate = useNavigate()
-  const { establishments, reviews, demoMode, injectNegativeReview, currentUser } = useApp()
+  const { establishments, reviews, demoMode, injectNegativeReview } = useApp()
   const active = establishments.filter((item) => item.isActive)
   const pending = reviews.filter((item) => isNegativeReview(item) && item.status === 'to_process')
   const latestNegative = recentNegativeReviews(reviews)
@@ -40,17 +38,10 @@ export function HomePage() {
         : featured?.syncStatus === 'pending' ? 'En attente'
           : 'Statut inconnu'
 
-  if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="home-greeting"><span className="eyebrow">Votre réputation, en clair</span><h2>Bonjour {currentUser.name.split(' ')[0]}</h2></div><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>Ajoutez votre premier établissement</h2><p>Surveillez les nouveaux avis et identifiez immédiatement ceux qui demandent une action.</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>Ajouter un établissement</button></div></>
+  if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>Ajoutez votre premier établissement</h2><p>Surveillez les nouveaux avis et identifiez immédiatement ceux qui demandent une action.</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>Ajouter un établissement</button></div></>
 
   return <>
     <BrandHeader />
-    <section className="home-welcome">
-      <div className="home-profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div>
-      <div><span>Bonjour</span><h1>{currentUser.name.split(' ')[0]}</h1><p>Bon retour sur HOME Reviews.</p></div>
-    </section>
-    <button className="attention-card" onClick={() => navigate('/avis?statut=to_process')}>
-      <span className="attention-symbol"><CircleAlert /></span><span><strong>{pending.length} avis nécessitent votre attention</strong><em>+{pending.filter((item) => pageLoadedAt - new Date(item.publishedAt).getTime() < 86_400_000).length} depuis hier</em></span><ChevronRight />
-    </button>
     {featured && <section className="home-feature-grid">
       <button className="featured-establishment" onClick={() => navigate(`/etablissements/${featured.id}`)}>
         {featured.photoUrl && <img src={featured.photoUrl.startsWith('/') ? `${import.meta.env.BASE_URL}${featured.photoUrl.replace(/^\/+/, '')}` : featured.photoUrl} alt="" />}

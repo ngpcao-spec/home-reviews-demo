@@ -4,7 +4,9 @@ test.beforeEach(async({page})=>{await page.addInitScript(()=>{if(!sessionStorage
 
 test('parcours accueil → avis → réponse → analyses',async({page})=>{
   await page.goto('/')
-  await expect(page.getByText('avis nécessitent votre attention')).toBeVisible()
+  await expect(page.locator('.home-feature-grid')).toBeVisible()
+  await expect(page.getByText('Bon retour sur HOME Reviews.')).toHaveCount(0)
+  await expect(page.getByText(/avis nécessitent votre attention/)).toHaveCount(0)
   await page.getByRole('link',{name:'Avis'}).click()
   await expect(page.getByRole('tab',{name:/À traiter/})).toHaveAttribute('aria-selected','true')
   await page.locator('.review-row').first().click()

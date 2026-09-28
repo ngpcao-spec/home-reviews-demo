@@ -90,16 +90,6 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
 .nav-item.active { color: #f1d6b2; background: rgba(216, 188, 151, .12); }
 .nav-item.active .nav-icon { color: var(--champagne); background: transparent; box-shadow: none; }
 
-.home-welcome { display: flex; align-items: center; gap: 13px; margin: 20px 2px 17px; }
-.home-profile-avatar { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; border: 1px solid #665b4f; border-radius: 50%; background: var(--surface-3); color: var(--champagne); font-weight: 850; }
-.home-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.home-welcome span { color: var(--muted); font-size: .78rem; }
-.home-welcome h1 { margin: 0; font-size: 1.75rem; line-height: 1.05; letter-spacing: -.04em; }
-.home-welcome p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
-.attention-card { border-color: rgba(187, 75, 80, .72); background: linear-gradient(120deg, rgba(77, 35, 35, .9), rgba(44, 30, 28, .94)); box-shadow: none; }
-.attention-symbol { background: var(--danger); box-shadow: none; }
-.attention-card em { color: #df8b8f; }
-
 .home-feature-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(112px, .8fr); gap: 10px; margin-top: 13px; }
 .featured-establishment { position: relative; min-height: 190px; overflow: hidden; padding: 0; border: 1px solid #66594b; border-radius: 22px; background: var(--surface); color: white; text-align: left; cursor: pointer; }
 .featured-establishment > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -229,8 +219,7 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
   .bottom-nav { left: 50%; right: auto; bottom: 14px; }
   .home-feature-grid,
   .home-summary,
-  .quick-actions,
-  .home-welcome { max-width: 720px; margin-inline: auto; }
+  .quick-actions { max-width: 720px; margin-inline: auto; }
   .home-feature-grid { grid-template-columns: minmax(0, 2fr) minmax(220px, .7fr); }
   .featured-arrow { display: grid; }
   .quick-actions { grid-template-columns: repeat(4, 1fr); }
