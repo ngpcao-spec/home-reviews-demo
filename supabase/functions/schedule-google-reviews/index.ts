@@ -15,12 +15,13 @@ Deno.serve(async (request) => {
   )
   if (authError || authorized !== true) return json({ error: 'UNAUTHORIZED' }, 401)
 
-  const limit = configuredInteger(
-    Deno.env.get('SYNC_SCHEDULER_ENQUEUE_LIMIT'),
-    1000,
-    1,
-    10000,
-  )
+  const { data: runtime, error: runtimeError } = await admin
+    .from('review_sync_runtime_config')
+    .select('scheduler_enqueue_limit')
+    .eq('singleton', true)
+    .single()
+  if (runtimeError) return json({ error: 'RUNTIME_CONFIG_UNAVAILABLE' }, 500)
+  const limit = configuredInteger(String(runtime.scheduler_enqueue_limit), 1000, 1, 10000)
   const { data, error } = await admin.rpc('enqueue_due_review_sync_jobs', {
     p_limit: limit,
   })
