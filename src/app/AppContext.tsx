@@ -47,7 +47,7 @@ interface AppContextValue {
   retryEstablishmentImport: (establishmentId: string) => Promise<{ negativeReviewCount: number; nextSyncAt?: string }>
   refreshEstablishment: (id: string) => Promise<void>
   toggleMonitoring: (id: string) => void
-  removeEstablishment: (id: string) => void
+  removeEstablishment: (id: string) => Promise<void>
   injectNegativeReview: () => string
   pushToast: (text: string) => void
   retryData: () => Promise<void>
@@ -554,13 +554,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const toggleMonitoring = (id: string) => setEstablishments((items) => items.map((item) => item.id === id ? { ...item, syncEnabled: !item.syncEnabled } : item))
-  const removeEstablishment = (id: string) => {
+  const removeEstablishment = async (id: string) => {
+    const removedReviewIds = new Set(reviews.filter((item) => item.establishmentId === id).map((item) => item.id))
     if (!demoMode) {
-      pushToast('Suppression indisponible dans cette version')
-      return
+      if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+      const { data, error } = await supabase
+        .from('establishments')
+        .delete()
+        .eq('id', id)
+        .select('id')
+        .maybeSingle()
+      if (error) throw error
+      if (!data) throw new Error('ESTABLISHMENT_NOT_FOUND_OR_FORBIDDEN')
     }
     setEstablishments((items) => items.filter((item) => item.id !== id))
     setReviews((items) => items.filter((item) => item.establishmentId !== id))
+    setNotifications((items) => items.filter((item) => item.establishmentId !== id))
+    setActions((items) => items.filter((item) => !removedReviewIds.has(item.reviewId)))
     pushToast('Établissement supprimé')
   }
 

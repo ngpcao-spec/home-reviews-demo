@@ -1,7 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EstablishmentDetailPage } from './EstablishmentDetailPage'
+
+const removeEstablishment = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../app/AppContext', () => ({
   useApp: () => ({
@@ -35,11 +38,13 @@ vi.mock('../app/AppContext', () => ({
     }],
     notifications: [],
     monitoringIntervalHours: 3,
-    removeEstablishment: vi.fn(),
+    removeEstablishment,
   }),
 }))
 
 describe('EstablishmentDetailPage', () => {
+  afterEach(() => cleanup())
+
   it('affiche la photo enregistrée de l’établissement', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/etablissements/green-home']}>
@@ -60,5 +65,25 @@ describe('EstablishmentDetailPage', () => {
     expect(screen.getByText('Service lent.')).toBeVisible()
     expect(screen.queryByText('Excellent restaurant.')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Google Maps' })).toBeVisible()
+  })
+
+  it('supprime après confirmation puis revient à la liste', async () => {
+    removeEstablishment.mockClear()
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/etablissements/green-home']}>
+        <Routes>
+          <Route path="/etablissements/:id" element={<EstablishmentDetailPage />} />
+          <Route path="/etablissements" element={<div>Liste des établissements</div>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Supprimer de HOME Reviews' }))
+    const dialog = screen.getByRole('dialog', { name: 'Supprimer cet établissement ?' })
+    await user.click(within(dialog).getByRole('button', { name: 'Supprimer' }))
+
+    expect(removeEstablishment).toHaveBeenCalledWith('green-home')
+    expect(await screen.findByText('Liste des établissements')).toBeVisible()
   })
 })
