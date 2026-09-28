@@ -1,4 +1,4 @@
-import { Building2, ChevronRight, CircleAlert, Frown, Plus, Sparkles, Star, Store } from 'lucide-react'
+import { ArrowRight, BarChart3, Building2, ChevronRight, CircleAlert, MessageSquareText, Plus, Sparkles, Star } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../app/AppContext'
 import { ReviewRow } from '../components/reviews/ReviewRow'
@@ -15,21 +15,37 @@ export function HomePage() {
   const pending = reviews.filter((item) => isNegativeReview(item) && item.status === 'to_process')
   const latestNegative = recentNegativeReviews(reviews)
   const weightedRating = active.length ? active.reduce((sum, item) => sum + item.currentRating * item.currentReviewCount, 0) / active.reduce((sum, item) => sum + item.currentReviewCount, 0) : 0
+  const featured = active[0]
 
   if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="home-greeting"><span className="eyebrow">Votre réputation, en clair</span><h2>Bonjour {currentUser.name.split(' ')[0]}</h2></div><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>Ajoutez votre premier établissement</h2><p>Surveillez les nouveaux avis et identifiez immédiatement ceux qui demandent une action.</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>Ajouter un établissement</button></div></>
 
   return <>
     <BrandHeader />
-    <section className="reference-intro home-intro"><h1>Bonjour !</h1><p>Voici la situation de vos établissements.</p></section>
+    <section className="home-welcome">
+      <div className="home-profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div>
+      <div><span>Bonjour</span><h1>{currentUser.name.split(' ')[0]}</h1><p>Bon retour sur HOME Reviews.</p></div>
+    </section>
     <button className="attention-card" onClick={() => navigate('/avis?statut=to_process')}>
       <span className="attention-symbol"><CircleAlert /></span><span><strong>{pending.length} avis nécessitent votre attention</strong><em>+{pending.filter((item) => pageLoadedAt - new Date(item.publishedAt).getTime() < 86_400_000).length} depuis hier</em></span><ChevronRight />
     </button>
-    <div className="kpi-grid">
-      <div className="kpi-card card"><span className="kpi-icon purple"><Store /></span><strong>{active.length}</strong><small>Établissements</small></div>
-      <div className="kpi-card card"><span className="kpi-icon red"><Frown /></span><strong>{pending.length}</strong><small>Avis négatifs</small></div>
-      <div className="kpi-card card kpi-positive"><span className="kpi-icon green"><Star /></span><strong>{weightedRating.toFixed(1)}</strong><small>Note moyenne</small></div>
+    {featured && <section className="home-feature-grid">
+      <button className="featured-establishment" onClick={() => navigate(`/etablissements/${featured.id}`)}>
+        {featured.photoUrl && <img src={featured.photoUrl.startsWith('/') ? `${import.meta.env.BASE_URL}${featured.photoUrl.replace(/^\/+/, '')}` : featured.photoUrl} alt="" />}
+        <span className="featured-overlay" />
+        <span className="featured-copy"><strong>{featured.name}</strong><span><Star fill="currentColor" /> {featured.currentRating.toFixed(1)} <small>({featured.currentReviewCount} avis)</small></span><em>{pending.filter((item) => item.establishmentId === featured.id).length} avis à traiter</em></span>
+        <span className="featured-arrow"><ArrowRight /></span>
+      </button>
+      <div className="home-sync-card card"><Sparkles/><strong>Surveillance</strong><span className={`home-sync-state ${featured.syncStatus}`}>● {featured.syncStatus === 'ok' ? 'À jour' : featured.syncStatus === 'syncing' ? 'En cours' : featured.syncStatus === 'error' ? 'Erreur' : 'En attente'}</span><small>{featured.nextSyncAt ? 'Prochain contrôle planifié' : 'Planification en attente'}</small></div>
+    </section>}
+    <div className="home-summary" aria-label="Résumé"><span>{active.length} établissement{active.length > 1 ? 's' : ''}</span><span>{pending.length} avis à traiter</span><span>Note {weightedRating.toFixed(1)}</span></div>
+    <div className="section-heading home-section-heading"><h2>Accès rapides</h2><button className="text-button" onClick={() => navigate('/etablissements')}>Voir tout <ChevronRight /></button></div>
+    <div className="quick-actions">
+      <button className="quick-action card" onClick={() => navigate('/etablissements')}><Building2/><span><strong>Établissements</strong><small>Gérer vos lieux</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/avis')}><MessageSquareText/><span><strong>Réponses IA</strong><small>{pending.length} avis à traiter</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/analyses')}><BarChart3/><span><strong>Analyses</strong><small>Suivre les tendances</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/etablissements/ajouter')}><Plus/><span><strong>Ajouter</strong><small>Un établissement</small></span><ArrowRight/></button>
     </div>
-    <div className="section-heading"><h2>Avis récents</h2><button className="text-button" onClick={() => navigate('/avis')}>Voir tout <ChevronRight /></button></div>
+    <div className="section-heading"><h2>Avis négatifs récents</h2><button className="text-button" onClick={() => navigate('/avis')}>Voir tout <ChevronRight /></button></div>
     {latestNegative.length ? latestNegative.map((review) => <ReviewRow compact key={review.id} review={review} />) : <div className="positive-state"><Sparkles/><div><strong>Tout est sous contrôle</strong><span>Aucun avis négatif récent.</span></div></div>}
     {demoMode && <button className="demo-button" onClick={injectNegativeReview}><Sparkles size={16}/>Injecter un nouvel avis négatif</button>}
   </>

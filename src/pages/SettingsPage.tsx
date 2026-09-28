@@ -1,4 +1,4 @@
-import { Bell, Building2, ChevronRight, CreditCard, Database, LogOut, Shield, Sparkles, User } from 'lucide-react'
+import { Bell, ChevronRight, Database, LogOut, Shield, Sparkles, User } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -38,7 +38,7 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 }
 
 export function SettingsPage() {
-  const { currentUser, plan, establishments, aiUsage, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval, signOut } = useApp()
+  const { currentUser, establishments, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval, signOut } = useApp()
   const [inApp, setInApp] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
   const [pushState, setPushState] = useState<PushUiState>(() => getPushUiState(
@@ -142,9 +142,10 @@ export function SettingsPage() {
   }
 
   return <><PageHeader title="Plus"/>
-  <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>HOME France</span></div></section>
+  <section className="settings-intro"><h1>Paramètres de votre compte</h1><p>Gérez vos préférences HOME Reviews.</p></section>
+  <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>Compte Google</span></div></section>
   {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>Mode démonstration</strong><span>Données locales, aucun service externe requis.</span></div></div>}
-  <SettingsSection title="Compte"><SettingLink icon={<User/>} title="Profil" detail="Nom et adresse email"/><SettingLink icon={<Building2/>} title="Organisation" detail="HOME France · Propriétaire"/><button className="setting-row clickable" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</strong><span>Fermer cette session uniquement</span></div><ChevronRight/></button></SettingsSection>
+  <SettingsSection title="Compte"><SettingLink icon={<User/>} title="Profil" detail="Nom et adresse email du compte Google"/><button className="setting-row"><div className="setting-icon google-setting-icon">G</div><div><strong>Connexion Google</strong><span>Utilisée uniquement pour votre connexion sécurisée</span></div></button><button className="setting-row clickable danger" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</strong><span>Fermer cette session uniquement</span></div><ChevronRight/></button></SettingsSection>
   <SettingsSection title="Notifications"><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>Notifications in-app</strong><span>Alertes visibles dans l’application</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={() => void togglePush()} disabled={pushBusy}><div className="setting-icon"><Bell/></div><div><strong>{pushState === 'enabled' ? 'Désactiver les notifications' : 'Activer les notifications'}</strong><span>État : {pushState === 'enabled' ? 'Activées' : pushState === 'denied' ? 'Permission refusée par le navigateur' : pushState === 'unsupported' ? 'Non prises en charge' : 'Désactivées'}</span>{isIosDevice() && !isStandalonePwa() && <span>Sur iPhone : ajoutez d’abord l’app à l’écran d’accueil.</span>}</div><ChevronRight/></button></SettingsSection>
   <SettingsSection title="Surveillance des avis">
     <div className="settings-info card">
@@ -155,7 +156,7 @@ export function SettingsPage() {
         value={monitoringInterval}
         disabled={savingMonitoring}
         onChange={(event) => void updateMonitoringInterval(Number(event.target.value) as MonitoringIntervalHours)}
-        style={{ minWidth: 190, height: 42, border: '1px solid var(--border)', borderRadius: 11, background: '#0e1327', color: 'var(--text)', padding: '0 10px' }}
+        className="monitoring-select"
       >
         {MONITORING_INTERVALS.map((interval) => <option key={interval.value} value={interval.value}>{interval.label}</option>)}
       </select>
@@ -165,7 +166,6 @@ export function SettingsPage() {
       <span>Prochain contrôle</span><strong>{nextSync ? timeUntil(nextSync) : 'Non planifié'}</strong>
     </div>
   </SettingsSection>
-  <SettingsSection title="Abonnement"><div className="subscription-card card"><div><span>Plan actuel</span><strong>Professionnel</strong><em>Statut actif</em></div><CreditCard/><div className="quota"><span>Établissements <b>{establishments.length} / {plan.maxEstablishments}</b></span><i><b style={{width:`${establishments.length/plan.maxEstablishments*100}%`}}/></i><span>Réponses IA <b>{aiUsage} / {plan.maxAiResponsesMonth}</b></span><i><b style={{width:`${aiUsage/plan.maxAiResponsesMonth*100}%`}}/></i></div><button className="secondary-button full-width" onClick={()=>pushToast('Gestion du plan simulée en mode démo')}>Changer de plan</button></div></SettingsSection>
   <SettingsSection title="Données & confidentialité"><SettingLink icon={<Shield/>} title="Confidentialité" detail="Politique et gestion des données"/><SettingLink icon={<Database/>} title="Supprimer mon compte" detail="Demande avec confirmation forte" danger/></SettingsSection>
   <p className="version">HOME Reviews v1.0 · {demoMode ? 'Données de démonstration' : 'Données Supabase sécurisées'}</p>
   </>}

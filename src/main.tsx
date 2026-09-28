@@ -7,6 +7,7 @@ import { AppProvider } from './app/AppContext'
 import './styles/global.css'
 import './styles/pages.css'
 import './styles/reference.css'
+import './styles/warm-theme.css'
 
 const queryClient=new QueryClient({defaultOptions:{queries:{staleTime:30_000,retry:1,refetchOnWindowFocus:false}}})
 const Router=import.meta.env.VITE_ROUTER_MODE==='hash'?HashRouter:BrowserRouter
