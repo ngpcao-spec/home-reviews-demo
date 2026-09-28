@@ -2,7 +2,7 @@ import { Bell, Building2, ChevronRight, CreditCard, Database, LogOut, Shield, Sp
 import { useEffect, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import { PageHeader } from '../components/ui/PageHeader'
-import { relativeTime } from '../lib/format'
+import { relativeTime, timeUntil } from '../lib/format'
 import { saveNotificationPreference } from '../lib/notification-preferences'
 import {
   currentPushSubscription,
@@ -51,6 +51,10 @@ export function SettingsPage() {
   const [savingMonitoring, setSavingMonitoring] = useState(false)
   const lastSyncTimestamp = Math.max(...establishments.map((item) => new Date(item.lastSyncedAt).getTime()))
   const lastSync = Number.isFinite(lastSyncTimestamp) ? new Date(lastSyncTimestamp).toISOString() : null
+  const nextSyncTimestamp = Math.min(...establishments
+    .filter((item) => item.isActive && item.nextSyncAt)
+    .map((item) => new Date(item.nextSyncAt as string).getTime()))
+  const nextSync = Number.isFinite(nextSyncTimestamp) ? new Date(nextSyncTimestamp).toISOString() : null
 
   useEffect(() => {
     if (isMonitoringInterval(monitoringIntervalHours)) setMonitoringInterval(monitoringIntervalHours)
@@ -158,6 +162,7 @@ export function SettingsPage() {
       <span style={{ gridColumn: '1 / -1', lineHeight: 1.5 }}>HOME Reviews vérifie automatiquement les nouveaux avis Google selon cette fréquence.</span>
       {monitoringInterval <= 3 && <span style={{ gridColumn: '1 / -1', color: 'var(--orange)' }}>Test / consommation API plus élevée</span>}
       <span>Dernière synchronisation globale</span><strong>{lastSync ? relativeTime(lastSync) : 'Jamais'}</strong>
+      <span>Prochain contrôle</span><strong>{nextSync ? timeUntil(nextSync) : 'Non planifié'}</strong>
     </div>
   </SettingsSection>
   <SettingsSection title="Abonnement"><div className="subscription-card card"><div><span>Plan actuel</span><strong>Professionnel</strong><em>Statut actif</em></div><CreditCard/><div className="quota"><span>Établissements <b>{establishments.length} / {plan.maxEstablishments}</b></span><i><b style={{width:`${establishments.length/plan.maxEstablishments*100}%`}}/></i><span>Réponses IA <b>{aiUsage} / {plan.maxAiResponsesMonth}</b></span><i><b style={{width:`${aiUsage/plan.maxAiResponsesMonth*100}%`}}/></i></div><button className="secondary-button full-width" onClick={()=>pushToast('Gestion du plan simulée en mode démo')}>Changer de plan</button></div></SettingsSection>
