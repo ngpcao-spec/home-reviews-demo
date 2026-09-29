@@ -41,6 +41,8 @@ interface AppContextValue {
   markProcessed: (reviewId: string) => void
   reopenReview: (reviewId: string) => void
   generateResponse: (reviewId: string) => Promise<string>
+  saveReplyDraft: (reviewId: string, text: string) => Promise<number>
+  translateReply: (reviewId: string, draftVersion: number) => Promise<void>
   logAction: (reviewId: string, actionType: ReviewAction['actionType']) => void
   markNotificationRead: (notificationId: string) => Promise<void>
   markAllNotificationsRead: () => Promise<void>
@@ -93,6 +95,16 @@ interface ReviewRow {
   status: ReviewStatus
   ai_summary: string | null
   ai_suggested_reply: string | null
+  ai_suggested_reply_language: string | null
+  reply_draft_text: string | null
+  reply_draft_language: string | null
+  reply_draft_updated_at: string | null
+  reply_draft_version: number
+  translated_reply_text: string | null
+  translated_reply_language: string | null
+  translated_from_draft_updated_at: string | null
+  translated_from_draft_version: number | null
+  translated_reply_at: string | null
   ai_detected_language: string | null
   ai_analyzed_at: string | null
   ai_status: 'pending' | 'completed' | 'failed' | null
@@ -119,6 +131,28 @@ interface AnalyzePayload {
   detected_language?: string
   ai_analyzed_at?: string
   ai_status?: 'completed'
+  reply_draft_text?: string
+  reply_draft_language?: string
+  reply_draft_updated_at?: string
+  reply_draft_version?: number
+  error?: string
+}
+
+interface TranslateReplyPayload {
+  translation_required?: boolean
+  translated_reply_text?: string
+  translated_reply_language?: string
+  translated_from_draft_updated_at?: string
+  translated_from_draft_version?: number
+  translated_reply_at?: string
+  error?: string
+}
+
+interface SaveReplyDraftPayload {
+  reply_draft_text?: string
+  reply_draft_language?: string
+  reply_draft_updated_at?: string
+  reply_draft_version?: number
   error?: string
 }
 
@@ -165,7 +199,7 @@ const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
 const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
-const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,original_language,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text)'
+const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,original_language,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text)'
 const REVIEW_LOAD_PAGE_SIZE = 500
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
@@ -226,6 +260,16 @@ function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review
     status,
     aiSummary: row.ai_summary ?? undefined,
     aiSuggestedReply: row.ai_suggested_reply ?? undefined,
+    aiSuggestedReplyLanguage: row.ai_suggested_reply_language ?? undefined,
+    replyDraftText: row.reply_draft_text ?? undefined,
+    replyDraftLanguage: row.reply_draft_language ?? undefined,
+    replyDraftUpdatedAt: row.reply_draft_updated_at ?? undefined,
+    replyDraftVersion: row.reply_draft_version ?? 0,
+    translatedReplyText: row.translated_reply_text ?? undefined,
+    translatedReplyLanguage: row.translated_reply_language ?? undefined,
+    translatedFromDraftUpdatedAt: row.translated_from_draft_updated_at ?? undefined,
+    translatedFromDraftVersion: row.translated_from_draft_version ?? undefined,
+    translatedReplyAt: row.translated_reply_at ?? undefined,
     aiDetectedLanguage: row.ai_detected_language ?? undefined,
     aiAnalyzedAt: row.ai_analyzed_at ?? undefined,
     aiStatus: row.ai_status ?? undefined,
@@ -443,7 +487,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (demoMode) {
       await new Promise((resolve) => setTimeout(resolve, 650))
       const response = review.aiSuggestedReply ?? `Bonjour, merci d’avoir pris le temps de partager votre expérience. Nous sommes désolés qu’elle n’ait pas été à la hauteur de vos attentes et prenons votre retour au sérieux.`
-      setReviews((items) => items.map((item) => item.id === reviewId ? { ...item, aiSuggestedReply: response, aiStatus: 'completed' } : item))
+      const now = new Date().toISOString()
+      setReviews((items) => items.map((item) => item.id === reviewId ? {
+        ...item,
+        aiSuggestedReply: response,
+        aiSuggestedReplyLanguage: preferredLanguage ?? 'fr',
+        replyDraftText: response,
+        replyDraftLanguage: preferredLanguage ?? 'fr',
+        replyDraftUpdatedAt: now,
+        replyDraftVersion: (item.replyDraftVersion ?? 0) + 1,
+        aiStatus: 'completed',
+      } : item))
       logAction(reviewId, 'response_generated')
       return response
     }
@@ -454,6 +508,71 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error || !data?.ai_suggested_reply) throw new Error(await functionErrorCode(error, data))
     await loadRealData()
     return data.ai_suggested_reply
+  }
+
+  const saveReplyDraft = async (reviewId: string, text: string) => {
+    const review = reviews.find((item) => item.id === reviewId)
+    if (!review) throw new Error('REVIEW_NOT_FOUND')
+    if (demoMode) {
+      const updatedAt = new Date().toISOString()
+      const version = (review.replyDraftVersion ?? 0) + 1
+      setReviews((items) => items.map((item) => item.id === reviewId ? {
+        ...item,
+        replyDraftText: text,
+        replyDraftLanguage: preferredLanguage ?? 'fr',
+        replyDraftUpdatedAt: updatedAt,
+        replyDraftVersion: version,
+      } : item))
+      return version
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<SaveReplyDraftPayload>('save-reply-draft', {
+      body: { review_id: reviewId, draft_text: text },
+    })
+    if (error || !data?.reply_draft_text && data?.reply_draft_text !== '') {
+      throw new Error(await functionErrorCode(error, data))
+    }
+    const saved = data
+    setReviews((items) => items.map((item) => item.id === reviewId ? {
+      ...item,
+      replyDraftText: saved.reply_draft_text,
+      replyDraftLanguage: saved.reply_draft_language ?? preferredLanguage ?? 'fr',
+      replyDraftUpdatedAt: saved.reply_draft_updated_at,
+      replyDraftVersion: saved.reply_draft_version ?? (item.replyDraftVersion ?? 0) + 1,
+    } : item))
+    return saved.reply_draft_version ?? (review.replyDraftVersion ?? 0) + 1
+  }
+
+  const translateReply = async (reviewId: string, draftVersion: number) => {
+    if (demoMode) {
+      const review = reviews.find((item) => item.id === reviewId)
+      if (!review?.replyDraftText) throw new Error('REPLY_DRAFT_REQUIRED')
+      const translatedAt = new Date().toISOString()
+      setReviews((items) => items.map((item) => item.id === reviewId ? {
+        ...item,
+        translatedReplyText: item.replyDraftText,
+        translatedReplyLanguage: item.reviewLanguage,
+        translatedFromDraftUpdatedAt: item.replyDraftUpdatedAt,
+        translatedFromDraftVersion: item.replyDraftVersion,
+        translatedReplyAt: translatedAt,
+      } : item))
+      return
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<TranslateReplyPayload>('translate-reply', {
+      body: { review_id: reviewId, draft_version: draftVersion },
+    })
+    if (error || !data) throw new Error(await functionErrorCode(error, data))
+    if (data.translation_required === false) return
+    if (!data.translated_reply_text) throw new Error(data.error ?? 'REPLY_TRANSLATION_FAILED')
+    setReviews((items) => items.map((item) => item.id === reviewId ? {
+      ...item,
+      translatedReplyText: data.translated_reply_text,
+      translatedReplyLanguage: data.translated_reply_language,
+      translatedFromDraftUpdatedAt: data.translated_from_draft_updated_at,
+      translatedFromDraftVersion: data.translated_from_draft_version,
+      translatedReplyAt: data.translated_reply_at,
+    } : item))
   }
 
   const markNotificationRead = async (id: string) => {
@@ -675,7 +794,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: AppContextValue = {
     establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, preferredLanguage, currentUser,
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
-    markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
+    markProcessed, reopenReview, generateResponse, saveReplyDraft, translateReply, logAction, markNotificationRead, markAllNotificationsRead,
     resolveEstablishment, addEstablishment, retryEstablishmentImport, refreshEstablishment, toggleMonitoring, removeEstablishment,
     injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, updatePreferredLanguage, completePasswordRecovery, signOut,
   }

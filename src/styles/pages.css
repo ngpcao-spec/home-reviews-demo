@@ -32,3 +32,9 @@
 .auth-legal{text-align:center!important;margin:15px 8px 0!important;color:#747d99!important;font-size:.68rem!important;line-height:1.5!important}
 .profile-avatar,.mini-avatar{overflow:hidden}
 .profile-avatar img,.mini-avatar img{width:100%;height:100%;display:block;object-fit:cover}
+
+.response-title h2{display:flex;align-items:center;gap:7px}
+.translated-reply-copy{margin:14px 0;padding:14px;border:1px solid var(--border);border-radius:14px;background:#0c1020;color:var(--text);line-height:1.55;white-space:pre-wrap}
+.client-reply.stale{border-color:rgba(246,173,85,.4)}
+.client-reply.stale .translated-reply-copy{opacity:.62}
+.client-reply .response-map-button{grid-column:1/-1}

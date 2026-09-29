@@ -37,6 +37,16 @@ export interface Review {
   status: ReviewStatus
   aiSummary?: string
   aiSuggestedReply?: string
+  aiSuggestedReplyLanguage?: string
+  replyDraftText?: string
+  replyDraftLanguage?: string
+  replyDraftUpdatedAt?: string
+  replyDraftVersion?: number
+  translatedReplyText?: string
+  translatedReplyLanguage?: string
+  translatedFromDraftUpdatedAt?: string
+  translatedFromDraftVersion?: number
+  translatedReplyAt?: string
   aiDetectedLanguage?: string
   aiAnalyzedAt?: string
   aiStatus?: AiStatus

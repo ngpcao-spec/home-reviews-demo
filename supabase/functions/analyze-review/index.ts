@@ -15,6 +15,7 @@ interface ReviewRow {
   historical_import: boolean
   rating: number
   text: string
+  original_text: string
   language: string | null
   ai_summary: string | null
   ai_suggested_reply: string | null
@@ -24,6 +25,7 @@ interface ReviewRow {
   ai_error: string | null
   ai_error_history: Array<{ error: string; at: string }> | null
   ai_attempt_count: number | null
+  reply_draft_version: number | null
 }
 
 async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary: string) {
@@ -119,7 +121,7 @@ Deno.serve(async (request) => {
 
     const { data, error } = await reader
       .from('reviews')
-      .select('id,organization_id,establishment_id,historical_import,rating,text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count')
+      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version')
       .eq('id', reviewId)
       .single()
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
@@ -157,11 +159,18 @@ Deno.serve(async (request) => {
     const summaryLanguage = userId
       ? await preferredLanguageForUser(admin, userId)
       : await preferredLanguageForOrganization(admin, review.organization_id)
-    const result = await analyzeReviewWithOpenAI(review.rating, review.text, summaryLanguage)
+    const result = await analyzeReviewWithOpenAI(review.rating, review.original_text || review.text, summaryLanguage)
     const analyzedAt = new Date().toISOString()
+    const currentDraftVersion = review.reply_draft_version ?? 0
+    const nextDraftVersion = currentDraftVersion + 1
     const { error: saveError } = await admin.from('reviews').update({
       ai_summary: result.ai_summary,
       ai_suggested_reply: result.ai_suggested_reply,
+      ai_suggested_reply_language: summaryLanguage,
+      reply_draft_text: result.ai_suggested_reply,
+      reply_draft_language: summaryLanguage,
+      reply_draft_updated_at: analyzedAt,
+      reply_draft_version: nextDraftVersion,
       ai_detected_language: result.detected_language,
       ai_analyzed_at: analyzedAt,
       ai_status: 'completed',
@@ -194,6 +203,11 @@ Deno.serve(async (request) => {
 
     return json({
       ...result,
+      ai_suggested_reply_language: summaryLanguage,
+      reply_draft_text: result.ai_suggested_reply,
+      reply_draft_language: summaryLanguage,
+      reply_draft_updated_at: analyzedAt,
+      reply_draft_version: nextDraftVersion,
       ai_analyzed_at: analyzedAt,
       ai_status: 'completed',
     })

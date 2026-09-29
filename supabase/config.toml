@@ -403,6 +403,12 @@ verify_jwt = false
 [functions.analyze-review]
 verify_jwt = false
 
+[functions.translate-reply]
+verify_jwt = true
+
+[functions.save-reply-draft]
+verify_jwt = true
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
