@@ -23,6 +23,10 @@ export function ReviewDetailPage() {
   }, [review?.aiSuggestedReply])
 
   useEffect(() => {
+    setShowOriginal(false)
+  }, [review?.id])
+
+  useEffect(() => {
     if (review) logAction(review.id, 'opened')
   }, [review?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -59,15 +63,15 @@ export function ReviewDetailPage() {
   const statusCopy = review.aiStatus === 'failed' ? messages.reviews.analysisFailed : messages.reviews.analysisPending
   const hasTranslation = Boolean(review.translatedText && review.originalText && review.translatedText !== review.originalText)
 
-  return <><PageHeader title={messages.reviews.original} back action={<span/>}/>
+  return <><PageHeader title={messages.reviews.detailTitle} back action={<span/>}/>
     <section className="review-detail card">
       <div className="review-establishment">
         <EstablishmentAvatar id={establishment.id} name={establishment.name} large photoUrl={establishment.photoUrl}/>
         <div><strong>{establishment.name}</strong><span>{relativeTime(review.publishedAt)}</span><b className={`detail-rating rating-${review.rating}`}>{review.rating} ★</b></div>
       </div>
-      <h2 className="review-section-label">{showOriginal ? messages.reviews.original : messages.nav.reviews}</h2>
+      <h2 className="review-section-label">{messages.reviews.reviewLabel}</h2>
       <blockquote>{showOriginal ? review.originalText : review.reviewText}</blockquote>
-      {hasTranslation && <button className="text-button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? messages.reviews.hideOriginal : messages.reviews.viewOriginal}</button>}
+      {hasTranslation && <button className="text-button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? messages.reviews.viewTranslation : messages.reviews.viewOriginal}</button>}
       <span className="author">— {review.authorName}</span>
     </section>
 
