@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatWeeklyPeriod, lastCompletedVietnamWeekStart, mapWeeklyReport, vietnamWeekBounds } from './weekly-report'
+import { currentVietnamPeriod, formatWeeklyPeriod, lastCompletedVietnamWeekStart, mapWeeklyReport, vietnamWeekBounds } from './weekly-report'
 
 describe('weekly report client helpers', () => {
   it('uses the last completed Vietnam calendar week', () => {
@@ -14,15 +14,24 @@ describe('weekly report client helpers', () => {
     expect(formatWeeklyPeriod('2026-09-20T17:00:00Z', '2026-09-27T17:00:00Z', 'vi')).toContain('27 tháng 9, 2026')
   })
 
+  it('uses a live end boundary for the current provisional week', () => {
+    expect(currentVietnamPeriod(new Date('2026-09-29T06:00:00Z'))).toEqual({
+      startAt: '2026-09-28T00:00:00+07:00', endAt: '2026-09-29T06:00:00.000Z',
+    })
+  })
+
   it('maps nullable snapshot values honestly', () => {
     const report = mapWeeklyReport({
       id: 'report', organization_id: 'org', establishment_id: 'est',
       period_start: '2026-09-20T17:00:00Z', period_end: '2026-09-27T17:00:00Z', preferred_language: 'fr',
       google_rating: null, google_total_reviews: null, snapshot_captured_at: null,
       new_reviews_count: 0, negative_reviews_count: 0, negative_rate: '0.0', ready_replies_count: 0,
+      data_complete: false, provisional: false,
       ai_weekly_summary: 'Aucun avis négatif.', ai_status: 'completed', ai_error: null, generated_at: null,
     })
     expect(report.googleRating).toBeNull()
     expect(report.googleTotalReviews).toBeNull()
+    expect(report.dataComplete).toBe(false)
+    expect(report.provisional).toBe(false)
   })
 })

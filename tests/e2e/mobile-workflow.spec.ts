@@ -17,6 +17,8 @@ test('parcours accueil → avis → réponse → analyses',async({page})=>{
   await expect(page.getByText('Rapport hebdomadaire',{exact:true}).first()).toBeVisible()
   await expect(page.getByText('Vue d’ensemble')).toBeVisible()
   await expect(page.getByText('Résumé IA de la semaine')).toBeVisible()
+  await page.getByLabel('Période').selectOption('current')
+  await expect(page.getByText('Rapport provisoire')).toBeVisible()
   await expect(page.locator('.bottom-nav')).toBeVisible()
   const box=await page.locator('body').boundingBox();expect(box?.width).toBeLessThanOrEqual(1280)
 })

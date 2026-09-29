@@ -3,7 +3,9 @@ import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import {
   calculateWeeklyMetrics,
+  currentVietnamPeriod,
   generateWeeklySummary,
+  isReportingPeriodComplete,
   lastCompletedVietnamWeekStart,
   periodFromVietnamMonday,
   type WeeklyReportLanguage,
@@ -22,18 +24,21 @@ Deno.serve(async (request) => {
     const context = await requireUser(request)
     adminForFailure = context.admin
     enforceRateLimit(`weekly-report:${context.user.id}`, 30, 3_600_000)
-    const body = await request.json() as { establishment_id?: string; period_start?: string }
+    const body = await request.json() as { establishment_id?: string; period_start?: string; provisional?: boolean }
     const establishmentId = body.establishment_id?.trim() ?? ''
     if (!establishmentId) return json({ error: 'ESTABLISHMENT_ID_REQUIRED' }, 400)
 
-    const period = periodFromVietnamMonday(body.period_start ?? lastCompletedVietnamWeekStart())
+    const provisional = body.provisional === true
+    const period = provisional
+      ? currentVietnamPeriod()
+      : { ...periodFromVietnamMonday(body.period_start ?? lastCompletedVietnamWeekStart()), provisional: false as const }
     const currentWeek = periodFromVietnamMonday(lastCompletedVietnamWeekStart())
-    if (new Date(period.startAt).getTime() > new Date(currentWeek.startAt).getTime()) {
+    if (!provisional && new Date(period.startAt).getTime() > new Date(currentWeek.startAt).getTime()) {
       return json({ error: 'PERIOD_NOT_COMPLETED' }, 400)
     }
 
     const [{ data: establishment, error: establishmentError }, { data: profile, error: profileError }] = await Promise.all([
-      context.client.from('establishments').select('id,organization_id,name,photo_url').eq('id', establishmentId).single(),
+      context.client.from('establishments').select('id,organization_id,name,photo_url,active,reporting_started_at').eq('id', establishmentId).single(),
       context.client.from('profiles').select('preferred_language').eq('user_id', context.user.id).single(),
     ])
     if (establishmentError || !establishment) return json({ error: 'ESTABLISHMENT_NOT_FOUND' }, 404)
@@ -42,14 +47,16 @@ Deno.serve(async (request) => {
       return json({ error: 'PREFERRED_LANGUAGE_REQUIRED' }, 400)
     }
     const language = profile.preferred_language as WeeklyReportLanguage
+    const dataComplete = establishment.active === true
+      && isReportingPeriodComplete(establishment.reporting_started_at, period.startAt)
 
-    const { data: existing } = await context.client
+    const existing = provisional ? null : (await context.client
       .from('weekly_establishment_reports')
       .select('*')
       .eq('establishment_id', establishmentId)
       .eq('period_start', period.startAt)
       .eq('preferred_language', language)
-      .maybeSingle()
+      .maybeSingle()).data
     if (existing?.ai_status === 'completed' || existing?.ai_status === 'generating') {
       return json({ report: existing }, existing.ai_status === 'generating' ? 202 : 200)
     }
@@ -106,9 +113,32 @@ Deno.serve(async (request) => {
       negative_reviews_count: metrics.negativeReviewsCount,
       negative_rate: metrics.negativeRate,
       ready_replies_count: readyRepliesCount,
-      ai_status: 'generating',
+      data_complete: dataComplete,
+      ai_status: dataComplete ? 'generating' : 'completed',
       ai_error: null,
       updated_at: new Date().toISOString(),
+    }
+
+    if (provisional) {
+      const summaryResult = dataComplete
+        ? await generateWeeklySummary(negativeReviews.map((review) => ({
+          rating: review.rating,
+          originalText: review.original_text?.trim() || review.text?.trim() || '',
+        })), language)
+        : null
+      return json({ report: {
+        id: `provisional-${establishmentId}-${period.periodStart}-${language}`,
+        ...baseRow,
+        ai_weekly_summary: summaryResult?.summary ?? null,
+        ai_status: 'completed',
+        ai_model: summaryResult?.model ?? null,
+        ai_input_tokens: summaryResult?.usage?.input_tokens ?? null,
+        ai_output_tokens: summaryResult?.usage?.output_tokens ?? null,
+        ai_total_tokens: summaryResult?.usage?.total_tokens ?? null,
+        generated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        provisional: true,
+      } })
     }
 
     if (existing?.ai_status === 'failed') {
@@ -142,6 +172,16 @@ Deno.serve(async (request) => {
         throw insertError
       }
       claimedReportId = inserted.id
+    }
+
+    if (!dataComplete) {
+      const { data: incomplete, error: incompleteError } = await context.admin
+        .from('weekly_establishment_reports')
+        .select('*')
+        .eq('id', claimedReportId)
+        .single()
+      if (incompleteError) throw incompleteError
+      return json({ report: incomplete })
     }
 
     const summaryResult = await generateWeeklySummary(

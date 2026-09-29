@@ -40,6 +40,17 @@ export function lastCompletedVietnamWeekStart(now = new Date()) {
   return addUtcDays(currentVietnamWeekStart(now), -7)
 }
 
+export function currentVietnamPeriod(now = new Date()) {
+  const periodStart = currentVietnamWeekStart(now)
+  return {
+    periodStart,
+    periodEnd: null,
+    startAt: `${periodStart}T00:00:00+07:00`,
+    endAt: now.toISOString(),
+    provisional: true as const,
+  }
+}
+
 export function periodFromVietnamMonday(periodStart: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(periodStart)) throw new Error('INVALID_PERIOD_START')
   const [year, month, day] = periodStart.split('-').map(Number)
@@ -64,6 +75,13 @@ export function calculateWeeklyMetrics(reviews: Array<{ rating: number }>): Week
     negativeReviewsCount,
     negativeRate: newReviewsCount === 0 ? 0 : Math.round((negativeReviewsCount / newReviewsCount) * 1_000) / 10,
   }
+}
+
+export function isReportingPeriodComplete(reportingStartedAt: string | null | undefined, periodStartAt: string) {
+  if (!reportingStartedAt) return false
+  const startedAt = Date.parse(reportingStartedAt)
+  const periodStart = Date.parse(periodStartAt)
+  return Number.isFinite(startedAt) && Number.isFinite(periodStart) && startedAt <= periodStart
 }
 
 export function emptyWeeklySummary(language: WeeklyReportLanguage) {

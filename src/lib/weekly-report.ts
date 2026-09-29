@@ -14,6 +14,8 @@ export interface WeeklyReport {
   negativeReviewsCount: number
   negativeRate: number
   readyRepliesCount: number
+  dataComplete: boolean
+  provisional: boolean
   aiWeeklySummary: string | null
   aiStatus: 'generating' | 'completed' | 'failed'
   aiError: string | null
@@ -34,6 +36,8 @@ export interface WeeklyReportRow {
   negative_reviews_count: number
   negative_rate: number | string
   ready_replies_count: number
+  data_complete: boolean
+  provisional?: boolean
   ai_weekly_summary: string | null
   ai_status: 'generating' | 'completed' | 'failed'
   ai_error: string | null
@@ -58,6 +62,18 @@ export function lastCompletedVietnamWeekStart(now = new Date()) {
   const [year, month, day] = today.split('-').map(Number)
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
   return addUtcDays(today, -((weekday + 6) % 7) - 7)
+}
+
+export function currentVietnamWeekStart(now = new Date()) {
+  const today = vietnamDateKey(now)
+  const [year, month, day] = today.split('-').map(Number)
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  return addUtcDays(today, -((weekday + 6) % 7))
+}
+
+export function currentVietnamPeriod(now = new Date()) {
+  const periodStart = currentVietnamWeekStart(now)
+  return { startAt: `${periodStart}T00:00:00+07:00`, endAt: now.toISOString() }
 }
 
 export function vietnamWeekBounds(periodStart: string) {
@@ -93,6 +109,8 @@ export function mapWeeklyReport(row: WeeklyReportRow): WeeklyReport {
     negativeReviewsCount: row.negative_reviews_count,
     negativeRate: Number(row.negative_rate),
     readyRepliesCount: row.ready_replies_count,
+    dataComplete: row.data_complete,
+    provisional: row.provisional === true,
     aiWeeklySummary: row.ai_weekly_summary,
     aiStatus: row.ai_status,
     aiError: row.ai_error,
@@ -106,10 +124,11 @@ export function buildDemoWeeklyReport(
   language: PreferredLanguage,
   rating: number,
   totalReviews: number,
+  provisional = false,
   now = new Date(),
 ): WeeklyReport {
-  const periodStartKey = lastCompletedVietnamWeekStart(now)
-  const bounds = vietnamWeekBounds(periodStartKey)
+  const periodStartKey = provisional ? currentVietnamWeekStart(now) : lastCompletedVietnamWeekStart(now)
+  const bounds = provisional ? currentVietnamPeriod(now) : vietnamWeekBounds(periodStartKey)
   const periodReviews = reviews.filter((review) => review.establishmentId === establishmentId
     && new Date(review.publishedAt).getTime() >= new Date(bounds.startAt).getTime()
     && new Date(review.publishedAt).getTime() < new Date(bounds.endAt).getTime())
@@ -128,6 +147,7 @@ export function buildDemoWeeklyReport(
     newReviewsCount: periodReviews.length, negativeReviewsCount: negative.length,
     negativeRate: periodReviews.length ? Math.round(negative.length / periodReviews.length * 1_000) / 10 : 0,
     readyRepliesCount: new Set(ready.map((review) => review.id)).size,
+    dataComplete: true, provisional,
     aiWeeklySummary: summary, aiStatus: 'completed', aiError: null, generatedAt: now.toISOString(),
   }
 }

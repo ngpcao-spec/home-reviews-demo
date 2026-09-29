@@ -210,6 +210,12 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
 .weekly-google-metrics strong { display: flex; align-items: center; gap: 4px; font-size: 1.25rem; }
 .weekly-google-metrics strong svg { width: 17px; height: 17px; fill: var(--champagne); color: var(--champagne); }
 .weekly-google-metrics span { color: var(--muted); font-size: .72rem; line-height: 1.35; }
+.weekly-report-label { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.weekly-provisional { padding: 4px 8px; border: 1px solid rgba(213, 190, 155, .32); border-radius: 999px; color: var(--champagne); background: rgba(213, 190, 155, .08); font-size: .62rem; font-weight: 800; }
+.weekly-data-warning { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-color: rgba(217, 109, 112, .32); }
+.weekly-data-warning > svg { flex: 0 0 auto; width: 21px; color: #d96d70; }
+.weekly-data-warning strong { display: block; font-size: .9rem; }
+.weekly-data-warning p { margin: 5px 0 0; color: var(--muted); font-size: .76rem; line-height: 1.5; }
 .weekly-section { display: grid; gap: 11px; }
 .weekly-section-heading { display: flex; align-items: center; gap: 9px; padding-inline: 2px; }
 .weekly-section-heading .eyebrow { font-size: .68rem; }

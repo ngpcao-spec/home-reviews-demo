@@ -7,6 +7,7 @@ import { useI18n } from '../i18n'
 import { supabase } from '../lib/supabase'
 import {
   buildDemoWeeklyReport,
+  currentVietnamWeekStart,
   formatWeeklyPeriod,
   lastCompletedVietnamWeekStart,
   mapWeeklyReport,
@@ -20,24 +21,27 @@ export function AnalyticsPage() {
   const { reviews, establishments, demoMode, preferredLanguage } = useApp()
   const { messages, language } = useI18n()
   const [establishmentId, setEstablishmentId] = useState('')
+  const [periodMode, setPeriodMode] = useState<'completed' | 'current'>('completed')
   const [reports, setReports] = useState<Record<string, WeeklyReport>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorKey, setErrorKey] = useState<string | null>(null)
   const [requestVersion, setRequestVersion] = useState(0)
   const requestedKeys = useRef(new Set<string>())
-  const periodStart = useMemo(() => lastCompletedVietnamWeekStart(), [])
+  const periodStart = useMemo(() => periodMode === 'current'
+    ? currentVietnamWeekStart()
+    : lastCompletedVietnamWeekStart(), [periodMode])
 
   const resolvedEstablishmentId = establishments.some((item) => item.id === establishmentId)
     ? establishmentId
     : establishments[0]?.id ?? ''
   const selected = establishments.find((item) => item.id === resolvedEstablishmentId)
-  const reportCacheKey = selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}` : ''
+  const reportCacheKey = selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}:${periodMode}` : ''
   const cachedReport = reportCacheKey ? reports[reportCacheKey] : undefined
   const demoReport = useMemo(() => selected && preferredLanguage && demoMode
-    ? buildDemoWeeklyReport(selected.id, reviews, preferredLanguage, selected.currentRating, selected.currentReviewCount)
+    ? buildDemoWeeklyReport(selected.id, reviews, preferredLanguage, selected.currentRating, selected.currentReviewCount, periodMode === 'current')
     : null,
-  [demoMode, preferredLanguage, reviews, selected])
+  [demoMode, periodMode, preferredLanguage, reviews, selected])
 
   useEffect(() => {
     if (!selected || !preferredLanguage) return
@@ -52,7 +56,9 @@ export function AnalyticsPage() {
       setError(null)
       setErrorKey(null)
       const { data, error: functionError } = await client.functions.invoke<GenerateWeeklyReportPayload>('generate-weekly-report', {
-        body: { establishment_id: selected.id, period_start: periodStart },
+        body: periodMode === 'current'
+          ? { establishment_id: selected.id, provisional: true }
+          : { establishment_id: selected.id, period_start: periodStart },
       })
       if (!active) return
       if (functionError || !data?.report) {
@@ -65,10 +71,10 @@ export function AnalyticsPage() {
     }
     void load()
     return () => { active = false }
-  }, [cachedReport, demoMode, messages.analytics.loadFailed, periodStart, preferredLanguage, reportCacheKey, requestVersion, selected])
+  }, [cachedReport, demoMode, messages.analytics.loadFailed, periodMode, periodStart, preferredLanguage, reportCacheKey, requestVersion, selected])
 
   const visibleReport = demoReport ?? cachedReport ?? null
-  const currentRequestPrefix = selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}:` : ''
+  const currentRequestPrefix = selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}:${periodMode}:` : ''
   const visibleError = errorKey?.startsWith(currentRequestPrefix) ? error : null
   const periodLabel = visibleReport ? formatWeeklyPeriod(visibleReport.periodStart, visibleReport.periodEnd, language) : ''
   const number = new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'fr-FR')
@@ -84,6 +90,11 @@ export function AnalyticsPage() {
       <select id="weekly-establishment" value={resolvedEstablishmentId} onChange={(event) => setEstablishmentId(event.target.value)}>
         {establishments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
+      <label htmlFor="weekly-period-mode">{messages.analytics.periodLabel}</label>
+      <select id="weekly-period-mode" value={periodMode} onChange={(event) => setPeriodMode(event.target.value as 'completed' | 'current')}>
+        <option value="completed">{messages.analytics.completedWeek}</option>
+        <option value="current">{messages.analytics.currentWeek}</option>
+      </select>
     </div>}
 
     {!establishments.length && <section className="weekly-report-state card"><p>{messages.analytics.noEstablishment}</p></section>}
@@ -94,7 +105,7 @@ export function AnalyticsPage() {
       <section className="weekly-report-hero card">
         <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />
         <div>
-          <span className="eyebrow">{messages.analytics.weeklyReport}</span>
+          <div className="weekly-report-label"><span className="eyebrow">{messages.analytics.weeklyReport}</span>{visibleReport.provisional && <span className="weekly-provisional">{messages.analytics.provisionalReport}</span>}</div>
           <h2>{selected.name}</h2>
           <p className="weekly-period">{periodLabel}</p>
           <div className="weekly-google-metrics">
@@ -104,13 +115,18 @@ export function AnalyticsPage() {
         </div>
       </section>
 
+      {!visibleReport.dataComplete && <section className="weekly-data-warning card" role="status">
+        <AlertTriangle aria-hidden="true"/>
+        <div><strong>{messages.analytics.dataInsufficient}</strong><p>{messages.analytics.dataInsufficientDetail}</p></div>
+      </section>}
+
       <section className="weekly-section">
         <div className="weekly-section-heading"><span className="eyebrow">01</span><h2>{messages.analytics.overview}</h2></div>
         <div className="weekly-kpis">
-          <article className="weekly-kpi card"><MessageSquareText/><strong>{visibleReport.newReviewsCount}</strong><span>{messages.analytics.newReviews}</span></article>
-          <article className="weekly-kpi card negative"><AlertTriangle/><strong>{visibleReport.negativeReviewsCount}</strong><span>{messages.analytics.negativeReviews}</span></article>
-          <article className="weekly-kpi card"><span className="weekly-percent">%</span><strong>{visibleReport.negativeRate.toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} %</strong><span>{messages.analytics.negativeRate}</span></article>
-          <article className="weekly-kpi card ready"><Sparkles/><strong>{visibleReport.readyRepliesCount}</strong><span>{messages.analytics.readyReplies}</span></article>
+          <article className="weekly-kpi card"><MessageSquareText/><strong>{visibleReport.dataComplete ? visibleReport.newReviewsCount : '—'}</strong><span>{messages.analytics.newReviews}</span></article>
+          <article className="weekly-kpi card negative"><AlertTriangle/><strong>{visibleReport.dataComplete ? visibleReport.negativeReviewsCount : '—'}</strong><span>{messages.analytics.negativeReviews}</span></article>
+          <article className="weekly-kpi card"><span className="weekly-percent">%</span><strong>{visibleReport.dataComplete ? `${visibleReport.negativeRate.toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} %` : '—'}</strong><span>{messages.analytics.negativeRate}</span></article>
+          <article className="weekly-kpi card ready"><Sparkles/><strong>{visibleReport.dataComplete ? visibleReport.readyRepliesCount : '—'}</strong><span>{messages.analytics.readyReplies}</span></article>
         </div>
       </section>
 
@@ -118,7 +134,9 @@ export function AnalyticsPage() {
         <div className="weekly-section-heading"><span className="eyebrow">02</span><h2>{messages.analytics.weeklySummary}</h2></div>
         <article className="weekly-summary card">
           <Sparkles aria-hidden="true"/>
-          {visibleReport.aiStatus === 'completed' && visibleReport.aiWeeklySummary
+          {!visibleReport.dataComplete
+            ? <p>{messages.analytics.dataInsufficientDetail}</p>
+            : visibleReport.aiStatus === 'completed' && visibleReport.aiWeeklySummary
             ? <p>{visibleReport.aiWeeklySummary}</p>
             : <p>{visibleReport.aiStatus === 'failed' ? messages.analytics.summaryFailed : messages.analytics.generating}</p>}
         </article>
