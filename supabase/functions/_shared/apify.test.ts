@@ -13,6 +13,7 @@ const item = {
   responseFromOwnerText: 'Спасибо за отзыв.',
   name: 'Client',
   title: 'Restaurant test',
+  inputStartUrl: 'https://www.google.com/maps/place/Restaurant+test/@12.2,109.1,17z',
   address: 'Nha Trang, Vietnam',
   totalScore: 4.6,
   reviewsCount: 4430,
@@ -42,5 +43,15 @@ describe('ApifyReviewProvider normalization', () => {
       totalReviews: 4430,
     })
     expect(result.reviews[0].externalReviewId).toBe('review-123')
+  })
+
+  it('keeps the canonical Google Maps place name instead of a localized actor title', () => {
+    const result = normalizeApifyDataset([{
+      ...item,
+      title: 'Nhà hàng Green Home',
+      inputStartUrl: 'https://www.google.com/maps/place/Green+Home+Restaurant/@12.2,109.1,17z',
+    }], item.url)
+
+    expect(result.establishment.name).toBe('Green Home Restaurant')
   })
 })

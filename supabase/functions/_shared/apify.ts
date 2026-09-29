@@ -48,6 +48,19 @@ const numberValue = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function placeNameFromMapsUrl(value: unknown): string | null {
+  const raw = stringValue(value)
+  if (!raw) return null
+  try {
+    const url = new URL(raw)
+    const match = url.pathname.match(/\/maps\/place\/([^/]+)/i)
+    if (!match?.[1]) return null
+    return decodeURIComponent(match[1].replace(/\+/g, ' ')).trim() || null
+  } catch {
+    return null
+  }
+}
+
 function apiHeaders(token: string, json = false): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,
@@ -209,8 +222,13 @@ export function normalizeApifyDataset(
     ?? [first.street, first.city, first.state, first.countryCode].map(stringValue).filter(Boolean).join(', ')
   const placeId = stringValue(first.placeId)
   const googleId = stringValue(first.cid) ?? placeId ?? stringValue(first.googleId) ?? fallbackUrl
+  // Apify localizes `title` according to the requested review language. A
+  // canonical Google Maps place URL retains the proper business name in its
+  // `/maps/place/<name>/` segment, so prefer it and never localize that name.
+  const canonicalName = placeNameFromMapsUrl(first.inputStartUrl)
+    ?? placeNameFromMapsUrl(fallbackUrl)
   const establishment: NormalizedEstablishment = {
-    name: stringValue(first.title) ?? 'Établissement Google',
+    name: canonicalName ?? stringValue(first.title) ?? 'Établissement Google',
     fullAddress: address ?? '',
     rating: numberValue(first.totalScore ?? first.rating),
     totalReviews: Math.trunc(numberValue(first.reviewsCount ?? first.reviewsNumber)),
