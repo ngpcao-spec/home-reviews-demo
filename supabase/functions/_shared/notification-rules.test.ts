@@ -7,6 +7,7 @@ describe('notification après analyse IA', () => {
     [2, true],
     [3, true],
     [4, false],
+    [5, false],
   ])('%i★ → notification %s', (rating, expected) => {
     expect(shouldCreateReviewNotification({ rating, historical_import: false })).toBe(expected)
   })

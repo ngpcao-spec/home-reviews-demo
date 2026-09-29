@@ -10,5 +10,6 @@ describe('déclenchement automatique Terra', () => {
     expect(shouldAutomaticallyAnalyzeReview({ rating: 1, historical_import: false })).toBe(true)
     expect(shouldAutomaticallyAnalyzeReview({ rating: 3, historical_import: false })).toBe(true)
     expect(shouldAutomaticallyAnalyzeReview({ rating: 4, historical_import: false })).toBe(false)
+    expect(shouldAutomaticallyAnalyzeReview({ rating: 5, historical_import: false })).toBe(false)
   })
 })

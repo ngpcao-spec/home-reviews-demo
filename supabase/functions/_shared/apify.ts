@@ -48,6 +48,21 @@ const numberValue = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const optionalNumberValue = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const stringArrayValue = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(stringValue).filter((item): item is string => Boolean(item)) : []
+
+const scalarText = (value: unknown): string | null => {
+  if (typeof value === 'string') return stringValue(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return null
+}
+
 function placeNameFromMapsUrl(value: unknown): string | null {
   const raw = stringValue(value)
   if (!raw) return null
@@ -209,6 +224,22 @@ export function normalizeApifyReview(item: JsonRecord): NormalizedReview | null 
     ownerResponse: stringValue(item.responseFromOwnerText),
     language: stringValue(item.originalLanguage),
     paginationId: null,
+    providerPublishAt: scalarText(item.publishAt),
+    providerRating: optionalNumberValue(item.rating ?? item.stars),
+    likesCount: optionalNumberValue(item.likesCount),
+    reviewOrigin: stringValue(item.reviewOrigin) ?? 'google',
+    visitedIn: scalarText(item.visitedIn),
+    responseFromOwnerDate: stringValue(item.responseFromOwnerDate),
+    reviewContext: item.reviewContext ?? null,
+    reviewDetailedRating: item.reviewDetailedRating ?? null,
+    reviewImageUrls: stringArrayValue(item.reviewImageUrls),
+    reviewerId: stringValue(item.reviewerId),
+    reviewerUrl: stringValue(item.reviewerUrl),
+    reviewerNumberOfReviews: optionalNumberValue(item.reviewerNumberOfReviews),
+    reviewerPhotoUrl: stringValue(item.reviewerPhotoUrl),
+    isLocalGuide: typeof item.isLocalGuide === 'boolean' ? item.isLocalGuide : null,
+    providerScrapedAt: stringValue(item.scrapedAt),
+    rawPayload: item,
   }
 }
 
@@ -227,6 +258,31 @@ export function normalizeApifyDataset(
   // `/maps/place/<name>/` segment, so prefer it and never localize that name.
   const canonicalName = placeNameFromMapsUrl(first.inputStartUrl)
     ?? placeNameFromMapsUrl(fallbackUrl)
+  const imageUrls = stringArrayValue(first.imageUrls)
+  const rawPlacePayload: JsonRecord = {
+    title: first.title,
+    placeId: first.placeId,
+    cid: first.cid,
+    fid: first.fid,
+    categoryName: first.categoryName,
+    categories: first.categories,
+    totalScore: first.totalScore,
+    reviewsCount: first.reviewsCount,
+    url: first.url,
+    imageUrl: first.imageUrl,
+    address: first.address,
+    neighborhood: first.neighborhood,
+    street: first.street,
+    city: first.city,
+    postalCode: first.postalCode,
+    state: first.state,
+    countryCode: first.countryCode,
+    location: first.location,
+    scrapedAt: first.scrapedAt,
+    language: first.language,
+    inputStartUrl: first.inputStartUrl,
+    reviewOrigin: first.reviewOrigin,
+  }
   const establishment: NormalizedEstablishment = {
     name: canonicalName ?? stringValue(first.title) ?? 'Établissement Google',
     fullAddress: address ?? '',
@@ -235,7 +291,8 @@ export function normalizeApifyDataset(
     placeId,
     googleId,
     locationLink: stringValue(first.url) ?? fallbackUrl,
-    photo: stringValue(first.imageUrl ?? first.imageUrls),
+    photo: stringValue(first.imageUrl) ?? imageUrls[0] ?? null,
+    rawPlacePayload,
   }
   return { provider: 'apify', establishment, reviews, count: reviews.length }
 }

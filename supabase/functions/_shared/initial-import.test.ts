@@ -30,6 +30,15 @@ describe('import initial PASS A + PASS B', () => {
     expect(result.recentNegative).toBe(1)
   })
 
+  it('conserve tous les avis 1★ à 5★ de PASS A dans la fenêtre récente', () => {
+    const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
+    const recent = [1, 2, 3, 4, 5].map((rating) => review(`recent-${rating}`, rating, rating))
+    const result = mergeInitialReviewPasses(recent, [], cutoff)
+
+    expect(result.reviews.map((item) => item.rating).sort()).toEqual([1, 2, 3, 4, 5])
+    expect(result.recentNegative).toBe(3)
+  })
+
   it('peut retenir un avis 2★ vieux de 45 jours via la passe historique', () => {
     const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
     const oldReview = review('old-2', 2, 45)
@@ -46,7 +55,7 @@ describe('import initial PASS A + PASS B', () => {
       [duplicate, review('older', 1, 90)],
       cutoff,
     )
-    expect(result.reviews.map((item) => item.externalReviewId)).toEqual(['newest', 'duplicate', 'older'])
+    expect(result.reviews.map((item) => item.externalReviewId)).toEqual(['positive', 'newest', 'duplicate', 'older'])
   })
 
   it('limite la passe historique négative à 100 avis', () => {

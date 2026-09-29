@@ -9,7 +9,7 @@ import {
   fetchApifyReviews,
   type SupportedLanguage,
 } from './apify.ts'
-import { reviewClassification } from './review-classification.ts'
+import { reviewClassification, reviewsForPersistence } from './review-classification.ts'
 import {
   HISTORICAL_NEGATIVE_LIMIT,
   historicalRecentWindowDays,
@@ -127,6 +127,7 @@ function reviewRow(
   establishment: Pick<EstablishmentRow, 'id' | 'organization_id'>,
   review: NormalizedReview,
   historicalImport: boolean,
+  provider: GoogleReviewsResult['provider'],
 ) {
   return {
     organization_id: establishment.organization_id,
@@ -142,6 +143,23 @@ function reviewRow(
     published_at: review.publishedAt,
     review_url: review.reviewUrl,
     owner_response: review.ownerResponse,
+    source_provider: provider,
+    provider_publish_at: review.providerPublishAt,
+    provider_rating: review.providerRating,
+    likes_count: review.likesCount,
+    review_context: review.reviewContext,
+    review_detailed_rating: review.reviewDetailedRating,
+    visited_in: review.visitedIn,
+    review_image_urls: review.reviewImageUrls ?? [],
+    response_from_owner_text: review.ownerResponse,
+    response_from_owner_date: review.responseFromOwnerDate,
+    reviewer_id: review.reviewerId,
+    reviewer_url: review.reviewerUrl,
+    reviewer_number_of_reviews: review.reviewerNumberOfReviews,
+    reviewer_photo_url: review.reviewerPhotoUrl,
+    is_local_guide: review.isLocalGuide,
+    review_origin: review.reviewOrigin,
+    provider_scraped_at: review.providerScrapedAt,
     historical_import: historicalImport,
     ...reviewClassification(review.rating),
   }
@@ -152,13 +170,10 @@ export async function insertReviews(
   establishment: Pick<EstablishmentRow, 'id' | 'organization_id'>,
   reviews: NormalizedReview[],
   historicalImport: boolean,
+  provider: GoogleReviewsResult['provider'],
 ): Promise<number> {
   if (!reviews.length) return 0
-  const validReviews = reviews.filter((review) =>
-    review.externalReviewId.length > 0
-    && review.rating >= 1
-    && review.rating <= 5
-  )
+  const validReviews = reviewsForPersistence(reviews)
   if (!validReviews.length) return 0
 
   const externalIds = validReviews.map((review) => review.externalReviewId)
@@ -175,7 +190,7 @@ export async function insertReviews(
   const { error } = await admin
     .from('reviews')
     .upsert(
-      validReviews.map((review) => reviewRow(establishment, review, historicalImport)),
+      validReviews.map((review) => reviewRow(establishment, review, historicalImport, provider)),
       {
         onConflict: 'establishment_id,external_review_id',
         ignoreDuplicates: true,
@@ -206,7 +221,48 @@ export async function insertReviews(
       .upsert(translations, { onConflict: 'review_id,language' })
     if (translationError) throw translationError
   }
+
+
+  const observedAt = new Date().toISOString()
+  const providerPayloads = validReviews.flatMap((review) => {
+    const reviewId = byExternalId.get(review.externalReviewId)
+    if (!reviewId) return []
+    return [{
+      review_id: reviewId,
+      provider,
+      raw_payload: review.rawPayload ?? {},
+      provider_last_seen_at: observedAt,
+      updated_at: observedAt,
+    }]
+  })
+  if (providerPayloads.length) {
+    const { error: payloadError } = await admin
+      .from('review_provider_payloads')
+      .upsert(providerPayloads, { onConflict: 'review_id,provider' })
+    if (payloadError) throw payloadError
+  }
   return validReviews.filter((review) => !existingIds.has(review.externalReviewId)).length
+}
+
+export async function persistEstablishmentSnapshot(
+  admin: SupabaseClient,
+  establishment: Pick<EstablishmentRow, 'id' | 'organization_id'>,
+  provider: GoogleReviewsResult['provider'],
+  place: GoogleReviewsResult['establishment'],
+  sourceRunId: string,
+) {
+  const capturedAt = new Date().toISOString()
+  const { error } = await admin.from('establishment_snapshots').upsert({
+    establishment_id: establishment.id,
+    organization_id: establishment.organization_id,
+    captured_at: capturedAt,
+    rating: place.rating,
+    total_reviews: place.totalReviews,
+    provider,
+    source_run_id: sourceRunId,
+    raw_place_payload: place.rawPlacePayload ?? {},
+  }, { onConflict: 'establishment_id,provider,source_run_id' })
+  if (error) throw error
 }
 
 interface InitializationFetchResult extends GoogleReviewsResult {
@@ -408,13 +464,12 @@ export async function initializeEstablishment(
   if (existingError) throw existingError
   if (existing) throw new Error('ESTABLISHMENT_ALREADY_ADDED')
 
-  const negativeReviews = sortNewest(
-    result.reviews.filter((review) => review.rating >= 1 && review.rating <= 3),
-  )
+  const importedReviews = sortNewest([...result.reviews])
+  const negativeReviews = importedReviews.filter((review) => review.rating <= 3)
 
   const now = new Date().toISOString()
-  // The Google stream checkpoint must include positive reviews even though HOME
-  // Reviews only persists 1-3 star history.
+  // The Google stream checkpoint always follows the newest review, regardless
+  // of rating. PASS A now persists every 1-5 star review in the recent window.
   const newestReview = result.checkpointReview
   const { data: establishment, error: establishmentError } = await admin
     .from('establishments')
@@ -445,7 +500,14 @@ export async function initializeEstablishment(
 
   const runId = await createRun(admin, establishment, 'initialization', provider)
   try {
-    const inserted = await insertReviews(admin, establishment, negativeReviews, true)
+    const inserted = await insertReviews(admin, establishment, importedReviews, true, result.provider)
+    await persistEstablishmentSnapshot(
+      admin,
+      establishment,
+      result.provider,
+      result.establishment,
+      `initial:${runId}`,
+    )
     const { error: updateError } = await admin
       .from('establishments')
       .update({
@@ -550,7 +612,14 @@ export async function backfillHistoricalReviews(
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
 
-  const inserted = await insertReviews(admin, establishment, result.reviews, true)
+  const inserted = await insertReviews(admin, establishment, result.reviews, true, result.provider)
+  await persistEstablishmentSnapshot(
+    admin,
+    establishment,
+    result.provider,
+    result.establishment,
+    `backfill:${crypto.randomUUID()}`,
+  )
   const newestReview = result.checkpointReview
   const currentNewestAt = establishment.last_review_at ? Date.parse(establishment.last_review_at) : 0
   const importedNewestAt = newestReview?.publishedAt ? Date.parse(newestReview.publishedAt) : 0
@@ -632,7 +701,10 @@ export async function syncEstablishment(
       if (knownError) throw knownError
       const knownIds = new Set((knownRows ?? []).map((row) => row.external_review_id as string))
       const newReviews = page.reviews.filter((review) => !knownIds.has(review.externalReviewId))
-      inserted += await insertReviews(admin, establishment, newReviews, false)
+      inserted += await insertReviews(admin, establishment, newReviews, false, page.provider)
+      if (pageNumber === 0) {
+        await persistEstablishmentSnapshot(admin, establishment, page.provider, page.establishment, `sync:${runId}`)
+      }
 
       if (knownIds.size > 0) {
         stoppedOnKnownReview = true

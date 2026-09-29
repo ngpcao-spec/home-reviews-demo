@@ -19,6 +19,22 @@ export interface NormalizedReview {
   ownerResponse: string | null
   language: string | null
   paginationId: string | null
+  providerPublishAt?: string | null
+  providerRating?: number | null
+  likesCount?: number | null
+  reviewOrigin?: string | null
+  visitedIn?: string | null
+  responseFromOwnerDate?: string | null
+  reviewContext?: unknown | null
+  reviewDetailedRating?: unknown | null
+  reviewImageUrls?: string[]
+  reviewerId?: string | null
+  reviewerUrl?: string | null
+  reviewerNumberOfReviews?: number | null
+  reviewerPhotoUrl?: string | null
+  isLocalGuide?: boolean | null
+  providerScrapedAt?: string | null
+  rawPayload?: JsonRecord
 }
 
 export interface NormalizedEstablishment {
@@ -30,6 +46,7 @@ export interface NormalizedEstablishment {
   googleId: string
   locationLink: string | null
   photo: string | null
+  rawPlacePayload?: JsonRecord
 }
 
 export interface GoogleReviewsResult {
@@ -62,6 +79,18 @@ const asNumber = (value: unknown): number => {
   const parsed = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(parsed) ? parsed : 0
 }
+
+const asOptionalNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const asBoolean = (value: unknown): boolean | null =>
+  typeof value === 'boolean' ? value : null
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(asString).filter((item): item is string => Boolean(item)) : []
 
 function toIsoDate(timestamp: unknown, dateText: unknown): string | null {
   const numericTimestamp = asNumber(timestamp)
@@ -176,6 +205,8 @@ export function normalizeOutscraperPayload(
     ? place.reviews_data.filter(isRecord)
     : []
   const rawReviews = maxReviews === null ? allReviews : allReviews.slice(0, maxReviews)
+  const rawPlacePayload = { ...place }
+  delete rawPlacePayload.reviews_data
 
   const reviews = rawReviews.map((review, index): NormalizedReview => {
     const publishedAt = toIsoDate(review.review_timestamp, review.review_datetime_utc)
@@ -197,6 +228,25 @@ export function normalizeOutscraperPayload(
         ?? asString(review.language)
         ?? asString(review.original_language),
       paginationId: asString(review.review_pagination_id),
+      providerPublishAt: asString(review.publishAt ?? review.review_datetime_utc),
+      providerRating: asOptionalNumber(review.review_rating ?? review.rating),
+      likesCount: asOptionalNumber(review.likes_count ?? review.likesCount),
+      reviewOrigin: asString(review.review_origin ?? review.reviewOrigin) ?? 'google',
+      visitedIn: asString(review.visited_in ?? review.visitedIn),
+      responseFromOwnerDate: toIsoDate(
+        review.owner_answer_timestamp,
+        review.owner_answer_datetime_utc,
+      ),
+      reviewContext: isRecord(review.review_context) ? review.review_context : null,
+      reviewDetailedRating: isRecord(review.review_detailed_rating) ? review.review_detailed_rating : null,
+      reviewImageUrls: asStringArray(review.review_image_urls ?? review.review_photos),
+      reviewerId: asString(review.author_id),
+      reviewerUrl: asString(review.author_link),
+      reviewerNumberOfReviews: asOptionalNumber(review.author_reviews_count),
+      reviewerPhotoUrl: asString(review.author_image),
+      isLocalGuide: asBoolean(review.author_is_local_guide),
+      providerScrapedAt: asString(review.scraped_at),
+      rawPayload: review,
     }
   })
 
@@ -210,6 +260,7 @@ export function normalizeOutscraperPayload(
       googleId,
       locationLink: asString(place.location_link),
       photo: asString(place.photo) ?? asString(place.photo_url),
+      rawPlacePayload,
     },
     reviews,
     count: reviews.length,
@@ -334,6 +385,22 @@ export function getMockGoogleReviews(query: string): GoogleReviewsResult {
     ownerResponse,
     language: 'fr',
     paginationId: null,
+    providerPublishAt: null,
+    providerRating: rating,
+    likesCount: null,
+    reviewOrigin: 'google',
+    visitedIn: null,
+    responseFromOwnerDate: null,
+    reviewContext: null,
+    reviewDetailedRating: null,
+    reviewImageUrls: [],
+    reviewerId: null,
+    reviewerUrl: null,
+    reviewerNumberOfReviews: null,
+    reviewerPhotoUrl: null,
+    isLocalGuide: null,
+    providerScrapedAt: new Date(now).toISOString(),
+    rawPayload: { authorName, rating, text, ownerResponse },
   }))
 
   return {
@@ -347,6 +414,7 @@ export function getMockGoogleReviews(query: string): GoogleReviewsResult {
       googleId,
       locationLink: sourceUrl,
       photo: null,
+      rawPlacePayload: { name, sourceUrl },
     },
     reviews,
     count: reviews.length,

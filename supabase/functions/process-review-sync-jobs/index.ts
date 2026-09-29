@@ -4,6 +4,7 @@ import {
   apifyToken,
   insertReviews,
   fetchIncrementalPage,
+  persistEstablishmentSnapshot,
   preferredLanguageForOrganization,
   providerName,
 } from '../_shared/sync-service.ts'
@@ -171,11 +172,14 @@ async function processApifyJob(
   const headReviewId = job.head_review_id ?? first?.externalReviewId ?? null
   const headReviewAt = job.head_review_at ?? first?.publishedAt ?? null
   const checkpoint = pageBeforeCheckpoint(page.reviews, job.checkpoint_review_id)
-  const negative = checkpoint.reviews.filter((review) => review.rating >= 1 && review.rating <= 3)
   const inserted = await insertReviews(admin, {
     id: job.establishment_id,
     organization_id: job.organization_id,
-  }, negative, false)
+  }, checkpoint.reviews, false, page.provider)
+  await persistEstablishmentSnapshot(admin, {
+    id: job.establishment_id,
+    organization_id: job.organization_id,
+  }, page.provider, page.establishment, `sync:${job.id}:${cursor.runId}`)
   const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
     p_job_id: job.id,
     p_worker_id: worker,
@@ -284,13 +288,16 @@ async function processJob(
       headReviewId ??= first?.externalReviewId ?? null
       headReviewAt ??= first?.publishedAt ?? null
       const checkpoint = pageBeforeCheckpoint(page.reviews, job.checkpoint_review_id)
-      const negative = checkpoint.reviews.filter(
-        (review) => review.rating >= 1 && review.rating <= 3,
-      )
       const inserted = await insertReviews(admin, {
         id: job.establishment_id,
         organization_id: job.organization_id,
-      }, negative, false)
+      }, checkpoint.reviews, false, page.provider)
+      if (pageNumber === 0) {
+        await persistEstablishmentSnapshot(admin, {
+          id: job.establishment_id,
+          organization_id: job.organization_id,
+        }, page.provider, page.establishment, `sync:${job.id}`)
+      }
       const nextCursor = page.reviews.at(-1)?.paginationId ?? null
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
         p_job_id: job.id,

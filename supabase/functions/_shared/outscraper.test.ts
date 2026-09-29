@@ -34,7 +34,7 @@ const payload = {
 describe('Outscraper Google reviews', () => {
   it('normalise les informations établissement et avis', () => {
     const result = normalizeOutscraperPayload(payload)
-    expect(result.establishment).toEqual({
+    expect(result.establishment).toMatchObject({
       name: 'Le Petit Hanoi',
       fullAddress: '12 rue de la Paix, Paris',
       rating: 4.2,

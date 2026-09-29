@@ -24,19 +24,20 @@ export function mergeInitialReviewPasses<T extends InitialImportReview>(
   historicalPass: T[],
   cutoffMilliseconds: number,
 ): { recentFetched: number; recentNegative: number; reviews: T[] } {
-  const recentNegative = recentPass.filter((review) => {
+  const recentInWindow = recentPass.filter((review) => {
     const publishedAt = review.publishedAt ? Date.parse(review.publishedAt) : Number.NaN
     return review.rating >= 1
-      && review.rating <= 3
+      && review.rating <= 5
       && Number.isFinite(publishedAt)
       && publishedAt >= cutoffMilliseconds
   })
+  const recentNegative = recentInWindow.filter((review) => review.rating <= 3)
   const historicalNegative = historicalPass
     .filter((review) => review.rating >= 1 && review.rating <= 3)
     .slice(0, HISTORICAL_NEGATIVE_LIMIT)
 
   const unique = new Map<string, T>()
-  for (const review of [...recentNegative, ...historicalNegative]) {
+  for (const review of [...recentInWindow, ...historicalNegative]) {
     if (review.externalReviewId && !unique.has(review.externalReviewId)) {
       unique.set(review.externalReviewId, review)
     }

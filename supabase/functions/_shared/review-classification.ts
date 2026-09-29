@@ -12,3 +12,11 @@ export function reviewClassification(rating: number) {
     status: 'ignored',
   } as const
 }
+
+export function reviewsForPersistence<T extends { externalReviewId: string; rating: number }>(reviews: T[]): T[] {
+  return reviews.filter((review) =>
+    review.externalReviewId.length > 0
+    && review.rating >= 1
+    && review.rating <= 5
+  )
+}
