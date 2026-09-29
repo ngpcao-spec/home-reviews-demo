@@ -47,6 +47,8 @@ export interface Review {
   translatedFromDraftUpdatedAt?: string
   translatedFromDraftVersion?: number
   translatedReplyAt?: string
+  hasLocalizedReply?: boolean
+  hasLegacyCompletedAnalysis?: boolean
   aiDetectedLanguage?: string
   aiAnalyzedAt?: string
   aiStatus?: AiStatus

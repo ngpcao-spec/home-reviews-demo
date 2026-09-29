@@ -11,6 +11,8 @@ function baseLanguage(language?: string | null) {
   return language?.trim().toLowerCase().split(/[-_]/)[0] ?? ''
 }
 
+const requestedLocalizedDrafts = new Set<string>()
+
 export function ReviewDetailPage() {
   const { id } = useParams()
   const { reviews, establishments, preferredLanguage, generateResponse, saveReplyDraft, translateReply, logAction, pushToast } = useApp()
@@ -49,6 +51,21 @@ export function ReviewDetailPage() {
   }, [review?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!review || !preferredLanguage || !review.hasLegacyCompletedAnalysis || review.hasLocalizedReply || review.aiStatus !== 'pending') return
+    const key = `${review.id}:${preferredLanguage}`
+    if (requestedLocalizedDrafts.has(key)) return
+    requestedLocalizedDrafts.add(key)
+    setGenerating(true)
+    void generateResponse(review.id)
+      .then((generated) => {
+        setResponse(generated)
+        pushToast(messages.reviews.analysisCompleted)
+      })
+      .catch(() => pushToast(messages.reviews.analysisRetryFailed))
+      .finally(() => setGenerating(false))
+  }, [review?.id, preferredLanguage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!review || response === persistedDraft) return
     const timer = window.setTimeout(() => {
       void persistDraft(response).catch(() => pushToast(messages.reviews.draftSaveFailed))
@@ -80,7 +97,10 @@ export function ReviewDetailPage() {
   }
 
   const completed = review.aiStatus === 'completed' && Boolean(review.aiSummary) && Boolean(review.aiSuggestedReply)
-  const statusCopy = review.aiStatus === 'failed' ? messages.reviews.analysisFailed : messages.reviews.analysisPending
+  const needsLocalizedDraft = Boolean(review.hasLegacyCompletedAnalysis && !review.hasLocalizedReply)
+  const statusCopy = review.aiStatus === 'failed'
+    ? messages.reviews.analysisFailed
+    : needsLocalizedDraft ? messages.reviews.prepareReply : messages.reviews.analysisPending
   const hasTranslation = Boolean(review.translatedText && review.originalText && review.translatedText !== review.originalText)
   const draftDirty = response !== persistedDraft
   const sourceLanguage = baseLanguage(review.replyDraftLanguage ?? preferredLanguage)
@@ -132,7 +152,7 @@ export function ReviewDetailPage() {
       <div className="ai-heading"><span><Sparkles size={20}/>{messages.reviews.aiSummary}</span></div>
       {completed
         ? <div className="ai-summary-copy">{review.aiSummary}</div>
-        : <div className="ai-empty"><p>{statusCopy}</p><button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {generating ? '…' : messages.reviews.relaunch}</button></div>}
+        : <div className="ai-empty"><p>{statusCopy}</p><button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {generating ? '…' : needsLocalizedDraft ? messages.reviews.prepareReply : messages.reviews.relaunch}</button></div>}
     </section>
 
     {response

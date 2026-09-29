@@ -109,6 +109,22 @@ interface ReviewRow {
   ai_analyzed_at: string | null
   ai_status: 'pending' | 'completed' | 'failed' | null
   ai_error: string | null
+  review_reply_drafts: LocalizedReplyDraftRow[] | null
+}
+
+interface LocalizedReplyDraftRow {
+  language: PreferredLanguage
+  ai_summary: string | null
+  ai_suggested_reply: string | null
+  draft_text: string | null
+  draft_updated_at: string | null
+  draft_version: number
+  translated_reply_text: string | null
+  translated_reply_language: string | null
+  translated_from_draft_version: number | null
+  translated_at: string | null
+  ai_status: 'pending' | 'processing' | 'completed' | 'failed'
+  ai_error: string | null
 }
 
 interface NotificationRow {
@@ -199,7 +215,7 @@ const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
 const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
-const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,original_language,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text)'
+const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,original_language,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text),review_reply_drafts(language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,translated_reply_text,translated_reply_language,translated_from_draft_version,translated_at,ai_status,ai_error)'
 const REVIEW_LOAD_PAGE_SIZE = 500
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
@@ -242,6 +258,8 @@ function mapEstablishment(row: EstablishmentRow): Establishment {
 function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review {
   const status = row.rating <= 3 && row.status === 'new' ? 'to_process' : row.status
   const localized = localizedReviewText(row.original_text || row.text, row.review_translations, preferredLanguage)
+  const localizedReply = row.review_reply_drafts?.find((draft) => draft.language === preferredLanguage)
+  const hasLocalizedReply = Boolean(localizedReply?.draft_text && localizedReply.ai_status === 'completed')
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -258,22 +276,23 @@ function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review
     isHistoricalImport: row.historical_import,
     requiresAction: row.rating <= 3,
     status,
-    aiSummary: row.ai_summary ?? undefined,
-    aiSuggestedReply: row.ai_suggested_reply ?? undefined,
-    aiSuggestedReplyLanguage: row.ai_suggested_reply_language ?? undefined,
-    replyDraftText: row.reply_draft_text ?? undefined,
-    replyDraftLanguage: row.reply_draft_language ?? undefined,
-    replyDraftUpdatedAt: row.reply_draft_updated_at ?? undefined,
-    replyDraftVersion: row.reply_draft_version ?? 0,
-    translatedReplyText: row.translated_reply_text ?? undefined,
-    translatedReplyLanguage: row.translated_reply_language ?? undefined,
-    translatedFromDraftUpdatedAt: row.translated_from_draft_updated_at ?? undefined,
-    translatedFromDraftVersion: row.translated_from_draft_version ?? undefined,
-    translatedReplyAt: row.translated_reply_at ?? undefined,
+    aiSummary: localizedReply?.ai_summary ?? undefined,
+    aiSuggestedReply: localizedReply?.ai_suggested_reply ?? undefined,
+    aiSuggestedReplyLanguage: localizedReply?.language,
+    replyDraftText: localizedReply?.draft_text ?? undefined,
+    replyDraftLanguage: localizedReply?.language,
+    replyDraftUpdatedAt: localizedReply?.draft_updated_at ?? undefined,
+    replyDraftVersion: localizedReply?.draft_version ?? 0,
+    translatedReplyText: localizedReply?.translated_reply_text ?? undefined,
+    translatedReplyLanguage: localizedReply?.translated_reply_language ?? undefined,
+    translatedFromDraftVersion: localizedReply?.translated_from_draft_version ?? undefined,
+    translatedReplyAt: localizedReply?.translated_at ?? undefined,
+    hasLocalizedReply,
+    hasLegacyCompletedAnalysis: row.ai_status === 'completed',
     aiDetectedLanguage: row.ai_detected_language ?? undefined,
     aiAnalyzedAt: row.ai_analyzed_at ?? undefined,
-    aiStatus: row.ai_status ?? undefined,
-    aiError: row.ai_error ?? undefined,
+    aiStatus: localizedReply?.ai_status ?? (row.ai_status === 'completed' ? 'pending' : row.ai_status ?? undefined),
+    aiError: localizedReply?.ai_error ?? undefined,
   }
 }
 

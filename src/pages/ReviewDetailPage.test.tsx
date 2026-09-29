@@ -7,7 +7,8 @@ import { I18nProvider } from '../i18n'
 import type { PreferredLanguage } from '../types/domain'
 
 const appMocks = vi.hoisted(() => ({
-  generateResponse: vi.fn(),
+  language: 'fr' as PreferredLanguage,
+  generateResponse: vi.fn(async () => appMocks.language === 'vi' ? 'Cảm ơn bạn đã chia sẻ phản hồi.' : 'Merci pour votre retour.'),
   saveReplyDraft: vi.fn(async () => 2),
   translateReply: vi.fn(async () => undefined),
   logAction: vi.fn(),
@@ -15,7 +16,15 @@ const appMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('../app/AppContext', () => ({
-  useApp: () => ({
+  useApp: () => {
+    const switchDraft = appMocks.language === 'vi'
+      ? {
+          aiStatus: 'completed', aiSummary: 'Tóm tắt tiếng Việt.', aiSuggestedReply: 'Bản nháp tiếng Việt.',
+          replyDraftText: 'Bản nháp tiếng Việt.', replyDraftLanguage: 'vi', replyDraftVersion: 1,
+          hasLocalizedReply: true, hasLegacyCompletedAnalysis: true,
+        }
+      : { aiStatus: 'pending', hasLocalizedReply: false, hasLegacyCompletedAnalysis: true }
+    return ({
     establishments: [{
       id: 'green-home', organizationId: 'organization', name: 'Green Home Restaurant',
       address: '42/17 Hùng Vương', city: 'Nha Trang', category: 'Restaurant',
@@ -51,16 +60,38 @@ vi.mock('../app/AppContext', () => ({
       publishedAt: '2026-09-28T06:00:00.000Z', sourceUrl: 'https://maps.google.com', isHistoricalImport: false,
       requiresAction: true, status: 'to_process', aiStatus: 'completed', aiSummary: 'Le service était lent.',
       aiSuggestedReply: 'Merci pour votre retour.', replyDraftText: 'Merci pour votre retour.', replyDraftLanguage: 'fr', replyDraftVersion: 1,
+    }, {
+      id: 'legacy-russian', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'legacy-russian',
+      authorName: 'Client', rating: 3, reviewText: 'Dịch vụ rất chậm.', translatedText: 'Dịch vụ rất chậm.',
+      originalText: 'Очень медленное обслуживание.', reviewLanguage: 'ru', publishedAt: '2026-09-28T06:00:00.000Z',
+      sourceUrl: 'https://maps.google.com', isHistoricalImport: false, requiresAction: true, status: 'to_process', aiStatus: 'pending',
+      hasLegacyCompletedAnalysis: true, hasLocalizedReply: false,
+    }, {
+      id: 'vietnamese-vi', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'vietnamese-vi',
+      authorName: 'Client', rating: 2, reviewText: 'Dịch vụ chậm.', originalText: 'Dịch vụ chậm.', reviewLanguage: 'vi',
+      publishedAt: '2026-09-28T06:00:00.000Z', sourceUrl: 'https://maps.google.com', isHistoricalImport: false,
+      requiresAction: true, status: 'to_process', aiStatus: 'completed', aiSummary: 'Khách hàng phàn nàn về dịch vụ chậm.',
+      aiSuggestedReply: 'Cảm ơn bạn đã phản hồi.', replyDraftText: 'Cảm ơn bạn đã phản hồi.', replyDraftLanguage: 'vi', replyDraftVersion: 1,
+      hasLocalizedReply: true, hasLegacyCompletedAnalysis: true,
+    }, {
+      id: 'switch-language', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'switch-language',
+      authorName: 'Client', rating: 2, reviewText: 'Service très lent.', originalText: 'Very slow service.', reviewLanguage: 'en',
+      publishedAt: '2026-09-28T06:00:00.000Z', sourceUrl: 'https://maps.google.com', isHistoricalImport: false,
+      requiresAction: true, status: 'to_process', ...switchDraft,
     }],
     notifications: [],
-    preferredLanguage: 'fr',
+    preferredLanguage: appMocks.language,
     ...appMocks,
-  }),
+  })},
 }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  appMocks.generateResponse.mockClear()
+})
 
 function renderReview(id: string, language: PreferredLanguage = 'fr') {
+  appMocks.language = language
   return render(<I18nProvider language={language}><MemoryRouter initialEntries={[`/avis/${id}`]}><Routes><Route path="/avis/:id" element={<ReviewDetailPage />} /></Routes></MemoryRouter></I18nProvider>)
 }
 
@@ -116,5 +147,33 @@ describe('ReviewDetailPage translation toggle', () => {
     renderReview('french-fr')
     expect(screen.getByRole('button', { name: 'Copier la réponse' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Traduire pour le client' })).not.toBeInTheDocument()
+  })
+
+  it('n’affiche pas un ancien draft russe comme réponse vietnamienne et génère progressivement la version VI', async () => {
+    renderReview('legacy-russian', 'vi')
+
+    expect(screen.queryByDisplayValue('Очень медленное обслуживание.')).not.toBeInTheDocument()
+    expect(await screen.findByDisplayValue('Cảm ơn bạn đã chia sẻ phản hồi.')).toBeVisible()
+    expect(appMocks.generateResponse).toHaveBeenCalledTimes(1)
+    expect(appMocks.generateResponse).toHaveBeenCalledWith('legacy-russian')
+  })
+
+  it('utilise un draft VI compatible pour un avis russe et propose la traduction client', () => {
+    renderReview('russian-vi', 'vi')
+    expect(screen.getByDisplayValue('Cảm ơn bạn đã chia sẻ phản hồi.')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Dịch cho khách hàng' })).toBeVisible()
+  })
+
+  it('copie directement lorsque l’avis original et le draft sont vietnamiens', () => {
+    renderReview('vietnamese-vi', 'vi')
+    expect(screen.getByRole('button', { name: 'Sao chép phản hồi' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Dịch cho khách hàng' })).not.toBeInTheDocument()
+  })
+
+  it('ne présente pas le draft VI comme draft FR après un changement de langue', async () => {
+    renderReview('switch-language', 'fr')
+    expect(screen.queryByDisplayValue('Bản nháp tiếng Việt.')).not.toBeInTheDocument()
+    expect(await screen.findByDisplayValue('Merci pour votre retour.')).toBeVisible()
+    expect(appMocks.generateResponse).toHaveBeenCalledTimes(1)
   })
 })

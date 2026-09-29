@@ -19,6 +19,7 @@ interface ReviewRow {
   language: string | null
   ai_summary: string | null
   ai_suggested_reply: string | null
+  ai_suggested_reply_language: string | null
   ai_detected_language: string | null
   ai_analyzed_at: string | null
   ai_status: 'pending' | 'processing' | 'completed' | 'failed' | null
@@ -26,6 +27,18 @@ interface ReviewRow {
   ai_error_history: Array<{ error: string; at: string }> | null
   ai_attempt_count: number | null
   reply_draft_version: number | null
+}
+
+interface LocalizedDraftRow {
+  id: string
+  language: 'fr' | 'vi'
+  ai_summary: string | null
+  ai_suggested_reply: string | null
+  draft_text: string | null
+  draft_updated_at: string | null
+  draft_version: number
+  ai_status: 'pending' | 'processing' | 'completed' | 'failed'
+  ai_error: string | null
 }
 
 async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary: string) {
@@ -102,6 +115,8 @@ Deno.serve(async (request) => {
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
   let reviewId = ''
+  let workingLanguage: 'fr' | 'vi' | null = null
+  let legacySuggestionExists = false
 
   try {
     const body = await request.json() as { review_id?: string; regenerate?: boolean }
@@ -121,56 +136,102 @@ Deno.serve(async (request) => {
 
     const { data, error } = await reader
       .from('reviews')
-      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version')
+      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_summary,ai_suggested_reply,ai_suggested_reply_language,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version')
       .eq('id', reviewId)
       .single()
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
 
     const review = data as ReviewRow
+    legacySuggestionExists = Boolean(review.ai_suggested_reply)
     if (automatic && !shouldAutomaticallyAnalyzeReview(review)) {
       return json({ ai_status: review.ai_status, skipped: true, reason: 'HISTORICAL_IMPORT' })
     }
     if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
-    if (review.ai_status === 'completed' && !body.regenerate) {
+
+    workingLanguage = userId
+      ? await preferredLanguageForUser(admin, userId)
+      : await preferredLanguageForOrganization(admin, review.organization_id)
+
+    const { data: existingData, error: existingError } = await admin
+      .from('review_reply_drafts')
+      .select('id,language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error')
+      .eq('review_id', review.id)
+      .eq('language', workingLanguage)
+      .maybeSingle()
+    if (existingError) throw existingError
+    let localized = existingData as LocalizedDraftRow | null
+
+    if (localized?.ai_status === 'completed' && localized.draft_text && !body.regenerate) {
       return json({
-        ai_summary: review.ai_summary,
-        ai_suggested_reply: review.ai_suggested_reply,
+        ai_summary: localized.ai_summary,
+        ai_suggested_reply: localized.ai_suggested_reply,
+        ai_suggested_reply_language: localized.language,
+        reply_draft_text: localized.draft_text,
+        reply_draft_language: localized.language,
+        reply_draft_updated_at: localized.draft_updated_at,
+        reply_draft_version: localized.draft_version,
         detected_language: review.ai_detected_language,
         ai_analyzed_at: review.ai_analyzed_at,
-        ai_status: review.ai_status,
+        ai_status: localized.ai_status,
         reused: true,
       })
     }
-
-    if (review.ai_status === 'processing' && !body.regenerate) {
+    if (localized?.ai_status === 'processing') {
       return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
+    }
+
+    if (localized) {
+      const { data: claimed, error: claimError } = await admin
+        .from('review_reply_drafts')
+        .update({ ai_status: 'processing', ai_error: null, updated_at: new Date().toISOString() })
+        .eq('id', localized.id)
+        .neq('ai_status', 'processing')
+        .select('id,language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error')
+        .maybeSingle()
+      if (claimError) throw claimError
+      if (!claimed) return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
+      localized = claimed as LocalizedDraftRow
+    } else {
+      const inserted = await admin.from('review_reply_drafts').insert({
+        review_id: review.id,
+        language: workingLanguage,
+        ai_status: 'processing',
+      }).select('id,language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error').maybeSingle()
+      if (inserted.error?.code === '23505') return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
+      if (inserted.error || !inserted.data) throw inserted.error ?? new Error('AI_DRAFT_CLAIM_FAILED')
+      localized = inserted.data as LocalizedDraftRow
     }
 
     const errorHistory = Array.isArray(review.ai_error_history) ? [...review.ai_error_history] : []
     if (review.ai_error) errorHistory.push({ error: review.ai_error, at: new Date().toISOString() })
-    const { error: pendingError } = await admin.from('reviews').update({
-      ai_status: 'processing',
-      ai_error: null,
+    const pendingReviewUpdate: Record<string, unknown> = {
       ai_error_history: errorHistory,
       ai_attempt_count: (review.ai_attempt_count ?? 0) + 1,
-    }).eq('id', review.id)
+    }
+    if (!review.ai_suggested_reply) {
+      pendingReviewUpdate.ai_status = 'processing'
+      pendingReviewUpdate.ai_error = null
+    }
+    const { error: pendingError } = await admin.from('reviews').update(pendingReviewUpdate).eq('id', review.id)
     if (pendingError) throw pendingError
 
-    const summaryLanguage = userId
-      ? await preferredLanguageForUser(admin, userId)
-      : await preferredLanguageForOrganization(admin, review.organization_id)
-    const result = await analyzeReviewWithOpenAI(review.rating, review.original_text || review.text, summaryLanguage)
+    const result = await analyzeReviewWithOpenAI(review.rating, review.original_text || review.text, workingLanguage)
     const analyzedAt = new Date().toISOString()
-    const currentDraftVersion = review.reply_draft_version ?? 0
+    const currentDraftVersion = localized.draft_version ?? 0
     const nextDraftVersion = currentDraftVersion + 1
-    const { error: saveError } = await admin.from('reviews').update({
+    const { error: localizedSaveError } = await admin.from('review_reply_drafts').update({
       ai_summary: result.ai_summary,
       ai_suggested_reply: result.ai_suggested_reply,
-      ai_suggested_reply_language: summaryLanguage,
-      reply_draft_text: result.ai_suggested_reply,
-      reply_draft_language: summaryLanguage,
-      reply_draft_updated_at: analyzedAt,
-      reply_draft_version: nextDraftVersion,
+      draft_text: result.ai_suggested_reply,
+      draft_updated_at: analyzedAt,
+      draft_version: nextDraftVersion,
+      ai_status: 'completed',
+      ai_error: null,
+      updated_at: analyzedAt,
+    }).eq('id', localized.id).eq('ai_status', 'processing')
+    if (localizedSaveError) throw localizedSaveError
+
+    const reviewUpdate: Record<string, unknown> = {
       ai_detected_language: result.detected_language,
       ai_analyzed_at: analyzedAt,
       ai_status: 'completed',
@@ -184,7 +245,19 @@ Deno.serve(async (request) => {
       ai_last_rejected_reply: null,
       ai_last_rejected_language: null,
       ai_validation_error: null,
-    }).eq('id', review.id)
+    }
+    if (!review.ai_suggested_reply) {
+      Object.assign(reviewUpdate, {
+        ai_summary: result.ai_summary,
+        ai_suggested_reply: result.ai_suggested_reply,
+        ai_suggested_reply_language: workingLanguage,
+        reply_draft_text: result.ai_suggested_reply,
+        reply_draft_language: workingLanguage,
+        reply_draft_updated_at: analyzedAt,
+        reply_draft_version: nextDraftVersion,
+      })
+    }
+    const { error: saveError } = await admin.from('reviews').update(reviewUpdate).eq('id', review.id)
     if (saveError) throw saveError
 
     if (automatic) {
@@ -203,9 +276,9 @@ Deno.serve(async (request) => {
 
     return json({
       ...result,
-      ai_suggested_reply_language: summaryLanguage,
+      ai_suggested_reply_language: workingLanguage,
       reply_draft_text: result.ai_suggested_reply,
-      reply_draft_language: summaryLanguage,
+      reply_draft_language: workingLanguage,
       reply_draft_updated_at: analyzedAt,
       reply_draft_version: nextDraftVersion,
       ai_analyzed_at: analyzedAt,
@@ -214,15 +287,25 @@ Deno.serve(async (request) => {
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 500) : 'AI_ANALYSIS_FAILED'
     const rejected = error instanceof ReviewAiValidationError ? error.result : null
-    if (reviewId) {
-      await admin.from('reviews').update({
+    if (reviewId && workingLanguage) {
+      await admin.from('review_reply_drafts').update({
         ai_status: 'failed',
         ai_error: code,
+        updated_at: new Date().toISOString(),
+      }).eq('review_id', reviewId).eq('language', workingLanguage).eq('ai_status', 'processing')
+    }
+    if (reviewId) {
+      const failedReviewUpdate: Record<string, unknown> = {
         ai_last_rejected_summary: rejected?.ai_summary ?? null,
         ai_last_rejected_reply: rejected?.ai_suggested_reply ?? null,
         ai_last_rejected_language: rejected?.detected_language ?? null,
         ai_validation_error: rejected ? code : null,
-      }).eq('id', reviewId)
+      }
+      if (!legacySuggestionExists) {
+        failedReviewUpdate.ai_status = 'failed'
+        failedReviewUpdate.ai_error = code
+      }
+      await admin.from('reviews').update(failedReviewUpdate).eq('id', reviewId)
     }
     return json({ error: code }, code === 'UNAUTHORIZED' ? 401 : code === 'RATE_LIMITED' ? 429 : 500)
   }
