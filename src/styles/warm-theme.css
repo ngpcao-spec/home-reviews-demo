@@ -231,6 +231,7 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
 .weekly-summary { position: relative; min-height: 150px; padding: 20px 20px 20px 52px; background: linear-gradient(145deg, rgba(67, 53, 48, .98), rgba(36, 33, 29, .98)); }
 .weekly-summary > svg { position: absolute; top: 20px; left: 19px; width: 22px; color: var(--violet); }
 .weekly-summary p { margin: 0; color: #e8e1d8; font-size: .9rem; line-height: 1.65; }
+.weekly-partial-summary-note { display: inline-block; margin-bottom: 9px; color: var(--champagne); font-size: .67rem; font-weight: 800; letter-spacing: .025em; }
 .weekly-report-state { display: grid; justify-items: center; gap: 12px; padding: 30px 20px; color: var(--muted); text-align: center; }
 .weekly-report-state > svg { color: #d96d70; }
 .weekly-report-state p { margin: 0; line-height: 1.5; }

@@ -41,6 +41,7 @@ describe('weekly report calendar and metrics', () => {
 
   it('marks a period before reporting coverage as incomplete', () => {
     expect(isReportingPeriodComplete('2026-09-28T00:00:00+07:00', '2026-09-21T00:00:00+07:00')).toBe(false)
+    expect(calculateWeeklyMetrics([{ rating: 3 }]).negativeReviewsCount).toBe(1)
   })
 
   it('keeps a covered zero-review period as a real zero', () => {

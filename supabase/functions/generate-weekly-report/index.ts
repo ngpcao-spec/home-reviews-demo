@@ -13,6 +13,7 @@ import {
 
 type ReviewRow = { id: string; rating: number; original_text: string | null; text: string | null }
 type DraftRow = { review_id: string; draft_text: string | null; ai_suggested_reply: string | null }
+const REPORT_CALCULATION_VERSION = 2
 
 Deno.serve(async (request) => {
   const preflightResponse = preflight(request)
@@ -57,7 +58,8 @@ Deno.serve(async (request) => {
       .eq('period_start', period.startAt)
       .eq('preferred_language', language)
       .maybeSingle()).data
-    if (existing?.ai_status === 'completed' || existing?.ai_status === 'generating') {
+    const needsCalculationUpgrade = Boolean(existing && Number(existing.calculation_version ?? 1) < REPORT_CALCULATION_VERSION)
+    if (!needsCalculationUpgrade && (existing?.ai_status === 'completed' || existing?.ai_status === 'generating')) {
       return json({ report: existing }, existing.ai_status === 'generating' ? 202 : 200)
     }
 
@@ -114,7 +116,8 @@ Deno.serve(async (request) => {
       negative_rate: metrics.negativeRate,
       ready_replies_count: readyRepliesCount,
       data_complete: dataComplete,
-      ai_status: dataComplete ? 'generating' : 'completed',
+      calculation_version: REPORT_CALCULATION_VERSION,
+      ai_status: dataComplete || negativeReviews.length > 0 ? 'generating' : 'completed',
       ai_error: null,
       updated_at: new Date().toISOString(),
     }
@@ -138,10 +141,25 @@ Deno.serve(async (request) => {
         generated_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         provisional: true,
+        calculation_version: REPORT_CALCULATION_VERSION,
       } })
     }
 
-    if (existing?.ai_status === 'failed') {
+    if (needsCalculationUpgrade && existing) {
+      const { data: claimed, error: claimError } = await context.admin
+        .from('weekly_establishment_reports')
+        .update(baseRow)
+        .eq('id', existing.id)
+        .lt('calculation_version', REPORT_CALCULATION_VERSION)
+        .select('id')
+        .maybeSingle()
+      if (claimError) throw claimError
+      if (!claimed) {
+        const { data: raced } = await context.client.from('weekly_establishment_reports').select('*').eq('id', existing.id).single()
+        return json({ report: raced }, raced?.ai_status === 'completed' ? 200 : 202)
+      }
+      claimedReportId = claimed.id
+    } else if (existing?.ai_status === 'failed') {
       const { data: claimed, error: claimError } = await context.admin
         .from('weekly_establishment_reports')
         .update(baseRow)
@@ -174,7 +192,7 @@ Deno.serve(async (request) => {
       claimedReportId = inserted.id
     }
 
-    if (!dataComplete) {
+    if (!dataComplete && negativeReviews.length === 0) {
       const { data: incomplete, error: incompleteError } = await context.admin
         .from('weekly_establishment_reports')
         .select('*')

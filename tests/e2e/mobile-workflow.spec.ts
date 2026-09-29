@@ -19,6 +19,7 @@ test('parcours accueil → avis → réponse → analyses',async({page})=>{
   await expect(page.getByText('Résumé IA de la semaine')).toBeVisible()
   await page.getByLabel('Période').selectOption('current')
   await expect(page.getByText('Rapport provisoire')).toBeVisible()
+  await expect(page.locator('.weekly-period')).toContainText('28–29 septembre 2026')
   await expect(page.locator('.bottom-nav')).toBeVisible()
   const box=await page.locator('body').boundingBox();expect(box?.width).toBeLessThanOrEqual(1280)
 })

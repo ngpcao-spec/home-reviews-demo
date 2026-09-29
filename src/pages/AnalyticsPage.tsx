@@ -117,16 +117,16 @@ export function AnalyticsPage() {
 
       {!visibleReport.dataComplete && <section className="weekly-data-warning card" role="status">
         <AlertTriangle aria-hidden="true"/>
-        <div><strong>{messages.analytics.dataInsufficient}</strong><p>{messages.analytics.dataInsufficientDetail}</p></div>
+        <div><strong>{messages.analytics.dataPartial}</strong><p>{messages.analytics.dataPartialDetail}</p></div>
       </section>}
 
       <section className="weekly-section">
         <div className="weekly-section-heading"><span className="eyebrow">01</span><h2>{messages.analytics.overview}</h2></div>
         <div className="weekly-kpis">
           <article className="weekly-kpi card"><MessageSquareText/><strong>{visibleReport.dataComplete ? visibleReport.newReviewsCount : '—'}</strong><span>{messages.analytics.newReviews}</span></article>
-          <article className="weekly-kpi card negative"><AlertTriangle/><strong>{visibleReport.dataComplete ? visibleReport.negativeReviewsCount : '—'}</strong><span>{messages.analytics.negativeReviews}</span></article>
+          <article className="weekly-kpi card negative"><AlertTriangle/><strong>{visibleReport.negativeReviewsCount}</strong><span>{visibleReport.dataComplete ? messages.analytics.negativeReviews : messages.analytics.knownNegativeReviews}</span></article>
           <article className="weekly-kpi card"><span className="weekly-percent">%</span><strong>{visibleReport.dataComplete ? `${visibleReport.negativeRate.toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} %` : '—'}</strong><span>{messages.analytics.negativeRate}</span></article>
-          <article className="weekly-kpi card ready"><Sparkles/><strong>{visibleReport.dataComplete ? visibleReport.readyRepliesCount : '—'}</strong><span>{messages.analytics.readyReplies}</span></article>
+          <article className="weekly-kpi card ready"><Sparkles/><strong>{visibleReport.readyRepliesCount}</strong><span>{messages.analytics.readyReplies}</span></article>
         </div>
       </section>
 
@@ -134,8 +134,10 @@ export function AnalyticsPage() {
         <div className="weekly-section-heading"><span className="eyebrow">02</span><h2>{messages.analytics.weeklySummary}</h2></div>
         <article className="weekly-summary card">
           <Sparkles aria-hidden="true"/>
-          {!visibleReport.dataComplete
-            ? <p>{messages.analytics.dataInsufficientDetail}</p>
+          {!visibleReport.dataComplete && visibleReport.aiStatus === 'completed' && visibleReport.aiWeeklySummary
+            ? <div><span className="weekly-partial-summary-note">{messages.analytics.summaryAvailableReviews}</span><p>{visibleReport.aiWeeklySummary}</p></div>
+            : !visibleReport.dataComplete
+            ? <p>{messages.analytics.partialSummaryUnavailable}</p>
             : visibleReport.aiStatus === 'completed' && visibleReport.aiWeeklySummary
             ? <p>{visibleReport.aiWeeklySummary}</p>
             : <p>{visibleReport.aiStatus === 'failed' ? messages.analytics.summaryFailed : messages.analytics.generating}</p>}
