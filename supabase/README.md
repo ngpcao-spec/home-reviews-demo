@@ -12,7 +12,8 @@ Compte local : `demo@home-reviews.fr` / `demohome`.
 
 ## Fournisseurs d’avis
 
-- `REVIEW_PROVIDER=outscraper` appelle l’API Google Maps Reviews d’Outscraper depuis une Edge Function authentifiée.
+- `REVIEW_PROVIDER=apify` utilise `compass/google-maps-reviews-scraper` et conserve texte original et traductions séparément.
+- `REVIEW_PROVIDER=outscraper` reste disponible comme rollback sans modification frontend.
 - `REVIEW_PROVIDER=mock` ne fait aucun appel externe.
 
 La fonction `fetch-google-reviews` limite la première récupération à 20 avis, demande le tri `newest` et normalise les données avant de les renvoyer. `OUTSCRAPER_API_KEY` est lu exclusivement depuis Supabase Secrets ; il ne doit être placé ni dans `.env.local`, ni dans une variable `VITE_*`. SerpApi n’est pas branché à ce flux.

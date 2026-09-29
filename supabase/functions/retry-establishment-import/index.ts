@@ -1,8 +1,9 @@
 import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { OutscraperError } from '../_shared/outscraper.ts'
+import { ApifyError } from '../_shared/apify.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
-import { backfillHistoricalReviews, type EstablishmentRow } from '../_shared/sync-service.ts'
+import { backfillHistoricalReviews, preferredLanguageForUser, type EstablishmentRow } from '../_shared/sync-service.ts'
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 
 Deno.serve(async (request) => {
@@ -36,7 +37,8 @@ Deno.serve(async (request) => {
       sync_error: null,
     }).eq('id', establishmentId)
 
-    const result = await backfillHistoricalReviews(admin, establishment as EstablishmentRow)
+    const language = await preferredLanguageForUser(admin, user.id)
+    const result = await backfillHistoricalReviews(admin, establishment as EstablishmentRow, language)
     const now = new Date().toISOString()
     const { data: updated, error: updateError } = await admin
       .from('establishments')
@@ -76,6 +78,7 @@ Deno.serve(async (request) => {
       }).eq('id', establishmentId)
     }
     if (error instanceof OutscraperError) return json({ error: error.code, retryable: true }, error.httpStatus)
+    if (error instanceof ApifyError) return json({ error: error.code, retryable: true }, error.httpStatus)
     if (code === 'UNAUTHORIZED') return json({ error: code }, 401)
     if (code === 'FORBIDDEN') return json({ error: code }, 403)
     if (code === 'RATE_LIMITED') return json({ error: code }, 429)

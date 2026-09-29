@@ -5,15 +5,18 @@ import { useApp } from '../app/AppContext'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
+import { useI18n } from '../i18n'
 
 export function ReviewDetailPage() {
   const { id } = useParams()
   const { reviews, establishments, generateResponse, logAction, pushToast } = useApp()
+  const { messages } = useI18n()
   const review = reviews.find((item) => item.id === id)
   const establishment = establishments.find((item) => item.id === review?.establishmentId)
   const [response, setResponse] = useState(review?.aiSuggestedReply ?? '')
   const [generating, setGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(false)
 
   useEffect(() => {
     setResponse(review?.aiSuggestedReply ?? '')
@@ -24,16 +27,16 @@ export function ReviewDetailPage() {
   }, [review?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!review || !establishment) {
-    return <><PageHeader title="Avis" back/><div className="empty-state"><h2>Avis introuvable</h2></div></>
+    return <><PageHeader title={messages.nav.reviews} back/><div className="empty-state"><h2>{messages.reviews.notFound}</h2></div></>
   }
 
   const handleGenerate = async () => {
     setGenerating(true)
     try {
       setResponse(await generateResponse(review.id))
-      pushToast('Analyse IA terminée')
+      pushToast(messages.reviews.analysisCompleted)
     } catch {
-      pushToast('L’analyse IA a échoué. Vous pouvez réessayer.')
+      pushToast(messages.reviews.analysisRetryFailed)
     } finally {
       setGenerating(false)
     }
@@ -43,7 +46,7 @@ export function ReviewDetailPage() {
     await navigator.clipboard.writeText(response)
     logAction(review.id, 'response_copied')
     setCopied(true)
-    pushToast('Réponse copiée')
+    pushToast(messages.reviews.replyCopied)
     window.setTimeout(() => setCopied(false), 1800)
   }
 
@@ -53,38 +56,38 @@ export function ReviewDetailPage() {
   }
 
   const completed = review.aiStatus === 'completed' && Boolean(review.aiSummary) && Boolean(review.aiSuggestedReply)
-  const statusCopy = review.aiStatus === 'failed'
-    ? 'L’analyse a échoué. L’avis est conservé et peut être analysé à nouveau.'
-    : 'L’analyse est en attente. Vous pouvez la lancer maintenant.'
+  const statusCopy = review.aiStatus === 'failed' ? messages.reviews.analysisFailed : messages.reviews.analysisPending
+  const hasTranslation = Boolean(review.translatedText && review.originalText && review.translatedText !== review.originalText)
 
-  return <><PageHeader title="Détail de l’avis" back action={<span/>}/>
+  return <><PageHeader title={messages.reviews.original} back action={<span/>}/>
     <section className="review-detail card">
       <div className="review-establishment">
         <EstablishmentAvatar id={establishment.id} name={establishment.name} large photoUrl={establishment.photoUrl}/>
         <div><strong>{establishment.name}</strong><span>{relativeTime(review.publishedAt)}</span><b className={`detail-rating rating-${review.rating}`}>{review.rating} ★</b></div>
       </div>
-      <h2 className="review-section-label">Avis original</h2>
-      <blockquote>{review.reviewText}</blockquote>
+      <h2 className="review-section-label">{showOriginal ? messages.reviews.original : messages.nav.reviews}</h2>
+      <blockquote>{showOriginal ? review.originalText : review.reviewText}</blockquote>
+      {hasTranslation && <button className="text-button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? messages.reviews.hideOriginal : messages.reviews.viewOriginal}</button>}
       <span className="author">— {review.authorName}</span>
     </section>
 
     <section className="ai-panel card">
-      <div className="ai-heading"><span><Sparkles size={20}/>Résumé IA</span></div>
+      <div className="ai-heading"><span><Sparkles size={20}/>{messages.reviews.aiSummary}</span></div>
       {completed
         ? <div className="ai-summary-copy">{review.aiSummary}</div>
-        : <div className="ai-empty"><p>{statusCopy}</p><button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {generating ? 'Analyse…' : 'Relancer l’analyse'}</button></div>}
+        : <div className="ai-empty"><p>{statusCopy}</p><button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {generating ? '…' : messages.reviews.relaunch}</button></div>}
     </section>
 
     {response
       ? <section className="response-panel card">
-          <div className="response-title"><h2><Sparkles size={18}/>Réponse proposée</h2><span>À relire avant publication</span></div>
-          <textarea value={response} onChange={(event) => setResponse(event.target.value)} rows={9} aria-label="Réponse proposée"/>
+          <div className="response-title"><h2><Sparkles size={18}/>{messages.reviews.suggestedReply}</h2><span>{messages.reviews.reviewBeforePublishing}</span></div>
+          <textarea value={response} onChange={(event) => setResponse(event.target.value)} rows={9} aria-label={messages.reviews.suggestedReply}/>
           <div className="response-grid">
-            <button className="primary-button" onClick={handleCopy}>{copied ? <Check/> : <Clipboard/>}{copied ? 'Copiée' : 'Copier la réponse'}</button>
-            <button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>}Régénérer</button>
-            <button className="secondary-button response-map-button" onClick={openMaps}><ExternalLink size={17}/>Ouvrir dans Google Maps</button>
+            <button className="primary-button" onClick={handleCopy}>{copied ? <Check/> : <Clipboard/>}{copied ? messages.reviews.copied : messages.reviews.copy}</button>
+            <button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {messages.reviews.regenerate}</button>
+            <button className="secondary-button response-map-button" onClick={openMaps}><ExternalLink size={17}/>{messages.reviews.openMaps}</button>
           </div>
         </section>
-      : <div className="detail-actions"><button className="secondary-button full-width" onClick={openMaps}><ExternalLink size={18}/>Ouvrir dans Google Maps</button></div>}
+      : <div className="detail-actions"><button className="secondary-button full-width" onClick={openMaps}><ExternalLink size={18}/>{messages.reviews.openMaps}</button></div>}
   </>
 }

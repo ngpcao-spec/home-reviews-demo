@@ -27,6 +27,8 @@ export interface Review {
   authorName: string
   rating: number
   reviewText: string
+  originalText?: string
+  translatedText?: string
   reviewLanguage: string
   publishedAt: string
   sourceUrl: string
@@ -40,6 +42,8 @@ export interface Review {
   aiStatus?: AiStatus
   aiError?: string
 }
+
+export type PreferredLanguage = 'fr' | 'vi'
 
 export interface AppNotification {
   id: string

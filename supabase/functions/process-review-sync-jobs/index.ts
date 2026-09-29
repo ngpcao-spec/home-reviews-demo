@@ -1,6 +1,21 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
-import { insertReviews, fetchIncrementalPage } from '../_shared/sync-service.ts'
+import {
+  apifyToken,
+  insertReviews,
+  fetchIncrementalPage,
+  preferredLanguageForOrganization,
+  providerName,
+} from '../_shared/sync-service.ts'
+import {
+  ApifyError,
+  apifyRunFinished,
+  apifyRunSucceeded,
+  fetchApifyDataset,
+  getApifyRun,
+  normalizeApifyDataset,
+  startApifyRun,
+} from '../_shared/apify.ts'
 import {
   configuredInteger,
   mapWithConcurrency,
@@ -34,6 +49,154 @@ async function requireSuccess<T>(
   return data
 }
 
+interface ApifyCursor {
+  provider: 'apify'
+  runId: string
+  datasetId: string
+  language: 'fr' | 'vi'
+}
+
+function parseApifyCursor(value: string | null): ApifyCursor | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as Partial<ApifyCursor>
+    if (parsed.provider !== 'apify' || !parsed.runId || !parsed.datasetId) return null
+    return {
+      provider: 'apify',
+      runId: parsed.runId,
+      datasetId: parsed.datasetId,
+      language: parsed.language === 'vi' ? 'vi' : 'fr',
+    }
+  } catch {
+    return null
+  }
+}
+
+async function continueJob(admin: SupabaseClient, jobId: string, worker: string, delaySeconds: number) {
+  const continued = await requireSuccess<boolean>(admin.rpc('continue_review_sync_job', {
+    p_job_id: jobId,
+    p_worker_id: worker,
+    p_delay_seconds: delaySeconds,
+  }))
+  if (continued !== true) throw new Error('SYNC_LEASE_LOST')
+}
+
+async function processApifyJob(
+  admin: SupabaseClient,
+  job: SyncJob,
+  worker: string,
+  config: {
+    leaseSeconds: number
+    providerLeaseSeconds: number
+    providerCooldownMs: number
+    providerSlotWaitMs: number
+  },
+) {
+  const token = apifyToken()
+  let cursor = parseApifyCursor(job.pagination_cursor)
+  if (!cursor) {
+    const providerToken = `${worker}:${job.id}:apify-start`
+    const slotDeadline = performance.now() + config.providerSlotWaitMs
+    let slot: number | null = null
+    do {
+      slot = await requireSuccess<number | null>(admin.rpc('claim_review_provider_slot', {
+        p_worker_token: providerToken,
+        p_lease_seconds: config.providerLeaseSeconds,
+      }))
+      if (slot === null) await wait(100)
+    } while (slot === null && performance.now() < slotDeadline)
+    if (slot === null) {
+      await continueJob(admin, job.id, worker, 5)
+      return { jobId: job.id, status: 'deferred', providerRequests: 0 }
+    }
+
+    try {
+      const language = await preferredLanguageForOrganization(admin, job.organization_id)
+      const since = job.checkpoint_review_at
+        ? new Date(Date.parse(job.checkpoint_review_at) - 5_000).toISOString()
+        : new Date(Date.now() - 30 * 86_400_000).toISOString()
+      const run = await startApifyRun(token, {
+        placeUrl: job.google_maps_url,
+        language,
+        sort: 'newest',
+        since,
+      })
+      cursor = { provider: 'apify', runId: run.runId, datasetId: run.datasetId, language }
+      const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
+        p_job_id: job.id,
+        p_worker_id: worker,
+        p_pagination_cursor: JSON.stringify(cursor),
+        p_head_review_id: job.head_review_id,
+        p_head_review_at: job.head_review_at,
+        p_provider_requests: 1,
+        p_reviews_fetched: 0,
+        p_reviews_inserted: 0,
+        p_lease_seconds: config.leaseSeconds,
+      }))
+      if (saved !== true) throw new Error('SYNC_LEASE_LOST')
+    } finally {
+      await admin.rpc('release_review_provider_slot', {
+        p_slot_number: slot,
+        p_worker_token: providerToken,
+        p_cooldown_ms: config.providerCooldownMs,
+      })
+    }
+    await continueJob(admin, job.id, worker, 5)
+    return { jobId: job.id, status: 'provider_started', providerRequests: 1 }
+  }
+
+  const run = await getApifyRun(token, cursor.runId)
+  if (!apifyRunFinished(run.status)) {
+    await continueJob(admin, job.id, worker, 5)
+    return { jobId: job.id, status: 'provider_running', providerRequests: 0 }
+  }
+  if (!apifyRunSucceeded(run.status)) {
+    await admin.rpc('checkpoint_review_sync_job', {
+      p_job_id: job.id,
+      p_worker_id: worker,
+      p_pagination_cursor: null,
+      p_head_review_id: job.head_review_id,
+      p_head_review_at: job.head_review_at,
+      p_provider_requests: 0,
+      p_reviews_fetched: 0,
+      p_reviews_inserted: 0,
+      p_lease_seconds: config.leaseSeconds,
+    })
+    throw new ApifyError(`APIFY_RUN_${run.status}`, 503)
+  }
+
+  const items = await fetchApifyDataset(token, cursor.datasetId)
+  const page = normalizeApifyDataset(items, job.google_maps_url)
+  const first = page.reviews[0]
+  const headReviewId = job.head_review_id ?? first?.externalReviewId ?? null
+  const headReviewAt = job.head_review_at ?? first?.publishedAt ?? null
+  const checkpoint = pageBeforeCheckpoint(page.reviews, job.checkpoint_review_id)
+  const negative = checkpoint.reviews.filter((review) => review.rating >= 1 && review.rating <= 3)
+  const inserted = await insertReviews(admin, {
+    id: job.establishment_id,
+    organization_id: job.organization_id,
+  }, negative, false)
+  const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
+    p_job_id: job.id,
+    p_worker_id: worker,
+    p_pagination_cursor: null,
+    p_head_review_id: headReviewId,
+    p_head_review_at: headReviewAt,
+    p_provider_requests: 0,
+    p_reviews_fetched: page.reviews.length,
+    p_reviews_inserted: inserted,
+    p_lease_seconds: config.leaseSeconds,
+  }))
+  if (saved !== true) throw new Error('SYNC_LEASE_LOST')
+  const completed = await requireSuccess(admin.rpc('complete_review_sync_job', {
+    p_job_id: job.id,
+    p_worker_id: worker,
+    p_synced_at: new Date().toISOString(),
+  }))
+  if (completed !== true) throw new Error('SYNC_LEASE_LOST')
+  return { jobId: job.id, status: 'completed', providerRequests: 0 }
+}
+
 async function processJob(
   admin: SupabaseClient,
   job: SyncJob,
@@ -48,6 +211,22 @@ async function processJob(
     providerSlotWaitMs: number
   },
 ) {
+  if (providerName() === 'apify') {
+    try {
+      return await processApifyJob(admin, job, worker, config)
+    } catch (error) {
+      const policy = retryPolicy(error, job.attempts, config.backoffSeconds)
+      const status = await requireSuccess(admin.rpc('fail_review_sync_job', {
+        p_job_id: job.id,
+        p_worker_id: worker,
+        p_error_code: policy.code,
+        p_retryable: policy.retryable,
+        p_max_attempts: config.maxAttempts,
+        p_backoff_seconds: policy.backoffSeconds,
+      }))
+      return { jobId: job.id, status, error: policy.code }
+    }
+  }
   let cursor = job.pagination_cursor ?? undefined
   let headReviewId = job.head_review_id
   let headReviewAt = job.head_review_at

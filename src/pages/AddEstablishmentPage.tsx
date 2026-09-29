@@ -6,6 +6,8 @@ import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Stars } from '../components/ui/Stars'
 import type { PlaceCandidate } from '../services/review-provider'
+import { useI18n } from '../i18n'
+import type { Messages } from '../i18n/fr'
 
 type Step = 'input' | 'confirm' | 'import' | 'success'
 
@@ -17,25 +19,28 @@ interface AddWizardLocationState {
   }
 }
 
-const errorMessages: Record<string, string> = {
-  INVALID_GOOGLE_MAPS_LINK: 'Ce lien Google Maps n’est pas valide.',
-  INVALID_INPUT: 'Ce lien Google Maps n’est pas valide.',
-  ESTABLISHMENT_NOT_FOUND: 'Aucun établissement n’a été trouvé avec ce lien.',
-  GOOGLE_MAPS_LINK_RESOLUTION_FAILED: 'Le lien court Google Maps n’a pas pu être résolu.',
-  ESTABLISHMENT_ALREADY_ADDED: 'Cet établissement est déjà ajouté à HOME Reviews.',
-  OUTSCRAPER_UNAVAILABLE: 'Le service Google Maps est momentanément indisponible.',
-  OUTSCRAPER_UPSTREAM_ERROR: 'Le service Google Maps est momentanément indisponible.',
-  OUTSCRAPER_QUOTA_EXCEEDED: 'Le quota de recherche est temporairement atteint.',
-  OUTSCRAPER_BILLING_REQUIRED: 'Le quota de recherche est temporairement atteint.',
-  OUTSCRAPER_TIMEOUT: 'La recherche a pris trop de temps. Réessayez.',
-  UNAUTHORIZED: 'Votre session a expiré. Reconnectez-vous.',
-  FORBIDDEN: 'Vous n’avez pas l’autorisation d’ajouter un établissement.',
-  ESTABLISHMENT_MISMATCH: 'La fiche Google Maps a changé. Relancez la recherche.',
-}
-
-function messageFor(error: unknown): string {
+function messageFor(error: unknown, messages: Messages): string {
   const code = error instanceof Error ? error.message : 'UNKNOWN'
-  return errorMessages[code] ?? 'Une erreur est survenue. Réessayez dans quelques instants.'
+  const errors = messages.add.errors
+  const errorMessages: Record<string, string> = {
+    INVALID_GOOGLE_MAPS_LINK: errors.invalidLink,
+    INVALID_INPUT: errors.invalidLink,
+    ESTABLISHMENT_NOT_FOUND: errors.notFound,
+    GOOGLE_MAPS_LINK_RESOLUTION_FAILED: errors.resolution,
+    ESTABLISHMENT_ALREADY_ADDED: errors.duplicate,
+    OUTSCRAPER_UNAVAILABLE: errors.unavailable,
+    OUTSCRAPER_UPSTREAM_ERROR: errors.unavailable,
+    APIFY_UNAVAILABLE: errors.unavailable,
+    APIFY_RATE_LIMIT: errors.quota,
+    OUTSCRAPER_QUOTA_EXCEEDED: errors.quota,
+    OUTSCRAPER_BILLING_REQUIRED: errors.quota,
+    OUTSCRAPER_TIMEOUT: errors.timeout,
+    APIFY_TIMEOUT: errors.timeout,
+    UNAUTHORIZED: errors.unauthorized,
+    FORBIDDEN: errors.forbidden,
+    ESTABLISHMENT_MISMATCH: errors.mismatch,
+  }
+  return errorMessages[code] ?? errors.generic
 }
 
 export function AddEstablishmentPage() {
@@ -50,6 +55,7 @@ export function AddEstablishmentPage() {
     plan,
     monitoringIntervalHours,
   } = useApp()
+  const { messages } = useI18n()
   const [step, setStep] = useState<Step>(restored ? 'success' : 'input')
   const [query, setQuery] = useState(restored?.query ?? '')
   const [candidate, setCandidate] = useState<PlaceCandidate | undefined>(restored?.candidate)
@@ -62,7 +68,7 @@ export function AddEstablishmentPage() {
   const search = async () => {
     setError('')
     if (!query.trim()) {
-      setError('Collez un lien Google Maps.')
+      setError(messages.add.pasteLink)
       return
     }
     setLoading(true)
@@ -71,7 +77,7 @@ export function AddEstablishmentPage() {
       setCandidate(found)
       setStep('confirm')
     } catch (searchError) {
-      setError(messageFor(searchError))
+      setError(messageFor(searchError, messages))
     } finally {
       setLoading(false)
     }
@@ -90,7 +96,7 @@ export function AddEstablishmentPage() {
         state: { addEstablishmentSuccess: { query: query.trim(), candidate, result: imported } },
       })
     } catch (importError) {
-      setError(messageFor(importError))
+      setError(messageFor(importError, messages))
       setStep('confirm')
     }
   }
@@ -115,7 +121,7 @@ export function AddEstablishmentPage() {
         state: { addEstablishmentSuccess: { query, candidate, result: updated } },
       })
     } catch (retryError) {
-      setError(messageFor(retryError))
+      setError(messageFor(retryError, messages))
     } finally {
       setRetrying(false)
     }
@@ -127,7 +133,7 @@ export function AddEstablishmentPage() {
   const negativeReviewCount = result?.negativeReviewCount ?? result?.inserted ?? 0
 
   return <>
-    <PageHeader title="Ajouter un établissement" back />
+    <PageHeader title={messages.add.title} back />
     <div className="stepper" aria-label="Progression">
       <i className="done" />
       <i className={step !== 'input' ? 'done' : ''} />
@@ -135,36 +141,36 @@ export function AddEstablishmentPage() {
       <i className={step === 'success' ? 'done' : ''} />
     </div>
 
-    {quotaReached && <div className="quota-alert"><MapPin /><div><strong>Quota atteint</strong><span>Votre plan autorise {plan.maxEstablishments} établissements.</span></div></div>}
+    {quotaReached && <div className="quota-alert"><MapPin /><div><strong>{messages.add.quota}</strong><span>{messages.add.quotaDetail.replace('{count}', String(plan.maxEstablishments))}</span></div></div>}
 
     {step === 'input' && <section className="flow-card card">
       <span className="flow-icon"><MapPin /></span>
-      <h2>Ajouter un établissement</h2>
-      <p>Collez simplement le lien Google Maps de votre établissement.</p>
+      <h2>{messages.add.title}</h2>
+      <p>{messages.add.paste}</p>
       <label className="search-field">
         <Link2 />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter') void search() }}
-          placeholder="Lien Google Maps"
+          placeholder={messages.add.mapLink}
           inputMode="url"
           autoCapitalize="none"
           autoCorrect="off"
           autoFocus
         />
       </label>
-      <div className="input-hint">Exemple : https://maps.app.goo.gl/...</div>
+      <div className="input-hint">{messages.add.example}</div>
       {error && <p className="field-error" role="alert">{error}</p>}
       <button className="primary-button full-width" onClick={() => void search()} disabled={loading || quotaReached}>
         {loading ? <LoaderCircle className="spin" /> : <Search />}
-        {loading ? 'Recherche…' : "Rechercher l’établissement"}
+        {loading ? messages.add.searching : messages.add.search}
       </button>
     </section>}
 
     {step === 'confirm' && candidate && <section className="flow-card card">
       <span className="flow-icon success"><CheckCircle2 /></span>
-      <h2>Confirmer l’établissement</h2>
+      <h2>{messages.add.confirmPlace}</h2>
       <div className="confirm-place">
         <EstablishmentAvatar id={candidate.placeRef} name={candidate.name} photoUrl={candidate.photoUrl} large />
         <div>
@@ -175,42 +181,42 @@ export function AddEstablishmentPage() {
       </div>
       {error && <p className="field-error" role="alert">{error}</p>}
       <div className="button-row">
-        <button className="secondary-button" onClick={() => { setStep('input'); setCandidate(undefined); setError(''); navigate('/etablissements/ajouter', { replace: true, state: null }) }}>Annuler</button>
-        <button className="primary-button" onClick={() => void confirm()}>Ajouter cet établissement</button>
+        <button className="secondary-button" onClick={() => { setStep('input'); setCandidate(undefined); setError(''); navigate('/etablissements/ajouter', { replace: true, state: null }) }}>{messages.common.cancel}</button>
+        <button className="primary-button" onClick={() => void confirm()}>{messages.add.addPlace}</button>
       </div>
     </section>}
 
     {step === 'import' && <section className="flow-card import-card card" aria-live="polite">
       <span className="flow-icon"><LoaderCircle className="spin" /></span>
-      <h2>Import en cours…</h2>
-      <p>Nous récupérons vos avis récents et préparons votre espace.</p>
+      <h2>{messages.add.importing}</h2>
+      <p>{messages.add.importingBody}</p>
     </section>}
 
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
       <span className="flow-icon success"><CheckCircle2 /></span>
-      <h2>✓ Établissement ajouté</h2>
+      <h2>✓ {messages.add.success}</h2>
       <div className="confirm-place">
         <EstablishmentAvatar id={candidate.placeRef} name={candidate.name} photoUrl={candidate.photoUrl} large />
         <div>
           <strong>{candidate.name}</strong>
-          <span className="rating-line"><b>{candidate.rating.toFixed(1)}</b><Stars rating={Math.round(candidate.rating)} compact /><em>{candidate.reviewCount} avis Google</em></span>
+          <span className="rating-line"><b>{candidate.rating.toFixed(1)}</b><Stars rating={Math.round(candidate.rating)} compact /><em>{candidate.reviewCount} {messages.add.googleReviews}</em></span>
         </div>
       </div>
       {result.importStatus === 'failed'
-        ? <p><strong>Certains avis n’ont pas encore pu être importés.</strong></p>
-        : <p><strong>{negativeReviewCount} avis négatifs importés</strong> dans HOME Reviews.</p>}
+        ? <p><strong>{messages.add.partialImport}</strong></p>
+        : <p><strong>{messages.add.imported.replace('{count}', String(negativeReviewCount))}</strong></p>}
       {result.importStatus !== 'failed' && <p>
-        Surveillance activée.<br />
-        Surveillance toutes les {monitoringIntervalHours} heures.<br />
-        Prochain contrôle dans environ {nextCheckHours} h.
+        {messages.add.monitoringEnabled}<br />
+        {messages.add.monitoringEvery.replace('{hours}', String(monitoringIntervalHours))}<br />
+        {messages.add.nextControl.replace('{hours}', String(nextCheckHours))}
       </p>}
       {error && <p className="field-error" role="alert">{error}</p>}
       {result.importStatus === 'failed' ? <button className="primary-button full-width" disabled={retrying} onClick={() => void retryImport()}>
         {retrying ? <LoaderCircle className="spin" /> : null}
-        {retrying ? 'Nouvelle tentative…' : 'Réessayer l’import'}
+        {retrying ? messages.add.retrying : messages.add.retryImport}
       </button> : <div className="button-row">
-        <button className="primary-button" onClick={() => navigate(`/avis?etablissement=${result.establishmentId}&statut=all`)}>Voir les avis</button>
-        <button className="secondary-button" onClick={() => navigate('/etablissements')}>Retour aux établissements</button>
+        <button className="primary-button" onClick={() => navigate(`/avis?etablissement=${result.establishmentId}&statut=all`)}>{messages.add.viewReviews}</button>
+        <button className="secondary-button" onClick={() => navigate('/etablissements')}>{messages.add.backPlaces}</button>
       </div>}
     </section>}
   </>

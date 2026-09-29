@@ -12,6 +12,8 @@ export interface NormalizedReview {
   authorImage: string | null
   rating: number
   text: string
+  translatedText?: string | null
+  translatedLanguage?: string | null
   publishedAt: string | null
   reviewUrl: string | null
   ownerResponse: string | null
@@ -31,7 +33,7 @@ export interface NormalizedEstablishment {
 }
 
 export interface GoogleReviewsResult {
-  provider: 'outscraper' | 'mock'
+  provider: 'apify' | 'outscraper' | 'mock'
   establishment: NormalizedEstablishment
   reviews: NormalizedReview[]
   count: number

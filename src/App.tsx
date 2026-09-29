@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useApp } from './app/AppContext'
 import { AppShell } from './components/ui/AppShell'
 import { NotificationOnboarding } from './components/NotificationOnboarding'
+import { LanguageSelection } from './components/LanguageSelection'
 
 const AddEstablishmentPage=lazy(()=>import('./pages/AddEstablishmentPage').then(m=>({default:m.AddEstablishmentPage})))
 const AnalyticsPage=lazy(()=>import('./pages/AnalyticsPage').then(m=>({default:m.AnalyticsPage})))
@@ -42,10 +43,11 @@ function PasswordRecoveryScreen() {
 }
 
 function ProtectedApp() {
-  const { authReady, dataReady, dataLoading, dataError, demoMode, isAuthenticated, retryData } = useApp()
+  const { authReady, dataReady, dataLoading, dataError, demoMode, isAuthenticated, preferredLanguage, retryData } = useApp()
   if (!authReady || dataLoading || (isAuthenticated && !dataReady)) return <div className="route-loading" aria-label="Chargement des données"><span/></div>
   if (dataError) return <main className="auth-page"><section className="auth-card card"><span className="eyebrow">Connexion aux données</span><h1>Données indisponibles</h1><p>{dataError}</p><button className="primary-button full-width" onClick={() => void retryData()}>Réessayer</button></section></main>
   if (!demoMode && !isAuthenticated) return <Navigate to="/connexion" replace />
+  if (!demoMode && !preferredLanguage) return <LanguageSelection />
   return <><AppShell /><NotificationOnboarding /></>
 }
 

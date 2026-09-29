@@ -5,6 +5,10 @@ import {
   type GoogleReviewsResult,
   type NormalizedReview,
 } from './outscraper.ts'
+import {
+  fetchApifyReviews,
+  type SupportedLanguage,
+} from './apify.ts'
 import { reviewClassification } from './review-classification.ts'
 import {
   HISTORICAL_NEGATIVE_LIMIT,
@@ -29,16 +33,16 @@ export interface EstablishmentRow {
 
 export interface SyncSummary {
   establishmentId: string
-  provider: 'outscraper' | 'mock'
+  provider: 'apify' | 'outscraper' | 'mock'
   providerRequests: number
   fetched: number
   inserted: number
   stoppedOnKnownReview: boolean
 }
 
-function providerName(): 'outscraper' | 'mock' {
+export function providerName(): 'apify' | 'outscraper' | 'mock' {
   const configured = (Deno.env.get('REVIEW_PROVIDER') ?? 'mock').trim().toLowerCase()
-  if (configured === 'mock' || configured === 'outscraper') return configured
+  if (configured === 'mock' || configured === 'outscraper' || configured === 'apify') return configured
   throw new Error('REVIEW_PROVIDER_UNSUPPORTED')
 }
 
@@ -46,6 +50,38 @@ function outscraperKey(): string {
   const key = Deno.env.get('OUTSCRAPER_API_KEY')?.trim() ?? ''
   if (!key) throw new Error('OUTSCRAPER_KEY_MISSING')
   return key
+}
+
+export function apifyToken(): string {
+  const token = Deno.env.get('APIFY_API_TOKEN')?.trim() ?? ''
+  if (!token) throw new Error('APIFY_TOKEN_MISSING')
+  return token
+}
+
+export async function preferredLanguageForUser(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<SupportedLanguage> {
+  const { data, error } = await admin
+    .from('profiles')
+    .select('preferred_language')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data?.preferred_language === 'vi' ? 'vi' : 'fr'
+}
+
+export async function preferredLanguageForOrganization(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<SupportedLanguage> {
+  const { data: organization, error: organizationError } = await admin
+    .from('organizations')
+    .select('created_by')
+    .eq('id', organizationId)
+    .single()
+  if (organizationError) throw organizationError
+  return preferredLanguageForUser(admin, organization.created_by as string)
 }
 
 async function createRun(
@@ -100,6 +136,8 @@ function reviewRow(
     author_image: review.authorImage,
     rating: review.rating,
     text: review.text,
+    original_text: review.text,
+    original_language: review.language,
     language: review.language,
     published_at: review.publishedAt,
     review_url: review.reviewUrl,
@@ -123,7 +161,18 @@ export async function insertReviews(
   )
   if (!validReviews.length) return 0
 
-  const { data, error } = await admin
+  const externalIds = validReviews.map((review) => review.externalReviewId)
+  const { data: existingRows, error: existingRowsError } = await admin
+    .from('reviews')
+    .select('external_review_id')
+    .eq('establishment_id', establishment.id)
+    .in('external_review_id', externalIds)
+  if (existingRowsError) throw existingRowsError
+  const existingIds = new Set(
+    (existingRows ?? []).map((row) => row.external_review_id as string),
+  )
+
+  const { error } = await admin
     .from('reviews')
     .upsert(
       validReviews.map((review) => reviewRow(establishment, review, historicalImport)),
@@ -132,9 +181,32 @@ export async function insertReviews(
         ignoreDuplicates: true,
       },
     )
-    .select('external_review_id')
   if (error) throw error
-  return data?.length ?? 0
+
+  const { data: persisted, error: persistedError } = await admin
+    .from('reviews')
+    .select('id,external_review_id')
+    .eq('establishment_id', establishment.id)
+    .in('external_review_id', externalIds)
+  if (persistedError) throw persistedError
+
+  const byExternalId = new Map(
+    (persisted ?? []).map((row) => [row.external_review_id as string, row.id as string]),
+  )
+  const translations = validReviews.flatMap((review) => {
+    const reviewId = byExternalId.get(review.externalReviewId)
+    const language = review.translatedLanguage
+    const translatedText = review.translatedText?.trim()
+    if (!reviewId || (language !== 'fr' && language !== 'vi') || !translatedText) return []
+    return [{ review_id: reviewId, language, translated_text: translatedText, updated_at: new Date().toISOString() }]
+  })
+  if (translations.length) {
+    const { error: translationError } = await admin
+      .from('review_translations')
+      .upsert(translations, { onConflict: 'review_id,language' })
+    if (translationError) throw translationError
+  }
+  return validReviews.filter((review) => !existingIds.has(review.externalReviewId)).length
 }
 
 interface InitializationFetchResult extends GoogleReviewsResult {
@@ -154,7 +226,10 @@ function sortNewest(reviews: NormalizedReview[]): NormalizedReview[] {
   })
 }
 
-async function fetchInitialization(query: string): Promise<InitializationFetchResult> {
+async function fetchInitialization(
+  query: string,
+  language: SupportedLanguage,
+): Promise<InitializationFetchResult> {
   const provider = providerName()
   const recentWindowDays = historicalRecentWindowDays(Deno.env.get('HISTORICAL_RECENT_WINDOW_DAYS'))
   const cutoffSeconds = initialImportCutoffSeconds(Date.now(), recentWindowDays)
@@ -172,6 +247,37 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
       historicalFetched: Math.min(result.reviews.length, HISTORICAL_NEGATIVE_LIMIT),
       finalAfterDeduplication: merged.reviews.length,
       checkpointReview: sortNewest([...result.reviews])[0] ?? null,
+    }
+  }
+
+  if (provider === 'apify') {
+    const cutoffIso = new Date(cutoffMilliseconds).toISOString()
+    const [recent, historical] = await Promise.all([
+      fetchApifyReviews(apifyToken(), {
+        placeUrl: query,
+        language,
+        sort: 'newest',
+        since: cutoffIso,
+      }),
+      fetchApifyReviews(apifyToken(), {
+        placeUrl: query,
+        language,
+        sort: 'lowest_rating',
+        limit: HISTORICAL_NEGATIVE_LIMIT,
+      }),
+    ])
+    const merged = mergeInitialReviewPasses(recent.reviews, historical.reviews, cutoffMilliseconds)
+    return {
+      provider: 'apify',
+      establishment: recent.establishment,
+      reviews: merged.reviews,
+      count: merged.reviews.length,
+      providerRequests: 2,
+      recentFetched: merged.recentFetched,
+      recentNegative: merged.recentNegative,
+      historicalFetched: historical.reviews.length,
+      finalAfterDeduplication: merged.reviews.length,
+      checkpointReview: sortNewest([...recent.reviews])[0] ?? null,
     }
   }
 
@@ -255,11 +361,21 @@ async function fetchInitialization(query: string): Promise<InitializationFetchRe
   }
 }
 
-export async function resolveEstablishmentCandidate(query: string) {
+export async function resolveEstablishmentCandidate(
+  query: string,
+  language: SupportedLanguage,
+) {
   const provider = providerName()
   const result = provider === 'mock'
     ? getMockGoogleReviews(query)
-    : await fetchOutscraperReviews({
+    : provider === 'apify'
+      ? await fetchApifyReviews(apifyToken(), {
+        placeUrl: query,
+        language,
+        sort: 'newest',
+        limit: 1,
+      })
+      : await fetchOutscraperReviews({
       query,
       apiKey: outscraperKey(),
       reviewsLimit: 1,
@@ -275,9 +391,10 @@ export async function initializeEstablishment(
   organizationId: string,
   query: string,
   expectedGoogleId?: string,
+  language: SupportedLanguage = 'fr',
 ) {
   const provider = providerName()
-  const result = await fetchInitialization(query)
+  const result = await fetchInitialization(query, language)
   if (expectedGoogleId && result.establishment.googleId !== expectedGoogleId) {
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
@@ -426,8 +543,9 @@ export async function initializeEstablishment(
 export async function backfillHistoricalReviews(
   admin: SupabaseClient,
   establishment: EstablishmentRow,
+  language: SupportedLanguage = 'fr',
 ) {
-  const result = await fetchInitialization(establishment.google_maps_url || establishment.google_id)
+  const result = await fetchInitialization(establishment.google_maps_url || establishment.google_id, language)
   if (result.establishment.googleId !== establishment.google_id) {
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
@@ -463,9 +581,11 @@ export async function backfillHistoricalReviews(
 export async function fetchIncrementalPage(
   establishment: EstablishmentRow,
   cursor?: string,
+  _language: SupportedLanguage = 'fr',
 ): Promise<GoogleReviewsResult> {
   const provider = providerName()
   if (provider === 'mock') return getMockGoogleReviews(establishment.google_id)
+  if (provider === 'apify') throw new Error('APIFY_ASYNC_WORKER_REQUIRED')
 
   const cutoff = establishment.last_review_at
     ? Math.max(0, Math.floor(Date.parse(establishment.last_review_at) / 1_000) - 5)

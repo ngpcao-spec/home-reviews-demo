@@ -29,7 +29,7 @@ Les tests E2E utilisent les viewports iPhone 14 (390×844), petit mobile (360×8
 - PWA installable avec service worker, cache du shell, état hors ligne et support Web Push.
 - État de démo persistant dans `localStorage`; aucun secret et aucune fausse donnée dynamique inscrite dans les composants.
 - Supabase Auth, PostgreSQL/RLS, Edge Functions et seed local dans [`supabase/`](./supabase/README.md).
-- Adaptateur `ReviewProvider` commun avec Outscraper et MockProvider. L’appel Outscraper est isolé dans une Edge Function authentifiée et sa réponse est normalisée côté serveur.
+- Adaptateur `ReviewProvider` commun avec Apify, Outscraper et MockProvider. Apify est le fournisseur principal configurable ; les appels et traductions restent exclusivement côté serveur.
 - Abstraction `BillingProvider` avec implémentation mock.
 
 ## Variables d’environnement
@@ -42,7 +42,8 @@ Copier `.env.example` vers `.env.local` pour le frontend. Les secrets backend se
 | `VITE_SUPABASE_ANON_KEY` | Non | Clé publishable/anon Supabase |
 | `VITE_DEMO_MODE` | Oui (`true`) | Active les données et actions locales |
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend réel | Accès serveur pour sync/IA |
-| `REVIEW_PROVIDER` | Oui (`mock`) | `outscraper` ou `mock` ; secret Supabase côté serveur |
+| `REVIEW_PROVIDER` | Oui (`mock`) | `apify`, `outscraper` ou `mock` ; configuration Supabase côté serveur |
+| `APIFY_API_TOKEN` | Production Apify | Secret Supabase uniquement, jamais `VITE_*` |
 | `OUTSCRAPER_API_KEY` | Production Outscraper | Secret Supabase uniquement, jamais `VITE_*` |
 | `OPENAI_API_KEY` + `OPENAI_MODEL` | IA réelle | Analyse et génération côté Edge Function |
 | `WEB_PUSH_PUBLIC_KEY` + `WEB_PUSH_PRIVATE_KEY` | Push réel | Notifications Web Push |

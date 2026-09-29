@@ -4,6 +4,8 @@ import { useApp } from '../app/AppContext'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime, timeUntil } from '../lib/format'
 import { saveNotificationPreference } from '../lib/notification-preferences'
+import { useI18n } from '../i18n'
+import type { PreferredLanguage } from '../types/domain'
 import {
   currentPushSubscription,
   disablePushNotifications,
@@ -17,18 +19,12 @@ import {
 
 type MonitoringIntervalHours = 1 | 3 | 6 | 12 | 24
 
-const MONITORING_INTERVALS: Array<{ value: MonitoringIntervalHours; label: string }> = [
-  { value: 1, label: '1 heure — Test' },
-  { value: 3, label: '3 heures — Test' },
-  { value: 6, label: '6 heures' },
-  { value: 12, label: '12 heures — Recommandé' },
-  { value: 24, label: '24 heures' },
-]
+const MONITORING_INTERVALS: MonitoringIntervalHours[] = [1, 3, 6, 12, 24]
 
 const MONITORING_STORAGE_KEY = 'home-reviews-monitoring-interval-hours'
 
 function isMonitoringInterval(value: number): value is MonitoringIntervalHours {
-  return MONITORING_INTERVALS.some((interval) => interval.value === value)
+  return MONITORING_INTERVALS.includes(value as MonitoringIntervalHours)
 }
 
 function getStoredMonitoringInterval(): MonitoringIntervalHours {
@@ -38,7 +34,8 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 }
 
 export function SettingsPage() {
-  const { currentUser, establishments, demoMode, pushToast, monitoringIntervalHours, updateMonitoringInterval: persistMonitoringInterval, signOut } = useApp()
+  const { currentUser, establishments, demoMode, pushToast, monitoringIntervalHours, preferredLanguage, updatePreferredLanguage, updateMonitoringInterval: persistMonitoringInterval, signOut } = useApp()
+  const { messages, language } = useI18n()
   const [inApp, setInApp] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
   const [pushState, setPushState] = useState<PushUiState>(() => getPushUiState(
@@ -49,6 +46,7 @@ export function SettingsPage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [monitoringInterval, setMonitoringInterval] = useState<MonitoringIntervalHours>(() => demoMode ? getStoredMonitoringInterval() : (isMonitoringInterval(monitoringIntervalHours) ? monitoringIntervalHours : 12))
   const [savingMonitoring, setSavingMonitoring] = useState(false)
+  const [savingLanguage, setSavingLanguage] = useState(false)
   const lastSyncTimestamp = Math.max(...establishments.map((item) => new Date(item.lastSyncedAt).getTime()))
   const lastSync = Number.isFinite(lastSyncTimestamp) ? new Date(lastSyncTimestamp).toISOString() : null
   const nextSyncTimestamp = Math.min(...establishments
@@ -73,17 +71,17 @@ export function SettingsPage() {
 
   const togglePush = async () => {
     if (!pushIsSupported()) {
-      pushToast('Notifications push non prises en charge')
+      pushToast(messages.settings.pushUnsupported)
       return
     }
     if (isIosDevice() && !isStandalonePwa()) {
-      pushToast('Sur iPhone, ajoutez HOME Reviews à l’écran d’accueil pour activer les notifications')
+      pushToast(messages.settings.pushIosInstall)
       return
     }
     if (Notification.permission === 'denied') {
       setPushState('denied')
       await saveNotificationPreference('denied')
-      pushToast('Permission refusée dans les réglages du navigateur')
+      pushToast(messages.settings.pushDenied)
       return
     }
 
@@ -93,7 +91,7 @@ export function SettingsPage() {
         await disablePushNotifications()
         await saveNotificationPreference('unknown')
         setPushState('disabled')
-        pushToast('Notifications push désactivées')
+        pushToast(messages.settings.pushDisabled)
         return
       }
       const permission = await Notification.requestPermission()
@@ -105,10 +103,10 @@ export function SettingsPage() {
       await enablePushNotifications()
       await saveNotificationPreference('granted')
       setPushState('enabled')
-      pushToast('Notifications push activées')
+      pushToast(messages.settings.pushEnabled)
     } catch {
       setPushState(getPushUiState(true, Notification.permission, false))
-      pushToast('Impossible d’activer les notifications push')
+      pushToast(messages.settings.pushFailed)
     } finally {
       setPushBusy(false)
     }
@@ -119,7 +117,7 @@ export function SettingsPage() {
     try {
       await signOut()
     } catch {
-      pushToast('Impossible de fermer la session')
+      pushToast(messages.settings.signOutFailed)
       setSigningOut(false)
     }
   }
@@ -132,42 +130,55 @@ export function SettingsPage() {
     try {
       await persistMonitoringInterval(value)
       if (demoMode) window.localStorage.setItem(MONITORING_STORAGE_KEY, String(value))
-      pushToast(`Surveillance réglée toutes les ${value} heure${value > 1 ? 's' : ''}`)
+      pushToast(messages.settings.monitoringSaved.replace('{hours}', String(value)))
     } catch {
       setMonitoringInterval(previousValue)
-      pushToast('Impossible de modifier la fréquence')
+      pushToast(messages.settings.monitoringFailed)
     } finally {
       setSavingMonitoring(false)
     }
   }
 
-  return <><PageHeader title="Plus"/>
-  <section className="settings-intro"><h1>Paramètres de votre compte</h1><p>Gérez vos préférences HOME Reviews.</p></section>
-  <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>Compte Google</span></div></section>
-  {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>Mode démonstration</strong><span>Données locales, aucun service externe requis.</span></div></div>}
-  <SettingsSection title="Compte"><SettingLink icon={<User/>} title="Profil" detail="Nom et adresse email du compte Google"/><button className="setting-row"><div className="setting-icon google-setting-icon">G</div><div><strong>Connexion Google</strong><span>Utilisée uniquement pour votre connexion sécurisée</span></div></button><button className="setting-row clickable danger" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? 'Déconnexion…' : 'Se déconnecter'}</strong><span>Fermer cette session uniquement</span></div><ChevronRight/></button></SettingsSection>
-  <SettingsSection title="Notifications"><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>Notifications in-app</strong><span>Alertes visibles dans l’application</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={() => void togglePush()} disabled={pushBusy}><div className="setting-icon"><Bell/></div><div><strong>{pushState === 'enabled' ? 'Désactiver les notifications' : 'Activer les notifications'}</strong><span>État : {pushState === 'enabled' ? 'Activées' : pushState === 'denied' ? 'Permission refusée par le navigateur' : pushState === 'unsupported' ? 'Non prises en charge' : 'Désactivées'}</span>{isIosDevice() && !isStandalonePwa() && <span>Sur iPhone : ajoutez d’abord l’app à l’écran d’accueil.</span>}</div><ChevronRight/></button></SettingsSection>
-  <SettingsSection title="Surveillance des avis">
+  const changeLanguage = async (language: PreferredLanguage) => {
+    setSavingLanguage(true)
+    try {
+      await updatePreferredLanguage(language)
+      pushToast(language === 'vi' ? 'Đã cập nhật ngôn ngữ' : 'Langue mise à jour')
+    } catch {
+      pushToast(language === 'vi' ? 'Không thể cập nhật ngôn ngữ' : 'Impossible de modifier la langue')
+    } finally {
+      setSavingLanguage(false)
+    }
+  }
+
+  return <><PageHeader title={messages.settings.title}/>
+  <section className="settings-intro"><h1>{messages.settings.heading}</h1><p>{messages.settings.intro}</p></section>
+  <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>{messages.settings.googleAccount}</span></div></section>
+  {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>{messages.settings.demo}</strong><span>{messages.settings.demoDetail}</span></div></div>}
+  <SettingsSection title={messages.settings.account}><SettingLink icon={<User/>} title={messages.settings.profile} detail={messages.settings.profileDetail}/><button className="setting-row"><div className="setting-icon google-setting-icon">G</div><div><strong>{messages.settings.googleLogin}</strong><span>{messages.settings.googleLoginDetail}</span></div></button><button className="setting-row clickable danger" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? '…' : messages.settings.signOut}</strong><span>{messages.settings.signOutDetail}</span></div><ChevronRight/></button></SettingsSection>
+  <SettingsSection title={messages.language.settingTitle}><div className="settings-info card"><label htmlFor="preferred-language">{messages.language.settingDetail}</label><select id="preferred-language" className="monitoring-select" value={preferredLanguage ?? 'fr'} disabled={savingLanguage} onChange={(event) => void changeLanguage(event.target.value as PreferredLanguage)}><option value="fr">Français</option><option value="vi">Tiếng Việt</option></select></div></SettingsSection>
+  <SettingsSection title={messages.settings.notifications}><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>{messages.settings.inApp}</strong><span>HOME Reviews</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={() => void togglePush()} disabled={pushBusy}><div className="setting-icon"><Bell/></div><div><strong>{pushState === 'enabled' ? messages.settings.disableNotifications : messages.settings.enableNotifications}</strong><span>{pushState}</span>{isIosDevice() && !isStandalonePwa() && <span>iPhone · PWA</span>}</div><ChevronRight/></button></SettingsSection>
+  <SettingsSection title={messages.settings.monitoring}>
     <div className="settings-info card">
-      <label htmlFor="monitoring-interval">Fréquence de vérification</label>
+      <label htmlFor="monitoring-interval">{messages.settings.monitoringFrequency}</label>
       <select
         id="monitoring-interval"
-        aria-label="Fréquence de vérification des avis"
+        aria-label={messages.settings.monitoringFrequency}
         value={monitoringInterval}
         disabled={savingMonitoring}
         onChange={(event) => void updateMonitoringInterval(Number(event.target.value) as MonitoringIntervalHours)}
         className="monitoring-select"
       >
-        {MONITORING_INTERVALS.map((interval) => <option key={interval.value} value={interval.value}>{interval.label}</option>)}
+        {MONITORING_INTERVALS.map((interval) => <option key={interval} value={interval}>{interval} {language === 'vi' ? 'giờ' : `heure${interval > 1 ? 's' : ''}`}{interval <= 3 ? ` — ${language === 'vi' ? 'Thử nghiệm' : 'Test'}` : interval === 12 ? ` — ${language === 'vi' ? 'Khuyên dùng' : 'Recommandé'}` : ''}</option>)}
       </select>
-      <span style={{ gridColumn: '1 / -1', lineHeight: 1.5 }}>HOME Reviews vérifie automatiquement les nouveaux avis Google selon cette fréquence.</span>
-      {monitoringInterval <= 3 && <span style={{ gridColumn: '1 / -1', color: 'var(--orange)' }}>Test / consommation API plus élevée</span>}
-      <span>Dernière synchronisation globale</span><strong>{lastSync ? relativeTime(lastSync) : 'Jamais'}</strong>
-      <span>Prochain contrôle</span><strong>{nextSync ? timeUntil(nextSync) : 'Non planifié'}</strong>
+      <span style={{ gridColumn: '1 / -1', lineHeight: 1.5 }}>{messages.settings.monitoringDetail}</span>
+      {monitoringInterval <= 3 && <span style={{ gridColumn: '1 / -1', color: 'var(--orange)' }}>{messages.settings.higherUsage}</span>}
+      <span>{messages.settings.lastGlobalSync}</span><strong>{lastSync ? relativeTime(lastSync) : '—'}</strong>
+      <span>{messages.settings.nextCheck}</span><strong>{nextSync ? timeUntil(nextSync) : '—'}</strong>
     </div>
   </SettingsSection>
-  <SettingsSection title="Données & confidentialité"><SettingLink icon={<Shield/>} title="Confidentialité" detail="Politique et gestion des données"/><SettingLink icon={<Database/>} title="Supprimer mon compte" detail="Demande avec confirmation forte" danger/></SettingsSection>
-  <p className="version">HOME Reviews v1.0 · {demoMode ? 'Données de démonstration' : 'Données Supabase sécurisées'}</p>
+  <SettingsSection title={messages.settings.privacy}><SettingLink icon={<Shield/>} title={messages.settings.privacyLink} detail="HOME Reviews"/><SettingLink icon={<Database/>} title={messages.settings.deleteAccount} detail="HOME Reviews" danger/></SettingsSection>
+  <p className="version">{messages.settings.version} · {demoMode ? messages.settings.demoData : messages.settings.secureData}</p>
   </>}
 
 function SettingsSection({title,children}:{title:string;children:React.ReactNode}){return <section className="settings-section"><h2>{title}</h2><div className="settings-group card">{children}</div></section>}

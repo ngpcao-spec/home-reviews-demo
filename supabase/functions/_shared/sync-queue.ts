@@ -1,4 +1,5 @@
 import { OutscraperError, type NormalizedReview } from './outscraper.ts'
+import { ApifyError } from './apify.ts'
 
 export function configuredInteger(
   value: string | undefined,
@@ -35,8 +36,11 @@ export function retryPolicy(error: unknown, attempts: number, baseSeconds: numbe
     'OUTSCRAPER_INVALID_QUERY',
     'OUTSCRAPER_KEY_MISSING',
     'ESTABLISHMENT_NOT_FOUND',
+    'APIFY_AUTH_ERROR',
+    'APIFY_BILLING_REQUIRED',
+    'APIFY_TOKEN_MISSING',
   ])
-  const retryable = error instanceof OutscraperError
+  const retryable = error instanceof OutscraperError || error instanceof ApifyError
     ? !terminal.has(error.code)
     : !terminal.has(code)
   const multiplier = Math.max(0, Math.min(attempts, 8))

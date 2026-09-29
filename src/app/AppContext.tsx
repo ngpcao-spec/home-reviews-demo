@@ -4,8 +4,9 @@ import type { User } from '@supabase/supabase-js'
 import { demoPlan, seedEstablishments, seedNotifications, seedReviews } from '../data/mock-data'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { nextSyncAtFromLastSync } from '../lib/monitoring-schedule'
+import { localizedReviewText } from '../lib/review-translation'
 import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
-import type { AppNotification, Establishment, Review, ReviewAction, ReviewStatus } from '../types/domain'
+import type { AppNotification, Establishment, PreferredLanguage, Review, ReviewAction, ReviewStatus } from '../types/domain'
 
 interface ToastMessage { id: number; text: string }
 
@@ -33,6 +34,7 @@ interface AppContextValue {
   dataError: string | null
   passwordRecovery: boolean
   monitoringIntervalHours: number
+  preferredLanguage: PreferredLanguage | null
   currentUser: { name: string; email: string; avatarUrl?: string; initials: string }
   plan: typeof demoPlan
   aiUsage: number
@@ -52,6 +54,7 @@ interface AppContextValue {
   pushToast: (text: string) => void
   retryData: () => Promise<void>
   updateMonitoringInterval: (hours: number) => Promise<void>
+  updatePreferredLanguage: (language: PreferredLanguage) => Promise<void>
   completePasswordRecovery: (password: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -79,6 +82,9 @@ interface ReviewRow {
   author_name: string
   rating: number
   text: string
+  original_text: string
+  original_language: string | null
+  review_translations: Array<{ language: PreferredLanguage; translated_text: string }> | null
   language: string | null
   published_at: string | null
   created_at: string
@@ -151,11 +157,15 @@ interface OrganizationRow {
   monitoring_interval_hours: number
 }
 
+interface ProfileRow {
+  preferred_language: PreferredLanguage | null
+}
+
 const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
 const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
-const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error'
+const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,original_language,language,published_at,created_at,review_url,historical_import,status,ai_summary,ai_suggested_reply,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text)'
 const REVIEW_LOAD_PAGE_SIZE = 500
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
@@ -195,8 +205,9 @@ function mapEstablishment(row: EstablishmentRow): Establishment {
   }
 }
 
-function mapReview(row: ReviewRow): Review {
+function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review {
   const status = row.rating <= 3 && row.status === 'new' ? 'to_process' : row.status
+  const localized = localizedReviewText(row.original_text || row.text, row.review_translations, preferredLanguage)
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -204,8 +215,10 @@ function mapReview(row: ReviewRow): Review {
     externalReviewId: row.external_review_id,
     authorName: row.author_name,
     rating: row.rating,
-    reviewText: row.text,
-    reviewLanguage: row.language ?? 'fr',
+    reviewText: localized.displayText,
+    originalText: localized.originalText,
+    translatedText: localized.translatedText,
+    reviewLanguage: row.original_language ?? row.language ?? 'fr',
     publishedAt: row.published_at ?? row.created_at,
     sourceUrl: row.review_url ?? '',
     isHistoricalImport: row.historical_import,
@@ -274,6 +287,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dataError, setDataError] = useState<string | null>(() => !allowDemo && !isSupabaseConfigured ? 'Supabase n’est pas configuré pour ce déploiement.' : null)
   const [passwordRecovery, setPasswordRecovery] = useState(() => window.location.hash.includes('type=recovery'))
   const [monitoringIntervalHours, setMonitoringIntervalHours] = useState(12)
+  const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage | null>(allowDemo ? 'fr' : null)
   const [establishments, setEstablishments] = useState(initial.establishments)
   const [reviews, setReviews] = useState(initial.reviews)
   const [notifications, setNotifications] = useState(initial.notifications)
@@ -300,17 +314,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDataError(null)
     }
 
-    const [establishmentsResult, reviewsResult, notificationsResult, organizationResult] = await Promise.all([
+    const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
+      supabase.from('profiles').select('preferred_language').eq('user_id', authUser?.id ?? '').maybeSingle(),
     ])
     if (!background) {
       setDataLoading(false)
       setDataReady(true)
     }
-    if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error) {
+    if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error || profileResult.error) {
       if (background) {
         pushToast('Les données seront actualisées à la prochaine ouverture.')
       } else {
@@ -323,12 +338,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return
     }
     setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
-    setReviews((reviewsResult.data as ReviewRow[]).map(mapReview))
+    const profile = profileResult.data as ProfileRow | null
+    const language = profile?.preferred_language === 'vi' ? 'vi' : 'fr'
+    setPreferredLanguage(profile?.preferred_language ?? null)
+    setReviews((reviewsResult.data as ReviewRow[]).map((row) => mapReview(row, language)))
     setNotifications((notificationsResult.data as NotificationRow[]).map(mapNotification))
     setActions([])
     const organization = organizationResult.data as OrganizationRow | null
     if (organization?.monitoring_interval_hours) setMonitoringIntervalHours(organization.monitoring_interval_hours)
-  }, [pushToast])
+  }, [authUser?.id, pushToast])
 
   useEffect(() => {
     if (!supabase) return
@@ -583,6 +601,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id, organizationId: establishment.organizationId, establishmentId: establishment.id, externalReviewId: `mock-${id}`,
       authorName: 'Alex M.', rating: 1, reviewText: "Nous avons attendu une heure et personne n'est venu nous expliquer la situation.",
       reviewLanguage: 'fr', publishedAt: new Date().toISOString(), sourceUrl: establishment.googleMapsUrl, isHistoricalImport: false,
+      originalText: "Nous avons attendu une heure et personne n'est venu nous expliquer la situation.",
       requiresAction: true, status: 'to_process', aiSummary: "Le client signale une attente d’une heure sans information de l’équipe.", aiSuggestedReply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés pour cette longue attente sans information et prenons votre retour au sérieux.", aiDetectedLanguage: 'fr', aiAnalyzedAt: new Date().toISOString(), aiStatus: 'completed',
     }
     setReviews((items) => [review, ...items])
@@ -618,6 +637,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await loadRealData({ background: true })
   }
 
+  const updatePreferredLanguage = async (language: PreferredLanguage) => {
+    if (demoMode) {
+      setPreferredLanguage(language)
+      return
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { error } = await supabase
+      .from('profiles')
+      .update({ preferred_language: language })
+      .eq('user_id', authUser.id)
+    if (error) throw error
+    setPreferredLanguage(language)
+    await loadRealData({ background: true })
+  }
+
   const signOut = async () => {
     if (!supabase) return
     const { error } = await supabase.auth.signOut({ scope: 'local' })
@@ -626,6 +660,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setReviews([])
     setNotifications([])
     setActions([])
+    setPreferredLanguage(null)
     setDataReady(true)
   }
 
@@ -638,11 +673,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const value: AppContextValue = {
-    establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, currentUser,
+    establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, preferredLanguage, currentUser,
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, logAction, markNotificationRead, markAllNotificationsRead,
     resolveEstablishment, addEstablishment, retryEstablishmentImport, refreshEstablishment, toggleMonitoring, removeEstablishment,
-    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, completePasswordRecovery, signOut,
+    injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, updatePreferredLanguage, completePasswordRecovery, signOut,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

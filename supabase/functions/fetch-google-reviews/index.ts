@@ -6,6 +6,8 @@ import {
   getMockGoogleReviews,
   OutscraperError,
 } from '../_shared/outscraper.ts'
+import { ApifyError, fetchApifyReviews } from '../_shared/apify.ts'
+import { apifyToken, preferredLanguageForUser } from '../_shared/sync-service.ts'
 
 interface RequestBody {
   query?: unknown
@@ -18,7 +20,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED' }, 405)
 
   try {
-    const { user } = await requireUser(request)
+    const { user, admin } = await requireUser(request)
     enforceRateLimit(`fetch-google-reviews:${user.id}`, 10, 60_000)
 
     const body = await request.json() as RequestBody
@@ -32,6 +34,15 @@ Deno.serve(async (request) => {
     const query = rawQuery.trim()
     const provider = (Deno.env.get('REVIEW_PROVIDER') ?? 'mock').trim().toLowerCase()
     if (provider === 'mock') return json(getMockGoogleReviews(query))
+    if (provider === 'apify') {
+      const language = await preferredLanguageForUser(admin, user.id)
+      return json(await fetchApifyReviews(apifyToken(), {
+        placeUrl: query,
+        language,
+        sort: 'newest',
+        limit: 20,
+      }))
+    }
     if (provider !== 'outscraper') return json({ error: 'REVIEW_PROVIDER_UNSUPPORTED' }, 500)
 
     const apiKey = Deno.env.get('OUTSCRAPER_API_KEY') ?? ''
@@ -39,6 +50,7 @@ Deno.serve(async (request) => {
     return json(result)
   } catch (error) {
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)
+    if (error instanceof ApifyError) return json({ error: error.code }, error.httpStatus)
     if (error instanceof SyntaxError) return json({ error: 'INVALID_JSON' }, 400)
     const code = error instanceof Error ? error.message : 'UNKNOWN'
     if (code === 'UNAUTHORIZED') return json({ error: code }, 401)

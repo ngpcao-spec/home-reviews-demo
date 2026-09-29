@@ -4,10 +4,12 @@ import { useApp } from '../app/AppContext'
 import { EmptyState } from '../components/ui/Loading'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
+import { useI18n } from '../i18n'
 
 export function NotificationsPage() {
   const { notifications, establishments, reviews, markNotificationRead, markAllNotificationsRead } = useApp()
   const navigate = useNavigate()
+  const { messages } = useI18n()
   const sorted = [...notifications].sort((a, b) => Number(Boolean(a.readAt)) - Number(Boolean(b.readAt))
     || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
@@ -18,9 +20,9 @@ export function NotificationsPage() {
 
   return <>
     <PageHeader
-      title="Notifications"
+      title={messages.notifications.title}
       back
-      action={<button className="icon-button" onClick={() => void markAllNotificationsRead()} aria-label="Tout marquer comme lu"><CheckCheck /></button>}
+      action={<button className="icon-button" onClick={() => void markAllNotificationsRead()} aria-label={messages.notifications.markAll}><CheckCheck /></button>}
     />
     {sorted.length ? <div className="notification-list">{sorted.map((item) => {
       const review = reviews.find((entry) => entry.id === item.reviewId)
@@ -37,8 +39,8 @@ export function NotificationsPage() {
           <p>{item.body}</p>
           {!review && <small>{relativeTime(item.createdAt)}</small>}
         </span>
-        {!item.readAt && <i aria-label="Non lue" />}
+        {!item.readAt && <i aria-label={messages.notifications.unread} />}
       </button>
-    })}</div> : <EmptyState icon={<Bell />} title="Aucune notification" body="Les nouveaux avis 1 à 3 étoiles apparaîtront ici après leur analyse." />}
+    })}</div> : <EmptyState icon={<Bell />} title={messages.notifications.none} body={messages.notifications.noneBody} />}
   </>
 }

@@ -6,6 +6,7 @@ import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { sendPushToUser } from '../_shared/push.ts'
 import { isDuplicateNotificationError, runNonBlockingNotification, shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
 import { shouldAutomaticallyAnalyzeReview } from '../_shared/ai-rules.ts'
+import { preferredLanguageForOrganization, preferredLanguageForUser } from '../_shared/sync-service.ts'
 
 interface ReviewRow {
   id: string
@@ -153,7 +154,10 @@ Deno.serve(async (request) => {
     }).eq('id', review.id)
     if (pendingError) throw pendingError
 
-    const result = await analyzeReviewWithOpenAI(review.rating, review.text)
+    const summaryLanguage = userId
+      ? await preferredLanguageForUser(admin, userId)
+      : await preferredLanguageForOrganization(admin, review.organization_id)
+    const result = await analyzeReviewWithOpenAI(review.rating, review.text, summaryLanguage)
     const analyzedAt = new Date().toISOString()
     const { error: saveError } = await admin.from('reviews').update({
       ai_summary: result.ai_summary,

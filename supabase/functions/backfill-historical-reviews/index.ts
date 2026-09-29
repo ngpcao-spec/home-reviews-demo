@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
 import {
   backfillHistoricalReviews,
+  preferredLanguageForOrganization,
   type EstablishmentRow,
 } from '../_shared/sync-service.ts'
 
@@ -32,7 +33,8 @@ Deno.serve(async (request) => {
       .single()
     if (error || !data) return json({ error: 'ESTABLISHMENT_NOT_FOUND' }, 404)
 
-    const result = await backfillHistoricalReviews(admin, data as EstablishmentRow)
+    const language = await preferredLanguageForOrganization(admin, data.organization_id)
+    const result = await backfillHistoricalReviews(admin, data as EstablishmentRow, language)
     return json(result)
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 160) : 'HISTORICAL_BACKFILL_FAILED'

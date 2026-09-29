@@ -6,10 +6,12 @@ import { ReviewRow } from '../components/reviews/ReviewRow'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { PageHeader } from '../components/ui/PageHeader'
 import { isNegativeReview, recentNegativeReviews } from '../lib/review-list'
+import { useI18n } from '../i18n'
 
 export function HomePage() {
   const navigate = useNavigate()
   const { establishments, reviews, demoMode, injectNegativeReview } = useApp()
+  const { messages } = useI18n()
   const active = establishments.filter((item) => item.isActive)
   const pending = reviews.filter((item) => isNegativeReview(item) && item.status === 'to_process')
   const latestNegative = recentNegativeReviews(reviews)
@@ -72,7 +74,7 @@ export function HomePage() {
     navigate(`/etablissements/${establishmentId}`)
   }
 
-  if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>Ajoutez votre premier établissement</h2><p>Surveillez les nouveaux avis et identifiez immédiatement ceux qui demandent une action.</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>Ajouter un établissement</button></div></>
+  if (!establishments.length) return <><PageHeader title="HOME Reviews" /><div className="empty-state"><div className="empty-icon"><Building2 /></div><h2>{messages.home.addFirst}</h2><p>{messages.home.addFirstBody}</p><button className="primary-button" onClick={() => navigate('/etablissements/ajouter')}><Plus size={18}/>{messages.home.add}</button></div></>
 
   return <>
     <BrandHeader />
@@ -82,7 +84,7 @@ export function HomePage() {
           className="featured-carousel-viewport"
           ref={carouselRef}
           role="region"
-          aria-label="Établissements à la une"
+          aria-label={messages.home.featured}
           onScroll={updateSelectionAfterScroll}
           onPointerDown={startGesture}
           onPointerMove={trackGesture}
@@ -100,7 +102,7 @@ export function HomePage() {
                   {photo ? <img src={photo} alt="" loading={isCurrent ? 'eager' : 'lazy'} /> : <span className="featured-photo-placeholder" aria-hidden="true"><Building2 /></span>}
                   <span className="featured-overlay" />
                   {active.length > 1 && <span className="featured-position">{index + 1} / {active.length}</span>}
-                  <span className="featured-copy"><strong>{establishment.name}</strong><span><Star fill="currentColor" /> {establishment.currentRating.toFixed(1)} <small>({establishment.currentReviewCount} avis)</small></span><em>{pending.filter((item) => item.establishmentId === establishment.id).length} avis à traiter</em></span>
+                  <span className="featured-copy"><strong>{establishment.name}</strong><span><Star fill="currentColor" /> {establishment.currentRating.toFixed(1)} <small>({establishment.currentReviewCount} {messages.common.reviews})</small></span><em>{pending.filter((item) => item.establishmentId === establishment.id).length} {messages.home.toProcess}</em></span>
                   <span className="featured-arrow"><ArrowRight /></span>
                 </button>
               </div>
@@ -108,21 +110,21 @@ export function HomePage() {
           </div>
         </div>
         {active.length > 1 && <>
-          <button className="featured-carousel-control previous" type="button" disabled={featuredIndex === 0} onClick={() => selectEstablishment(featuredIndex - 1)} aria-label="Établissement précédent"><ArrowLeft /></button>
-          <button className="featured-carousel-control next" type="button" disabled={featuredIndex === active.length - 1} onClick={() => selectEstablishment(featuredIndex + 1)} aria-label="Établissement suivant"><ArrowRight /></button>
+          <button className="featured-carousel-control previous" type="button" disabled={featuredIndex === 0} onClick={() => selectEstablishment(featuredIndex - 1)} aria-label={messages.home.previous}><ArrowLeft /></button>
+          <button className="featured-carousel-control next" type="button" disabled={featuredIndex === active.length - 1} onClick={() => selectEstablishment(featuredIndex + 1)} aria-label={messages.home.next}><ArrowRight /></button>
         </>}
       </div>
     </section>}
-    <div className="home-summary" aria-label="Résumé"><span>{active.length} établissement{active.length > 1 ? 's' : ''}</span><span>{pending.length} avis à traiter</span><span>Note {weightedRating.toFixed(1)}</span></div>
-    <div className="section-heading home-section-heading"><h2>Accès rapides</h2><button className="text-button" onClick={() => navigate('/etablissements')}>Voir tout <ChevronRight /></button></div>
+    <div className="home-summary"><span>{active.length} {messages.common.establishments}</span><span>{pending.length} {messages.home.toProcess}</span><span>{messages.home.rating} {weightedRating.toFixed(1)}</span></div>
+    <div className="section-heading home-section-heading"><h2>{messages.home.quick}</h2><button className="text-button" onClick={() => navigate('/etablissements')}>{messages.common.viewAll} <ChevronRight /></button></div>
     <div className="quick-actions">
-      <button className="quick-action card" onClick={() => navigate('/etablissements')}><Building2/><span><strong>Établissements</strong><small>Gérer vos lieux</small></span><ArrowRight/></button>
-      <button className="quick-action card" onClick={() => navigate('/avis')}><MessageSquareText/><span><strong>Réponses IA</strong><small>{pending.length} avis à traiter</small></span><ArrowRight/></button>
-      <button className="quick-action card" onClick={() => navigate('/analyses')}><BarChart3/><span><strong>Analyses</strong><small>Suivre les tendances</small></span><ArrowRight/></button>
-      <button className="quick-action card" onClick={() => navigate('/etablissements/ajouter')}><Plus/><span><strong>Ajouter</strong><small>Un établissement</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/etablissements')}><Building2/><span><strong>{messages.nav.establishments}</strong><small>{messages.home.managePlaces}</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/avis')}><MessageSquareText/><span><strong>{messages.home.aiReplies}</strong><small>{pending.length} {messages.home.toProcess}</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/analyses')}><BarChart3/><span><strong>{messages.home.analytics}</strong><small>{messages.home.trends}</small></span><ArrowRight/></button>
+      <button className="quick-action card" onClick={() => navigate('/etablissements/ajouter')}><Plus/><span><strong>{messages.home.addShort}</strong><small>{messages.home.onePlace}</small></span><ArrowRight/></button>
     </div>
-    <div className="section-heading"><h2>Avis négatifs récents</h2><button className="text-button" onClick={() => navigate('/avis')}>Voir tout <ChevronRight /></button></div>
-    {latestNegative.length ? latestNegative.map((review) => <ReviewRow compact key={review.id} review={review} />) : <div className="positive-state"><Sparkles/><div><strong>Tout est sous contrôle</strong><span>Aucun avis négatif récent.</span></div></div>}
+    <div className="section-heading"><h2>{messages.home.recentNegative}</h2><button className="text-button" onClick={() => navigate('/avis')}>{messages.common.viewAll} <ChevronRight /></button></div>
+    {latestNegative.length ? latestNegative.map((review) => <ReviewRow compact key={review.id} review={review} />) : <div className="positive-state"><Sparkles/><div><strong>{messages.home.underControl}</strong><span>{messages.home.noNegative}</span></div></div>}
     {demoMode && <button className="demo-button" onClick={injectNegativeReview}><Sparkles size={16}/>Injecter un nouvel avis négatif</button>}
   </>
 }

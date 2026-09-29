@@ -14,11 +14,11 @@ import {
   isStandalonePwa,
   pushIsSupported,
 } from '../lib/push-notifications'
-
-const IOS_INSTALL_MESSAGE = "Pour recevoir les notifications sur iPhone, ajoutez HOME Reviews à votre écran d'accueil, puis ouvrez l'application depuis son icône."
+import { useI18n } from '../i18n'
 
 export function NotificationOnboarding() {
   const { dataReady, demoMode, isAuthenticated, pushToast } = useApp()
+  const { messages } = useI18n()
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showInstallSteps, setShowInstallSteps] = useState(false)
@@ -63,7 +63,7 @@ export function NotificationOnboarding() {
       await saveNotificationPreference('unknown')
       setVisible(false)
     } catch {
-      pushToast('Impossible d’enregistrer votre choix')
+      pushToast(messages.onboarding.saveFailed)
     } finally {
       setBusy(false)
     }
@@ -75,7 +75,7 @@ export function NotificationOnboarding() {
       return
     }
     if (!pushIsSupported()) {
-      pushToast('Notifications push non prises en charge')
+      pushToast(messages.onboarding.unsupported)
       return
     }
 
@@ -88,7 +88,7 @@ export function NotificationOnboarding() {
       if (permission === 'denied') {
         await saveNotificationPreference('denied')
         setVisible(false)
-        pushToast('Permission refusée — vous pourrez réessayer dans Paramètres')
+        pushToast(messages.onboarding.denied)
         return
       }
       if (permission !== 'granted') {
@@ -100,9 +100,9 @@ export function NotificationOnboarding() {
       await enablePushNotifications()
       await saveNotificationPreference('granted')
       setVisible(false)
-      pushToast('Notifications activées')
+      pushToast(messages.onboarding.enabled)
     } catch {
-      pushToast('Impossible d’activer les notifications')
+      pushToast(messages.onboarding.enableFailed)
     } finally {
       setBusy(false)
     }
@@ -113,15 +113,15 @@ export function NotificationOnboarding() {
   return <div className="notification-onboarding-backdrop" role="presentation">
     <section className="notification-onboarding card" role="dialog" aria-modal="true" aria-labelledby="notification-onboarding-title">
       <div className="notification-onboarding-icon"><Bell aria-hidden="true" /></div>
-      <h2 id="notification-onboarding-title">Restez informé des nouveaux avis</h2>
-      <p>HOME Reviews peut vous prévenir lorsqu'un nouvel avis 1★ à 3★ arrive et que votre réponse est prête.</p>
+      <h2 id="notification-onboarding-title">{messages.onboarding.title}</h2>
+      <p>{messages.onboarding.body}</p>
       {iosNeedsInstall && <div className="notification-onboarding-info" role="status">
-        <span>{IOS_INSTALL_MESSAGE}</span>
+        <span>{messages.onboarding.installMessage}</span>
         {showInstallSteps && <ol>
-          <li>Appuyez sur le bouton Partager de Safari.</li>
-          <li>Choisissez « Sur l'écran d'accueil ».</li>
-          <li>Appuyez sur « Ajouter ».</li>
-          <li>Ouvrez ensuite HOME Reviews depuis la nouvelle icône.</li>
+          <li>{messages.onboarding.installStep1}</li>
+          <li>{messages.onboarding.installStep2}</li>
+          <li>{messages.onboarding.installStep3}</li>
+          <li>{messages.onboarding.installStep4}</li>
         </ol>}
       </div>}
       <div className="notification-onboarding-actions">
@@ -131,9 +131,9 @@ export function NotificationOnboarding() {
           disabled={busy}
         >
           {iosNeedsInstall ? <Share2 size={18} /> : <Check size={18} />}
-          {iosNeedsInstall ? "Comment l'installer" : 'Activer les notifications'}
+          {iosNeedsInstall ? messages.onboarding.install : messages.onboarding.activate}
         </button>
-        <button className="text-button full-width" onClick={() => void postpone()} disabled={busy}>Plus tard</button>
+        <button className="text-button full-width" onClick={() => void postpone()} disabled={busy}>{messages.onboarding.later}</button>
       </div>
     </section>
   </div>

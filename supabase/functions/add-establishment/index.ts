@@ -1,8 +1,9 @@
 import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { OutscraperError } from '../_shared/outscraper.ts'
+import { ApifyError } from '../_shared/apify.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
-import { initializeEstablishment } from '../_shared/sync-service.ts'
+import { initializeEstablishment, preferredLanguageForUser } from '../_shared/sync-service.ts'
 
 interface RequestBody {
   organizationId?: unknown
@@ -43,15 +44,18 @@ Deno.serve(async (request) => {
     }
 
     await assertMembership(admin, user.id, organizationId, ['owner', 'admin', 'manager'])
+    const language = await preferredLanguageForUser(admin, user.id)
     const result = await initializeEstablishment(
       admin,
       organizationId,
       body.query.trim(),
       body.expectedGoogleId,
+      language,
     )
     return json(result, 201)
   } catch (error) {
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)
+    if (error instanceof ApifyError) return json({ error: error.code }, error.httpStatus)
     if (error instanceof SyntaxError) return json({ error: 'INVALID_JSON' }, 400)
     const code = error instanceof Error ? error.message : 'UNKNOWN'
     if (code === 'UNAUTHORIZED') return json({ error: code }, 401)

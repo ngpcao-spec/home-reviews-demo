@@ -1,8 +1,9 @@
 import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { OutscraperError } from '../_shared/outscraper.ts'
+import { ApifyError } from '../_shared/apify.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
-import { resolveEstablishmentCandidate } from '../_shared/sync-service.ts'
+import { preferredLanguageForUser, resolveEstablishmentCandidate } from '../_shared/sync-service.ts'
 
 interface RequestBody { input?: unknown }
 
@@ -40,7 +41,8 @@ Deno.serve(async (request) => {
       .single()
     if (membershipError || !membership) return json({ error: 'FORBIDDEN' }, 403)
 
-    const resolved = await resolveEstablishmentCandidate(body.input.trim())
+    const language = await preferredLanguageForUser(admin, user.id)
+    const resolved = await resolveEstablishmentCandidate(body.input.trim(), language)
     const { data: existing, error: existingError } = await admin
       .from('establishments')
       .select('id')
@@ -53,6 +55,7 @@ Deno.serve(async (request) => {
     return json({ candidate: resolved.establishment })
   } catch (error) {
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)
+    if (error instanceof ApifyError) return json({ error: error.code }, error.httpStatus)
     if (error instanceof SyntaxError) return json({ error: 'INVALID_JSON' }, 400)
     const code = error instanceof Error ? error.message : 'UNKNOWN'
     if (code === 'UNAUTHORIZED') return json({ error: code }, 401)
