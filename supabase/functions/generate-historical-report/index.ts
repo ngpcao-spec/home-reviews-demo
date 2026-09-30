@@ -27,6 +27,7 @@ Deno.serve(async (request) => {
   if (preflightResponse) return preflightResponse
   let claimedReportId: string | null = null
   let adminForFailure: Awaited<ReturnType<typeof requireUser>>['admin'] | null = null
+  let restoreCompletedOnFailure = false
 
   try {
     const context = await requireUser(request)
@@ -89,6 +90,8 @@ Deno.serve(async (request) => {
       rating_5_count: Number(metrics.rating_5_count),
     }
 
+    if (counts.stored_reviews_count === 0) return json({ error: 'NO_REVIEWS_AVAILABLE' })
+
     const { data: existing, error: existingError } = await context.client
       .from('historical_establishment_reports')
       .select('*')
@@ -97,9 +100,6 @@ Deno.serve(async (request) => {
       .maybeSingle()
     if (existingError) throw existingError
 
-    const sourceUnchanged = Boolean(existing
-      && Number(existing.stored_reviews_count) === counts.stored_reviews_count
-      && existing.source_latest_published_at === metrics.source_latest_published_at)
     const baseRow = {
       organization_id: establishment.organization_id,
       establishment_id: establishmentId,
@@ -113,34 +113,21 @@ Deno.serve(async (request) => {
       source_latest_published_at: metrics.source_latest_published_at,
       updated_at: now,
     }
-
-    if (existing && sourceUnchanged && existing.ai_status === 'completed') {
-      const { data: refreshed, error: refreshError } = await context.admin
-        .from('historical_establishment_reports')
-        .update(baseRow)
-        .eq('id', existing.id)
-        .select('*')
-        .single()
-      if (refreshError) throw refreshError
-      return json({ report: refreshed })
-    }
-    if (existing && sourceUnchanged && (existing.ai_status === 'generating' || existing.ai_status === 'failed')) {
-      return json({ report: existing }, existing.ai_status === 'generating' ? 202 : 200)
-    }
-
     if (existing) {
+      const generatingSince = existing.ai_status === 'generating' ? Date.parse(existing.updated_at) : Number.NaN
+      if (Number.isFinite(generatingSince) && Date.now() - generatingSince < 10 * 60_000) {
+        return json({ error: 'REPORT_GENERATION_IN_PROGRESS' })
+      }
+      restoreCompletedOnFailure = existing.ai_status === 'completed' && Boolean(existing.ai_historical_summary)
       const { data: claimed, error: claimError } = await context.admin
         .from('historical_establishment_reports')
-        .update({ ...baseRow, ai_historical_summary: null, ai_status: 'generating', ai_error: null })
+        .update({ ai_status: 'generating', ai_error: null, updated_at: now })
         .eq('id', existing.id)
         .eq('updated_at', existing.updated_at)
         .select('id')
         .maybeSingle()
       if (claimError) throw claimError
-      if (!claimed) {
-        const { data: raced } = await context.client.from('historical_establishment_reports').select('*').eq('id', existing.id).single()
-        return json({ report: raced }, 202)
-      }
+      if (!claimed) return json({ error: 'REPORT_GENERATION_IN_PROGRESS' })
       claimedReportId = claimed.id
     } else {
       const { data: inserted, error: insertError } = await context.admin
@@ -150,13 +137,7 @@ Deno.serve(async (request) => {
         .single()
       if (insertError) {
         if (insertError.code === '23505') {
-          const { data: raced } = await context.client
-            .from('historical_establishment_reports')
-            .select('*')
-            .eq('establishment_id', establishmentId)
-            .eq('preferred_language', language)
-            .single()
-          return json({ report: raced }, 202)
+          return json({ error: 'REPORT_GENERATION_IN_PROGRESS' })
         }
         throw insertError
       }
@@ -204,7 +185,7 @@ Deno.serve(async (request) => {
     const code = error instanceof Error ? error.message.slice(0, 500) : 'HISTORICAL_REPORT_FAILED'
     if (claimedReportId && adminForFailure) {
       await adminForFailure.from('historical_establishment_reports').update({
-        ai_status: 'failed',
+        ai_status: restoreCompletedOnFailure ? 'completed' : 'failed',
         ai_error: code,
         updated_at: new Date().toISOString(),
       }).eq('id', claimedReportId)
