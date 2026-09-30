@@ -88,7 +88,7 @@ async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary
 
     try {
       const push = await sendPushToUser(admin, member.user_id, {
-        title: 'HOME Reviews',
+        title: isFourStarWatch ? title : 'HOME Reviews',
         body: isFourStarWatch ? body : `${title}\n“${shortSummary}”\nRéponse prête à être vérifiée.`,
         url: `#/avis/${review.id}`,
         tag: `review-${review.id}`,
