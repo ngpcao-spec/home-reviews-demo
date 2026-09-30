@@ -10,7 +10,7 @@ import {
   startApifyRun,
   type SupportedLanguage,
 } from '../_shared/apify.ts'
-import { initialHistoryComplete, prepareInitialReviews } from '../_shared/initial-import.ts'
+import { canonicalEstablishmentName, initialHistoryComplete, prepareInitialReviews } from '../_shared/initial-import.ts'
 import {
   apifyToken,
   fetchInitialization,
@@ -34,6 +34,7 @@ interface InitialImportJob {
   attempts: number
   provider_run_id: string | null
   provider_dataset_id: string | null
+  resolved_place_url: string | null
 }
 
 const workerId = () => `initial-import:${crypto.randomUUID()}`
@@ -63,6 +64,7 @@ async function checkpoint(
   values: {
     providerRunId?: string
     providerDatasetId?: string
+    resolvedPlaceUrl?: string
     establishmentId?: string
     reviewsFetched?: number
     reviewsInserted?: number
@@ -75,6 +77,7 @@ async function checkpoint(
     p_worker_id: worker,
     p_provider_run_id: values.providerRunId ?? null,
     p_provider_dataset_id: values.providerDatasetId ?? null,
+    p_resolved_place_url: values.resolvedPlaceUrl ?? null,
     p_establishment_id: values.establishmentId ?? null,
     p_reviews_fetched: values.reviewsFetched ?? null,
     p_reviews_inserted: values.reviewsInserted ?? null,
@@ -109,7 +112,7 @@ async function createOrResumeEstablishment(
 ) {
   const { data: existing, error: existingError } = await admin
     .from('establishments')
-    .select('id,initial_import_job_id')
+    .select('id,initial_import_job_id,name')
     .eq('organization_id', job.organization_id)
     .eq('google_id', result.establishment.googleId)
     .maybeSingle()
@@ -119,7 +122,7 @@ async function createOrResumeEstablishment(
       throw new Error('ESTABLISHMENT_ALREADY_ADDED')
     }
     const { error } = await admin.from('establishments').update({
-      name: result.establishment.name,
+      name: canonicalEstablishmentName(existing.name, result.establishment.name),
       place_id: result.establishment.placeId,
       google_maps_url: result.establishment.locationLink ?? job.query,
       address: result.establishment.fullAddress,
@@ -269,6 +272,7 @@ async function processApify(
       await checkpoint(admin, job, worker, {
         providerRunId: run.runId,
         providerDatasetId: run.datasetId,
+        resolvedPlaceUrl: run.resolvedPlaceUrl,
         providerRequests: 1,
       }, config.leaseSeconds)
     } finally {
@@ -290,7 +294,7 @@ async function processApify(
   if (!apifyRunSucceeded(run.status)) throw new ApifyError(`APIFY_RUN_${run.status}`, 503)
 
   const items = await fetchApifyDataset(token, job.provider_dataset_id)
-  const normalized = normalizeApifyDataset(items, job.query)
+  const normalized = normalizeApifyDataset(items, job.query, job.resolved_place_url ?? undefined)
   const reviews = prepareInitialReviews(normalized.reviews, job.reviews_target)
   await checkpoint(admin, job, worker, {
     reviewsFetched: reviews.length,

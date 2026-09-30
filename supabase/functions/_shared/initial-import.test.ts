@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_INITIAL_REVIEWS_LIMIT,
+  canonicalEstablishmentName,
   initialHistoryComplete,
   initialReviewsLimit,
   prepareInitialReviews,
@@ -56,5 +57,10 @@ describe('import initial des avis les plus récents', () => {
   it.each([1, 2, 3, 4, 5])('ne déclenche ni Terra ni notification pour un import historique %i★', (rating) => {
     expect(shouldAutomaticallyAnalyzeReview({ rating, historical_import: true })).toBe(false)
     expect(shouldCreateReviewNotification({ rating, historical_import: true })).toBe(false)
+  })
+
+  it('never overwrites an existing canonical establishment name with a localized provider title', () => {
+    expect(canonicalEstablishmentName('Green Home Restaurant', 'Nhà hàng Green Home')).toBe('Green Home Restaurant')
+    expect(canonicalEstablishmentName(null, 'Green Home Restaurant')).toBe('Green Home Restaurant')
   })
 })

@@ -39,3 +39,7 @@ export function initialHistoryComplete(totalGoogleReviews: number, persistedRevi
   if (totalGoogleReviews > limit) return false
   return persistedReviews >= totalGoogleReviews
 }
+
+export function canonicalEstablishmentName(existingName: string | null | undefined, importedName: string): string {
+  return existingName?.trim() ? existingName : importedName
+}

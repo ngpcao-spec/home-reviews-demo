@@ -95,4 +95,18 @@ describe('ApifyReviewProvider normalization', () => {
 
     expect(result.establishment.name).toBe('Green Home Restaurant')
   })
+
+  it.each([
+    ['vi', 'Nhà hàng Green Home'],
+    ['fr', 'Restaurant Green Home'],
+  ])('uses the resolved canonical URL for %s instead of the localized title', (_language, localizedTitle) => {
+    const result = normalizeApifyDataset([{
+      ...item,
+      title: localizedTitle,
+      inputStartUrl: 'https://www.google.com/maps/search/?api=1&query=localized',
+    }], 'https://www.google.com/maps/search/?api=1&query=localized', 'https://www.google.com/maps/place/Green+Home+Restaurant/@12.2,109.1,17z')
+
+    expect(result.establishment.name).toBe('Green Home Restaurant')
+    expect(result.establishment.rawPlacePayload?.title).toBe(localizedTitle)
+  })
 })

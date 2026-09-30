@@ -24,6 +24,7 @@ export interface ApifyRunState {
   runId: string
   datasetId: string
   status: string
+  resolvedPlaceUrl?: string
 }
 
 export interface ApifyReviewRequest {
@@ -125,7 +126,7 @@ export function apifyActorInput(request: ApifyReviewRequest) {
   }
 }
 
-async function resolvePlaceUrl(placeUrl: string): Promise<string> {
+export async function resolvePlaceUrl(placeUrl: string): Promise<string> {
   try {
     const url = new URL(placeUrl)
     if (url.hostname.toLowerCase() !== 'maps.app.goo.gl') return placeUrl
@@ -162,7 +163,7 @@ export async function startApifyRun(
     headers: apiHeaders(token, true),
     body: JSON.stringify(apifyActorInput({ ...request, placeUrl: resolvedUrl })),
   })
-  return runFromPayload(payload)
+  return { ...runFromPayload(payload), resolvedPlaceUrl: resolvedUrl }
 }
 
 export async function getApifyRun(token: string, runId: string): Promise<ApifyRunState> {
@@ -246,6 +247,7 @@ export function normalizeApifyReview(item: JsonRecord): NormalizedReview | null 
 export function normalizeApifyDataset(
   items: JsonRecord[],
   fallbackUrl: string,
+  resolvedPlaceUrl?: string,
 ): GoogleReviewsResult {
   const first = items[0] ?? {}
   const reviews = items.map(normalizeApifyReview).filter((review): review is NormalizedReview => Boolean(review))
@@ -256,7 +258,8 @@ export function normalizeApifyDataset(
   // Apify localizes `title` according to the requested review language. A
   // canonical Google Maps place URL retains the proper business name in its
   // `/maps/place/<name>/` segment, so prefer it and never localize that name.
-  const canonicalName = placeNameFromMapsUrl(first.inputStartUrl)
+  const canonicalName = placeNameFromMapsUrl(resolvedPlaceUrl)
+    ?? placeNameFromMapsUrl(first.inputStartUrl)
     ?? placeNameFromMapsUrl(fallbackUrl)
   const imageUrls = stringArrayValue(first.imageUrls)
   const rawPlacePayload: JsonRecord = {
@@ -320,5 +323,5 @@ export async function fetchApifyReviews(
   const run = await startApifyRun(token, request)
   const completed = await waitForApifyRun(token, run)
   const items = await fetchApifyDataset(token, completed.datasetId)
-  return normalizeApifyDataset(items, request.placeUrl)
+  return normalizeApifyDataset(items, request.placeUrl, run.resolvedPlaceUrl)
 }
