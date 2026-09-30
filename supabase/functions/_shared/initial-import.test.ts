@@ -1,66 +1,60 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_HISTORICAL_RECENT_WINDOW_DAYS,
-  HISTORICAL_NEGATIVE_LIMIT,
-  historicalRecentWindowDays,
-  initialImportCutoffSeconds,
-  mergeInitialReviewPasses,
+  DEFAULT_INITIAL_REVIEWS_LIMIT,
+  initialHistoryComplete,
+  initialReviewsLimit,
+  prepareInitialReviews,
 } from './initial-import'
+import { shouldAutomaticallyAnalyzeReview } from './ai-rules'
+import { shouldCreateReviewNotification } from './notification-rules'
 
-const day = 24 * 60 * 60 * 1_000
-const now = Date.parse('2026-09-28T00:00:00.000Z')
-const review = (id: string, rating: number, ageDays: number) => ({
-  externalReviewId: id,
+const now = Date.parse('2026-09-30T00:00:00.000Z')
+const review = (index: number, rating = index % 5 + 1) => ({
+  externalReviewId: `review-${index}`,
   rating,
-  publishedAt: new Date(now - ageDays * day).toISOString(),
+  publishedAt: new Date(now - index * 60_000).toISOString(),
 })
 
-describe('import initial PASS A + PASS B', () => {
-  it('utilise une fenêtre serveur de 30 jours par défaut', () => {
-    expect(DEFAULT_HISTORICAL_RECENT_WINDOW_DAYS).toBe(30)
-    expect(historicalRecentWindowDays(undefined)).toBe(30)
-    expect(historicalRecentWindowDays('45')).toBe(45)
-    expect(historicalRecentWindowDays('incorrect')).toBe(30)
+describe('import initial des avis les plus récents', () => {
+  it('utilise la limite serveur 500 et rejette une configuration hors produit', () => {
+    expect(DEFAULT_INITIAL_REVIEWS_LIMIT).toBe(500)
+    expect(initialReviewsLimit(undefined)).toBe(500)
+    expect(initialReviewsLimit('250')).toBe(250)
+    expect(initialReviewsLimit('501')).toBe(500)
+    expect(initialReviewsLimit('incorrect')).toBe(500)
   })
 
-  it('retient un avis 2★ vieux de 14 jours dans la passe récente', () => {
-    const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
-    const result = mergeInitialReviewPasses([review('recent-2', 2, 14)], [], cutoff)
-    expect(result.reviews.map((item) => item.externalReviewId)).toEqual(['recent-2'])
-    expect(result.recentNegative).toBe(1)
+  it('persiste les 342 avis disponibles lorsque l’établissement en possède 342', () => {
+    const result = prepareInitialReviews(Array.from({ length: 342 }, (_, index) => review(index)))
+    expect(result).toHaveLength(342)
+    expect(initialHistoryComplete(342, result.length, 500)).toBe(true)
   })
 
-  it('conserve tous les avis 1★ à 5★ de PASS A dans la fenêtre récente', () => {
-    const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
-    const recent = [1, 2, 3, 4, 5].map((rating) => review(`recent-${rating}`, rating, rating))
-    const result = mergeInitialReviewPasses(recent, [], cutoff)
-
-    expect(result.reviews.map((item) => item.rating).sort()).toEqual([1, 2, 3, 4, 5])
-    expect(result.recentNegative).toBe(3)
+  it.each([541, 1_649])('plafonne à 500 les %i avis Google les plus récents', (total) => {
+    const result = prepareInitialReviews(Array.from({ length: total }, (_, index) => review(index)))
+    expect(result).toHaveLength(500)
+    expect(result[0].externalReviewId).toBe('review-0')
+    expect(result.at(-1)?.externalReviewId).toBe('review-499')
+    expect(initialHistoryComplete(total, result.length, 500)).toBe(false)
   })
 
-  it('peut retenir un avis 2★ vieux de 45 jours via la passe historique', () => {
-    const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
-    const oldReview = review('old-2', 2, 45)
-    const result = mergeInitialReviewPasses([oldReview], [oldReview], cutoff)
-    expect(result.recentNegative).toBe(0)
-    expect(result.reviews.map((item) => item.externalReviewId)).toEqual(['old-2'])
+  it('conserve toutes les notes 1★ à 5★, déduplique et trie par date décroissante', () => {
+    const mixed = [1, 2, 3, 4, 5].map((rating, index) => review(index + 1, rating))
+    const result = prepareInitialReviews([mixed[4], ...mixed, mixed[0]])
+    expect(result.map((item) => item.rating).sort()).toEqual([1, 2, 3, 4, 5])
+    expect(result.map((item) => item.externalReviewId)).toEqual([
+      'review-1', 'review-2', 'review-3', 'review-4', 'review-5',
+    ])
   })
 
-  it('déduplique un même avis présent dans les deux passes et trie par date décroissante', () => {
-    const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
-    const duplicate = review('duplicate', 2, 14)
-    const result = mergeInitialReviewPasses(
-      [review('newest', 3, 2), duplicate, review('positive', 5, 1)],
-      [duplicate, review('older', 1, 90)],
-      cutoff,
-    )
-    expect(result.reviews.map((item) => item.externalReviewId)).toEqual(['positive', 'newest', 'duplicate', 'older'])
+  it('utilise le premier avis trié comme checkpoint, quelle que soit sa note', () => {
+    const newestPositive = review(0, 5)
+    const result = prepareInitialReviews([review(2, 1), newestPositive, review(1, 3)])
+    expect(result[0]).toEqual(newestPositive)
   })
 
-  it('limite la passe historique négative à 100 avis', () => {
-    const cutoff = initialImportCutoffSeconds(now, 30) * 1_000
-    const historical = Array.from({ length: 120 }, (_, index) => review(`history-${index}`, 1, 31 + index))
-    expect(mergeInitialReviewPasses([], historical, cutoff).reviews).toHaveLength(HISTORICAL_NEGATIVE_LIMIT)
+  it.each([1, 2, 3, 4, 5])('ne déclenche ni Terra ni notification pour un import historique %i★', (rating) => {
+    expect(shouldAutomaticallyAnalyzeReview({ rating, historical_import: true })).toBe(false)
+    expect(shouldCreateReviewNotification({ rating, historical_import: true })).toBe(false)
   })
 })

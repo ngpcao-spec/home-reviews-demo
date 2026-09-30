@@ -113,7 +113,7 @@ async function apiJson(
   }
 }
 
-function actorInput(request: ApifyReviewRequest) {
+export function apifyActorInput(request: ApifyReviewRequest) {
   return {
     startUrls: [{ url: request.placeUrl }],
     reviewsOrigin: 'google',
@@ -160,7 +160,7 @@ export async function startApifyRun(
   const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}`, {
     method: 'POST',
     headers: apiHeaders(token, true),
-    body: JSON.stringify(actorInput({ ...request, placeUrl: resolvedUrl })),
+    body: JSON.stringify(apifyActorInput({ ...request, placeUrl: resolvedUrl })),
   })
   return runFromPayload(payload)
 }

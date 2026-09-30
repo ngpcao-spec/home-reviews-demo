@@ -1,5 +1,4 @@
-export const DEFAULT_HISTORICAL_RECENT_WINDOW_DAYS = 30
-export const HISTORICAL_NEGATIVE_LIMIT = 100
+export const DEFAULT_INITIAL_REVIEWS_LIMIT = 500
 
 export interface InitialImportReview {
   externalReviewId: string
@@ -7,47 +6,36 @@ export interface InitialImportReview {
   publishedAt: string | null
 }
 
-export function historicalRecentWindowDays(value?: string): number {
-  if (!value?.trim()) return DEFAULT_HISTORICAL_RECENT_WINDOW_DAYS
+export function initialReviewsLimit(value?: string): number {
+  if (!value?.trim()) return DEFAULT_INITIAL_REVIEWS_LIMIT
   const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 365
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= DEFAULT_INITIAL_REVIEWS_LIMIT
     ? parsed
-    : DEFAULT_HISTORICAL_RECENT_WINDOW_DAYS
+    : DEFAULT_INITIAL_REVIEWS_LIMIT
 }
 
-export function initialImportCutoffSeconds(nowMs: number, windowDays: number): number {
-  return Math.floor((nowMs - windowDays * 24 * 60 * 60 * 1_000) / 1_000)
-}
-
-export function mergeInitialReviewPasses<T extends InitialImportReview>(
-  recentPass: T[],
-  historicalPass: T[],
-  cutoffMilliseconds: number,
-): { recentFetched: number; recentNegative: number; reviews: T[] } {
-  const recentInWindow = recentPass.filter((review) => {
-    const publishedAt = review.publishedAt ? Date.parse(review.publishedAt) : Number.NaN
-    return review.rating >= 1
-      && review.rating <= 5
-      && Number.isFinite(publishedAt)
-      && publishedAt >= cutoffMilliseconds
-  })
-  const recentNegative = recentInWindow.filter((review) => review.rating <= 3)
-  const historicalNegative = historicalPass
-    .filter((review) => review.rating >= 1 && review.rating <= 3)
-    .slice(0, HISTORICAL_NEGATIVE_LIMIT)
-
+export function prepareInitialReviews<T extends InitialImportReview>(
+  reviews: T[],
+  limit = DEFAULT_INITIAL_REVIEWS_LIMIT,
+): T[] {
+  const safeLimit = Math.min(DEFAULT_INITIAL_REVIEWS_LIMIT, Math.max(1, Math.floor(limit)))
   const unique = new Map<string, T>()
-  for (const review of [...recentInWindow, ...historicalNegative]) {
-    if (review.externalReviewId && !unique.has(review.externalReviewId)) {
-      unique.set(review.externalReviewId, review)
-    }
+  for (const review of reviews) {
+    if (!review.externalReviewId || review.rating < 1 || review.rating > 5) continue
+    if (!unique.has(review.externalReviewId)) unique.set(review.externalReviewId, review)
   }
 
-  const reviews = [...unique.values()].sort((left, right) => {
-    const leftTime = left.publishedAt ? Date.parse(left.publishedAt) : 0
-    const rightTime = right.publishedAt ? Date.parse(right.publishedAt) : 0
-    return rightTime - leftTime
-  })
+  return [...unique.values()]
+    .sort((left, right) => {
+      const leftTime = left.publishedAt ? Date.parse(left.publishedAt) : 0
+      const rightTime = right.publishedAt ? Date.parse(right.publishedAt) : 0
+      return rightTime - leftTime
+    })
+    .slice(0, safeLimit)
+}
 
-  return { recentFetched: recentPass.length, recentNegative: recentNegative.length, reviews }
+export function initialHistoryComplete(totalGoogleReviews: number, persistedReviews: number, limit: number): boolean {
+  if (!Number.isFinite(totalGoogleReviews) || totalGoogleReviews < 0) return false
+  if (totalGoogleReviews > limit) return false
+  return persistedReviews >= totalGoogleReviews
 }

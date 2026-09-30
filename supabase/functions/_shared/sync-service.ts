@@ -11,16 +11,13 @@ import {
 } from './apify.ts'
 import { reviewClassification, reviewsForPersistence } from './review-classification.ts'
 import {
-  HISTORICAL_NEGATIVE_LIMIT,
-  historicalRecentWindowDays,
-  initialImportCutoffSeconds,
-  mergeInitialReviewPasses,
+  initialHistoryComplete,
+  initialReviewsLimit,
+  prepareInitialReviews,
 } from './initial-import.ts'
 
 const INCREMENTAL_WINDOW = 20
 const MAX_INCREMENTAL_PAGES = 5
-const INITIAL_RECENT_PAGE_SIZE = 100
-const MAX_INITIAL_RECENT_PAGES = 100
 
 export interface EstablishmentRow {
   id: string
@@ -267,10 +264,8 @@ export async function persistEstablishmentSnapshot(
 
 interface InitializationFetchResult extends GoogleReviewsResult {
   providerRequests: number
-  recentFetched: number
-  recentNegative: number
-  historicalFetched: number
-  finalAfterDeduplication: number
+  initialLimit: number
+  initialFetched: number
   checkpointReview: NormalizedReview | null
 }
 
@@ -287,133 +282,57 @@ async function fetchInitialization(
   language: SupportedLanguage,
 ): Promise<InitializationFetchResult> {
   const provider = providerName()
-  const recentWindowDays = historicalRecentWindowDays(Deno.env.get('HISTORICAL_RECENT_WINDOW_DAYS'))
-  const cutoffSeconds = initialImportCutoffSeconds(Date.now(), recentWindowDays)
-  const cutoffMilliseconds = cutoffSeconds * 1_000
+  const limit = initialReviewsLimit(Deno.env.get('INITIAL_REVIEWS_LIMIT'))
   if (provider === 'mock') {
     const result = getMockGoogleReviews(query)
-    const merged = mergeInitialReviewPasses(result.reviews, result.reviews, cutoffMilliseconds)
+    const reviews = prepareInitialReviews(result.reviews, limit)
     return {
       ...result,
-      reviews: merged.reviews,
-      count: merged.reviews.length,
-      providerRequests: 2,
-      recentFetched: merged.recentFetched,
-      recentNegative: merged.recentNegative,
-      historicalFetched: Math.min(result.reviews.length, HISTORICAL_NEGATIVE_LIMIT),
-      finalAfterDeduplication: merged.reviews.length,
-      checkpointReview: sortNewest([...result.reviews])[0] ?? null,
+      reviews,
+      count: reviews.length,
+      providerRequests: 1,
+      initialLimit: limit,
+      initialFetched: reviews.length,
+      checkpointReview: reviews[0] ?? null,
     }
   }
 
   if (provider === 'apify') {
-    const cutoffIso = new Date(cutoffMilliseconds).toISOString()
-    const [recent, historical] = await Promise.all([
-      fetchApifyReviews(apifyToken(), {
-        placeUrl: query,
-        language,
-        sort: 'newest',
-        since: cutoffIso,
-      }),
-      fetchApifyReviews(apifyToken(), {
-        placeUrl: query,
-        language,
-        sort: 'lowest_rating',
-        limit: HISTORICAL_NEGATIVE_LIMIT,
-      }),
-    ])
-    const merged = mergeInitialReviewPasses(recent.reviews, historical.reviews, cutoffMilliseconds)
-    return {
-      provider: 'apify',
-      establishment: recent.establishment,
-      reviews: merged.reviews,
-      count: merged.reviews.length,
-      providerRequests: 2,
-      recentFetched: merged.recentFetched,
-      recentNegative: merged.recentNegative,
-      historicalFetched: historical.reviews.length,
-      finalAfterDeduplication: merged.reviews.length,
-      checkpointReview: sortNewest([...recent.reviews])[0] ?? null,
-    }
-  }
-
-  const apiKey = outscraperKey()
-  const recentReviews: NormalizedReview[] = []
-  const seenCursors = new Set<string>()
-  let cursor: string | undefined
-  let recentEstablishment: GoogleReviewsResult['establishment'] | undefined
-  let providerRequests = 0
-  let recentWindowComplete = false
-
-  for (let pageNumber = 0; pageNumber < MAX_INITIAL_RECENT_PAGES; pageNumber += 1) {
-    const page = await fetchOutscraperReviews({
-      query,
-      apiKey,
-      reviewsLimit: INITIAL_RECENT_PAGE_SIZE,
+    const result = await fetchApifyReviews(apifyToken(), {
+      placeUrl: query,
+      language,
       sort: 'newest',
-      cutoff: cutoffSeconds,
-      lastPaginationId: cursor,
-      timeoutMs: 90_000,
+      limit,
     })
-    providerRequests += 1
-    recentEstablishment ??= page.establishment
-
-    const inWindow = page.reviews.filter((review) => {
-      if (!review.publishedAt) return true
-      return Date.parse(review.publishedAt) >= cutoffMilliseconds
-    })
-    recentReviews.push(...inWindow)
-
-    if (page.reviews.length === 0) {
-      recentWindowComplete = true
-      break
+    const reviews = prepareInitialReviews(result.reviews, limit)
+    return {
+      ...result,
+      reviews,
+      count: reviews.length,
+      providerRequests: 1,
+      initialLimit: limit,
+      initialFetched: reviews.length,
+      checkpointReview: reviews[0] ?? null,
     }
-
-    const crossedCutoff = page.reviews.some((review) =>
-      review.publishedAt !== null
-      && Date.parse(review.publishedAt) < cutoffMilliseconds
-    )
-    if (crossedCutoff) {
-      recentWindowComplete = true
-      break
-    }
-
-    const nextCursor = page.reviews.at(-1)?.paginationId ?? undefined
-    if (!nextCursor) {
-      recentWindowComplete = true
-      break
-    }
-    if (seenCursors.has(nextCursor)) throw new Error('RECENT_IMPORT_PAGINATION_LOOP')
-    seenCursors.add(nextCursor)
-    cursor = nextCursor
   }
 
-  if (!recentWindowComplete) throw new Error('RECENT_IMPORT_WINDOW_INCOMPLETE')
-
-  const historical = await fetchOutscraperReviews({
+  const result = await fetchOutscraperReviews({
     query,
-    apiKey,
-    reviewsLimit: HISTORICAL_NEGATIVE_LIMIT,
-    sort: 'lowest_rating',
-    cutoffRating: 3,
+    apiKey: outscraperKey(),
+    reviewsLimit: limit,
+    sort: 'newest',
     timeoutMs: 90_000,
   })
-  providerRequests += 1
-
-  const merged = mergeInitialReviewPasses(recentReviews, historical.reviews, cutoffMilliseconds)
-  const checkpointReview = sortNewest([...recentReviews])[0] ?? null
+  const reviews = prepareInitialReviews(result.reviews, limit)
 
   return {
-    provider: 'outscraper',
-    establishment: recentEstablishment ?? historical.establishment,
-    reviews: merged.reviews,
-    count: merged.reviews.length,
-    providerRequests,
-    recentFetched: merged.recentFetched,
-    recentNegative: merged.recentNegative,
-    historicalFetched: historical.reviews.length,
-    finalAfterDeduplication: merged.reviews.length,
-    checkpointReview,
+    ...result,
+    reviews,
+    count: reviews.length,
+    providerRequests: 1,
+    initialLimit: limit,
+    initialFetched: reviews.length,
+    checkpointReview: reviews[0] ?? null,
   }
 }
 
@@ -466,10 +385,16 @@ export async function initializeEstablishment(
 
   const importedReviews = sortNewest([...result.reviews])
   const negativeReviews = importedReviews.filter((review) => review.rating <= 3)
+  const historyComplete = initialHistoryComplete(
+    result.establishment.totalReviews,
+    importedReviews.length,
+    result.initialLimit,
+  )
+  const oldestImportedAt = importedReviews.at(-1)?.publishedAt ?? null
 
   const now = new Date().toISOString()
   // The Google stream checkpoint always follows the newest review, regardless
-  // of rating. PASS A now persists every 1-5 star review in the recent window.
+  // of rating. Initial imports persist the newest reviews across all five ratings.
   const newestReview = result.checkpointReview
   const { data: establishment, error: establishmentError } = await admin
     .from('establishments')
@@ -516,6 +441,7 @@ export async function initializeEstablishment(
         last_sync_status: 'ok',
         last_sync_error: null,
         last_sync_at: now,
+        ...(historyComplete ? { reporting_started_at: oldestImportedAt ?? now } : {}),
       })
       .eq('id', establishment.id)
     if (updateError) throw updateError
@@ -544,12 +470,12 @@ export async function initializeEstablishment(
       providerRequests: result.providerRequests,
       fetched: result.reviews.length,
       inserted,
+      negativeReviewCount: negativeReviews.length,
       distribution,
       nextSyncAt: establishment.next_sync_at as string,
-      recentFetched: result.recentFetched,
-      recentNegative: result.recentNegative,
-      historicalFetched: result.historicalFetched,
-      finalAfterDeduplication: result.finalAfterDeduplication,
+      initialLimit: result.initialLimit,
+      initialFetched: result.initialFetched,
+      historyComplete,
     }
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 120) : 'INITIALIZATION_FAILED'
@@ -589,15 +515,15 @@ export async function initializeEstablishment(
       providerRequests: result.providerRequests,
       fetched: result.reviews.length,
       inserted: 0,
+      negativeReviewCount: 0,
       distribution,
       nextSyncAt: establishment.next_sync_at as string,
       importStatus: 'failed' as const,
       retryable: true,
       importError: code,
-      recentFetched: result.recentFetched,
-      recentNegative: result.recentNegative,
-      historicalFetched: result.historicalFetched,
-      finalAfterDeduplication: result.finalAfterDeduplication,
+      initialLimit: result.initialLimit,
+      initialFetched: result.initialFetched,
+      historyComplete,
     }
   }
 }
@@ -621,17 +547,23 @@ export async function backfillHistoricalReviews(
     `backfill:${crypto.randomUUID()}`,
   )
   const newestReview = result.checkpointReview
+  const oldestImportedAt = result.reviews.at(-1)?.publishedAt ?? null
+  const historyComplete = initialHistoryComplete(
+    result.establishment.totalReviews,
+    result.reviews.length,
+    result.initialLimit,
+  )
   const currentNewestAt = establishment.last_review_at ? Date.parse(establishment.last_review_at) : 0
   const importedNewestAt = newestReview?.publishedAt ? Date.parse(newestReview.publishedAt) : 0
+  const establishmentUpdate: Record<string, unknown> = {}
 
   if (newestReview && importedNewestAt > currentNewestAt) {
-    const { error } = await admin
-      .from('establishments')
-      .update({
-        last_review_id: newestReview.externalReviewId,
-        last_review_at: newestReview.publishedAt,
-      })
-      .eq('id', establishment.id)
+    establishmentUpdate.last_review_id = newestReview.externalReviewId
+    establishmentUpdate.last_review_at = newestReview.publishedAt
+  }
+  if (historyComplete) establishmentUpdate.reporting_started_at = oldestImportedAt ?? new Date().toISOString()
+  if (Object.keys(establishmentUpdate).length > 0) {
+    const { error } = await admin.from('establishments').update(establishmentUpdate).eq('id', establishment.id)
     if (error) throw error
   }
 
@@ -639,10 +571,9 @@ export async function backfillHistoricalReviews(
     establishmentId: establishment.id,
     provider: result.provider,
     providerRequests: result.providerRequests,
-    recentFetched: result.recentFetched,
-    recentNegative: result.recentNegative,
-    historicalFetched: result.historicalFetched,
-    finalAfterDeduplication: result.finalAfterDeduplication,
+    initialLimit: result.initialLimit,
+    initialFetched: result.initialFetched,
+    historyComplete,
     inserted,
   }
 }

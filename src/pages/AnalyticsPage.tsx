@@ -150,7 +150,10 @@ export function AnalyticsPage() {
 
       {!visibleHistoricalReport.dataComplete && <section className="weekly-data-warning historical-data-warning card" role="status">
         <AlertTriangle aria-hidden="true"/>
-        <div><strong>{messages.analytics.historicalDataPartial}</strong><p>{messages.analytics.historicalDataPartialDetail}</p></div>
+        <div><strong>{messages.analytics.historicalDataPartial}</strong><p>{visibleHistoricalReport.storedReviewsCount === 500
+          && (visibleHistoricalReport.googleTotalReviews ?? 0) > 500
+          ? messages.analytics.historicalRecentSample
+          : messages.analytics.historicalDataPartialDetail}</p></div>
       </section>}
 
       <section className="weekly-section">

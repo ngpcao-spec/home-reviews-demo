@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeApifyDataset, normalizeApifyReview } from './apify.ts'
+import { apifyActorInput, normalizeApifyDataset, normalizeApifyReview } from './apify.ts'
 
 const item = {
   reviewId: 'review-123',
@@ -35,6 +35,22 @@ const item = {
 }
 
 describe('ApifyReviewProvider normalization', () => {
+  it('requests one newest-first initial sample capped at 500 reviews', () => {
+    expect(apifyActorInput({
+      placeUrl: item.url,
+      language: 'fr',
+      sort: 'newest',
+      limit: 500,
+    })).toMatchObject({
+      startUrls: [{ url: item.url }],
+      reviewsOrigin: 'google',
+      reviewsSort: 'newest',
+      language: 'fr',
+      personalData: true,
+      maxReviews: 500,
+    })
+  })
+
   it('keeps original and translated texts separate with a stable review id', () => {
     expect(normalizeApifyReview(item)).toMatchObject({
       externalReviewId: 'review-123',
