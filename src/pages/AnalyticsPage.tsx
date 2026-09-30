@@ -41,6 +41,7 @@ export function AnalyticsPage() {
   const [historicalGenerating, setHistoricalGenerating] = useState(false)
   const [historicalFeedback, setHistoricalFeedback] = useState<HistoricalFeedback>(null)
   const requestedKeys = useRef(new Set<string>())
+  const historicalGenerationLock = useRef(false)
   const periodStart = useMemo(() => periodMode === 'current'
     ? currentVietnamWeekStart()
     : lastCompletedVietnamWeekStart(), [periodMode])
@@ -117,7 +118,8 @@ export function AnalyticsPage() {
   }, [cachedHistoricalReport, cachedReport, demoMode, historicalCacheKey, messages.analytics.historicalLoadFailed, messages.analytics.loadFailed, periodMode, periodStart, preferredLanguage, reportCacheKey, requestVersion, selected])
 
   const generateHistoricalReport = async () => {
-    if (!selected || !preferredLanguage || historicalGenerating) return
+    if (!selected || !preferredLanguage || historicalGenerationLock.current) return
+    historicalGenerationLock.current = true
     setHistoricalFeedback(null)
     setHistoricalGenerating(true)
     try {
@@ -151,6 +153,7 @@ export function AnalyticsPage() {
       console.error('Historical report generation failed', generationError)
       setHistoricalFeedback('error')
     } finally {
+      historicalGenerationLock.current = false
       setHistoricalGenerating(false)
     }
   }
