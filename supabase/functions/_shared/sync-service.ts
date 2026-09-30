@@ -15,6 +15,7 @@ import {
   initialReviewsLimit,
   prepareInitialReviews,
 } from './initial-import.ts'
+import { reviewPersistenceBatches } from './review-persistence.ts'
 
 const INCREMENTAL_WINDOW = 20
 const MAX_INCREMENTAL_PAGES = 5
@@ -170,75 +171,74 @@ export async function insertReviews(
   provider: GoogleReviewsResult['provider'],
 ): Promise<number> {
   if (!reviews.length) return 0
-  const validReviews = reviewsForPersistence(reviews)
+  const validReviews = Array.from(
+    new Map(reviewsForPersistence(reviews).map((review) => [review.externalReviewId, review])).values(),
+  )
   if (!validReviews.length) return 0
-
-  const externalIds = validReviews.map((review) => review.externalReviewId)
-  const { data: existingRows, error: existingRowsError } = await admin
-    .from('reviews')
-    .select('external_review_id')
-    .eq('establishment_id', establishment.id)
-    .in('external_review_id', externalIds)
-  if (existingRowsError) throw existingRowsError
-  const existingIds = new Set(
-    (existingRows ?? []).map((row) => row.external_review_id as string),
-  )
-
-  const { error } = await admin
-    .from('reviews')
-    .upsert(
-      validReviews.map((review) => reviewRow(establishment, review, historicalImport, provider)),
-      {
-        onConflict: 'establishment_id,external_review_id',
-        ignoreDuplicates: true,
-      },
+  let inserted = 0
+  for (const batch of reviewPersistenceBatches(validReviews)) {
+    const externalIds = batch.map((review) => review.externalReviewId)
+    const { data: existingRows, error: existingRowsError } = await admin.from('reviews')
+      .select('external_review_id').eq('establishment_id', establishment.id)
+      .in('external_review_id', externalIds)
+    if (existingRowsError) {
+      console.error('REVIEWS_EXISTING_LOOKUP_FAILED', existingRowsError.message)
+      throw new Error('REVIEWS_EXISTING_LOOKUP_FAILED')
+    }
+    const existingIds = new Set((existingRows ?? []).map((row) => row.external_review_id as string))
+    const { error: upsertError } = await admin.from('reviews').upsert(
+      batch.map((review) => reviewRow(establishment, review, historicalImport, provider)),
+      { onConflict: 'establishment_id,external_review_id', ignoreDuplicates: true },
     )
-  if (error) throw error
-
-  const { data: persisted, error: persistedError } = await admin
-    .from('reviews')
-    .select('id,external_review_id')
-    .eq('establishment_id', establishment.id)
-    .in('external_review_id', externalIds)
-  if (persistedError) throw persistedError
-
-  const byExternalId = new Map(
-    (persisted ?? []).map((row) => [row.external_review_id as string, row.id as string]),
-  )
-  const translations = validReviews.flatMap((review) => {
-    const reviewId = byExternalId.get(review.externalReviewId)
-    const language = review.translatedLanguage
-    const translatedText = review.translatedText?.trim()
-    if (!reviewId || (language !== 'fr' && language !== 'vi') || !translatedText) return []
-    return [{ review_id: reviewId, language, translated_text: translatedText, updated_at: new Date().toISOString() }]
-  })
-  if (translations.length) {
-    const { error: translationError } = await admin
-      .from('review_translations')
-      .upsert(translations, { onConflict: 'review_id,language' })
-    if (translationError) throw translationError
+    if (upsertError) {
+      console.error('REVIEWS_UPSERT_FAILED', upsertError.message)
+      throw new Error('REVIEWS_UPSERT_FAILED')
+    }
+    const { data: persisted, error: persistedError } = await admin.from('reviews')
+      .select('id,external_review_id').eq('establishment_id', establishment.id)
+      .in('external_review_id', externalIds)
+    if (persistedError) {
+      console.error('REVIEWS_RESELECT_FAILED', persistedError.message)
+      throw new Error('REVIEWS_RESELECT_FAILED')
+    }
+    const byExternalId = new Map((persisted ?? []).map((row) => [
+      row.external_review_id as string, row.id as string,
+    ]))
+    const translations = batch.flatMap((review) => {
+      const reviewId = byExternalId.get(review.externalReviewId)
+      const language = review.translatedLanguage
+      const translatedText = review.translatedText?.trim()
+      if (!reviewId || (language !== 'fr' && language !== 'vi') || !translatedText) return []
+      return [{ review_id: reviewId, language, translated_text: translatedText, updated_at: new Date().toISOString() }]
+    })
+    if (translations.length) {
+      const { error: translationError } = await admin.from('review_translations')
+        .upsert(translations, { onConflict: 'review_id,language' })
+      if (translationError) {
+        console.error('TRANSLATIONS_UPSERT_FAILED', translationError.message)
+        throw new Error('TRANSLATIONS_UPSERT_FAILED')
+      }
+    }
+    const observedAt = new Date().toISOString()
+    const providerPayloads = batch.flatMap((review) => {
+      const reviewId = byExternalId.get(review.externalReviewId)
+      if (!reviewId) return []
+      return [{
+        review_id: reviewId, provider, raw_payload: review.rawPayload ?? {},
+        provider_last_seen_at: observedAt, updated_at: observedAt,
+      }]
+    })
+    if (providerPayloads.length) {
+      const { error: payloadError } = await admin.from('review_provider_payloads')
+        .upsert(providerPayloads, { onConflict: 'review_id,provider' })
+      if (payloadError) {
+        console.error('PROVIDER_PAYLOADS_UPSERT_FAILED', payloadError.message)
+        throw new Error('PROVIDER_PAYLOADS_UPSERT_FAILED')
+      }
+    }
+    inserted += batch.filter((review) => !existingIds.has(review.externalReviewId)).length
   }
-
-
-  const observedAt = new Date().toISOString()
-  const providerPayloads = validReviews.flatMap((review) => {
-    const reviewId = byExternalId.get(review.externalReviewId)
-    if (!reviewId) return []
-    return [{
-      review_id: reviewId,
-      provider,
-      raw_payload: review.rawPayload ?? {},
-      provider_last_seen_at: observedAt,
-      updated_at: observedAt,
-    }]
-  })
-  if (providerPayloads.length) {
-    const { error: payloadError } = await admin
-      .from('review_provider_payloads')
-      .upsert(providerPayloads, { onConflict: 'review_id,provider' })
-    if (payloadError) throw payloadError
-  }
-  return validReviews.filter((review) => !existingIds.has(review.externalReviewId)).length
+  return inserted
 }
 
 export async function persistEstablishmentSnapshot(
@@ -259,7 +259,10 @@ export async function persistEstablishmentSnapshot(
     source_run_id: sourceRunId,
     raw_place_payload: place.rawPlacePayload ?? {},
   }, { onConflict: 'establishment_id,provider,source_run_id' })
-  if (error) throw error
+  if (error) {
+    console.error('SNAPSHOT_UPSERT_FAILED', error.message)
+    throw new Error('SNAPSHOT_UPSERT_FAILED')
+  }
 }
 
 interface InitializationFetchResult extends GoogleReviewsResult {
