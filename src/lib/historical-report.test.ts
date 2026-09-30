@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { formatHistoricalPeriodStart, mapHistoricalReport } from './historical-report'
+import { formatHistoricalGeneratedAt, formatHistoricalPeriodStart, mapHistoricalReport } from './historical-report'
 
 describe('historical report client helpers', () => {
   it('formats the real coverage start in French and Vietnamese', () => {
     const start = '2026-09-23T17:00:00Z'
     expect(formatHistoricalPeriodStart(start, 'fr')).toBe('Depuis le 24 septembre 2026')
     expect(formatHistoricalPeriodStart(start, 'vi')).toBe('Từ 24 tháng 9, 2026')
+  })
+
+  it('formats the manual generation time in Vietnam as DD/MM/YYYY HH:mm', () => {
+    expect(formatHistoricalGeneratedAt('2026-09-30T08:15:00Z')).toBe('30/09/2026 15:15')
   })
 
   it('maps all five rating buckets without changing the stored denominator', () => {
