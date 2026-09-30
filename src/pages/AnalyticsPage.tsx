@@ -4,6 +4,13 @@ import { useApp } from '../app/AppContext'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
+import {
+  buildDemoHistoricalReport,
+  formatHistoricalPeriodStart,
+  mapHistoricalReport,
+  type HistoricalReport,
+  type HistoricalReportRow,
+} from '../lib/historical-report'
 import { supabase } from '../lib/supabase'
 import {
   buildDemoWeeklyReport,
@@ -16,13 +23,16 @@ import {
 } from '../lib/weekly-report'
 
 interface GenerateWeeklyReportPayload { report?: WeeklyReportRow; error?: string }
+interface GenerateHistoricalReportPayload { report?: HistoricalReportRow; error?: string }
+type PeriodMode = 'completed' | 'current' | 'historical'
 
 export function AnalyticsPage() {
   const { reviews, establishments, demoMode, preferredLanguage } = useApp()
   const { messages, language } = useI18n()
   const [establishmentId, setEstablishmentId] = useState('')
-  const [periodMode, setPeriodMode] = useState<'completed' | 'current'>('completed')
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('completed')
   const [reports, setReports] = useState<Record<string, WeeklyReport>>({})
+  const [historicalReports, setHistoricalReports] = useState<Record<string, HistoricalReport>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorKey, setErrorKey] = useState<string | null>(null)
@@ -36,18 +46,28 @@ export function AnalyticsPage() {
     ? establishmentId
     : establishments[0]?.id ?? ''
   const selected = establishments.find((item) => item.id === resolvedEstablishmentId)
-  const reportCacheKey = selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}:${periodMode}` : ''
+  const reportCacheKey = selected && preferredLanguage && periodMode !== 'historical' ? `${selected.id}:${periodStart}:${preferredLanguage}:${periodMode}` : ''
   const cachedReport = reportCacheKey ? reports[reportCacheKey] : undefined
+  const historicalCacheKey = selected && preferredLanguage ? `${selected.id}:${preferredLanguage}` : ''
+  const cachedHistoricalReport = historicalCacheKey ? historicalReports[historicalCacheKey] : undefined
   const demoReport = useMemo(() => selected && preferredLanguage && demoMode
+    && periodMode !== 'historical'
     ? buildDemoWeeklyReport(selected.id, reviews, preferredLanguage, selected.currentRating, selected.currentReviewCount, periodMode === 'current')
+    : null,
+  [demoMode, periodMode, preferredLanguage, reviews, selected])
+  const demoHistoricalReport = useMemo(() => selected && preferredLanguage && demoMode && periodMode === 'historical'
+    ? buildDemoHistoricalReport(selected.id, reviews, preferredLanguage, selected.currentRating, selected.currentReviewCount)
     : null,
   [demoMode, periodMode, preferredLanguage, reviews, selected])
 
   useEffect(() => {
     if (!selected || !preferredLanguage) return
-    if (demoMode || !supabase || cachedReport) return
+    if (demoMode || !supabase) return
+    const historical = periodMode === 'historical'
+    if (historical ? cachedHistoricalReport : cachedReport) return
     const client = supabase
-    const requestKey = `${reportCacheKey}:${requestVersion}`
+    const activeCacheKey = historical ? historicalCacheKey : reportCacheKey
+    const requestKey = `${activeCacheKey}:${periodMode}:${requestVersion}`
     if (requestedKeys.current.has(requestKey)) return
     requestedKeys.current.add(requestKey)
     let active = true
@@ -55,26 +75,38 @@ export function AnalyticsPage() {
       setLoading(true)
       setError(null)
       setErrorKey(null)
-      const { data, error: functionError } = await client.functions.invoke<GenerateWeeklyReportPayload>('generate-weekly-report', {
-        body: periodMode === 'current'
-          ? { establishment_id: selected.id, provisional: true }
-          : { establishment_id: selected.id, period_start: periodStart },
-      })
+      const { data, error: functionError } = historical
+        ? await client.functions.invoke<GenerateHistoricalReportPayload>('generate-historical-report', {
+          body: { establishment_id: selected.id },
+        })
+        : await client.functions.invoke<GenerateWeeklyReportPayload>('generate-weekly-report', {
+          body: periodMode === 'current'
+            ? { establishment_id: selected.id, provisional: true }
+            : { establishment_id: selected.id, period_start: periodStart },
+        })
       if (!active) return
       if (functionError || !data?.report) {
-        setError(messages.analytics.loadFailed)
+        setError(historical ? messages.analytics.historicalLoadFailed : messages.analytics.loadFailed)
         setErrorKey(requestKey)
+      } else if (historical) {
+        setHistoricalReports((current) => ({
+          ...current,
+          [historicalCacheKey]: mapHistoricalReport(data.report as HistoricalReportRow),
+        }))
       } else {
-        setReports((current) => ({ ...current, [reportCacheKey]: mapWeeklyReport(data.report!) }))
+        setReports((current) => ({ ...current, [reportCacheKey]: mapWeeklyReport(data.report as WeeklyReportRow) }))
       }
       setLoading(false)
     }
     void load()
     return () => { active = false }
-  }, [cachedReport, demoMode, messages.analytics.loadFailed, periodMode, periodStart, preferredLanguage, reportCacheKey, requestVersion, selected])
+  }, [cachedHistoricalReport, cachedReport, demoMode, historicalCacheKey, messages.analytics.historicalLoadFailed, messages.analytics.loadFailed, periodMode, periodStart, preferredLanguage, reportCacheKey, requestVersion, selected])
 
   const visibleReport = demoReport ?? cachedReport ?? null
-  const currentRequestPrefix = selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}:${periodMode}:` : ''
+  const visibleHistoricalReport = demoHistoricalReport ?? cachedHistoricalReport ?? null
+  const currentRequestPrefix = periodMode === 'historical'
+    ? `${historicalCacheKey}:${periodMode}:`
+    : selected && preferredLanguage ? `${selected.id}:${periodStart}:${preferredLanguage}:${periodMode}:` : ''
   const visibleError = errorKey?.startsWith(currentRequestPrefix) ? error : null
   const periodLabel = visibleReport ? formatWeeklyPeriod(visibleReport.periodStart, visibleReport.periodEnd, language) : ''
   const number = new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'fr-FR')
@@ -82,7 +114,7 @@ export function AnalyticsPage() {
   return <>
     <BrandHeader />
     <section className="reference-intro analytics-intro">
-      <h1>{messages.analytics.weeklyTitle}</h1>
+      <h1>{periodMode === 'historical' ? messages.analytics.historicalAnalysis : messages.analytics.weeklyTitle}</h1>
       <p>{messages.analytics.weeklyIntro}</p>
     </section>
     {establishments.length > 0 && <div className="analytics-filters weekly-report-filter">
@@ -91,9 +123,10 @@ export function AnalyticsPage() {
         {establishments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
       <label htmlFor="weekly-period-mode">{messages.analytics.periodLabel}</label>
-      <select id="weekly-period-mode" value={periodMode} onChange={(event) => setPeriodMode(event.target.value as 'completed' | 'current')}>
-        <option value="completed">{messages.analytics.completedWeek}</option>
+      <select id="weekly-period-mode" value={periodMode} onChange={(event) => setPeriodMode(event.target.value as PeriodMode)}>
         <option value="current">{messages.analytics.currentWeek}</option>
+        <option value="completed">{messages.analytics.completedWeek}</option>
+        <option value="historical">{messages.analytics.historicalMode}</option>
       </select>
     </div>}
 
@@ -101,7 +134,62 @@ export function AnalyticsPage() {
     {loading && <section className="weekly-report-state card" aria-live="polite"><span className="weekly-report-spinner"/><p>{messages.analytics.generating}</p></section>}
     {visibleError && <section className="weekly-report-state card" role="alert"><AlertTriangle/><p>{visibleError}</p><button className="secondary-button" onClick={() => setRequestVersion((value) => value + 1)}>{messages.common.retry}</button></section>}
 
-    {selected && visibleReport && <div className="weekly-report">
+    {selected && periodMode === 'historical' && visibleHistoricalReport && <div className="weekly-report historical-report">
+      <section className="weekly-report-hero card">
+        <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />
+        <div>
+          <div className="weekly-report-label"><span className="eyebrow">{messages.analytics.historicalAnalysis}</span></div>
+          <h2>{selected.name}</h2>
+          <p className="weekly-period">{formatHistoricalPeriodStart(visibleHistoricalReport.periodStart, language)}</p>
+          <div className="weekly-google-metrics">
+            <strong>{visibleHistoricalReport.googleRating === null ? '—' : visibleHistoricalReport.googleRating.toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} <Star aria-hidden="true"/></strong>
+            <span>{visibleHistoricalReport.googleTotalReviews === null ? messages.analytics.snapshotUnavailable : `${number.format(visibleHistoricalReport.googleTotalReviews)} ${messages.analytics.googleReviews}`}</span>
+          </div>
+        </div>
+      </section>
+
+      {!visibleHistoricalReport.dataComplete && <section className="weekly-data-warning historical-data-warning card" role="status">
+        <AlertTriangle aria-hidden="true"/>
+        <div><strong>{messages.analytics.historicalDataPartial}</strong><p>{messages.analytics.historicalDataPartialDetail}</p></div>
+      </section>}
+
+      <section className="weekly-section">
+        <div className="weekly-section-heading"><span className="eyebrow">01</span><h2>{messages.analytics.overview}</h2></div>
+        <div className="weekly-kpis">
+          <article className="weekly-kpi card"><MessageSquareText/><strong>{visibleHistoricalReport.storedReviewsCount}</strong><span>{messages.analytics.storedReviews}</span></article>
+          <article className="weekly-kpi card negative"><AlertTriangle/><strong>{visibleHistoricalReport.negativeReviewsCount}</strong><span>{messages.analytics.negativeReviews}</span></article>
+          <article className="weekly-kpi card"><span className="weekly-percent">%</span><strong>{visibleHistoricalReport.negativeRate.toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} %</strong><span>{visibleHistoricalReport.dataComplete ? messages.analytics.negativeRate : messages.analytics.rateAvailableData}</span></article>
+          <article className="weekly-kpi card ready"><Sparkles/><strong>{visibleHistoricalReport.readyRepliesCount}</strong><span>{messages.analytics.readyReplies}</span></article>
+        </div>
+      </section>
+
+      <section className="weekly-section historical-rating-section">
+        <div className="weekly-section-heading"><span className="eyebrow">02</span><h2>{messages.analytics.starDistribution}</h2></div>
+        <article className="historical-rating-card card">
+          {([1, 2, 3, 4, 5] as const).map((rating) => {
+            const count = visibleHistoricalReport.ratingCounts[rating]
+            const percentage = visibleHistoricalReport.storedReviewsCount ? count / visibleHistoricalReport.storedReviewsCount * 100 : 0
+            return <div className="historical-rating-row" key={rating}>
+              <strong>{rating}★</strong>
+              <span className="historical-rating-track"><i style={{ width: `${percentage}%` }}/></span>
+              <b>{count}</b>
+            </div>
+          })}
+        </article>
+      </section>
+
+      <section className="weekly-section">
+        <div className="weekly-section-heading"><span className="eyebrow">03</span><h2>{messages.analytics.historicalSummary}</h2></div>
+        <article className="weekly-summary card">
+          <Sparkles aria-hidden="true"/>
+          <p>{visibleHistoricalReport.aiStatus === 'completed' && visibleHistoricalReport.aiHistoricalSummary
+            ? visibleHistoricalReport.aiHistoricalSummary
+            : visibleHistoricalReport.aiStatus === 'failed' ? messages.analytics.summaryFailed : messages.analytics.generating}</p>
+        </article>
+      </section>
+    </div>}
+
+    {selected && periodMode !== 'historical' && visibleReport && <div className="weekly-report">
       <section className="weekly-report-hero card">
         <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />
         <div>

@@ -236,6 +236,15 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
 .weekly-summary > svg { position: absolute; top: 20px; left: 19px; width: 22px; color: var(--violet); }
 .weekly-summary p { margin: 0; color: #e8e1d8; font-size: .9rem; line-height: 1.65; }
 .weekly-partial-summary-note { display: inline-block; margin-bottom: 9px; color: var(--champagne); font-size: .67rem; font-weight: 800; letter-spacing: .025em; }
+.historical-data-warning { border-color: rgba(216, 188, 151, .34); }
+.historical-data-warning > svg { color: var(--champagne); }
+.historical-rating-card { display: grid; gap: 12px; padding: 18px; }
+.historical-rating-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) 34px; gap: 10px; align-items: center; }
+.historical-rating-row strong,
+.historical-rating-row b { font-size: .78rem; }
+.historical-rating-row b { color: var(--muted); text-align: right; }
+.historical-rating-track { height: 8px; overflow: hidden; border-radius: 999px; background: #1d1b18; }
+.historical-rating-track i { display: block; min-width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--champagne), var(--violet)); }
 .weekly-report-state { display: grid; justify-items: center; gap: 12px; padding: 30px 20px; color: var(--muted); text-align: center; }
 .weekly-report-state > svg { color: #d96d70; }
 .weekly-report-state p { margin: 0; line-height: 1.5; }

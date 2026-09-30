@@ -55,6 +55,18 @@ test('garde le résumé hebdomadaire au-dessus de la navigation et de la safe-ar
   expect(clearance).toBeGreaterThanOrEqual(23)
 })
 
+test('affiche un mode historique distinct avec les cinq notes',async({page})=>{
+  await page.goto('/analyses')
+  await page.getByLabel('Période').selectOption('historical')
+  await expect(page.getByLabel('Période')).toHaveValue('historical')
+  await expect(page.getByText('Analyse historique',{exact:true}).first()).toBeVisible()
+  await expect(page.getByText('Avis stockés',{exact:true})).toBeVisible()
+  await expect(page.getByText('Répartition par étoiles',{exact:true})).toBeVisible()
+  await expect(page.locator('.historical-rating-row')).toHaveCount(5)
+  await expect(page.getByText('Résumé IA historique',{exact:true})).toBeVisible()
+  await expect(page.getByText('Analyse basée sur les données disponibles dans HOME Reviews.',{exact:true})).toBeVisible()
+})
+
 test('garde l’accueil lisible pendant le défilement',async({page})=>{
   await page.goto('/')
   const header=page.locator('.brand-header')
