@@ -14,8 +14,8 @@ export interface AddEstablishmentResult {
   importJobId?: string
   status?: 'queued' | 'running' | 'retry' | 'completed' | 'failed'
   establishmentId?: string
-  inserted: number
-  distribution: { '1': number; '2': number; '3': number }
+  inserted?: number
+  distribution?: { '1': number; '2': number; '3': number }
   importStatus?: 'completed' | 'failed'
   retryable?: boolean
   nextSyncAt?: string
