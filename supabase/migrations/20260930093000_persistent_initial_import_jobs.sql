@@ -192,7 +192,7 @@ create function public.finalize_initial_import_job(
   p_last_review_id text,p_last_review_at timestamptz,
   p_reporting_started_at timestamptz,p_result jsonb
 ) returns boolean
-language plpgsql security definer set search_path='' as $
+language plpgsql security definer set search_path='' as $$
 declare v_job public.initial_import_jobs%rowtype; v_interval integer; v_now timestamptz:=now();
 begin
   select * into v_job from public.initial_import_jobs
@@ -219,7 +219,7 @@ begin
     lease_until=null,locked_by=null,finished_at=v_now,updated_at=v_now
   where id=p_job_id;
   return true;
-end $;
+end $$;
 revoke all on function public.finalize_initial_import_job(uuid,text,uuid,text,timestamptz,timestamptz,jsonb)
   from public,anon,authenticated;
 grant execute on function public.finalize_initial_import_job(uuid,text,uuid,text,timestamptz,timestamptz,jsonb)
