@@ -11,7 +11,7 @@ describe('weekly report client helpers', () => {
 
   it('formats the inclusive display range in the selected language', () => {
     expect(formatWeeklyPeriod('2026-09-20T17:00:00Z', '2026-09-27T17:00:00Z', 'fr')).toBe('21–27 septembre 2026')
-    expect(formatWeeklyPeriod('2026-09-20T17:00:00Z', '2026-09-27T17:00:00Z', 'vi')).toContain('27 tháng 9, 2026')
+    expect(formatWeeklyPeriod('2026-09-20T17:00:00Z', '2026-09-27T17:00:00Z', 'vi')).toBe('21–27 tháng 9, 2026')
   })
 
   it('uses a live end boundary for the current provisional week', () => {

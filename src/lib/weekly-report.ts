@@ -88,6 +88,13 @@ export function formatWeeklyPeriod(periodStart: string, periodEnd: string, langu
   const start = new Date(periodStart)
   const end = new Date(new Date(periodEnd).getTime() - 1)
   const startDay = new Intl.DateTimeFormat(locale, { timeZone: 'Asia/Ho_Chi_Minh', day: 'numeric' }).format(start)
+  if (language === 'vi') {
+    const endParts = new Intl.DateTimeFormat(locale, {
+      timeZone: 'Asia/Ho_Chi_Minh', day: 'numeric', month: 'numeric', year: 'numeric',
+    }).formatToParts(end)
+    const value = (type: Intl.DateTimeFormatPartTypes) => endParts.find((part) => part.type === type)?.value ?? ''
+    return `${startDay}–${value('day')} tháng ${value('month')}, ${value('year')}`
+  }
   const endParts = new Intl.DateTimeFormat(locale, {
     timeZone: 'Asia/Ho_Chi_Minh', day: 'numeric', month: 'long', year: 'numeric',
   }).format(end)

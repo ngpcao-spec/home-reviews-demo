@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { currentVietnamPeriod, formatWeeklyPeriod } from '../../src/lib/weekly-report'
 
 test.beforeEach(async({page})=>{await page.addInitScript(()=>{if(!sessionStorage.getItem('preserve-demo-state'))localStorage.clear()})})
 
@@ -19,7 +20,8 @@ test('parcours accueil → avis → réponse → analyses',async({page})=>{
   await expect(page.getByText('Résumé IA de la semaine')).toBeVisible()
   await page.getByLabel('Période').selectOption('current')
   await expect(page.getByText('Rapport provisoire')).toBeVisible()
-  await expect(page.locator('.weekly-period')).toContainText('28–29 septembre 2026')
+  const currentPeriod=currentVietnamPeriod()
+  await expect(page.locator('.weekly-period')).toContainText(formatWeeklyPeriod(currentPeriod.startAt,currentPeriod.endAt,'fr'))
   await expect(page.locator('.bottom-nav')).toBeVisible()
   const box=await page.locator('body').boundingBox();expect(box?.width).toBeLessThanOrEqual(1280)
 })
@@ -36,6 +38,22 @@ test('ajoute un établissement avec le fournisseur mock',async({page})=>{
 })
 
 test('ne déborde pas horizontalement',async({page})=>{await page.goto('/');const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth);expect(overflow).toBe(false)})
+
+test('garde le résumé hebdomadaire au-dessus de la navigation et de la safe-area',async({page},testInfo)=>{
+  test.skip(testInfo.project.name==='desktop','La régression concerne la navigation mobile fixe')
+  await page.goto('/analyses')
+  await page.addStyleTag({content:':root{--safe-bottom:34px !important}'})
+  const summary=page.locator('.weekly-summary')
+  await expect(summary).toBeVisible()
+  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight))
+  await page.waitForFunction(()=>window.scrollY+window.innerHeight>=document.documentElement.scrollHeight-2)
+  const clearance=await page.evaluate(()=>{
+    const card=document.querySelector('.weekly-summary')?.getBoundingClientRect()
+    const nav=document.querySelector('.bottom-nav')?.getBoundingClientRect()
+    return card&&nav ? nav.top-card.bottom : -1
+  })
+  expect(clearance).toBeGreaterThanOrEqual(23)
+})
 
 test('garde l’accueil lisible pendant le défilement',async({page})=>{
   await page.goto('/')

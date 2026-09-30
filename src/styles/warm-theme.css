@@ -16,6 +16,7 @@
   --blue: #a9b7a8;
   --radius: 22px;
   --shadow: 0 18px 48px rgba(0, 0, 0, .28);
+  --bottom-nav-height: 76px;
 }
 
 html,
@@ -40,6 +41,9 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
   padding-inline: 18px;
   padding-bottom: calc(92px + max(8px, var(--safe-bottom)));
   overflow: visible;
+}
+.page-frame-analytics {
+  padding-bottom: calc(var(--bottom-nav-height) + max(8px, var(--safe-bottom)) + 24px);
 }
 .card { background: linear-gradient(145deg, rgba(48, 43, 37, .98), rgba(36, 33, 29, .98)); border-color: var(--border); box-shadow: 0 14px 38px rgba(0, 0, 0, .16); }
 .brand-header,
