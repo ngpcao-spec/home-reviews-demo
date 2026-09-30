@@ -187,6 +187,44 @@ revoke all on function public.complete_initial_import_job(uuid,text,jsonb)
 grant execute on function public.complete_initial_import_job(uuid,text,jsonb)
   to service_role;
 
+create function public.finalize_initial_import_job(
+  p_job_id uuid,p_worker_id text,p_establishment_id uuid,
+  p_last_review_id text,p_last_review_at timestamptz,
+  p_reporting_started_at timestamptz,p_result jsonb
+) returns boolean
+language plpgsql security definer set search_path='' as $
+declare v_job public.initial_import_jobs%rowtype; v_interval integer; v_now timestamptz:=now();
+begin
+  select * into v_job from public.initial_import_jobs
+  where id=p_job_id and status='running' and locked_by=left(p_worker_id,120)
+    and lease_until>now() for update;
+  if not found then return false; end if;
+  select monitoring_interval_hours into v_interval
+  from public.organizations where id=v_job.organization_id;
+  update public.establishments set
+    active=true,initialized_at=coalesce(initialized_at,v_now),
+    last_review_id=p_last_review_id,last_review_at=p_last_review_at,
+    reporting_started_at=p_reporting_started_at,
+    last_sync_at=v_now,
+    next_sync_at=v_now+make_interval(hours=>v_interval)
+      +public.review_sync_spread_offset(id,v_interval),
+    sync_status='ok',sync_error=null,last_sync_status='ok',last_sync_error=null,
+    updated_at=v_now
+  where id=p_establishment_id and organization_id=v_job.organization_id
+    and initial_import_job_id=p_job_id;
+  if not found then raise exception 'INITIAL_IMPORT_ESTABLISHMENT_MISSING'; end if;
+  update public.initial_import_jobs set
+    establishment_id=p_establishment_id,status='completed',
+    result=coalesce(p_result,'{}'::jsonb),error_code=null,
+    lease_until=null,locked_by=null,finished_at=v_now,updated_at=v_now
+  where id=p_job_id;
+  return true;
+end $;
+revoke all on function public.finalize_initial_import_job(uuid,text,uuid,text,timestamptz,timestamptz,jsonb)
+  from public,anon,authenticated;
+grant execute on function public.finalize_initial_import_job(uuid,text,uuid,text,timestamptz,timestamptz,jsonb)
+  to service_role;
+
 create function public.fail_initial_import_job(
   p_job_id uuid,p_worker_id text,p_error_code text,p_retryable boolean,
   p_max_attempts integer default 5,p_backoff_seconds integer default 60,
