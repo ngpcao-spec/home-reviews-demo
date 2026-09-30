@@ -36,6 +36,8 @@ export function retryPolicy(error: unknown, attempts: number, baseSeconds: numbe
     'OUTSCRAPER_INVALID_QUERY',
     'OUTSCRAPER_KEY_MISSING',
     'ESTABLISHMENT_NOT_FOUND',
+    'ESTABLISHMENT_ALREADY_ADDED',
+    'ESTABLISHMENT_MISMATCH',
     'APIFY_AUTH_ERROR',
     'APIFY_BILLING_REQUIRED',
     'APIFY_TOKEN_MISSING',
