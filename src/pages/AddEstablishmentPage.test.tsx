@@ -16,6 +16,7 @@ const candidate = {
 }
 
 const successResult = {
+  status: 'completed' as const,
   establishmentId: 'establishment-123',
   inserted: 18,
   negativeReviewCount: 18,
@@ -33,6 +34,9 @@ vi.mock('../app/AppContext', () => ({
     resolveEstablishment,
     addEstablishment,
     retryEstablishmentImport,
+    acknowledgeInitialImport: vi.fn(),
+    refreshInitialImports: vi.fn().mockResolvedValue(undefined),
+    initialImportJobs: [],
     establishments: [],
     notifications: [],
     plan: { maxEstablishments: 5 },
@@ -110,26 +114,20 @@ describe('confirmation d’ajout d’un établissement', () => {
     expect(addEstablishment).not.toHaveBeenCalled()
   })
 
-  it('reste en succès retryable après un échec partiel puis termine sans recréer', async () => {
+  it('passe immédiatement en import serveur après la création du job', async () => {
     const user = userEvent.setup()
     addEstablishment.mockResolvedValue({
-      ...successResult,
-      inserted: 0,
-      negativeReviewCount: 0,
-      importStatus: 'failed',
-      retryable: true,
+      importJobId: 'job-123',
+      status: 'queued',
     })
     renderWizard()
     await user.type(screen.getByPlaceholderText('Lien Google Maps'), 'https://maps.app.goo.gl/test')
     fireEvent.click(screen.getByRole('button', { name: 'Rechercher l’établissement' }))
     await user.click(await screen.findByRole('button', { name: 'Ajouter cet établissement' }))
 
-    expect(await screen.findByText('Certains avis n’ont pas encore pu être importés.')).toBeVisible()
-    expect(screen.queryByPlaceholderText('Lien Google Maps')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Réessayer l’import' }))
-
-    await waitFor(() => expect(retryEstablishmentImport).toHaveBeenCalledWith('establishment-123'))
+    expect(await screen.findByText('Import en cours…')).toBeVisible()
+    expect(screen.getByText(/fermer l’application/)).toBeVisible()
     expect(addEstablishment).toHaveBeenCalledTimes(1)
-    expect(await screen.findByText(/18 avis négatifs importés/)).toBeVisible()
+    expect(screen.queryByPlaceholderText('Lien Google Maps')).not.toBeInTheDocument()
   })
 })
