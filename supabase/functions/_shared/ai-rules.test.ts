@@ -18,4 +18,4 @@ describe('déclenchement automatique Terra', () => {
     expect(shouldAutomaticallyAnalyzeReview({ rating: 4, historical_import: false, text: 'Critique', negative_feedback_checked_at: '2026-09-30T00:00:00Z' })).toBe(false)
     expect(shouldAutomaticallyAnalyzeReview({ rating: 5, historical_import: false, text: 'Texte' })).toBe(false)
   })
-}
+})
