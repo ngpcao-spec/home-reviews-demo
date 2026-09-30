@@ -265,7 +265,7 @@ export async function persistEstablishmentSnapshot(
   }
 }
 
-interface InitializationFetchResult extends GoogleReviewsResult {
+export interface InitializationFetchResult extends GoogleReviewsResult {
   providerRequests: number
   initialLimit: number
   initialFetched: number
@@ -280,7 +280,7 @@ function sortNewest(reviews: NormalizedReview[]): NormalizedReview[] {
   })
 }
 
-async function fetchInitialization(
+export async function fetchInitialization(
   query: string,
   language: SupportedLanguage,
 ): Promise<InitializationFetchResult> {
