@@ -11,7 +11,9 @@ import type { AppNotification, Establishment, PreferredLanguage, Review, ReviewA
 interface ToastMessage { id: number; text: string }
 
 export interface AddEstablishmentResult {
-  establishmentId: string
+  importJobId?: string
+  status?: 'queued' | 'running' | 'retry' | 'completed' | 'failed'
+  establishmentId?: string
   inserted: number
   distribution: { '1': number; '2': number; '3': number }
   importStatus?: 'completed' | 'failed'
@@ -20,8 +22,34 @@ export interface AddEstablishmentResult {
   negativeReviewCount?: number
 }
 
+export interface InitialImportJob {
+  id: string
+  organizationId: string
+  userId: string
+  query: string
+  expectedGoogleId: string
+  establishmentId?: string
+  status: 'queued' | 'running' | 'retry' | 'completed' | 'failed'
+  reviewsTarget: number
+  reviewsFetched: number
+  reviewsInserted: number
+  errorCode?: string
+  candidate: {
+    name?: string
+    address?: string
+    photoUrl?: string
+    googleMapsUrl?: string
+    rating?: number
+    reviewCount?: number
+  }
+  result?: AddEstablishmentResult
+  createdAt: string
+  updatedAt: string
+}
+
 interface AppContextValue {
   establishments: Establishment[]
+  initialImportJobs: InitialImportJob[]
   reviews: Review[]
   notifications: AppNotification[]
   actions: ReviewAction[]
@@ -48,7 +76,9 @@ interface AppContextValue {
   markAllNotificationsRead: () => Promise<void>
   resolveEstablishment: (input: string) => Promise<PlaceCandidate>
   addEstablishment: (input: string, candidate: PlaceCandidate) => Promise<AddEstablishmentResult>
-  retryEstablishmentImport: (establishmentId: string) => Promise<{ negativeReviewCount: number; nextSyncAt?: string }>
+  retryEstablishmentImport: (importJobId: string) => Promise<void>
+  acknowledgeInitialImport: (importJobId: string) => Promise<void>
+  refreshInitialImports: () => Promise<void>
   refreshEstablishment: (id: string) => Promise<void>
   toggleMonitoring: (id: string) => void
   removeEstablishment: (id: string) => Promise<void>
@@ -74,6 +104,24 @@ interface EstablishmentRow {
   last_sync_at: string | null
   next_sync_at: string | null
   sync_status: 'pending' | 'syncing' | 'ok' | 'error'
+}
+
+interface InitialImportJobRow {
+  id: string
+  organization_id: string
+  user_id: string
+  query: string
+  expected_google_id: string
+  establishment_id: string | null
+  status: 'queued' | 'running' | 'retry' | 'completed' | 'failed'
+  reviews_target: number
+  reviews_fetched: number
+  reviews_inserted: number
+  error_code: string | null
+  candidate_snapshot: InitialImportJob['candidate'] | null
+  result: AddEstablishmentResult | null
+  created_at: string
+  updated_at: string
 }
 
 interface ReviewRow {
@@ -255,6 +303,26 @@ function mapEstablishment(row: EstablishmentRow): Establishment {
   }
 }
 
+function mapInitialImportJob(row: InitialImportJobRow): InitialImportJob {
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    userId: row.user_id,
+    query: row.query,
+    expectedGoogleId: row.expected_google_id,
+    establishmentId: row.establishment_id ?? undefined,
+    status: row.status,
+    reviewsTarget: row.reviews_target,
+    reviewsFetched: row.reviews_fetched,
+    reviewsInserted: row.reviews_inserted,
+    errorCode: row.error_code ?? undefined,
+    candidate: row.candidate_snapshot ?? {},
+    result: row.result ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
 function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review {
   const status = row.rating <= 3 && row.status === 'new' ? 'to_process' : row.status
   const localized = localizedReviewText(row.original_text || row.text, row.review_translations, preferredLanguage)
@@ -352,6 +420,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [monitoringIntervalHours, setMonitoringIntervalHours] = useState(12)
   const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage | null>(allowDemo ? 'fr' : null)
   const [establishments, setEstablishments] = useState(initial.establishments)
+  const [initialImportJobs, setInitialImportJobs] = useState<InitialImportJob[]>([])
   const [reviews, setReviews] = useState(initial.reviews)
   const [notifications, setNotifications] = useState(initial.notifications)
   const [actions, setActions] = useState(initial.actions)
@@ -377,18 +446,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDataError(null)
     }
 
-    const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult] = await Promise.all([
+    const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult, initialImportsResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
       supabase.from('profiles').select('preferred_language').eq('user_id', authUser?.id ?? '').maybeSingle(),
+      supabase.from('initial_import_jobs').select('id,organization_id,user_id,query,expected_google_id,establishment_id,status,reviews_target,reviews_fetched,reviews_inserted,error_code,candidate_snapshot,result,created_at,updated_at').is('acknowledged_at', null).order('created_at', { ascending: false }).limit(10),
     ])
     if (!background) {
       setDataLoading(false)
       setDataReady(true)
     }
-    if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error || profileResult.error) {
+    if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error || profileResult.error || initialImportsResult.error) {
       if (background) {
         pushToast('Les données seront actualisées à la prochaine ouverture.')
       } else {
@@ -401,6 +471,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return
     }
     setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
+    setInitialImportJobs((initialImportsResult.data as InitialImportJobRow[]).map(mapInitialImportJob))
     const profile = profileResult.data as ProfileRow | null
     const language = profile?.preferred_language === 'vi' ? 'vi' : 'fr'
     setPreferredLanguage(profile?.preferred_language ?? null)
@@ -468,6 +539,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .subscribe()
     return () => { void client.removeChannel(channel) }
+  }, [authUser, demoMode, loadRealData])
+
+  useEffect(() => {
+    if (!supabase || !authUser || demoMode) return
+    const client = supabase
+    const channel = client
+      .channel(`initial-imports:${authUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'initial_import_jobs', filter: `user_id=eq.${authUser.id}` }, () => {
+        void loadRealData({ background: true })
+      })
+      .subscribe()
+    const refreshOnForeground = () => {
+      if (document.visibilityState === 'visible') void loadRealData({ background: true })
+    }
+    document.addEventListener('visibilitychange', refreshOnForeground)
+    window.addEventListener('focus', refreshOnForeground)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshOnForeground)
+      window.removeEventListener('focus', refreshOnForeground)
+      void client.removeChannel(channel)
+    }
   }, [authUser, demoMode, loadRealData])
 
   const logAction = (reviewId: string, actionType: ReviewAction['actionType']) => {
@@ -659,37 +751,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
         syncStatus: 'ok',
       }
       setEstablishments((items) => [...items, establishment])
-      return { establishmentId: establishment.id, inserted: 0, distribution: { '1': 0, '2': 0, '3': 0 } }
+      return { status: 'completed', establishmentId: establishment.id, inserted: 0, distribution: { '1': 0, '2': 0, '3': 0 } }
     }
     if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
     const { data, error } = await supabase.functions.invoke<AddPayload>('add-establishment', {
-      body: { query: input, confirmed: true, expectedGoogleId: candidate.placeRef },
+      body: {
+        query: input,
+        confirmed: true,
+        expectedGoogleId: candidate.placeRef,
+        candidate,
+      },
     })
-    if (error || !data?.establishmentId || !data.distribution) {
+    if (error || !data?.importJobId || !data.status) {
       throw new Error(await functionErrorCode(error, data))
     }
     await loadRealData({ background: true })
-    return {
-      establishmentId: data.establishmentId,
-      inserted: data.inserted ?? 0,
-      distribution: data.distribution,
-      importStatus: data.importStatus ?? 'completed',
-      retryable: data.retryable ?? false,
-      nextSyncAt: data.nextSyncAt,
-      negativeReviewCount: data.negativeReviewCount ?? data.inserted ?? 0,
-    }
+    return { importJobId: data.importJobId, status: data.status }
   }
 
-  const retryEstablishmentImport = async (establishmentId: string) => {
+  const refreshInitialImports = useCallback(async () => {
+    await loadRealData({ background: true })
+  }, [loadRealData])
+
+  const retryEstablishmentImport = async (importJobId: string) => {
     if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
     const { data, error } = await supabase.functions.invoke<RetryImportPayload>('retry-establishment-import', {
-      body: { establishmentId },
+      body: { importJobId },
     })
-    if (error || typeof data?.negativeReviewCount !== 'number') {
-      throw new Error(await functionErrorCode(error, data))
-    }
+    if (error || !data?.importJobId) throw new Error(await functionErrorCode(error, data))
     await loadRealData({ background: true })
-    return { negativeReviewCount: data.negativeReviewCount, nextSyncAt: data.nextSyncAt }
+  }
+
+  const acknowledgeInitialImport = async (importJobId: string) => {
+    if (demoMode) {
+      setInitialImportJobs((items) => items.filter((item) => item.id !== importJobId))
+      return
+    }
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.rpc('acknowledge_initial_import_job', { p_job_id: importJobId })
+    if (error || data !== true) throw error ?? new Error('IMPORT_ACKNOWLEDGE_FAILED')
+    setInitialImportJobs((items) => items.filter((item) => item.id !== importJobId))
   }
 
   const refreshEstablishment = async (id: string) => {
@@ -811,10 +912,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const value: AppContextValue = {
-    establishments, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, preferredLanguage, currentUser,
+    establishments, initialImportJobs, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, preferredLanguage, currentUser,
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, saveReplyDraft, translateReply, logAction, markNotificationRead, markAllNotificationsRead,
-    resolveEstablishment, addEstablishment, retryEstablishmentImport, refreshEstablishment, toggleMonitoring, removeEstablishment,
+    resolveEstablishment, addEstablishment, retryEstablishmentImport, acknowledgeInitialImport, refreshInitialImports, refreshEstablishment, toggleMonitoring, removeEstablishment,
     injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, updatePreferredLanguage, completePasswordRecovery, signOut,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
