@@ -25,17 +25,22 @@ Deno.serve(async (request) => {
 
     const { data: establishment, error } = await client
       .from('establishments')
-      .select('id,organization_id,google_id,google_maps_url,last_review_id,last_review_at,next_sync_at')
+      .select('id,organization_id,google_id,google_maps_url,last_review_id,last_review_at,next_sync_at,sync_status')
       .eq('id', establishmentId)
       .eq('active', true)
       .single()
     if (error || !establishment) return json({ error: 'ESTABLISHMENT_NOT_FOUND' }, 404)
     await assertMembership(admin, user.id, establishment.organization_id, ['owner', 'admin', 'manager'])
 
-    await admin.from('establishments').update({
-      sync_status: 'syncing',
-      sync_error: null,
-    }).eq('id', establishmentId)
+    const { data: claimed, error: claimError } = await admin
+      .from('establishments')
+      .update({ sync_status: 'syncing', sync_error: null })
+      .eq('id', establishmentId)
+      .neq('sync_status', 'syncing')
+      .select('id')
+      .maybeSingle()
+    if (claimError) throw claimError
+    if (!claimed) return json({ error: 'IMPORT_ALREADY_RUNNING' }, 409)
 
     const language = await preferredLanguageForUser(admin, user.id)
     const result = await backfillHistoricalReviews(admin, establishment as EstablishmentRow, language)
