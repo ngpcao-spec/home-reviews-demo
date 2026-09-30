@@ -1,5 +1,5 @@
 import { CheckCircle2, Link2, LoaderCircle, MapPin, Search } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp, type AddEstablishmentResult } from '../app/AppContext'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
@@ -51,6 +51,9 @@ export function AddEstablishmentPage() {
     resolveEstablishment,
     addEstablishment,
     retryEstablishmentImport,
+    acknowledgeInitialImport,
+    refreshInitialImports,
+    initialImportJobs,
     establishments,
     plan,
     monitoringIntervalHours,
@@ -64,6 +67,46 @@ export function AddEstablishmentPage() {
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
   const quotaReached = establishments.length >= plan.maxEstablishments
+  const currentJob = result?.importJobId
+    ? initialImportJobs.find((job) => job.id === result.importJobId)
+    : initialImportJobs[0]
+
+  useEffect(() => {
+    const job = initialImportJobs[0]
+    if (!job) return
+    const restoredCandidate: PlaceCandidate = {
+      placeRef: job.expectedGoogleId,
+      name: job.candidate.name ?? messages.add.importing,
+      address: job.candidate.address ?? '',
+      rating: job.candidate.rating ?? 0,
+      reviewCount: job.candidate.reviewCount ?? 0,
+      googleMapsUrl: job.candidate.googleMapsUrl ?? job.query,
+      photoUrl: job.candidate.photoUrl,
+      confidence: 1,
+    }
+    setQuery(job.query)
+    setCandidate(restoredCandidate)
+    const jobResult: AddEstablishmentResult = {
+      importJobId: job.id,
+      status: job.status,
+      establishmentId: job.establishmentId ?? job.result?.establishmentId,
+      inserted: job.result?.inserted ?? job.reviewsInserted,
+      negativeReviewCount: job.result?.negativeReviewCount,
+      distribution: job.result?.distribution ?? { '1': 0, '2': 0, '3': 0 },
+      importStatus: job.status === 'completed' ? 'completed' : job.status === 'failed' ? 'failed' : undefined,
+      retryable: job.status === 'failed',
+      nextSyncAt: job.result?.nextSyncAt,
+    }
+    setResult(jobResult)
+    setError(job.status === 'failed' ? messageFor(new Error(job.errorCode ?? 'UNKNOWN'), messages) : '')
+    setStep(job.status === 'completed' || job.status === 'failed' ? 'success' : 'import')
+  }, [initialImportJobs, messages])
+
+  useEffect(() => {
+    if (step !== 'import' || !currentJob || !['queued', 'running', 'retry'].includes(currentJob.status)) return
+    const timer = window.setInterval(() => { void refreshInitialImports() }, 3_000)
+    return () => window.clearInterval(timer)
+  }, [currentJob, refreshInitialImports, step])
 
   const search = async () => {
     setError('')
@@ -90,11 +133,7 @@ export function AddEstablishmentPage() {
     try {
       const imported = await addEstablishment(query.trim(), candidate)
       setResult(imported)
-      setStep('success')
-      navigate('/etablissements/ajouter', {
-        replace: true,
-        state: { addEstablishmentSuccess: { query: query.trim(), candidate, result: imported } },
-      })
+      setStep(imported.status === 'completed' ? 'success' : 'import')
     } catch (importError) {
       setError(messageFor(importError, messages))
       setStep('confirm')
@@ -102,29 +141,26 @@ export function AddEstablishmentPage() {
   }
 
   const retryImport = async () => {
-    if (!candidate || !result) return
+    if (!result?.importJobId) return
     setRetrying(true)
     setError('')
     try {
-      const retried = await retryEstablishmentImport(result.establishmentId)
-      const updated: AddEstablishmentResult = {
-        ...result,
-        importStatus: 'completed',
-        retryable: false,
-        negativeReviewCount: retried.negativeReviewCount,
-        inserted: retried.negativeReviewCount,
-        nextSyncAt: retried.nextSyncAt ?? result.nextSyncAt,
-      }
-      setResult(updated)
-      navigate('/etablissements/ajouter', {
-        replace: true,
-        state: { addEstablishmentSuccess: { query, candidate, result: updated } },
-      })
+      await retryEstablishmentImport(result.importJobId)
+      setResult((current) => current ? { ...current, status: 'queued', importStatus: undefined, retryable: false } : current)
+      setStep('import')
+      await refreshInitialImports()
     } catch (retryError) {
       setError(messageFor(retryError, messages))
     } finally {
       setRetrying(false)
     }
+  }
+
+  const leaveSuccess = async (destination: string) => {
+    if (result?.importJobId) {
+      try { await acknowledgeInitialImport(result.importJobId) } catch { /* keep server state restorable */ }
+    }
+    navigate(destination)
   }
 
   const nextCheckHours = result?.nextSyncAt
@@ -190,6 +226,8 @@ export function AddEstablishmentPage() {
       <span className="flow-icon"><LoaderCircle className="spin" /></span>
       <h2>{messages.add.importing}</h2>
       <p>{messages.add.importingBody}</p>
+      <p className="import-background-note">{messages.add.importContinues}</p>
+      {currentJob && currentJob.reviewsFetched > 0 && <div className="import-progress-copy">{messages.add.importProgress.replace('{count}', String(currentJob.reviewsInserted)).replace('{target}', String(currentJob.reviewsTarget))}</div>}
     </section>}
 
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
@@ -215,8 +253,8 @@ export function AddEstablishmentPage() {
         {retrying ? <LoaderCircle className="spin" /> : null}
         {retrying ? messages.add.retrying : messages.add.retryImport}
       </button> : <div className="button-row">
-        <button className="primary-button" onClick={() => navigate(`/avis?etablissement=${result.establishmentId}&statut=all`)}>{messages.add.viewReviews}</button>
-        <button className="secondary-button" onClick={() => navigate('/etablissements')}>{messages.add.backPlaces}</button>
+        <button className="primary-button" disabled={!result.establishmentId} onClick={() => void leaveSuccess(`/avis?etablissement=${result.establishmentId}&statut=all`)}>{messages.add.viewReviews}</button>
+        <button className="secondary-button" onClick={() => void leaveSuccess('/etablissements')}>{messages.add.backPlaces}</button>
       </div>}
     </section>}
   </>
