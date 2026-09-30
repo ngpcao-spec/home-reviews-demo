@@ -6,6 +6,7 @@ import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
 import {
   buildDemoHistoricalReport,
+  formatHistoricalGeneratedAt,
   formatHistoricalPeriodStart,
   mapHistoricalReport,
   type HistoricalReport,
@@ -209,9 +210,7 @@ export function AnalyticsPage() {
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
           <span>{historicalGenerating ? messages.analytics.generatingHistorical : messages.analytics.generateHistorical}</span>
         </button>
-        {visibleHistoricalReport?.generatedAt && <small>{messages.analytics.updatedAt}: {new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'fr-FR', {
-          timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-        }).format(new Date(visibleHistoricalReport.generatedAt))}</small>}
+        {visibleHistoricalReport?.generatedAt && <small>{messages.analytics.updatedAt}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
         {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
         {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
