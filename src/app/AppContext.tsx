@@ -235,6 +235,8 @@ interface ResolvePayload {
 }
 
 interface AddPayload {
+  importJobId?: string
+  status?: 'queued' | 'running' | 'retry'
   establishmentId?: string
   inserted?: number
   distribution?: { '1': number; '2': number; '3': number }
@@ -246,6 +248,8 @@ interface AddPayload {
 }
 
 interface RetryImportPayload {
+  importJobId?: string
+  status?: 'queued'
   negativeReviewCount?: number
   nextSyncAt?: string
   error?: string
