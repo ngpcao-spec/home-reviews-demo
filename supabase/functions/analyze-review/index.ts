@@ -1,12 +1,12 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
-import { analyzeReviewWithOpenAI, ReviewAiValidationError } from '../_shared/ai.ts'
+import { analyzeFourStarReviewWithOpenAI, analyzeReviewWithOpenAI, ReviewAiValidationError } from '../_shared/ai.ts'
 import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { sendPushToUser } from '../_shared/push.ts'
 import { isDuplicateNotificationError, runNonBlockingNotification, shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
 import { shouldAutomaticallyAnalyzeReview } from '../_shared/ai-rules.ts'
-import { preferredLanguageForOrganization, preferredLanguageForUser } from '../_shared/sync-service.ts'
+import { preferredLanguageForOrganization, preferredLanguageForUser } from '../_shared/preferences.ts'
 
 interface ReviewRow {
   id: string
@@ -27,6 +27,13 @@ interface ReviewRow {
   ai_error_history: Array<{ error: string; at: string }> | null
   ai_attempt_count: number | null
   reply_draft_version: number | null
+  review_context: unknown
+  review_detailed_rating: unknown
+  has_negative_feedback: boolean | null
+  negative_feedback_summary: string | null
+  negative_feedback_checked_at: string | null
+  negative_feedback_model: string | null
+  negative_feedback_status: 'processing' | 'completed' | 'failed' | null
 }
 
 interface LocalizedDraftRow {
@@ -51,17 +58,29 @@ async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary
   if (!establishment?.name || !members?.length) return
 
   const shortSummary = summary.length > 220 ? `${summary.slice(0, 217).trimEnd()}…` : summary
-  const title = `⭐ Nouvel avis ${review.rating}★ — ${establishment.name}`
+  const shortLegacyTitle = `⭐ Nouvel avis ${review.rating}★ — ${establishment.name}`
 
   for (const member of members as Array<{ user_id: string }>) {
+    const language = review.rating === 4
+      ? await preferredLanguageForUser(admin, member.user_id)
+      : 'fr'
+    const isFourStarWatch = review.rating === 4
+    const title = isFourStarWatch
+      ? language === 'vi' ? '⭐ Đánh giá 4★ — cần lưu ý' : '⭐ Avis 4★ — point à surveiller'
+      : shortLegacyTitle
+    const readyText = language === 'vi' ? 'Phản hồi đã sẵn sàng' : 'Réponse prête'
+    const body = isFourStarWatch
+      ? `${establishment.name}\n${shortSummary}\n${readyText}`
+      : shortSummary
+    const notificationType = isFourStarWatch ? 'four_star_attention' : 'new_negative_review'
     const inserted = await admin.from('notifications').insert({
       organization_id: review.organization_id,
       user_id: member.user_id,
       review_id: review.id,
       establishment_id: review.establishment_id,
-      type: 'new_negative_review',
+      type: notificationType,
       title,
-      body: shortSummary,
+      body,
     }).select('id').maybeSingle()
 
     if (isDuplicateNotificationError(inserted.error?.code)) continue
@@ -70,7 +89,7 @@ async function notifyNewReview(admin: SupabaseClient, review: ReviewRow, summary
     try {
       const push = await sendPushToUser(admin, member.user_id, {
         title: 'HOME Reviews',
-        body: `${title}\n“${shortSummary}”\nRéponse prête à être vérifiée.`,
+        body: isFourStarWatch ? body : `${title}\n“${shortSummary}”\nRéponse prête à être vérifiée.`,
         url: `#/avis/${review.id}`,
         tag: `review-${review.id}`,
       })
@@ -117,6 +136,7 @@ Deno.serve(async (request) => {
   let reviewId = ''
   let workingLanguage: 'fr' | 'vi' | null = null
   let legacySuggestionExists = false
+  let fourStarCheckClaimed = false
 
   try {
     const body = await request.json() as { review_id?: string; regenerate?: boolean }
@@ -136,7 +156,7 @@ Deno.serve(async (request) => {
 
     const { data, error } = await reader
       .from('reviews')
-      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_summary,ai_suggested_reply,ai_suggested_reply_language,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version')
+      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_summary,ai_suggested_reply,ai_suggested_reply_language,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version,review_context,review_detailed_rating,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,negative_feedback_model,negative_feedback_status')
       .eq('id', reviewId)
       .single()
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
@@ -146,7 +166,13 @@ Deno.serve(async (request) => {
     if (automatic && !shouldAutomaticallyAnalyzeReview(review)) {
       return json({ ai_status: review.ai_status, skipped: true, reason: 'HISTORICAL_IMPORT' })
     }
-    if (review.rating > 3) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
+    if (review.rating > 4) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
+    if (review.rating === 4 && !(review.original_text || review.text).trim()) {
+      return json({ skipped: true, reason: 'FOUR_STAR_WITHOUT_TEXT' })
+    }
+    if (review.rating === 4 && review.negative_feedback_checked_at && review.has_negative_feedback !== true && !body.regenerate) {
+      return json({ skipped: true, reason: 'NO_NEGATIVE_FEEDBACK', has_negative_feedback: false })
+    }
 
     workingLanguage = userId
       ? await preferredLanguageForUser(admin, userId)
@@ -178,6 +204,104 @@ Deno.serve(async (request) => {
     }
     if (localized?.ai_status === 'processing') {
       return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
+    }
+
+    if (review.rating === 4 && !review.negative_feedback_checked_at) {
+      const { data: claimed, error: claimError } = await admin
+        .from('reviews')
+        .update({ negative_feedback_status: 'processing', ai_error: null })
+        .eq('id', review.id)
+        .or('negative_feedback_status.is.null,negative_feedback_status.eq.failed')
+        .select('id')
+        .maybeSingle()
+      if (claimError) throw claimError
+      if (!claimed) return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
+      fourStarCheckClaimed = true
+
+      const result = await analyzeFourStarReviewWithOpenAI(
+        review.original_text || review.text,
+        workingLanguage,
+        review.review_detailed_rating,
+        review.review_context,
+      )
+      const analyzedAt = new Date().toISOString()
+      const commonUpdate = {
+        has_negative_feedback: result.has_negative_feedback,
+        negative_feedback_summary: result.negative_feedback_summary,
+        negative_feedback_checked_at: analyzedAt,
+        negative_feedback_model: result.model,
+        negative_feedback_status: 'completed',
+        ai_detected_language: result.detected_language,
+        ai_model: result.model,
+        ai_input_tokens: result.usage?.input_tokens ?? null,
+        ai_output_tokens: result.usage?.output_tokens ?? null,
+        ai_reasoning_tokens: result.usage?.output_tokens_details?.reasoning_tokens ?? null,
+        ai_total_tokens: result.usage?.total_tokens ?? null,
+        ai_error: null,
+      }
+
+      if (!result.has_negative_feedback) {
+        const { error: saveNoFeedbackError } = await admin.from('reviews').update({
+          ...commonUpdate,
+          requires_attention: false,
+          requires_ai_analysis: false,
+          status: 'ignored',
+          ai_status: null,
+        }).eq('id', review.id)
+        if (saveNoFeedbackError) throw saveNoFeedbackError
+        return json({ has_negative_feedback: false, ai_status: 'completed' })
+      }
+
+      const nextDraftVersion = 1
+      const { error: draftError } = await admin.from('review_reply_drafts').upsert({
+        review_id: review.id,
+        language: workingLanguage,
+        ai_summary: result.negative_feedback_summary,
+        ai_suggested_reply: result.ai_suggested_reply,
+        draft_text: result.ai_suggested_reply,
+        draft_updated_at: analyzedAt,
+        draft_version: nextDraftVersion,
+        ai_status: 'completed',
+        ai_error: null,
+        updated_at: analyzedAt,
+      }, { onConflict: 'review_id,language' })
+      if (draftError) throw draftError
+
+      const { error: saveFeedbackError } = await admin.from('reviews').update({
+        ...commonUpdate,
+        requires_attention: true,
+        requires_ai_analysis: true,
+        status: 'to_process',
+        ai_summary: result.negative_feedback_summary,
+        ai_suggested_reply: result.ai_suggested_reply,
+        ai_suggested_reply_language: workingLanguage,
+        reply_draft_text: result.ai_suggested_reply,
+        reply_draft_language: workingLanguage,
+        reply_draft_updated_at: analyzedAt,
+        reply_draft_version: nextDraftVersion,
+        ai_analyzed_at: analyzedAt,
+        ai_status: 'completed',
+      }).eq('id', review.id)
+      if (saveFeedbackError) throw saveFeedbackError
+
+      if (automatic) {
+        await runNonBlockingNotification(() => notifyNewReview(
+          admin,
+          { ...review, has_negative_feedback: true },
+          result.negative_feedback_summary!,
+        ))
+      }
+      return json({
+        ...result,
+        ai_summary: result.negative_feedback_summary,
+        ai_suggested_reply_language: workingLanguage,
+        reply_draft_text: result.ai_suggested_reply,
+        reply_draft_language: workingLanguage,
+        reply_draft_updated_at: analyzedAt,
+        reply_draft_version: nextDraftVersion,
+        ai_analyzed_at: analyzedAt,
+        ai_status: 'completed',
+      })
     }
 
     if (localized) {
@@ -287,6 +411,13 @@ Deno.serve(async (request) => {
   } catch (error) {
     const code = error instanceof Error ? error.message.slice(0, 500) : 'AI_ANALYSIS_FAILED'
     const rejected = error instanceof ReviewAiValidationError ? error.result : null
+    if (reviewId && fourStarCheckClaimed) {
+      await admin.from('reviews').update({
+        negative_feedback_status: 'failed',
+        ai_status: 'failed',
+        ai_error: code,
+      }).eq('id', reviewId).eq('negative_feedback_status', 'processing')
+    }
     if (reviewId && workingLanguage) {
       await admin.from('review_reply_drafts').update({
         ai_status: 'failed',

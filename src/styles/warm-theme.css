@@ -179,6 +179,7 @@ select:focus-visible { outline-color: rgba(216, 188, 151, .62); }
 .row-chevron { color: var(--champagne); }
 .ai-ready,
 .ai-ready svg { color: var(--violet); }
+.watch-four-star { display: inline-flex; align-items: center; padding: 3px 7px; border: 1px solid rgba(216, 188, 151, .35); border-radius: 999px; background: rgba(216, 188, 151, .1); color: var(--champagne); font-size: .62rem; font-weight: 800; white-space: nowrap; }
 .numeric-rating.rating-1 { color: #d95d61; }
 .numeric-rating.rating-2 { color: #e48662; }
 .numeric-rating.rating-3 { color: #d8bc97; }

@@ -1,13 +1,13 @@
 export interface NotificationEligibleReview {
   rating: number
   historical_import: boolean
+  has_negative_feedback?: boolean | null
 }
 
 export function shouldCreateReviewNotification(review: NotificationEligibleReview) {
-  return !review.historical_import
-    && Number.isInteger(review.rating)
-    && review.rating >= 1
-    && review.rating <= 3
+  if (review.historical_import || !Number.isInteger(review.rating)) return false
+  if (review.rating >= 1 && review.rating <= 3) return true
+  return review.rating === 4 && review.has_negative_feedback === true
 }
 
 export function isDuplicateNotificationError(code?: string) {

@@ -34,6 +34,9 @@ export interface Review {
   sourceUrl: string
   isHistoricalImport: boolean
   requiresAction: boolean
+  hasNegativeFeedback?: boolean
+  negativeFeedbackSummary?: string
+  negativeFeedbackCheckedAt?: string
   status: ReviewStatus
   aiSummary?: string
   aiSuggestedReply?: string

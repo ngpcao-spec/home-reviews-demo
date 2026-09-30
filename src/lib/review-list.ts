@@ -6,8 +6,17 @@ export function isNegativeReview(review: Review): boolean {
   return review.rating >= 1 && review.rating <= 3
 }
 
+export function isAttentionReview(review: Review): boolean {
+  return isNegativeReview(review)
+    || (review.rating === 4 && review.hasNegativeFeedback === true)
+}
+
 export function negativeReviews(reviews: Review[]): Review[] {
   return reviews.filter(isNegativeReview)
+}
+
+export function attentionReviews(reviews: Review[]): Review[] {
+  return reviews.filter(isAttentionReview)
 }
 
 export function sortReviewsNewest(reviews: Review[]): Review[] {

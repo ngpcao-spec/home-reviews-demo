@@ -16,7 +16,7 @@ export function ReviewRow({ review, compact = false }: { review: Review; compact
     <div className="review-row-content">
       <div className="review-meta"><strong className={`numeric-rating rating-${review.rating}`}>{review.rating} <span>★</span></strong><span>{relativeTime(review.publishedAt)}</span></div>
       <p>{review.reviewText}</p>
-      <div className="review-foot"><strong>{establishment.name}</strong>{review.aiStatus === 'completed' && <span className="ai-ready"><Sparkles size={12}/>{messages.reviews.replyReady}</span>}</div>
+      <div className="review-foot"><strong>{establishment.name}</strong>{review.rating === 4 && review.hasNegativeFeedback && <span className="watch-four-star">{messages.reviews.watchFourStar}</span>}{review.aiStatus === 'completed' && <span className="ai-ready"><Sparkles size={12}/>{messages.reviews.replyReady}</span>}</div>
     </div>
     <ChevronRight className="row-chevron" size={18} />
   </Link>

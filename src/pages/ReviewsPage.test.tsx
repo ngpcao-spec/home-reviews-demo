@@ -16,6 +16,11 @@ vi.mock('../app/AppContext', () => ({
       publishedAt: '2026-09-28T06:00:00.000Z', sourceUrl: '', isHistoricalImport: true,
       requiresAction: true, status: 'processed',
     }, {
+      id: 'watched-four-review', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'watched-four-review',
+      authorName: 'Client quatre étoiles', rating: 4, reviewText: 'Très bon, mais attente longue.', reviewLanguage: 'fr',
+      publishedAt: '2026-09-28T06:30:00.000Z', sourceUrl: '', isHistoricalImport: false,
+      requiresAction: true, hasNegativeFeedback: true, status: 'to_process', aiStatus: 'completed',
+    }, {
       id: 'positive-review', organizationId: 'organization', establishmentId: 'green-home', externalReviewId: 'positive-review',
       authorName: 'Client positif', rating: 5, reviewText: 'Avis positif masqué.', reviewLanguage: 'fr',
       publishedAt: '2026-09-28T07:00:00.000Z', sourceUrl: '', isHistoricalImport: false,
@@ -27,7 +32,7 @@ vi.mock('../app/AppContext', () => ({
 }))
 
 describe('ReviewsPage', () => {
-  it('affiche uniquement les avis 1★ à 3★ dans Voir tout', () => {
+  it('affiche les avis 1★ à 3★ et les 4★ réellement signalés', () => {
     render(
       <MemoryRouter initialEntries={['/avis?etablissement=green-home&statut=all']}>
         <ReviewsPage />
@@ -35,7 +40,9 @@ describe('ReviewsPage', () => {
     )
 
     expect(screen.getByText('Avis négatif visible.')).toBeVisible()
+    expect(screen.getByText('Très bon, mais attente longue.')).toBeVisible()
+    expect(screen.getByText('4★ · À surveiller')).toBeVisible()
     expect(screen.queryByText('Avis positif masqué.')).not.toBeInTheDocument()
-    expect(screen.getByText('Avis à traiter (0)')).toBeVisible()
+    expect(screen.getByText('Avis à traiter (1)')).toBeVisible()
   })
 })
