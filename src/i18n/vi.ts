@@ -1,6 +1,8 @@
 import type { Messages } from './fr'
+import { reputationVi } from './reputation'
 
 export const vi: Messages = {
+  reputation: reputationVi,
   nav: { home: 'Trang chủ', establishments: 'Cơ sở', reviews: 'Đánh giá', analytics: 'Phân tích', more: 'Thêm' },
   common: { retry: 'Thử lại', cancel: 'Hủy', confirm: 'Xác nhận', loading: 'Đang tải…', viewAll: 'Xem tất cả', back: 'Quay lại', reviews: 'đánh giá', establishments: 'cơ sở', delete: 'Xóa', deleting: 'Đang xóa…' },
   language: { title: 'Chọn ngôn ngữ của bạn', body: 'Bạn có thể thay đổi lựa chọn này sau trong phần cài đặt.', french: 'Français', vietnamese: 'Tiếng Việt', settingTitle: 'Ngôn ngữ', settingDetail: 'Ngôn ngữ giao diện và bản dịch đánh giá', saved: 'Đã cập nhật ngôn ngữ' },

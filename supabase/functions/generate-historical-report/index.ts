@@ -1,199 +1,126 @@
 import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
-import {
-  generateHistoricalSummary,
-  historicalDataComplete,
-  type HistoricalReportLanguage,
-} from '../_shared/historical-report.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
+import { ANALYSIS_VERSION, reputationMetrics, reviewBatches, type ReputationReview } from '../_shared/reputation-metrics.ts'
+import { extractThemes, mergeThemes, overallSummary, representativeIds, type Finding } from '../_shared/reputation-themes.ts'
 
-type MetricsRow = {
-  stored_reviews_count: number | string
-  negative_reviews_count: number | string
-  negative_rate: number | string
-  ready_replies_count: number | string
-  rating_1_count: number | string
-  rating_2_count: number | string
-  rating_3_count: number | string
-  rating_4_count: number | string
-  rating_5_count: number | string
-  source_latest_published_at: string | null
+type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
+type InputReview = ReputationReview & { review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
+const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
+const check = (error: unknown, code: string) => { if (error) throw new Error(code) }
+async function fingerprint(value: unknown) {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))
+  return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2,'0')).join('')
 }
-
-type ReviewRow = { rating: number; original_text: string | null; text: string | null }
-
 Deno.serve(async (request) => {
-  const preflightResponse = preflight(request)
-  if (preflightResponse) return preflightResponse
-  let claimedReportId: string | null = null
-  let adminForFailure: Awaited<ReturnType<typeof requireUser>>['admin'] | null = null
-  let restoreCompletedOnFailure = false
-
+  const early = preflight(request)
+  if (early) return early
+  if (request.method !== 'POST') return json({error:'METHOD_NOT_ALLOWED'},405)
+  let claimed: {id:string;worker:string;generation:string} | null = null
+  let admin: Awaited<ReturnType<typeof requireUser>>['admin'] | null = null
   try {
     const context = await requireUser(request)
-    adminForFailure = context.admin
-    enforceRateLimit(`historical-report:${context.user.id}`, 12, 3_600_000)
-    const body = await request.json() as { establishment_id?: string }
-    const establishmentId = body.establishment_id?.trim() ?? ''
-    if (!establishmentId) return json({ error: 'ESTABLISHMENT_ID_REQUIRED' }, 400)
-
-    const [{ data: establishment, error: establishmentError }, { data: profile, error: profileError }] = await Promise.all([
-      context.client.from('establishments')
-        .select('id,organization_id,name,photo_url,rating,total_reviews,active,created_at,reporting_started_at')
-        .eq('id', establishmentId)
-        .single(),
-      context.client.from('profiles').select('preferred_language').eq('user_id', context.user.id).single(),
+    admin = context.admin
+    const body = await request.json() as {establishment_id?:string;generation_id?:string;force?:boolean}
+    const id = body.establishment_id
+    if (typeof id !== 'string') return json({error:'ESTABLISHMENT_ID_REQUIRED'},400)
+    const [{data:e,error:ee},{data:profile,error:pe}] = await Promise.all([
+      context.client.from('establishments').select('id,organization_id,name,rating,total_reviews,created_at').eq('id',id).single(),
+      context.client.from('profiles').select('preferred_language').eq('user_id',context.user.id).single(),
     ])
-    if (establishmentError || !establishment) return json({ error: 'ESTABLISHMENT_NOT_FOUND' }, 404)
-    await assertMembership(context.client, context.user.id, establishment.organization_id, ['owner', 'admin', 'manager'])
-    if (profileError || !profile || !['fr', 'vi'].includes(profile.preferred_language)) {
-      return json({ error: 'PREFERRED_LANGUAGE_REQUIRED' }, 400)
+    if (ee || !e) return json({error:'ESTABLISHMENT_NOT_FOUND'},404)
+    await assertMembership(context.client,context.user.id,e.organization_id,['owner','admin','manager'])
+    if (pe || !['fr','vi'].includes(profile?.preferred_language)) return json({error:'PREFERRED_LANGUAGE_REQUIRED'},400)
+    const language = profile.preferred_language as 'fr'|'vi'
+    const {data:existing,error:re} = await context.client.from('historical_establishment_reports').select('*').eq('establishment_id',id).eq('preferred_language',language).maybeSingle()
+    check(re,'REPORT_READ_FAILED')
+    let {data:run,error:runError} = await admin.from('historical_report_runs').select('*').eq('establishment_id',id).eq('language',language).maybeSingle()
+    check(runError,'REPORT_RUN_READ_FAILED')
+    // A crash after saving the report must not repeat the paid summary step.
+    if (run && run.status !== 'completed' && existing?.generation_id === run.generation_id && existing.ai_status === 'completed') {
+      await admin.from('historical_report_runs').update({status:'completed',locked_by:null,lease_until:null}).eq('id',run.id).eq('generation_id',run.generation_id)
+      return json({report:existing,cached:true})
     }
-    const language = profile.preferred_language as HistoricalReportLanguage
-    const now = new Date().toISOString()
-
-    const { data: oldestReview, error: oldestError } = await context.admin
-      .from('reviews')
-      .select('published_at')
-      .eq('organization_id', establishment.organization_id)
-      .eq('establishment_id', establishmentId)
-      .not('published_at', 'is', null)
-      .order('published_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    if (oldestError) throw oldestError
-    const periodStart = oldestReview?.published_at
-      ?? establishment.reporting_started_at
-      ?? establishment.created_at
-      ?? now
-    const dataComplete = establishment.active === true
-      && historicalDataComplete(establishment.reporting_started_at, periodStart)
-
-    const { data: metricsData, error: metricsError } = await context.admin.rpc('get_historical_report_metrics', {
-      p_organization_id: establishment.organization_id,
-      p_establishment_id: establishmentId,
-      p_period_start: periodStart,
-      p_period_end: now,
-      p_language: language,
-    }).single()
-    if (metricsError || !metricsData) throw metricsError ?? new Error('HISTORICAL_METRICS_MISSING')
-    const metrics = metricsData as MetricsRow
-    const counts = {
-      stored_reviews_count: Number(metrics.stored_reviews_count),
-      negative_reviews_count: Number(metrics.negative_reviews_count),
-      negative_rate: Number(metrics.negative_rate),
-      ready_replies_count: Number(metrics.ready_replies_count),
-      rating_1_count: Number(metrics.rating_1_count),
-      rating_2_count: Number(metrics.rating_2_count),
-      rating_3_count: Number(metrics.rating_3_count),
-      rating_4_count: Number(metrics.rating_4_count),
-      rating_5_count: Number(metrics.rating_5_count),
-    }
-
-    if (counts.stored_reviews_count === 0) return json({ error: 'NO_REVIEWS_AVAILABLE' })
-
-    const { data: existing, error: existingError } = await context.client
-      .from('historical_establishment_reports')
-      .select('*')
-      .eq('establishment_id', establishmentId)
-      .eq('preferred_language', language)
-      .maybeSingle()
-    if (existingError) throw existingError
-
-    const baseRow = {
-      organization_id: establishment.organization_id,
-      establishment_id: establishmentId,
-      preferred_language: language,
-      period_start: periodStart,
-      period_end: now,
-      google_rating: establishment.rating ?? null,
-      google_total_reviews: establishment.total_reviews ?? null,
-      ...counts,
-      data_complete: dataComplete,
-      source_latest_published_at: metrics.source_latest_published_at,
-      updated_at: now,
-    }
-    if (existing) {
-      const generatingSince = existing.ai_status === 'generating' ? Date.parse(existing.updated_at) : Number.NaN
-      if (Number.isFinite(generatingSince) && Date.now() - generatingSince < 10 * 60_000) {
-        return json({ error: 'REPORT_GENERATION_IN_PROGRESS' })
-      }
-      restoreCompletedOnFailure = existing.ai_status === 'completed' && Boolean(existing.ai_historical_summary)
-      const { data: claimed, error: claimError } = await context.admin
-        .from('historical_establishment_reports')
-        .update({ ai_status: 'generating', ai_error: null, updated_at: now })
-        .eq('id', existing.id)
-        .eq('updated_at', existing.updated_at)
-        .select('id')
-        .maybeSingle()
-      if (claimError) throw claimError
-      if (!claimed) return json({ error: 'REPORT_GENERATION_IN_PROGRESS' })
-      claimedReportId = claimed.id
-    } else {
-      const { data: inserted, error: insertError } = await context.admin
-        .from('historical_establishment_reports')
-        .insert({ ...baseRow, ai_status: 'generating', ai_error: null })
-        .select('id')
-        .single()
-      if (insertError) {
-        if (insertError.code === '23505') {
-          return json({ error: 'REPORT_GENERATION_IN_PROGRESS' })
+    if (body.generation_id && run?.generation_id !== body.generation_id) return json({error:'REPORT_GENERATION_CHANGED'},409)
+    if (body.generation_id && run?.status === 'completed') return json({report:existing})
+    if (!run || run.status === 'completed' || run.status === 'failed') {
+      enforceRateLimit('historical-report:'+context.user.id,12,3_600_000)
+      const end = new Date().toISOString()
+      const reviews: ReputationReview[] = []
+      for (let offset=0;;offset+=500) {
+        const {data,error} = await admin.from('reviews').select('id,rating,original_text,text,published_at,historical_import,has_negative_feedback,status,review_detailed_rating,review_context,ai_status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,review_reply_drafts(language,ai_status,draft_text,ai_suggested_reply)')
+          .eq('organization_id',e.organization_id).eq('establishment_id',id).lte('created_at',end).gte('rating',1).lte('rating',5).order('id').range(offset,offset+499)
+        check(error,'REPORT_REVIEWS_READ_FAILED')
+        for (const r of (data ?? []) as InputReview[]) {
+          const localized = r.review_reply_drafts.find(d => d.language === language)
+          const hasDraft = r.reply_draft_text !== null && r.reply_draft_text !== undefined
+          const ready = localized ? localized.ai_status === 'completed' && Boolean((localized.draft_text ?? localized.ai_suggested_reply)?.trim())
+            : r.ai_status === 'completed' && languageOf(hasDraft ? r.reply_draft_language : r.ai_suggested_reply_language) === language && Boolean((hasDraft ? r.reply_draft_text : r.ai_suggested_reply)?.trim())
+          reviews.push({id:r.id,rating:r.rating,original_text:r.original_text,text:r.text,published_at:r.published_at,historical_import:r.historical_import,has_negative_feedback:r.has_negative_feedback,status:r.status,review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,ready})
         }
-        throw insertError
+        if ((data?.length ?? 0)<500) break
       }
-      claimedReportId = inserted.id
+      if (!reviews.length) return json({error:'NO_REVIEWS_AVAILABLE'})
+      const sourceFingerprint = await fingerprint({reviews,language,googleTotal:e.total_reviews,googleRating:e.rating,version:ANALYSIS_VERSION})
+      if (!body.force && existing?.analysis_version === ANALYSIS_VERSION && existing.source_fingerprint === sourceFingerprint && existing.ai_status === 'completed') return json({report:existing,cached:true})
+      const dated = reviews.map(r=>r.published_at).filter((v):v is string=>!!v && Number.isFinite(Date.parse(v))).sort()
+      const snapshot = {reviews, base:{ organization_id:e.organization_id,establishment_id:id,preferred_language:language,
+        period_start:dated[0] ?? e.created_at,period_end:end,google_rating:e.rating,google_total_reviews:e.total_reviews,
+        source_latest_published_at:dated.at(-1) ?? null,source_undated_count:reviews.length-dated.length,
+        ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION}}
+      const next = {organization_id:e.organization_id,establishment_id:id,language,generation_id:crypto.randomUUID(),status:'running',snapshot,findings:[],cursor:0,input_tokens:0,output_tokens:0,ai_calls:0,lease_until:null,locked_by:null,error_code:null,updated_at:end}
+      const resume = run?.status === 'failed' && run.snapshot.base.source_fingerprint === sourceFingerprint
+      const values = resume ? {status:'running',error_code:null,lease_until:null,locked_by:null,updated_at:end} : next
+      const result = run
+        ? await admin.from('historical_report_runs').update(values).eq('id',run.id).eq('generation_id',run.generation_id).eq('updated_at',run.updated_at).select('*').maybeSingle()
+        : await admin.from('historical_report_runs').insert(next).select('*').maybeSingle()
+      if (result.error?.code === '23505' || !result.data && !result.error) return json({error:'REPORT_GENERATION_IN_PROGRESS'})
+      check(result.error,'REPORT_RUN_CREATE_FAILED')
+      run = result.data
     }
-
-    const { data: negativeData, error: negativeError } = await context.admin
-      .from('reviews')
-      .select('rating,original_text,text')
-      .eq('organization_id', establishment.organization_id)
-      .eq('establishment_id', establishmentId)
-      .gte('published_at', periodStart)
-      .lt('published_at', now)
-      .gte('rating', 1)
-      .lte('rating', 3)
-      .order('published_at', { ascending: true })
-    if (negativeError) throw negativeError
-    const negativeReviews = (negativeData ?? []) as ReviewRow[]
-    const summaryResult = await generateHistoricalSummary(negativeReviews.map((review) => ({
-      rating: review.rating,
-      originalText: review.original_text?.trim() || review.text?.trim() || '',
-    })), language)
-    const generatedAt = new Date().toISOString()
-    const { data: completed, error: completionError } = await context.admin
-      .from('historical_establishment_reports')
-      .update({
-        ...baseRow,
-        period_end: generatedAt,
-        ai_historical_summary: summaryResult.summary,
-        ai_status: 'completed',
-        ai_error: null,
-        ai_model: summaryResult.model,
-        ai_input_tokens: summaryResult.usage?.input_tokens ?? null,
-        ai_output_tokens: summaryResult.usage?.output_tokens ?? null,
-        ai_total_tokens: summaryResult.usage?.total_tokens ?? null,
-        generated_at: generatedAt,
-        updated_at: generatedAt,
-      })
-      .eq('id', claimedReportId)
-      .select('*')
-      .single()
-    if (completionError) throw completionError
-    return json({ report: completed })
-  } catch (error) {
-    const code = error instanceof Error ? error.message.slice(0, 500) : 'HISTORICAL_REPORT_FAILED'
-    if (claimedReportId && adminForFailure) {
-      await adminForFailure.from('historical_establishment_reports').update({
-        ai_status: restoreCompletedOnFailure ? 'completed' : 'failed',
-        ai_error: code,
-        updated_at: new Date().toISOString(),
-      }).eq('id', claimedReportId)
+    const worker = crypto.randomUUID()
+    const {data:locked,error:lockError} = await admin.rpc('claim_historical_report_step',{p_run_id:run.id,p_generation_id:run.generation_id,p_worker_id:worker})
+    check(lockError,'REPORT_LOCK_FAILED')
+    if (!locked) return json({pending:true,generation_id:run.generation_id,progress:run.cursor})
+    claimed = {id:run.id,generation:run.generation_id,worker}
+    const fresh = await admin.from('historical_report_runs').select('*').eq('id',run.id).single()
+    check(fresh.error,'REPORT_RUN_READ_FAILED')
+    run = fresh.data
+    const reviews = run.snapshot.reviews as ReputationReview[]
+    const batches = reviewBatches(reviews)
+    const updateRun = async (values: Record<string,unknown>) => {
+      const result = await admin!.from('historical_report_runs').update({...values,updated_at:new Date().toISOString()}).eq('id',run.id).eq('generation_id',run.generation_id).eq('locked_by',worker).select('id').maybeSingle()
+      check(result.error,'REPORT_PROGRESS_SAVE_FAILED')
+      if (!result.data) throw new Error('REPORT_LEASE_LOST')
     }
-    const status = code === 'UNAUTHORIZED' ? 401
-      : code === 'FORBIDDEN' ? 403
-      : code === 'RATE_LIMITED' ? 429
-      : 500
-    return json({ error: code }, status)
+    if (run.cursor < batches.length) {
+      await updateRun({ai_calls:run.ai_calls+1})
+      const extracted = await extractThemes(batches[run.cursor])
+      await updateRun({findings:[...run.findings,...extracted.findings],cursor:run.cursor+1,input_tokens:run.input_tokens+extracted.usage.input_tokens,output_tokens:run.output_tokens+extracted.usage.output_tokens,locked_by:null,lease_until:null})
+      claimed = null
+      return json({pending:true,generation_id:run.generation_id,progress:run.cursor+1,total_steps:batches.length+1})
+    }
+    const themes = mergeThemes(run.findings as Finding[])
+    await updateRun({ai_calls:run.ai_calls+1})
+    const result = await overallSummary(run.snapshot.base,themes,language)
+    const generated = new Date().toISOString()
+    const input = run.input_tokens+result.usage.input_tokens, output = run.output_tokens+result.usage.output_tokens
+    const row = {...run.snapshot.base,generation_id:run.generation_id,
+      positive_themes:themes.filter(t=>t.sentiment==='positive'),negative_themes:themes.filter(t=>t.sentiment==='negative'),
+      representative_positive_review_ids:representativeIds(reviews,themes,'positive'),representative_attention_review_ids:representativeIds(reviews,themes,'negative'),
+      ai_overall_summary:result.summary,ai_historical_summary:result.summary,ai_status:'completed',ai_error:null,ai_model:'gpt-5.6-terra',
+      ai_input_tokens:input,ai_output_tokens:output,ai_total_tokens:input+output,ai_call_count:run.ai_calls+1,ai_cost_usd:null,
+      generated_at:generated,updated_at:generated}
+    await updateRun({lease_until:new Date(Date.now()+180_000).toISOString()})
+    const saved = await admin.from('historical_establishment_reports').upsert(row,{onConflict:'establishment_id,preferred_language'}).select('*').single()
+    check(saved.error,'REPORT_SAVE_FAILED')
+    await updateRun({status:'completed',input_tokens:input,output_tokens:output,lease_until:null,locked_by:null})
+    claimed = null
+    return json({report:saved.data})
+  } catch(error) {
+    const code = error instanceof Error && /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'HISTORICAL_REPORT_FAILED'
+    if (claimed && admin) await admin.from('historical_report_runs').update({status:'failed',error_code:code,lease_until:null,locked_by:null,updated_at:new Date().toISOString()}).eq('id',claimed.id).eq('generation_id',claimed.generation).eq('locked_by',claimed.worker)
+    console.error('Historical report failed',{code})
+    return json({error:code},code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:code==='RATE_LIMITED'?429:500)
   }
 })

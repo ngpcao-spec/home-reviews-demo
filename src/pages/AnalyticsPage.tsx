@@ -1,6 +1,7 @@
 import { AlertTriangle, MessageSquareText, Sparkles, Star } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../app/AppContext'
+import { ReputationReport } from '../components/ReputationReport'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
@@ -24,7 +25,7 @@ import {
 } from '../lib/weekly-report'
 
 interface GenerateWeeklyReportPayload { report?: WeeklyReportRow; error?: string }
-interface GenerateHistoricalReportPayload { report?: HistoricalReportRow; error?: string }
+interface GenerateHistoricalReportPayload { report?: HistoricalReportRow; error?: string; pending?: boolean; generation_id?: string; progress?: number; total_steps?: number }
 type HistoricalFeedback = 'success' | 'error' | 'empty' | null
 type PeriodMode = 'completed' | 'current' | 'historical'
 
@@ -39,6 +40,7 @@ export function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null)
   const [errorKey, setErrorKey] = useState<string | null>(null)
   const [requestVersion, setRequestVersion] = useState(0)
+  const [historicalProgress, setHistoricalProgress] = useState('')
   const [historicalGenerating, setHistoricalGenerating] = useState(false)
   const [historicalFeedback, setHistoricalFeedback] = useState<HistoricalFeedback>(null)
   const requestedKeys = useRef(new Set<string>())
@@ -123,6 +125,7 @@ export function AnalyticsPage() {
     historicalGenerationLock.current = true
     setHistoricalFeedback(null)
     setHistoricalGenerating(true)
+    setHistoricalProgress('')
     try {
       if (demoMode) {
         if (!demoHistoricalReport || demoHistoricalReport.storedReviewsCount === 0) {
@@ -134,10 +137,21 @@ export function AnalyticsPage() {
         return
       }
       if (!supabase) throw new Error('SUPABASE_UNAVAILABLE')
-      const { data, error: functionError } = await supabase.functions.invoke<GenerateHistoricalReportPayload>('generate-historical-report', {
-        body: { establishment_id: selected.id },
-      })
-      if (functionError) throw functionError
+      let data: GenerateHistoricalReportPayload | null = null
+      let generationId: string | undefined
+      do {
+        const response = await supabase.functions.invoke<GenerateHistoricalReportPayload>('generate-historical-report', {
+          body: { establishment_id: selected.id, ...(generationId ? { generation_id: generationId } : { force: true }) },
+        })
+        if (response.error) throw response.error
+        data = response.data
+        if (data?.pending) {
+          if (!data.generation_id) throw new Error('REPORT_GENERATION_ID_MISSING')
+          generationId = data.generation_id
+          if (data.total_steps) setHistoricalProgress(messages.reputation.progress.replace('{done}', String(data.progress ?? 0)).replace('{total}', String(data.total_steps)))
+          await new Promise(resolve => window.setTimeout(resolve, 1500))
+        }
+      } while (data?.pending)
       if (data?.error === 'NO_REVIEWS_AVAILABLE') {
         setHistoricalFeedback('empty')
         return
@@ -172,7 +186,7 @@ export function AnalyticsPage() {
     <BrandHeader />
     <section className="reference-intro analytics-intro">
       <h1>{periodMode === 'historical' ? messages.analytics.historicalAnalysis : messages.analytics.weeklyTitle}</h1>
-      <p>{messages.analytics.weeklyIntro}</p>
+      <p>{periodMode === 'historical' ? messages.reputation.intro : messages.analytics.weeklyIntro}</p>
     </section>
     {establishments.length > 0 && <div className="analytics-filters weekly-report-filter">
       <label htmlFor="weekly-establishment">{messages.analytics.establishmentLabel}</label>
@@ -197,11 +211,19 @@ export function AnalyticsPage() {
         <div>
           <div className="weekly-report-label"><span className="eyebrow">{messages.analytics.historicalAnalysis}</span></div>
           <h2>{selected.name}</h2>
-          <p className="weekly-period">{visibleHistoricalReport ? formatHistoricalPeriodStart(visibleHistoricalReport.periodStart, language) : messages.analytics.historicalMode}</p>
+          <p className="weekly-period">{visibleHistoricalReport ? `${formatHistoricalPeriodStart(visibleHistoricalReport.periodStart, language)} ${messages.reputation.until} ${new Date(visibleHistoricalReport.periodEnd).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'fr-FR', {timeZone:'Asia/Ho_Chi_Minh'})}` : messages.analytics.historicalMode}</p>
           <div className="weekly-google-metrics">
             <strong>{(visibleHistoricalReport?.googleRating ?? selected.currentRating) === null ? '—' : (visibleHistoricalReport?.googleRating ?? selected.currentRating).toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} <Star aria-hidden="true"/></strong>
             <span>{(visibleHistoricalReport?.googleTotalReviews ?? selected.currentReviewCount) === null ? messages.analytics.snapshotUnavailable : `${number.format(visibleHistoricalReport?.googleTotalReviews ?? selected.currentReviewCount)} ${messages.analytics.googleReviews}`}</span>
           </div>
+          {visibleHistoricalReport?.reputation && <div className="reputation-sample-note">
+            <p>{(visibleHistoricalReport.dataComplete ? messages.reputation.complete
+              : visibleHistoricalReport.storedReviewsCount === 500 ? messages.reputation.recent : messages.reputation.sample)
+              .replace('{count}', number.format(visibleHistoricalReport.storedReviewsCount))}</p>
+            {!visibleHistoricalReport.dataComplete && <small>{messages.reputation.partial}</small>}
+            {visibleHistoricalReport.reputation.source_undated_count > 0 && <p>{messages.reputation.undated.replace('{count}',String(visibleHistoricalReport.reputation.source_undated_count))}</p>}
+          </div>}
+
         </div>
       </section>
 
@@ -210,55 +232,15 @@ export function AnalyticsPage() {
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
           <span>{historicalGenerating ? messages.analytics.generatingHistorical : messages.analytics.generateHistorical}</span>
         </button>
+        {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
         {visibleHistoricalReport?.generatedAt && <small>{messages.analytics.updatedAt}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
         {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
         {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
       </div>
 
-      {visibleHistoricalReport && <>
-        {!visibleHistoricalReport.dataComplete && <section className="weekly-data-warning historical-data-warning card" role="status">
-          <AlertTriangle aria-hidden="true"/>
-          <div><strong>{messages.analytics.historicalDataPartial}</strong><p>{visibleHistoricalReport.storedReviewsCount === 500
-            && (visibleHistoricalReport.googleTotalReviews ?? 0) > 500
-            ? messages.analytics.historicalRecentSample
-            : messages.analytics.historicalDataPartialDetail}</p></div>
-        </section>}
+      {visibleHistoricalReport && <ReputationReport report={visibleHistoricalReport} />}
 
-        <section className="weekly-section">
-          <div className="weekly-section-heading"><span className="eyebrow">01</span><h2>{messages.analytics.overview}</h2></div>
-          <div className="weekly-kpis">
-            <article className="weekly-kpi card"><MessageSquareText/><strong>{visibleHistoricalReport.storedReviewsCount}</strong><span>{messages.analytics.storedReviews}</span></article>
-            <article className="weekly-kpi card negative"><AlertTriangle/><strong>{visibleHistoricalReport.negativeReviewsCount}</strong><span>{messages.analytics.negativeReviews}</span></article>
-            <article className="weekly-kpi card"><span className="weekly-percent">%</span><strong>{visibleHistoricalReport.negativeRate.toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} %</strong><span>{visibleHistoricalReport.dataComplete ? messages.analytics.negativeRate : messages.analytics.rateAvailableData}</span></article>
-            <article className="weekly-kpi card ready"><Sparkles/><strong>{visibleHistoricalReport.readyRepliesCount}</strong><span>{messages.analytics.readyReplies}</span></article>
-          </div>
-        </section>
-
-        <section className="weekly-section historical-rating-section">
-          <div className="weekly-section-heading"><span className="eyebrow">02</span><h2>{messages.analytics.starDistribution}</h2></div>
-          <article className="historical-rating-card card">
-            {([1, 2, 3, 4, 5] as const).map((rating) => {
-              const count = visibleHistoricalReport.ratingCounts[rating]
-              const percentage = visibleHistoricalReport.storedReviewsCount ? count / visibleHistoricalReport.storedReviewsCount * 100 : 0
-              return <div className="historical-rating-row" key={rating}>
-                <strong>{rating}★</strong>
-                <span className="historical-rating-track"><i style={{ width: `${percentage}%` }}/></span>
-                <b>{count}</b>
-              </div>
-            })}
-          </article>
-        </section>
-
-        <section className="weekly-section">
-          <div className="weekly-section-heading"><span className="eyebrow">03</span><h2>{messages.analytics.historicalSummary}</h2></div>
-          <article className="weekly-summary card">
-            <Sparkles aria-hidden="true"/>
-            <p>{visibleHistoricalReport.aiHistoricalSummary
-              ?? (visibleHistoricalReport.aiStatus === 'failed' ? messages.analytics.summaryFailed : messages.analytics.generating)}</p>
-          </article>
-        </section>
-      </>}
     </div>}
 
     {selected && periodMode !== 'historical' && visibleReport && <div className="weekly-report">

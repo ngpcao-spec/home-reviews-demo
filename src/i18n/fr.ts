@@ -1,4 +1,6 @@
+import { reputationFr } from './reputation'
 export const fr = {
+  reputation: reputationFr,
   nav: { home: 'Accueil', establishments: 'Établissements', reviews: 'Avis', analytics: 'Analyses', more: 'Plus' },
   common: { retry: 'Réessayer', cancel: 'Annuler', confirm: 'Confirmer', loading: 'Chargement…', viewAll: 'Voir tout', back: 'Retour', reviews: 'avis', establishments: 'établissements', delete: 'Supprimer', deleting: 'Suppression…' },
   language: { title: 'Choisissez votre langue', body: 'Vous pourrez modifier ce choix plus tard dans les paramètres.', french: 'Français', vietnamese: 'Tiếng Việt', settingTitle: 'Langue', settingDetail: 'Langue de l’interface et des traductions d’avis', saved: 'Langue mise à jour' },

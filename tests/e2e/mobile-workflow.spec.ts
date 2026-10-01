@@ -60,11 +60,20 @@ test('affiche un mode historique distinct avec les cinq notes',async({page})=>{
   await page.getByLabel('Période').selectOption('historical')
   await expect(page.getByLabel('Période')).toHaveValue('historical')
   await expect(page.getByText('Analyse historique',{exact:true}).first()).toBeVisible()
-  await expect(page.getByText('Avis stockés',{exact:true})).toBeVisible()
+  await expect(page.getByText('Avis analysés',{exact:true})).toBeVisible()
   await expect(page.getByText('Répartition par étoiles',{exact:true})).toBeVisible()
   await expect(page.locator('.historical-rating-row')).toHaveCount(5)
-  await expect(page.getByText('Résumé IA historique',{exact:true})).toBeVisible()
-  await expect(page.getByText('Analyse basée sur les données disponibles dans HOME Reviews.',{exact:true})).toBeVisible()
+  await expect(page.getByText('Résumé IA global',{exact:true})).toBeVisible()
+  await expect(page.getByText('Note des avis analysés',{exact:true})).toBeVisible()
+  await expect(page.getByText('Gestion des réponses',{exact:true})).toBeVisible()
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth)).toBe(false)
+  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight))
+  const clearance=await page.evaluate(()=>{
+    const card=document.querySelector('.reputation-replies')?.closest('article')?.getBoundingClientRect()
+    const nav=document.querySelector('.bottom-nav')?.getBoundingClientRect()
+    return card&&nav ? nav.top-card.bottom : 0
+  })
+  expect(clearance).toBeGreaterThanOrEqual(0)
 })
 
 test('garde l’accueil lisible pendant le défilement',async({page})=>{

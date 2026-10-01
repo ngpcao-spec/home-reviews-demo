@@ -1,6 +1,37 @@
 import type { PreferredLanguage, Review } from '../types/domain'
 
+export interface ReputationTheme {
+  category: 'food' | 'service' | 'atmosphere' | 'other'
+  sentiment: 'positive' | 'negative'
+  theme_key: string
+  label_fr: string
+  label_vi: string
+  mentions: number
+}
+export interface ReputationData {
+  analysis_version: number
+  sample_reviews_count: number
+  sample_average_rating: number | null
+  positive_rate: number
+  attention_reviews_count: number
+  processed_reviews_count: number
+  remaining_replies_count: number
+  food_average: number | null
+  food_review_count: number
+  service_average: number | null
+  service_review_count: number
+  atmosphere_average: number | null
+  atmosphere_review_count: number
+  positive_themes: ReputationTheme[]
+  negative_themes: ReputationTheme[]
+  representative_positive_review_ids: string[]
+  representative_attention_review_ids: string[]
+  ai_overall_summary: string | null
+  source_undated_count: number
+}
+
 export interface HistoricalReport {
+  reputation?: ReputationData
   id: string
   organizationId: string
   establishmentId: string
@@ -21,7 +52,7 @@ export interface HistoricalReport {
   generatedAt: string | null
 }
 
-export interface HistoricalReportRow {
+export interface HistoricalReportRow extends Partial<ReputationData> {
   id: string
   organization_id: string
   establishment_id: string
@@ -48,6 +79,7 @@ export interface HistoricalReportRow {
 
 export function mapHistoricalReport(row: HistoricalReportRow): HistoricalReport {
   return {
+    reputation: row.analysis_version === 2 ? row as HistoricalReportRow & ReputationData : undefined,
     id: row.id,
     organizationId: row.organization_id,
     establishmentId: row.establishment_id,
@@ -114,6 +146,16 @@ export function buildDemoHistoricalReport(
       : `L’analyse historique repose sur les ${negative.length} avis négatifs actuellement disponibles dans HOME Reviews.`
   return {
     id: `demo-historical-${establishmentId}`,
+    reputation: {
+      analysis_version: 2, sample_reviews_count: stored.length,
+      sample_average_rating: stored.length ? stored.reduce((sum,review)=>sum+review.rating,0)/stored.length : null,
+      positive_rate: stored.length ? (ratingCounts[4]+ratingCounts[5])/stored.length*100 : 0,
+      attention_reviews_count: negative.length, processed_reviews_count: negative.filter(r=>r.status==='processed').length,
+      remaining_replies_count: negative.filter(r=>r.status!=='processed'&&!ready.includes(r)).length,
+      food_average:null,food_review_count:0,service_average:null,service_review_count:0,atmosphere_average:null,atmosphere_review_count:0,
+      positive_themes:[],negative_themes:[],representative_positive_review_ids:[],representative_attention_review_ids:[],
+      ai_overall_summary:language==='vi'?'Chế độ minh họa: chưa thực hiện phân tích AI.':'Mode démonstration : aucune analyse IA effectuée.',source_undated_count:0,
+    },
     organizationId: 'demo', establishmentId, preferredLanguage: language,
     periodStart: oldest ?? now.toISOString(), periodEnd: now.toISOString(),
     googleRating: rating, googleTotalReviews: totalReviews,
