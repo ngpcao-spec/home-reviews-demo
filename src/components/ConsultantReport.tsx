@@ -1,22 +1,29 @@
 import { useI18n } from '../i18n'
+import type { ReactNode } from 'react'
 import { AXES, type ConsultantReportData } from '../../supabase/functions/_shared/consultant-contract'
 import './ReputationReport.css'
+
+function ReportSection({index,title,className='',children}:{index:number;title:string;className?:string;children:ReactNode}) {
+  return <section className={`weekly-section ${className}`}><article className="card reputation-theme-card consultant-section-card">
+    <header className="weekly-section-heading consultant-section-banner"><span className="eyebrow">{String(index).padStart(2,'0')}</span><h2>{title}</h2></header>
+    <div className="consultant-section-body">{children}</div>
+  </article></section>
+}
 
 export function ConsultantReport({report}: {report: ConsultantReportData}) {
   const {messages, language} = useI18n()
   const m = messages.reputation
   if (report.language !== language) return <p role="status">{m.languageUnavailable}</p>
-  const heading = (index: number, title: string) => <div className="weekly-section-heading"><span className="eyebrow">{String(index).padStart(2,'0')}</span><h2>{title}</h2></div>
   const label = {service:m.service,quality:m.quality,price:m.price,atmosphere:m.atmosphere}
   const aspects = (items: ConsultantReportData['positive_aspects'] = [], compact = false, countOnly = false) => {
     const displayed = compact ? [...items].sort((a,b)=>b.mentions-a.mentions).slice(0,5) : items
     return displayed.length ? <ul className="consultant-count-list">{displayed.map(item=><li key={`${item.theme_key}:${item.sentiment}`}><span>- {item.label}</span><strong>{compact || countOnly ? item.mentions : m.exactReviews.replace('{count}',String(item.mentions))}</strong></li>)}</ul> : <p>{m.noSubrating}</p>
   }
   return <div className="consultant-report">
-    <section className="weekly-section">{heading(1,m.consultantOverview)}<article className="card reputation-theme-card"><dl className="reputation-replies">
+    <ReportSection index={1} title={m.consultantOverview}><dl className="reputation-replies">
       <div><dt>{m.analyzedTotal}</dt><dd>{report.total}</dd></div><div><dt>{m.positive}</dt><dd>{report.positive}</dd></div><div><dt>{m.analyticalNegative}</dt><dd>{report.negative}</dd></div>
-    </dl><small>{m.analyticalNote}</small></article></section>
-    <section className="weekly-section consultant-synthesis">{heading(2,m.analysisSynthesis)}<article className="card reputation-theme-card">
+    </dl><small>{m.analyticalNote}</small></ReportSection>
+    <ReportSection index={2} title={m.analysisSynthesis} className="consultant-synthesis">
       <p className="consultant-total"><strong>{report.total ?? '—'}</strong> {m.analyzed}</p>
       <dl className="consultant-sentiments"><div><dt>{m.positive}</dt><dd>{report.positive ?? '—'}</dd></div><div><dt>{m.analyticalNegative}</dt><dd>{report.negative ?? '—'}</dd></div></dl>
       <div className="consultant-axis-grid">{AXES.map(key=>{
@@ -25,18 +32,18 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
       })}</div>
       <div className="consultant-summary-themes"><h3>{m.mainStrengths}</h3>{aspects(report.positive_aspects,true)}</div>
       <div className="consultant-summary-themes consultant-negative"><h3>{m.mainImprovements}</h3>{aspects(report.negative_aspects,true)}</div>
-    </article></section>
+    </ReportSection>
     {AXES.map((key,index)=>{
       const axis=report.axes?.find(item=>item.key===key)
-      return <section className="weekly-section" key={key}>{heading(index+3,label[key])}<article className="card reputation-theme-card">
+      return <ReportSection key={key} index={index+3} title={label[key]}>
         <dl className="reputation-replies"><div><dt>{m.axisPositive.replace('{axis}',label[key])}</dt><dd>{axis?.positive ?? '—'}</dd></div><div><dt>{m.axisNegative.replace('{axis}',label[key])}</dt><dd>{axis?.negative ?? '—'}</dd></div></dl>
         <p className="consultant-prose">{axis?.summary || m.insufficientAnalysis}</p>
-      </article></section>
+      </ReportSection>
     })}
-    <section className="weekly-section consultant-positive-details">{heading(7,m.positiveAspects)}<article className="card reputation-theme-card">{aspects(report.positive_aspects,false,true)}<small>{m.themeNote}</small></article></section>
-    <section className="weekly-section consultant-negative">{heading(8,m.negativeAspects)}<article className="card reputation-theme-card">{aspects(report.negative_aspects)}</article></section>
-    <section className="weekly-section">{heading(9,m.conclusion)}<article className="card reputation-theme-card"><h3>{m.globalSynthesis}</h3><p className="consultant-prose">{report.conclusion || m.noSubrating}</p><h3>{m.recommendations}</h3><ul className="consultant-aspects">
+    <ReportSection index={7} title={m.positiveAspects} className="consultant-positive-details">{aspects(report.positive_aspects,false,true)}<small>{m.themeNote}</small></ReportSection>
+    <ReportSection index={8} title={m.negativeAspects} className="consultant-negative">{aspects(report.negative_aspects)}</ReportSection>
+    <ReportSection index={9} title={m.conclusion}><h3>{m.globalSynthesis}</h3><p className="consultant-prose">{report.conclusion || m.noSubrating}</p><h3>{m.recommendations}</h3><ul className="consultant-aspects">
       {AXES.map(key=><li key={key}><span aria-hidden="true">- </span><strong>{label[key]} :</strong> {report.axes?.find(axis=>axis.key===key)?.recommendation || m.insufficientAnalysis}</li>)}
-    </ul></article></section>
+    </ul></ReportSection>
   </div>
 }

@@ -15,6 +15,8 @@ describe('consultant report V3',()=>{
     expect([...container.querySelectorAll('.eyebrow')].map(element=>element.textContent)).toEqual(['01','02','03','04','05','06','07','08','09'])
     expect([...container.querySelectorAll('.weekly-section-heading h2')].map(element=>element.textContent)).toEqual(language==='fr'?['Vue d’ensemble','Synthèse de l’analyse','Service','Qualité','Prix','Ambiance','Points positifs','Points négatifs','Conclusion']:['Tổng quan','Tóm tắt phân tích','Dịch vụ','Chất lượng','Giá cả','Không gian','Điểm tích cực','Điểm tiêu cực','Kết luận'])
     expect(container.querySelectorAll('section')[8].querySelectorAll('li')).toHaveLength(4)
+    expect(container.querySelectorAll('article > header.consultant-section-banner')).toHaveLength(9)
+    expect(container.querySelectorAll('section > .weekly-section-heading')).toHaveLength(0)
     expect(container.querySelector('.consultant-count-list li')?.textContent).toMatch(/^- /)
     expect(container).not.toHaveTextContent('Google :')
   })
