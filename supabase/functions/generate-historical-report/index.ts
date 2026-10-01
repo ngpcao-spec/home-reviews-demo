@@ -18,6 +18,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({error:'METHOD_NOT_ALLOWED'},405)
   let claimed: {id:string;worker:string;generation:string} | null = null
   let admin: Awaited<ReturnType<typeof requireUser>>['admin'] | null = null
+  let callUsageRecorded = true
   try {
     const context = await requireUser(request)
     admin = context.admin
@@ -68,7 +69,7 @@ Deno.serve(async (request) => {
         period_start:dated[0] ?? e.created_at,period_end:end,google_rating:e.rating,google_total_reviews:e.total_reviews,
         source_latest_published_at:dated.at(-1) ?? null,source_undated_count:reviews.length-dated.length,
         ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION}}
-      const next = {organization_id:e.organization_id,establishment_id:id,language,generation_id:crypto.randomUUID(),status:'running',snapshot,findings:[],cursor:0,input_tokens:0,output_tokens:0,ai_calls:0,lease_until:null,locked_by:null,error_code:null,updated_at:end}
+      const next = {organization_id:e.organization_id,establishment_id:id,language,generation_id:crypto.randomUUID(),status:'running',snapshot,findings:[],cursor:0,input_tokens:0,output_tokens:0,ai_calls:0,rejected_findings_count:0,token_usage_complete:true,lease_until:null,locked_by:null,error_code:null,updated_at:end}
       const resume = run?.status === 'failed' && run.snapshot.base.source_fingerprint === sourceFingerprint
       const values = resume ? {status:'running',error_code:null,lease_until:null,locked_by:null,updated_at:end} : next
       const result = run
@@ -93,16 +94,24 @@ Deno.serve(async (request) => {
       check(result.error,'REPORT_PROGRESS_SAVE_FAILED')
       if (!result.data) throw new Error('REPORT_LEASE_LOST')
     }
+    const recordUsage = async (usage: {input_tokens:number;output_tokens:number}) => {
+      await updateRun({input_tokens:run.input_tokens+usage.input_tokens,output_tokens:run.output_tokens+usage.output_tokens})
+      callUsageRecorded = true
+    }
     if (run.cursor < batches.length) {
       await updateRun({ai_calls:run.ai_calls+1})
-      const extracted = await extractThemes(batches[run.cursor])
-      await updateRun({findings:[...run.findings,...extracted.findings],cursor:run.cursor+1,input_tokens:run.input_tokens+extracted.usage.input_tokens,output_tokens:run.output_tokens+extracted.usage.output_tokens,locked_by:null,lease_until:null})
+      callUsageRecorded = false
+      const extracted = await extractThemes(batches[run.cursor],recordUsage)
+      const findings = [...new Map([...run.findings,...extracted.findings].map((f:Finding)=>[`${f.review_id}:${f.theme_key}:${f.sentiment}`,f])).values()]
+      await updateRun({findings,cursor:run.cursor+1,rejected_findings_count:run.rejected_findings_count+extracted.rejectedCount,locked_by:null,lease_until:null})
+      console.info('Historical report batch completed',{batch:run.cursor+1,accepted:extracted.findings.length,rejected:extracted.rejectedCount})
       claimed = null
       return json({pending:true,generation_id:run.generation_id,progress:run.cursor+1,total_steps:batches.length+1})
     }
     const themes = mergeThemes(run.findings as Finding[])
     await updateRun({ai_calls:run.ai_calls+1})
-    const result = await overallSummary(run.snapshot.base,themes,language)
+    callUsageRecorded = false
+    const result = await overallSummary(run.snapshot.base,themes,language,recordUsage)
     const generated = new Date().toISOString()
     const input = run.input_tokens+result.usage.input_tokens, output = run.output_tokens+result.usage.output_tokens
     const row = {...run.snapshot.base,generation_id:run.generation_id,
@@ -110,6 +119,8 @@ Deno.serve(async (request) => {
       representative_positive_review_ids:representativeIds(reviews,themes,'positive'),representative_attention_review_ids:representativeIds(reviews,themes,'negative'),
       ai_overall_summary:result.summary,ai_historical_summary:result.summary,ai_status:'completed',ai_error:null,ai_model:'gpt-5.6-terra',
       ai_input_tokens:input,ai_output_tokens:output,ai_total_tokens:input+output,ai_call_count:run.ai_calls+1,ai_cost_usd:null,
+      accepted_findings_count:run.findings.length,rejected_findings_count:run.rejected_findings_count,
+      processed_batches_count:run.cursor,token_usage_complete:run.token_usage_complete,
       generated_at:generated,updated_at:generated}
     await updateRun({lease_until:new Date(Date.now()+180_000).toISOString()})
     const saved = await admin.from('historical_establishment_reports').upsert(row,{onConflict:'establishment_id,preferred_language'}).select('*').single()
@@ -119,7 +130,7 @@ Deno.serve(async (request) => {
     return json({report:saved.data})
   } catch(error) {
     const code = error instanceof Error && /^[A-Z0-9_]+$/.test(error.message) ? error.message : 'HISTORICAL_REPORT_FAILED'
-    if (claimed && admin) await admin.from('historical_report_runs').update({status:'failed',error_code:code,lease_until:null,locked_by:null,updated_at:new Date().toISOString()}).eq('id',claimed.id).eq('generation_id',claimed.generation).eq('locked_by',claimed.worker)
+    if (claimed && admin) await admin.from('historical_report_runs').update({status:'failed',error_code:code,lease_until:null,locked_by:null,...(!callUsageRecorded?{token_usage_complete:false}:{}),updated_at:new Date().toISOString()}).eq('id',claimed.id).eq('generation_id',claimed.generation).eq('locked_by',claimed.worker)
     console.error('Historical report failed',{code})
     return json({error:code},code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:code==='RATE_LIMITED'?429:500)
   }
