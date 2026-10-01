@@ -41,7 +41,7 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
       </ReportSection>
     })}
     <ReportSection index={7} title={m.positiveAspects} className="consultant-positive-details">{aspects(report.positive_aspects,false,true)}<small>{m.themeNote}</small></ReportSection>
-    <ReportSection index={8} title={m.negativeAspects} className="consultant-negative">{aspects(report.negative_aspects)}</ReportSection>
+    <ReportSection index={8} title={m.negativeAspects} className="consultant-negative">{aspects(report.negative_aspects,false,true)}</ReportSection>
     <ReportSection index={9} title={m.conclusion}><h3>{m.globalSynthesis}</h3><p className="consultant-prose">{report.conclusion || m.noSubrating}</p><h3>{m.recommendations}</h3><ul className="consultant-aspects">
       {AXES.map(key=><li key={key}><span aria-hidden="true">- </span><strong>{label[key]} :</strong> {report.axes?.find(axis=>axis.key===key)?.recommendation || m.insufficientAnalysis}</li>)}
     </ul></ReportSection>
