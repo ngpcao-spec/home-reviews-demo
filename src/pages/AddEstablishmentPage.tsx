@@ -54,8 +54,6 @@ export function AddEstablishmentPage() {
     acknowledgeInitialImport,
     refreshInitialImports,
     initialImportJobs,
-    establishments,
-    plan,
     monitoringIntervalHours,
   } = useApp()
   const { messages } = useI18n()
@@ -66,7 +64,6 @@ export function AddEstablishmentPage() {
   const [loading, setLoading] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
-  const quotaReached = establishments.length >= plan.maxEstablishments
   const currentJob = result?.importJobId
     ? initialImportJobs.find((job) => job.id === result.importJobId)
     : initialImportJobs[0]
@@ -177,7 +174,6 @@ export function AddEstablishmentPage() {
       <i className={step === 'success' ? 'done' : ''} />
     </div>
 
-    {quotaReached && <div className="quota-alert"><MapPin /><div><strong>{messages.add.quota}</strong><span>{messages.add.quotaDetail.replace('{count}', String(plan.maxEstablishments))}</span></div></div>}
 
     {step === 'input' && <section className="flow-card card">
       <span className="flow-icon"><MapPin /></span>
@@ -198,7 +194,7 @@ export function AddEstablishmentPage() {
       </label>
       <div className="input-hint">{messages.add.example}</div>
       {error && <p className="field-error" role="alert">{error}</p>}
-      <button className="primary-button full-width" onClick={() => void search()} disabled={loading || quotaReached}>
+      <button className="primary-button full-width" onClick={() => void search()} disabled={loading}>
         {loading ? <LoaderCircle className="spin" /> : <Search />}
         {loading ? messages.add.searching : messages.add.search}
       </button>
