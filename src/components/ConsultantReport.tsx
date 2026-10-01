@@ -8,9 +8,9 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
   if (report.language !== language) return <p role="status">{m.languageUnavailable}</p>
   const heading = (index: number, title: string) => <div className="weekly-section-heading"><span className="eyebrow">{String(index).padStart(2,'0')}</span><h2>{title}</h2></div>
   const label = {service:m.service,quality:m.quality,price:m.price,atmosphere:m.atmosphere}
-  const aspects = (items: ConsultantReportData['positive_aspects'] = [], compact = false) => {
+  const aspects = (items: ConsultantReportData['positive_aspects'] = [], compact = false, countOnly = false) => {
     const displayed = compact ? [...items].sort((a,b)=>b.mentions-a.mentions).slice(0,5) : items
-    return displayed.length ? <ul className="consultant-count-list">{displayed.map(item=><li key={`${item.theme_key}:${item.sentiment}`}><span>- {item.label}</span><strong>{compact ? item.mentions : m.exactReviews.replace('{count}',String(item.mentions))}</strong></li>)}</ul> : <p>{m.noSubrating}</p>
+    return displayed.length ? <ul className="consultant-count-list">{displayed.map(item=><li key={`${item.theme_key}:${item.sentiment}`}><span>- {item.label}</span><strong>{compact || countOnly ? item.mentions : m.exactReviews.replace('{count}',String(item.mentions))}</strong></li>)}</ul> : <p>{m.noSubrating}</p>
   }
   return <div className="consultant-report">
     <section className="weekly-section">{heading(1,m.consultantOverview)}<article className="card reputation-theme-card"><dl className="reputation-replies">
@@ -33,7 +33,7 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
         <p className="consultant-prose">{axis?.summary || m.insufficientAnalysis}</p>
       </article></section>
     })}
-    <section className="weekly-section">{heading(7,m.positiveAspects)}<article className="card reputation-theme-card">{aspects(report.positive_aspects)}<small>{m.themeNote}</small></article></section>
+    <section className="weekly-section consultant-positive-details">{heading(7,m.positiveAspects)}<article className="card reputation-theme-card">{aspects(report.positive_aspects,false,true)}<small>{m.themeNote}</small></article></section>
     <section className="weekly-section consultant-negative">{heading(8,m.negativeAspects)}<article className="card reputation-theme-card">{aspects(report.negative_aspects)}</article></section>
     <section className="weekly-section">{heading(9,m.conclusion)}<article className="card reputation-theme-card"><h3>{m.globalSynthesis}</h3><p className="consultant-prose">{report.conclusion || m.noSubrating}</p><h3>{m.recommendations}</h3><ul className="consultant-aspects">
       {AXES.map(key=><li key={key}><span aria-hidden="true">- </span><strong>{label[key]} :</strong> {report.axes?.find(axis=>axis.key===key)?.recommendation || m.insufficientAnalysis}</li>)}

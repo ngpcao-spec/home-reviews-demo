@@ -48,6 +48,14 @@ describe('consultant report V3',()=>{
     expect(screen.getByRole('status')).toHaveTextContent('Ce rapport n’est pas disponible')
     expect(container.querySelectorAll('section')).toHaveLength(0)
   })
+  it.each(['fr','vi'] as const)('only removes the count suffix in section 07 (%s)',language=>{
+    const report=fixture(language)
+    report.negative_aspects=report.positive_aspects.map(item=>({...item,sentiment:'negative'}))
+    const {container}=render(<I18nProvider language={language}><ConsultantReport report={report}/></I18nProvider>)
+    expect(container.querySelector('.consultant-positive-details strong')).toHaveTextContent(/^1$/)
+    expect(container.querySelectorAll('section')[7].querySelector('strong')).toHaveTextContent(language==='fr'?'1 avis':'1 đánh giá')
+    expect(container.querySelector('.consultant-positive-details .eyebrow')).toHaveTextContent('07')
+  })
   it('maps V3 separately from rating-based V2 data',()=>{
     const row={analysis_version:3,consultant_report:fixture('fr'),negative_reviews_count:4,negative_rate:80} as HistoricalReportRow
     const result=mapHistoricalReport(row)

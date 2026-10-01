@@ -19,6 +19,7 @@
 .executive-preview{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .consultant-aspects{list-style:none;padding:0;margin:16px 0;display:grid;gap:16px;line-height:1.65}.consultant-aspects li,.consultant-prose{overflow-wrap:anywhere}.consultant-prose{line-height:1.65;white-space:pre-wrap}.consultant-aspects strong{color:#d6c09b}
 .consultant-count-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:10px}
+.consultant-positive-details>.weekly-section-heading{margin-bottom:18px}
 .consultant-count-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;line-height:1.45;font-size:.9rem}
 .consultant-count-list span{min-width:0;overflow-wrap:anywhere}.consultant-count-list strong{white-space:nowrap;text-align:right;color:#d6c09b;font-size:.85rem}
 .consultant-negative .consultant-count-list strong{color:#deb28a}
