@@ -15,6 +15,11 @@ test('V3 summary second, nine fixed sections, compact details and no generation 
     await expect(page.locator('.weekly-section').nth(6).locator('li')).toHaveCount(7)
     await expect(page.locator('.consultant-positive-details strong')).toHaveText(['100','101','102','103','104','105','106'])
     await expect(page.locator('article > .consultant-section-banner')).toHaveCount(9)
+    expect(await page.locator('.consultant-section-banner').evaluateAll(headers=>headers.every(header=>getComputedStyle(header).backgroundImage.includes('linear-gradient')))).toBe(true)
+    expect(await page.locator('.weekly-section').evaluateAll(sections=>sections.slice(1).every((section,i)=>section.getBoundingClientRect().top-sections[i].getBoundingClientRect().bottom>=24))).toBe(true)
+    for(const index of [2,3,4]){
+      expect(await page.locator('.weekly-section').nth(index).locator('header').evaluate(header=>header.getBoundingClientRect().height)).toBeLessThanOrEqual(54)
+    }
     expect(await page.locator('.consultant-section-card').evaluateAll(cards=>cards.every(card=>{
       const bounds=card.getBoundingClientRect(),banner=card.querySelector('header')!.getBoundingClientRect(),title=card.querySelector('h2')!.getBoundingClientRect()
       return banner.top>=bounds.top && banner.right<=bounds.right && title.right<=bounds.right && title.bottom<=banner.bottom
@@ -29,6 +34,8 @@ test('V3 summary second, nine fixed sections, compact details and no generation 
   await page.locator('.consultant-synthesis').screenshot({path:`test-results/consultant-summary-${test.info().project.name}.png`})
   await page.locator('.consultant-positive-details').screenshot({path:`test-results/consultant-positive-${test.info().project.name}.png`})
   await page.locator('.weekly-section').nth(2).screenshot({path:`test-results/consultant-service-${test.info().project.name}.png`})
+  await page.locator('.weekly-section').nth(3).scrollIntoViewIfNeeded()
+  await page.screenshot({path:`test-results/consultant-axes-${test.info().project.name}.png`})
   // Stress a longer localized title without changing any production wording.
   const longTitle=page.locator('.consultant-synthesis h2').first()
   await longTitle.evaluate(el=>{el.textContent='Synthèse des résultats de l’analyse'})
