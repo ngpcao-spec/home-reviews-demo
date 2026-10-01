@@ -1,7 +1,9 @@
 export const reputationFr = {
+  consultantOverview: 'Vue d’ensemble', analysisSynthesis: 'Synthèse de l’analyse',
+  mainStrengths: 'Principaux points forts', mainImprovements: 'Principaux points à améliorer', shortPositive: 'positifs', shortNegative: 'négatifs',
   reviewSynthesis: 'Synthèse des avis', analyzedTotal: 'Nombre total d’avis analysés', analyticalNegative: 'Avis négatifs',
   quality: 'Qualité', price: 'Prix', axisPositive: 'Avis positifs concernant {axis}', axisNegative: 'Avis négatifs concernant {axis}',
-  positiveAspects: 'Aspects positifs', negativeAspects: 'Aspects négatifs', conclusion: 'Conclusion', globalSynthesis: 'Synthèse globale', recommendations: 'Recommandations',
+  positiveAspects: 'Points positifs', negativeAspects: 'Points négatifs', conclusion: 'Conclusion', globalSynthesis: 'Synthèse globale', recommendations: 'Recommandations',
   exactReviews: '{count} avis', isolated: 'Constat ponctuel.',
   analyticalNote: 'Classification analytique du contenu : chaque avis compte une seule fois. Elle est distincte du classement opérationnel par étoiles.',
   insufficientAnalysis: 'Données insuffisantes dans les avis analysés pour tirer une conclusion fiable sur ce point.',
@@ -33,6 +35,8 @@ export const reputationFr = {
   progress: 'Analyse par lots : {done} / {total}',
 }
 export const reputationVi: typeof reputationFr = {
+  consultantOverview: 'Tổng quan', analysisSynthesis: 'Tóm tắt phân tích',
+  mainStrengths: 'Điểm mạnh chính', mainImprovements: 'Những điểm cần cải thiện chính', shortPositive: 'tích cực', shortNegative: 'tiêu cực',
   reviewSynthesis: 'Tổng hợp đánh giá', analyzedTotal: 'Tổng số đánh giá được phân tích', analyticalNegative: 'Đánh giá tiêu cực',
   quality: 'Chất lượng', price: 'Giá cả', axisPositive: 'Đánh giá tích cực về {axis}', axisNegative: 'Đánh giá tiêu cực về {axis}',
   positiveAspects: 'Điểm tích cực', negativeAspects: 'Điểm tiêu cực', conclusion: 'Kết luận', globalSynthesis: 'Tổng hợp chung', recommendations: 'Khuyến nghị',

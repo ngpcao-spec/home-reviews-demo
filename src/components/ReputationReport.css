@@ -18,6 +18,17 @@
 .executive-satisfaction small{color:var(--text-muted,#b4ada3)}
 .executive-preview{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .consultant-aspects{list-style:none;padding:0;margin:16px 0;display:grid;gap:16px;line-height:1.65}.consultant-aspects li,.consultant-prose{overflow-wrap:anywhere}.consultant-prose{line-height:1.65;white-space:pre-wrap}.consultant-aspects strong{color:#d6c09b}
+.consultant-count-list{list-style:none;padding:0;margin:12px 0;display:grid;gap:10px}
+.consultant-count-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:baseline;line-height:1.45;font-size:.9rem}
+.consultant-count-list span{min-width:0;overflow-wrap:anywhere}.consultant-count-list strong{white-space:nowrap;text-align:right;color:#d6c09b;font-size:.85rem}
+.consultant-negative .consultant-count-list strong{color:#deb28a}
+.consultant-total{margin:0 0 16px;line-height:1.5}.consultant-total strong{font-size:1.5rem;color:#d6c09b}
+.consultant-sentiments,.consultant-axis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.consultant-sentiments{margin:0 0 20px}.consultant-sentiments dd{margin:4px 0 0;font-size:1.25rem;font-weight:700;color:#d6c09b}.consultant-sentiments>div:last-child dd{color:#deb28a}
+.consultant-axis-tile{min-width:0;padding:12px;border-radius:14px;background:#ffffff05;border:1px solid #ffffff0d}
+.consultant-axis-tile h3{margin:0 0 10px;font-size:1rem}.consultant-axis-tile dl{margin:0;display:grid;gap:6px;font-size:.85rem}
+.consultant-axis-tile dl>div{display:flex;align-items:baseline;gap:6px}.consultant-axis-tile dd{order:-1;margin:0;color:#d6c09b;font-weight:700}.consultant-axis-tile dl>div:last-child dd{color:#deb28a}
+.consultant-summary-themes{margin-top:24px}.consultant-summary-themes h3{font-size:1rem;line-height:1.45;margin:0 0 12px}
 .executive-block{margin-top:24px}.executive-block>h3{color:#d6c09b}
 .executive-themes{list-style:none;padding:0;margin:0;display:grid;gap:12px}
 .executive-themes li{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:baseline;gap:8px;line-height:1.5}
