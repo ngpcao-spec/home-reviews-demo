@@ -16,9 +16,15 @@ test('V3 summary second, nine fixed sections, compact details and no generation 
     await expect(page.locator('.consultant-positive-details strong')).toHaveText(['100','101','102','103','104','105','106'])
     await expect(page.locator('article > .consultant-section-banner')).toHaveCount(9)
     expect(await page.locator('.consultant-section-banner').evaluateAll(headers=>headers.every(header=>getComputedStyle(header).backgroundImage.includes('linear-gradient')))).toBe(true)
-    expect(await page.locator('.weekly-section').evaluateAll(sections=>sections.slice(1).every((section,i)=>section.getBoundingClientRect().top-sections[i].getBoundingClientRect().bottom>=24))).toBe(true)
-    for(const index of [2,3,4]){
-      expect(await page.locator('.weekly-section').nth(index).locator('header').evaluate(header=>header.getBoundingClientRect().height)).toBeLessThanOrEqual(54)
+    expect(await page.locator('.weekly-section').evaluateAll(sections=>sections.slice(1).every((section,i)=>Math.abs(section.getBoundingClientRect().top-sections[i].getBoundingClientRect().bottom-16)<1))).toBe(true)
+    for(const index of [2,3,4,6]){
+      const dimensions=await page.locator('.weekly-section').nth(index).locator('header').evaluate(header=>{
+        const badge=header.querySelector('.eyebrow')!.getBoundingClientRect()
+        return {height:header.getBoundingClientRect().height,badgeWidth:badge.width,badgeHeight:badge.height,radius:getComputedStyle(header).borderTopLeftRadius}
+      })
+      expect(dimensions.height).toBeGreaterThanOrEqual(52)
+      expect(dimensions.height).toBeLessThanOrEqual(56)
+      expect(dimensions).toMatchObject({badgeWidth:38,badgeHeight:34,radius:'0px'})
     }
     expect(await page.locator('.consultant-section-card').evaluateAll(cards=>cards.every(card=>{
       const bounds=card.getBoundingClientRect(),banner=card.querySelector('header')!.getBoundingClientRect(),title=card.querySelector('h2')!.getBoundingClientRect()
@@ -41,9 +47,10 @@ test('V3 summary second, nine fixed sections, compact details and no generation 
   await longTitle.evaluate(el=>{el.textContent='Synthèse des résultats de l’analyse'})
   const titleBounds=await longTitle.evaluate(el=>{
     const title=el.getBoundingClientRect(),header=el.closest('header')!.getBoundingClientRect()
-    return {fits:title.right<=header.right && title.bottom<=header.bottom,lines:title.height/parseFloat(getComputedStyle(el).lineHeight)}
+    return {fits:title.right<=header.right && title.bottom<=header.bottom,lines:title.height/parseFloat(getComputedStyle(el).lineHeight),height:header.height}
   })
   expect(titleBounds.fits).toBe(true)
   expect(titleBounds.lines).toBeLessThanOrEqual(2.1)
+  expect(titleBounds.height).toBeLessThanOrEqual(66)
   expect(requests).toHaveLength(0)
 })
