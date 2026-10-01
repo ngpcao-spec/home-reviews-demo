@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NormalizedReview } from './outscraper.ts'
+import { prepareInitialReviews } from './initial-import'
+import { reviewPersistenceBatches } from './review-persistence'
 import {
   configuredInteger,
   mapWithConcurrency,
@@ -22,6 +24,23 @@ const review = (id: string): NormalizedReview => ({
 })
 
 describe('scalable review sync queue helpers', () => {
+  it.each([100, 350, 500])('keeps %i existing reviews and appends incremental reviews without the initial cap', (size) => {
+    const existing = Array.from({ length: size }, (_, i) => review(`old-${i}`))
+    const stored = new Map(existing.map(item => [item.externalReviewId, item]))
+    const initial = prepareInitialReviews(existing)
+    expect(initial).toHaveLength(100)
+    expect(existing).toHaveLength(size)
+    const next = { ...review('new-review'), rating: 5 }
+    const page = pageBeforeCheckpoint([next, existing[0]], existing[0].externalReviewId)
+    expect(page.caughtUp).toBe(true)
+    for (const batch of reviewPersistenceBatches(page.reviews)) {
+      for (const item of batch) stored.set(item.externalReviewId, item)
+    }
+    expect(stored.size).toBe(size + 1)
+    expect(stored.get('new-review')?.rating).toBe(5)
+    expect(existing.every(item => stored.has(item.externalReviewId))).toBe(true)
+  })
+
   it.each([4, 100, 1_000, 10_000])(
     'deduplicates active jobs for %i due establishments',
     (size) => {

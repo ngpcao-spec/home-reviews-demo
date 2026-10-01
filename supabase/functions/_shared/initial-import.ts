@@ -1,4 +1,4 @@
-export const DEFAULT_INITIAL_REVIEWS_LIMIT = 500
+export const DEFAULT_INITIAL_REVIEWS_LIMIT = 100
 
 export interface InitialImportReview {
   externalReviewId: string

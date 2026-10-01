@@ -203,7 +203,7 @@ export function AnalyticsPage() {
           </div>}
           {visibleHistoricalReport?.reputation && <div className="reputation-sample-note">
             <p>{(visibleHistoricalReport.dataComplete ? messages.reputation.complete
-              : visibleHistoricalReport.storedReviewsCount === 500 ? messages.reputation.recent : messages.reputation.sample)
+              : messages.reputation.recent)
               .replace('{count}', number.format(visibleHistoricalReport.storedReviewsCount))}</p>
             {!visibleHistoricalReport.dataComplete && <small>{messages.reputation.partial}</small>}
             {visibleHistoricalReport.reputation.source_undated_count > 0 && <p>{messages.reputation.undated.replace('{count}',String(visibleHistoricalReport.reputation.source_undated_count))}</p>}

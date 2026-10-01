@@ -17,26 +17,28 @@ const review = (index: number, rating = index % 5 + 1) => ({
 })
 
 describe('import initial des avis les plus récents', () => {
-  it('utilise la limite serveur 500 et rejette une configuration hors produit', () => {
-    expect(DEFAULT_INITIAL_REVIEWS_LIMIT).toBe(500)
-    expect(initialReviewsLimit(undefined)).toBe(500)
-    expect(initialReviewsLimit('250')).toBe(250)
-    expect(initialReviewsLimit('501')).toBe(500)
-    expect(initialReviewsLimit('incorrect')).toBe(500)
+  it('utilise la limite serveur 100 et rejette une ancienne configuration 500', () => {
+    expect(DEFAULT_INITIAL_REVIEWS_LIMIT).toBe(100)
+    expect(initialReviewsLimit(undefined)).toBe(100)
+    expect(initialReviewsLimit('65')).toBe(65)
+    expect(initialReviewsLimit('500')).toBe(100)
+    expect(initialReviewsLimit('101')).toBe(100)
+    expect(initialReviewsLimit('incorrect')).toBe(100)
   })
 
-  it('persiste les 342 avis disponibles lorsque l’établissement en possède 342', () => {
-    const result = prepareInitialReviews(Array.from({ length: 342 }, (_, index) => review(index)))
-    expect(result).toHaveLength(342)
-    expect(initialHistoryComplete(342, result.length, 500)).toBe(true)
-  })
-
-  it.each([541, 1_649])('plafonne à 500 les %i avis Google les plus récents', (total) => {
+  it.each([65, 100])('conserve tous les %i avis disponibles', (total) => {
     const result = prepareInitialReviews(Array.from({ length: total }, (_, index) => review(index)))
-    expect(result).toHaveLength(500)
+    expect(result).toHaveLength(total)
+    expect(initialHistoryComplete(total, result.length, 100)).toBe(true)
+    expect(initialHistoryComplete(total, result.length - 1, 100)).toBe(false)
+  })
+
+  it.each([345, 1_659, 10_000])('plafonne à 100 les %i avis Google les plus récents', (total) => {
+    const result = prepareInitialReviews(Array.from({ length: total }, (_, index) => review(index)))
+    expect(result).toHaveLength(100)
     expect(result[0].externalReviewId).toBe('review-0')
-    expect(result.at(-1)?.externalReviewId).toBe('review-499')
-    expect(initialHistoryComplete(total, result.length, 500)).toBe(false)
+    expect(result.at(-1)?.externalReviewId).toBe('review-99')
+    expect(initialHistoryComplete(total, result.length, 100)).toBe(false)
   })
 
   it('conserve toutes les notes 1★ à 5★, déduplique et trie par date décroissante', () => {
