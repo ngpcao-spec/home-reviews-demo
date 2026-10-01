@@ -17,6 +17,7 @@
 .executive-satisfaction p,.executive-text{line-height:1.65;margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap}
 .executive-satisfaction small{color:var(--text-muted,#b4ada3)}
 .executive-preview{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.consultant-aspects{list-style:none;padding:0;margin:16px 0;display:grid;gap:16px;line-height:1.65}.consultant-aspects li,.consultant-prose{overflow-wrap:anywhere}.consultant-prose{line-height:1.65;white-space:pre-wrap}.consultant-aspects strong{color:#d6c09b}
 .executive-block{margin-top:24px}.executive-block>h3{color:#d6c09b}
 .executive-themes{list-style:none;padding:0;margin:0;display:grid;gap:12px}
 .executive-themes li{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:baseline;gap:8px;line-height:1.5}

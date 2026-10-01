@@ -1,8 +1,9 @@
 import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
-import { ANALYSIS_VERSION, reputationMetrics, reviewBatches, type ReputationReview } from '../_shared/reputation-metrics.ts'
-import { extractThemes, mergeThemes, overallSummary, representativeIds, type Finding } from '../_shared/reputation-themes.ts'
+import { reputationMetrics, type ReputationReview } from '../_shared/reputation-metrics.ts'
+import { CONSULTANT_VERSION as ANALYSIS_VERSION, AXES } from '../_shared/consultant-contract.ts'
+import { assembleConsultantReport, consultantBatches, consultantMetrics, consultantNarrative, extractConsultantBatch, insufficient, ratingClassification, type Classification, type ConsultantFinding } from '../_shared/consultant-report.ts'
 
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
 type InputReview = ReputationReview & { review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
@@ -37,8 +38,13 @@ Deno.serve(async (request) => {
     check(re,'REPORT_READ_FAILED')
     let {data:run,error:runError} = await admin.from('historical_report_runs').select('*').eq('establishment_id',id).eq('language',language).maybeSingle()
     check(runError,'REPORT_RUN_READ_FAILED')
+    // Never mix V2 extraction checkpoints with the V3 analytical contract.
+    if (run && run.snapshot.base.analysis_version !== ANALYSIS_VERSION && run.status !== 'completed') {
+      if (body.generation_id || run.lease_until && Date.parse(run.lease_until)>Date.now()) return json({error:'REPORT_VERSION_CHANGED'},409)
+      run = {...run,status:'failed'}
+    }
     // A crash after saving the report must not repeat the paid summary step.
-    if (run && run.status !== 'completed' && existing?.generation_id === run.generation_id && existing.ai_status === 'completed') {
+    if (run && run.snapshot.base.analysis_version === ANALYSIS_VERSION && run.status !== 'completed' && existing?.generation_id === run.generation_id && existing.ai_status === 'completed') {
       await admin.from('historical_report_runs').update({status:'completed',locked_by:null,lease_until:null}).eq('id',run.id).eq('generation_id',run.generation_id)
       return json({report:existing,cached:true})
     }
@@ -69,7 +75,8 @@ Deno.serve(async (request) => {
         period_start:dated[0] ?? e.created_at,period_end:end,google_rating:e.rating,google_total_reviews:e.total_reviews,
         source_latest_published_at:dated.at(-1) ?? null,source_undated_count:reviews.length-dated.length,
         ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION}}
-      const next = {organization_id:e.organization_id,establishment_id:id,language,generation_id:crypto.randomUUID(),status:'running',snapshot,findings:[],cursor:0,input_tokens:0,output_tokens:0,ai_calls:0,rejected_findings_count:0,token_usage_complete:true,lease_until:null,locked_by:null,error_code:null,updated_at:end}
+      const classifications = reviews.filter(review=>!(review.original_text ?? review.text ?? '').trim()).map(ratingClassification)
+      const next = {organization_id:e.organization_id,establishment_id:id,language,generation_id:crypto.randomUUID(),status:'running',snapshot,findings:[],classifications,cursor:0,input_tokens:0,output_tokens:0,ai_calls:0,rejected_findings_count:0,token_usage_complete:true,lease_until:null,locked_by:null,error_code:null,updated_at:end}
       const resume = run?.status === 'failed' && run.snapshot.base.source_fingerprint === sourceFingerprint
       const values = resume ? {status:'running',error_code:null,lease_until:null,locked_by:null,updated_at:end} : next
       const result = run
@@ -88,7 +95,7 @@ Deno.serve(async (request) => {
     check(fresh.error,'REPORT_RUN_READ_FAILED')
     run = fresh.data
     const reviews = run.snapshot.reviews as ReputationReview[]
-    const batches = reviewBatches(reviews)
+    const batches = consultantBatches(reviews)
     const updateRun = async (values: Record<string,unknown>) => {
       const result = await admin!.from('historical_report_runs').update({...values,updated_at:new Date().toISOString()}).eq('id',run.id).eq('generation_id',run.generation_id).eq('locked_by',worker).select('id').maybeSingle()
       check(result.error,'REPORT_PROGRESS_SAVE_FAILED')
@@ -101,24 +108,29 @@ Deno.serve(async (request) => {
     if (run.cursor < batches.length) {
       await updateRun({ai_calls:run.ai_calls+1})
       callUsageRecorded = false
-      const extracted = await extractThemes(batches[run.cursor],recordUsage)
-      const findings = [...new Map([...run.findings,...extracted.findings].map((f:Finding)=>[`${f.review_id}:${f.theme_key}:${f.sentiment}`,f])).values()]
-      await updateRun({findings,cursor:run.cursor+1,rejected_findings_count:run.rejected_findings_count+extracted.rejectedCount,locked_by:null,lease_until:null})
+      const extracted = await extractConsultantBatch(batches[run.cursor],recordUsage)
+      const findings = [...new Map([...run.findings,...extracted.findings].map((f:ConsultantFinding)=>[`${f.review_id}:${f.theme_key}:${f.sentiment}`,f])).values()]
+      const classifications = [...new Map([...run.classifications,...extracted.classifications].map((item:Classification)=>[item.review_id,item])).values()]
+      await updateRun({findings,classifications,cursor:run.cursor+1,rejected_findings_count:run.rejected_findings_count+extracted.rejectedCount,locked_by:null,lease_until:null})
       console.info('Historical report batch completed',{batch:run.cursor+1,accepted:extracted.findings.length,rejected:extracted.rejectedCount})
       claimed = null
       return json({pending:true,generation_id:run.generation_id,progress:run.cursor+1,total_steps:batches.length+1})
     }
-    const themes = mergeThemes(run.findings as Finding[])
-    await updateRun({ai_calls:run.ai_calls+1})
-    callUsageRecorded = false
-    const result = await overallSummary(run.snapshot.base,themes,language,recordUsage)
+    const metrics = consultantMetrics(reviews,run.classifications,run.findings)
+    const narrativeCall = metrics.themes.length > 0
+    if (narrativeCall) { await updateRun({ai_calls:run.ai_calls+1}); callUsageRecorded = false }
+    const result = narrativeCall ? await consultantNarrative(metrics,language,recordUsage) : {
+      report:assembleConsultantReport(metrics,{axes:AXES.map(key=>({key})),explanations:[],conclusion:insufficient(language)},language),
+      usage:{input_tokens:0,output_tokens:0},
+    }
+    // No establishment identity is provided to the narrative model. Reject any accidental echo.
+    if (e.name && JSON.stringify(result.report).normalize('NFC').toLowerCase().includes(e.name.normalize('NFC').toLowerCase())) throw new Error('REPORT_IDENTITY_DISCLOSURE')
     const generated = new Date().toISOString()
     const input = run.input_tokens+result.usage.input_tokens, output = run.output_tokens+result.usage.output_tokens
     const row = {...run.snapshot.base,generation_id:run.generation_id,
-      positive_themes:themes.filter(t=>t.sentiment==='positive'),negative_themes:themes.filter(t=>t.sentiment==='negative'),
-      representative_positive_review_ids:representativeIds(reviews,themes,'positive'),representative_attention_review_ids:representativeIds(reviews,themes,'negative'),
-      ai_overall_summary:result.summary,ai_historical_summary:result.summary,ai_status:'completed',ai_error:null,ai_model:'gpt-5.6-terra',
-      ai_input_tokens:input,ai_output_tokens:output,ai_total_tokens:input+output,ai_call_count:run.ai_calls+1,ai_cost_usd:null,
+      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:result.report,
+      ai_overall_summary:result.report.conclusion,ai_historical_summary:result.report.conclusion,ai_status:'completed',ai_error:null,ai_model:'gpt-5.6-terra',
+      ai_input_tokens:input,ai_output_tokens:output,ai_total_tokens:input+output,ai_call_count:run.ai_calls+(narrativeCall?1:0),ai_cost_usd:null,
       accepted_findings_count:run.findings.length,rejected_findings_count:run.rejected_findings_count,
       processed_batches_count:run.cursor,token_usage_complete:run.token_usage_complete,
       generated_at:generated,updated_at:generated}

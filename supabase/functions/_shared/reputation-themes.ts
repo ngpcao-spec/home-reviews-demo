@@ -86,7 +86,7 @@ export function representativeIds(reviews: ReputationReview[], themes: Theme[], 
 
 export interface Usage { input_tokens: number; output_tokens: number }
 type RecordUsage = (usage: Usage) => Promise<void>
-async function structuredCall(instructions: string, input: unknown, schema: unknown, maxTokens: number, recordUsage?: RecordUsage): Promise<{ data: Record<string, unknown>; usage: Usage }> {
+export async function structuredCall(instructions: string, input: unknown, schema: unknown, maxTokens: number, recordUsage?: RecordUsage): Promise<{ data: Record<string, unknown>; usage: Usage }> {
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
   if (!key) throw new Error('AI_NOT_CONFIGURED')
   const response = await fetch('https://api.openai.com/v1/responses', {

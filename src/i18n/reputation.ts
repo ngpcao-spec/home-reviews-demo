@@ -1,4 +1,11 @@
 export const reputationFr = {
+  reviewSynthesis: 'Synthèse des avis', analyzedTotal: 'Nombre total d’avis analysés', analyticalNegative: 'Avis négatifs',
+  quality: 'Qualité', price: 'Prix', axisPositive: 'Avis positifs concernant {axis}', axisNegative: 'Avis négatifs concernant {axis}',
+  positiveAspects: 'Aspects positifs', negativeAspects: 'Aspects négatifs', conclusion: 'Conclusion', globalSynthesis: 'Synthèse globale', recommendations: 'Recommandations',
+  exactReviews: '{count} avis', isolated: 'Constat ponctuel.',
+  analyticalNote: 'Classification analytique du contenu : chaque avis compte une seule fois. Elle est distincte du classement opérationnel par étoiles.',
+  insufficientAnalysis: 'Données insuffisantes dans les avis analysés pour tirer une conclusion fiable sur ce point.',
+  languageUnavailable: 'Ce rapport n’est pas disponible dans la langue sélectionnée.',
   regenerate: 'Régénérer l’analyse', lastUpdated: 'Dernière mise à jour', loadingReport: 'Chargement du rapport…',
   intro: 'Une vue complète de la réputation client, à partir des avis disponibles.',
   analyzed: 'Avis analysés', sampleRating: 'Note des avis analysés', positive: 'Avis positifs', attention: 'À surveiller',
@@ -26,6 +33,13 @@ export const reputationFr = {
   progress: 'Analyse par lots : {done} / {total}',
 }
 export const reputationVi: typeof reputationFr = {
+  reviewSynthesis: 'Tổng hợp đánh giá', analyzedTotal: 'Tổng số đánh giá được phân tích', analyticalNegative: 'Đánh giá tiêu cực',
+  quality: 'Chất lượng', price: 'Giá cả', axisPositive: 'Đánh giá tích cực về {axis}', axisNegative: 'Đánh giá tiêu cực về {axis}',
+  positiveAspects: 'Điểm tích cực', negativeAspects: 'Điểm tiêu cực', conclusion: 'Kết luận', globalSynthesis: 'Tổng hợp chung', recommendations: 'Khuyến nghị',
+  exactReviews: '{count} đánh giá', isolated: 'Ý kiến riêng lẻ.',
+  analyticalNote: 'Phân loại theo nội dung: mỗi đánh giá chỉ được tính một lần. Cách phân loại này khác với quy tắc xử lý theo số sao.',
+  insufficientAnalysis: 'Chưa có đủ dữ liệu trong các đánh giá được phân tích để đưa ra kết luận đáng tin cậy về điểm này.',
+  languageUnavailable: 'Báo cáo này chưa có bằng ngôn ngữ đã chọn.',
   regenerate: 'Tạo lại phân tích', lastUpdated: 'Cập nhật lần cuối', loadingReport: 'Đang tải báo cáo…',
   intro: 'Cái nhìn toàn diện về danh tiếng từ các đánh giá hiện có.',
   analyzed: 'Đánh giá được phân tích', sampleRating: 'Điểm trung bình của mẫu', positive: 'Đánh giá tích cực', attention: 'Cần lưu ý',

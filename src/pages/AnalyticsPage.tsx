@@ -5,6 +5,7 @@ import { analyticsSession, resolveAnalyticsSelection, type AnalyticsMode, type A
 import { useAnalyticsScroll } from '../lib/use-analytics-scroll'
 import { useApp } from '../app/AppContext'
 import { ReputationReport } from '../components/ReputationReport'
+import { ConsultantReport } from '../components/ConsultantReport'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
@@ -191,15 +192,15 @@ export function AnalyticsPage() {
 
     {selected && periodMode === 'historical' && <div className="weekly-report historical-report">
       <section className="weekly-report-hero card">
-        <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />
+        {!visibleHistoricalReport?.consultant && <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />}
         <div>
           <div className="weekly-report-label"><span className="eyebrow">{messages.analytics.historicalAnalysis}</span></div>
-          <h2>{selected.name}</h2>
+          {!visibleHistoricalReport?.consultant && <h2>{selected.name}</h2>}
           <p className="weekly-period">{visibleHistoricalReport ? `${formatHistoricalPeriodStart(visibleHistoricalReport.periodStart, language)} ${messages.reputation.until} ${new Date(visibleHistoricalReport.periodEnd).toLocaleDateString(language === 'vi' ? 'vi-VN' : 'fr-FR', {timeZone:'Asia/Ho_Chi_Minh'})}` : messages.analytics.historicalMode}</p>
-          <div className="weekly-google-metrics">
+          {!visibleHistoricalReport?.consultant && <div className="weekly-google-metrics">
             <strong>{(visibleHistoricalReport?.googleRating ?? selected.currentRating) === null ? '—' : (visibleHistoricalReport?.googleRating ?? selected.currentRating).toLocaleString(language === 'vi' ? 'vi-VN' : 'fr-FR', { maximumFractionDigits: 1 })} <Star aria-hidden="true"/></strong>
             <span>{(visibleHistoricalReport?.googleTotalReviews ?? selected.currentReviewCount) === null ? messages.analytics.snapshotUnavailable : `${number.format(visibleHistoricalReport?.googleTotalReviews ?? selected.currentReviewCount)} ${messages.analytics.googleReviews}`}</span>
-          </div>
+          </div>}
           {visibleHistoricalReport?.reputation && <div className="reputation-sample-note">
             <p>{(visibleHistoricalReport.dataComplete ? messages.reputation.complete
               : visibleHistoricalReport.storedReviewsCount === 500 ? messages.reputation.recent : messages.reputation.sample)
@@ -214,7 +215,7 @@ export function AnalyticsPage() {
       <div className="historical-report-action">
         <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
-          <span>{historicalGenerating ? messages.analytics.generatingHistorical : visibleHistoricalReport?.reputation ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
+          <span>{historicalGenerating ? messages.analytics.generatingHistorical : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
         </button>
         {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
         {visibleHistoricalReport?.generatedAt && <small>{messages.reputation.lastUpdated}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
@@ -223,7 +224,7 @@ export function AnalyticsPage() {
         {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
       </div>
 
-      {visibleHistoricalReport && <ReputationReport report={visibleHistoricalReport} />}
+      {visibleHistoricalReport && (visibleHistoricalReport.consultant ? <ConsultantReport report={visibleHistoricalReport.consultant}/> : <ReputationReport report={visibleHistoricalReport} />)}
 
     </div>}
 

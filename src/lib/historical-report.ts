@@ -1,4 +1,5 @@
 import type { PreferredLanguage, Review } from '../types/domain'
+import type { ConsultantReportData } from '../../supabase/functions/_shared/consultant-contract'
 
 export interface ReputationTheme {
   category: 'food' | 'service' | 'atmosphere' | 'other'
@@ -31,6 +32,7 @@ export interface ReputationData {
 }
 
 export interface HistoricalReport {
+  consultant?: ConsultantReportData
   reputation?: ReputationData
   id: string
   organizationId: string
@@ -53,6 +55,7 @@ export interface HistoricalReport {
 }
 
 export interface HistoricalReportRow extends Partial<ReputationData> {
+  consultant_report?: ConsultantReportData | null
   id: string
   organization_id: string
   establishment_id: string
@@ -79,6 +82,7 @@ export interface HistoricalReportRow extends Partial<ReputationData> {
 
 export function mapHistoricalReport(row: HistoricalReportRow): HistoricalReport {
   return {
+    consultant: row.analysis_version === 3 && row.consultant_report?.version === 3 ? row.consultant_report : undefined,
     reputation: row.analysis_version === 2 ? row as HistoricalReportRow & ReputationData : undefined,
     id: row.id,
     organizationId: row.organization_id,
