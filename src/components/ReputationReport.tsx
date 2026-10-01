@@ -31,7 +31,7 @@ export function ReputationReport({ report }: {report: HistoricalReport}) {
   const heading = (n:string,title:string) => <div className="weekly-section-heading"><span className="eyebrow">{n}</span><h2>{title}</h2></div>
   const themes = (items:ReputationTheme[]) => items.length ? <ul className="reputation-themes">{items.map(t=><li key={t.theme_key}><span>{language==='vi'?t.label_vi:t.label_fr}</span><b>{m.mentions.replace('{count}',number(t.mentions,0))}</b></li>)}</ul> : <p className="reputation-muted">{m.noTheme}</p>
   const exampleCards = (selectedIds:string[]) => <div className="reputation-examples">
-    {examplesLoading ? <p>{messages.common.loading}</p> : examplesError ? <p role="alert">{m.examplesFailed}</p> : !selectedIds.length ? <p>{m.noExample}</p> : selectedIds.map(id=>{
+    {examplesLoading && !examples.length ? <p>{messages.common.loading}</p> : examplesError && !examples.length ? <p role="alert">{m.examplesFailed}</p> : !selectedIds.length ? <p>{m.noExample}</p> : selectedIds.map(id=>{
       const review=examples.find(r=>r.id===id)
       if (!review) return null
       const translated=review.review_translations.find(t=>t.language===language)?.translated_text

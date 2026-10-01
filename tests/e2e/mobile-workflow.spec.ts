@@ -39,6 +39,28 @@ test('ajoute un établissement avec le fournisseur mock',async({page})=>{
 
 test('ne déborde pas horizontalement',async({page})=>{await page.goto('/');const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth);expect(overflow).toBe(false)})
 
+test('restaure sélection historique et scroll au retour dans Analyses',async({page})=>{
+  const generationRequests:string[]=[]
+  page.on('request',request=>{if(request.url().includes('generate-historical-report'))generationRequests.push(request.url())})
+  await page.goto('/analyses')
+  const selected=await page.getByLabel('Établissement',{exact:true}).locator('option').nth(1).getAttribute('value')
+  await page.getByLabel('Période').selectOption('historical')
+  await page.getByLabel('Établissement',{exact:true}).selectOption({index:1})
+  await expect(page).toHaveURL(new RegExp(`establishment=${selected}&mode=historical`))
+  await expect(page.getByRole('button',{name:'Régénérer l’analyse'})).toBeVisible()
+  await page.evaluate(()=>window.scrollTo({top:900,behavior:'instant'}))
+  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(900)
+  await page.getByRole('link',{name:'Établissements',exact:true}).click()
+  await page.getByRole('link',{name:'Analyses',exact:true}).click()
+  await expect(page.getByLabel('Établissement',{exact:true})).toHaveValue(selected)
+  await expect(page.getByLabel('Période')).toHaveValue('historical')
+  await expect(page.locator('[data-testid="analytics-initial-loading"]')).toHaveCount(0)
+  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(900)
+  expect(generationRequests).toHaveLength(0)
+  await page.getByLabel('Période').selectOption('completed')
+  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(0)
+})
+
 test('garde le résumé hebdomadaire au-dessus de la navigation et de la safe-area',async({page},testInfo)=>{
   test.skip(testInfo.project.name==='desktop','La régression concerne la navigation mobile fixe')
   await page.goto('/analyses')

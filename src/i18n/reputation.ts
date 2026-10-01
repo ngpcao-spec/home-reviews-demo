@@ -1,4 +1,5 @@
 export const reputationFr = {
+  regenerate: 'Régénérer l’analyse', lastUpdated: 'Dernière mise à jour', loadingReport: 'Chargement du rapport…',
   intro: 'Une vue complète de la réputation client, à partir des avis disponibles.',
   analyzed: 'Avis analysés', sampleRating: 'Note des avis analysés', positive: 'Avis positifs', attention: 'À surveiller',
   sample: 'Analyse basée sur {count} avis disponibles dans HOME Reviews.',
@@ -20,6 +21,7 @@ export const reputationFr = {
   progress: 'Analyse par lots : {done} / {total}',
 }
 export const reputationVi: typeof reputationFr = {
+  regenerate: 'Tạo lại phân tích', lastUpdated: 'Cập nhật lần cuối', loadingReport: 'Đang tải báo cáo…',
   intro: 'Cái nhìn toàn diện về danh tiếng từ các đánh giá hiện có.',
   analyzed: 'Đánh giá được phân tích', sampleRating: 'Điểm trung bình của mẫu', positive: 'Đánh giá tích cực', attention: 'Cần lưu ý',
   sample: 'Phân tích dựa trên {count} đánh giá hiện có trong HOME Reviews.',

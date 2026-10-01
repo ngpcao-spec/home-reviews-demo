@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { User } from '@supabase/supabase-js'
 import { demoPlan, seedEstablishments, seedNotifications, seedReviews } from '../data/mock-data'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { resetAnalyticsCache } from '../lib/analytics-cache'
 import { nextSyncAtFromLastSync } from '../lib/monitoring-schedule'
 import { localizedReviewText } from '../lib/review-translation'
 import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
@@ -63,7 +64,7 @@ interface AppContextValue {
   passwordRecovery: boolean
   monitoringIntervalHours: number
   preferredLanguage: PreferredLanguage | null
-  currentUser: { name: string; email: string; avatarUrl?: string; initials: string }
+  currentUser: { id?: string; name: string; email: string; avatarUrl?: string; initials: string }
   plan: typeof demoPlan
   aiUsage: number
   markProcessed: (reviewId: string) => void
@@ -503,6 +504,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAuthReady(true)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') resetAnalyticsCache()
       setAuthUser(session?.user ?? null)
       setAuthReady(true)
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
@@ -866,6 +868,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const name = metadata.full_name ?? metadata.name ?? metadata.display_name ?? authUser?.email?.split('@')[0] ?? (demoMode ? 'Linh Nguyen' : 'Utilisateur')
     const initials = String(name).split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'HR'
     return {
+      id: authUser?.id ?? (demoMode ? 'demo' : undefined),
       name: String(name),
       email: authUser?.email ?? (demoMode ? 'linh@home-reviews.fr' : ''),
       avatarUrl: metadata.avatar_url ?? metadata.picture ?? undefined,
