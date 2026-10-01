@@ -11,4 +11,20 @@
 .reputation-example p{line-height:1.65;overflow-wrap:anywhere;white-space:pre-wrap}.reputation-example footer{display:flex;gap:12px;justify-content:space-between;font-size:.8rem;margin-top:14px;color:#b4ada3}
 .reputation-replies{margin:0 0 14px;display:grid;gap:12px}.reputation-replies div{display:flex;gap:12px;justify-content:space-between}.reputation-replies dd{margin:0;color:#d6c09b;font-weight:700}
 .reputation-attention strong{color:#d6c09b}.reputation-sample-note{line-height:1.6;color:#cfc5b6;margin-top:14px;font-size:.88rem}
+.executive-summary{padding:clamp(16px,3vw,24px);min-width:0}
+.executive-summary h3{font-size:1rem;line-height:1.45;margin:0 0 10px}
+.executive-satisfaction{border-left:3px solid #d6c09b;padding-left:14px}
+.executive-satisfaction p,.executive-text{line-height:1.65;margin:8px 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.executive-satisfaction small{color:var(--text-muted,#b4ada3)}
+.executive-preview{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.executive-block{margin-top:24px}.executive-block>h3{color:#d6c09b}
+.executive-themes{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.executive-themes li{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:baseline;gap:8px;line-height:1.5}
+.executive-themes svg{align-self:start;margin-top:4px;color:#d6c09b}
+.executive-themes span{overflow-wrap:anywhere}.executive-themes b{white-space:nowrap;font-size:.78rem;font-weight:600;color:#d6c09b;text-align:right}
+.executive-negative svg,.executive-negative b{color:#deb28a}
+.executive-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 0;background:none;border:0;color:#d6c09b;text-align:left;font:inherit;cursor:pointer}
+.executive-toggle:focus-visible{outline:2px solid #d6c09b;outline-offset:4px;border-radius:4px}.executive-toggle:disabled{opacity:.6;cursor:default}
+.executive-about{width:100%;border-top:1px solid #ffffff18;margin-top:20px;padding-top:16px}.executive-about[aria-expanded=true] svg{transform:rotate(180deg)}
+.executive-methodology{display:grid;gap:12px;font-size:.85rem;line-height:1.5}.executive-methodology div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.executive-methodology dd{margin:0;text-align:right;overflow-wrap:anywhere;color:#d6c09b}
 @media(max-width:700px){.reputation-categories{grid-template-columns:minmax(0,1fr)}.reputation-category,.reputation-theme-card,.reputation-example{padding:18px}.reputation-themes li{gap:8px}}
