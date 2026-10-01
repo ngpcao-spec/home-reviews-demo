@@ -77,4 +77,22 @@ describe('manual historical report generation', () => {
     resolveRequest({ data: { error: 'NO_REVIEWS_AVAILABLE' }, error: null })
     expect(await screen.findByText('Chưa có đủ dữ liệu để tạo báo cáo.')).toBeVisible()
   })
+
+  it('continues the same server generation without starting another report', async () => {
+    let steps = 0
+    mocks.invoke.mockImplementation((name: string) => Promise.resolve(name !== 'generate-historical-report'
+      ? { data: { error: 'WEEKLY_TEST_RESPONSE' }, error: null }
+      : ++steps === 1
+        ? { data: { pending: true, generation_id: 'generation-1', progress: 1, total_steps: 3 }, error: null }
+        : { data: { error: 'NO_REVIEWS_AVAILABLE' }, error: null }))
+    renderPage()
+    await selectHistoricalMode()
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo báo cáo AI' }))
+    expect(await screen.findByText('Phân tích theo nhóm: 1 / 3')).toBeVisible()
+    expect(await screen.findByText('Chưa có đủ dữ liệu để tạo báo cáo.', {}, {timeout:3000})).toBeVisible()
+    const calls=mocks.invoke.mock.calls.filter(([name])=>name==='generate-historical-report')
+    expect(calls).toHaveLength(2)
+    expect(calls[0][1].body).toEqual({establishment_id:'est-1',force:true})
+    expect(calls[1][1].body).toEqual({establishment_id:'est-1',generation_id:'generation-1'})
+  })
 })
