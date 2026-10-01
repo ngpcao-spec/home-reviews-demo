@@ -18,12 +18,29 @@ describe('consultant V3 isolated analytics',()=>{
     expect(metrics.axes.map(axis=>axis.key)).toEqual([...AXES])
     expect(reputationMetrics(rows,9999).negative_reviews_count).toBe(2)
   })
-  it('rejects missing, duplicate, unknown and ungrounded classifications rather than fabricate exact totals',()=>{
-    const rows=[review('a')]
-    expect(()=>validateConsultantBatch({classifications:[],findings:[]},rows)).toThrow('REPORT_CLASSIFICATION_INCOMPLETE')
-    expect(()=>validateConsultantBatch({classifications:[classified('other')],findings:[]},rows)).toThrow('REPORT_INVALID_CLASSIFICATION')
-    expect(()=>validateConsultantBatch({classifications:[classified('a'),classified('a')],findings:[]},rows)).toThrow('REPORT_INVALID_CLASSIFICATION')
-    expect(()=>validateConsultantBatch({classifications:[{...classified('a'),evidence:'Not in the review'}],findings:[]},rows)).toThrow('REPORT_UNGROUNDED_CLASSIFICATION')
+  it.each([[],[classified('other')],[classified('a'),classified('a')],[{...classified('a'),evidence:'Not in the review'}],[{...classified('a'),sentiment:'mixed'}],[null]].map(classifications=>({classifications})))('falls back for invalid individual classifications: $classifications',({classifications})=>{
+    for (const rating of [1,2,3,4,5]) {
+      const result=validateConsultantBatch({classifications,findings:[]},[review('a',rating)])
+      expect(result.classifications).toEqual([ratingClassification(review('a',rating))])
+      expect(result.classificationFallbackCount).toBe(1)
+    }
+  })
+  it('keeps valid text-based classifications despite stars and repairs one invalid among sixty',()=>{
+    const rows=Array.from({length:60},(_,i)=>review(String(i),5))
+    const result=validateConsultantBatch({classifications:rows.map((r,i)=>({...classified(r.id,'negative'),evidence:i===30?'invented':'slow service'})),findings:[]},rows)
+    expect(result.classificationFallbackCount).toBe(1)
+    const metrics=consultantMetrics(rows,result.classifications,[])
+    expect(metrics).toMatchObject({total:60,positive:1,negative:59,classificationFallbackCount:1})
+    expect(metrics.positive+metrics.negative).toBe(metrics.total)
+  })
+  it('repairs missing persisted classifications before final counting, ignoring unknown IDs',()=>{
+    const rows=[review('a',5),review('b',2),review('c',4)]
+    const metrics=consultantMetrics(rows,[{...classified('a','negative'),evidence:'slow service'},classified('unknown')],[])
+    expect(metrics).toMatchObject({total:3,positive:1,negative:2,classificationFallbackCount:2})
+    expect(metrics.classifications.map(c=>c.review_id)).toEqual(['a','b','c'])
+  })
+  it.each([null,{}, {classifications:null,findings:[]}, {classifications:[],findings:null}])('still rejects an unusable batch envelope: %j',raw=>{
+    expect(()=>validateConsultantBatch(raw,[review('a')])).toThrow('REPORT_INVALID_ANALYSIS')
   })
   it('deduplicates per review/theme and per axis, with both sentiments independently counted',()=>{
     const rows=[review('a'),review('b')]

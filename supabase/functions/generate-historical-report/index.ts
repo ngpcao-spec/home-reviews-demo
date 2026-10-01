@@ -112,11 +112,13 @@ Deno.serve(async (request) => {
       const findings = [...new Map([...run.findings,...extracted.findings].map((f:ConsultantFinding)=>[`${f.review_id}:${f.theme_key}:${f.sentiment}`,f])).values()]
       const classifications = [...new Map([...run.classifications,...extracted.classifications].map((item:Classification)=>[item.review_id,item])).values()]
       await updateRun({findings,classifications,cursor:run.cursor+1,rejected_findings_count:run.rejected_findings_count+extracted.rejectedCount,locked_by:null,lease_until:null})
-      console.info('Historical report batch completed',{batch:run.cursor+1,accepted:extracted.findings.length,rejected:extracted.rejectedCount})
+      console.info('Historical report batch completed',{batch:run.cursor+1,accepted:extracted.findings.length,rejected:extracted.rejectedCount,classification_fallback_count:extracted.classificationFallbackCount})
       claimed = null
       return json({pending:true,generation_id:run.generation_id,progress:run.cursor+1,total_steps:batches.length+1})
     }
     const metrics = consultantMetrics(reviews,run.classifications,run.findings)
+    // Persist repaired final classifications before narrative/saving; basis is the durable fallback metric.
+    await updateRun({classifications:metrics.classifications})
     const narrativeCall = metrics.themes.length > 0
     if (narrativeCall) { await updateRun({ai_calls:run.ai_calls+1}); callUsageRecorded = false }
     const result = narrativeCall ? await consultantNarrative(metrics,language,recordUsage) : {
@@ -128,7 +130,7 @@ Deno.serve(async (request) => {
     const generated = new Date().toISOString()
     const input = run.input_tokens+result.usage.input_tokens, output = run.output_tokens+result.usage.output_tokens
     const row = {...run.snapshot.base,generation_id:run.generation_id,
-      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:result.report,
+      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:{...result.report,classification_fallback_count:metrics.classificationFallbackCount},
       ai_overall_summary:result.report.conclusion,ai_historical_summary:result.report.conclusion,ai_status:'completed',ai_error:null,ai_model:'gpt-5.6-terra',
       ai_input_tokens:input,ai_output_tokens:output,ai_total_tokens:input+output,ai_call_count:run.ai_calls+(narrativeCall?1:0),ai_cost_usd:null,
       accepted_findings_count:run.findings.length,rejected_findings_count:run.rejected_findings_count,
@@ -138,6 +140,7 @@ Deno.serve(async (request) => {
     const saved = await admin.from('historical_establishment_reports').upsert(row,{onConflict:'establishment_id,preferred_language'}).select('*').single()
     check(saved.error,'REPORT_SAVE_FAILED')
     await updateRun({status:'completed',input_tokens:input,output_tokens:output,lease_until:null,locked_by:null})
+    console.info('Historical report classification totals',{total:metrics.total,positive:metrics.positive,negative:metrics.negative,classification_fallback_count:metrics.classificationFallbackCount})
     claimed = null
     return json({report:saved.data})
   } catch(error) {

@@ -56,13 +56,13 @@ describe('V3 finalization and safety',()=>{
     expect(harness.writes.every(write=>['historical_report_runs','historical_establishment_reports'].includes(write.table))).toBe(true)
     expect(mocks.extract).not.toHaveBeenCalled()
   })
-  it('retains the previous report if classifications are incomplete',async()=>{
+  it('repairs incomplete classifications and persists exact final counts plus fallback observability',async()=>{
     const harness=await setup('missing')
     const response=await harness.call()
-    expect(response.status).toBe(500)
-    expect(await response.json()).toMatchObject({error:'REPORT_CLASSIFICATION_INCOMPLETE'})
-    expect(harness.getReport()).toBe(harness.oldReport)
-    expect(mocks.narrative).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(harness.getReport()).toMatchObject({analytical_positive_count:1,analytical_negative_count:1,consultant_report:{total:2,positive:1,negative:1,classification_fallback_count:2}})
+    const repaired=harness.writes.find(write=>Array.isArray(write.values.classifications))!
+    expect(repaired.values.classifications).toHaveLength(2)
   })
   it('does not call AI when another request owns the lease',async()=>{
     const harness=await setup('locked')

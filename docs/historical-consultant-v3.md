@@ -17,12 +17,20 @@ La classification analytique est distincte des statistiques opérationnelles :
 - un avis = une classification positive ou négative ;
 - sens global du texte original en priorité ;
 - ambiguïté/absence de texte : 4–5★ positif, 1–3★ négatif ;
-- une classification manquante, inconnue ou dupliquée bloque la finalisation, sans remplacer l’ancien rapport ;
+- une classification absente, invalide, dupliquée ou sans preuve textuelle exacte utilise le fallback 4–5★ positif / 1–3★ négatif, sans bloquer le batch ; les IDs inconnus sont ignorés ;
 - les totaux sont calculés côté serveur, pas fournis par le modèle ;
 - les mentions sont des identifiants d’avis distincts par thème/sentiment et par axe/sentiment ; les thèmes ne sont jamais additionnés pour obtenir le total ;
 - un avis peut contribuer à plusieurs axes et aux deux sentiments d’un axe.
 
 Le moteur fournit un catalogue fixe avec synonymes regroupés. Chaque finding doit être ancré dans un extrait exact normalisé (Unicode/espaces). Un finding non sourcé est rejeté individuellement ; les décomptes thématiques portent uniquement sur les findings acceptés. Comme pour toute extraction IA, le grounding vérifie la présence de la preuve, pas l’infaillibilité de son interprétation sémantique.
+
+### Classification résiliente
+
+Une classification textuelle valide prime toujours sur la note (un 5★ critique peut être négatif). Le fallback ne crée aucun finding et ne contribue pas aux comptes des thèmes. Une enveloppe structurée entière inutilisable reste une erreur de batch.
+
+Avant sauvegarde, les classifications sont reconstruites depuis les IDs du snapshot, revalidées, complétées par la note si nécessaire puis persistées. Les comptes positif/négatif sont exclusivement calculés depuis cette liste finale ; leur somme est vérifiée et la contrainte SQL existante reste active.
+
+La métrique durable du run est le nombre de `classifications` ayant `basis = rating`. Elle inclut les avis sans texte, les réponses `insufficient` et les propositions invalides/manquantes, une seule fois par avis. Elle est également conservée dans `consultant_report.classification_fallback_count` et les logs de compteurs (sans texte d’avis). Aucun nouveau champ SQL ni migration n’est nécessaire. Version, fingerprint et découpage des batches restent inchangés : un run échoué reprend à son curseur si les données sont identiques.
 
 ## Reprise, coûts, confidentialité
 

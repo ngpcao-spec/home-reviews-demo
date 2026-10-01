@@ -19,6 +19,25 @@ const sentiment = (value: unknown): value is AnalyticalSentiment => value === 'p
 const quoted = (evidence: unknown, sources: string[]) => typeof evidence === 'string' && normalizeEvidence(evidence).length >= 1 && sources.some(source => normalizeEvidence(source).includes(normalizeEvidence(evidence)))
 export const ratingClassification = (review: ReputationReview): Classification => ({review_id: review.id, sentiment: review.rating >= 4 ? 'positive' : 'negative', basis: 'rating', evidence: ''})
 
+/** Source reviews own the IDs and totals. Ambiguous duplicates never win by array order. */
+export function finalClassifications(reviews: ReputationReview[], proposed: unknown[], persisted = false): Classification[] {
+  const grouped = new Map<string, Record<string, unknown>[]>()
+  for (const value of proposed) {
+    const item = object(value)
+    if (!item || typeof item.review_id !== 'string') continue
+    grouped.set(item.review_id, [...(grouped.get(item.review_id) ?? []), item])
+  }
+  return reviews.map(review => {
+    const candidates = grouped.get(review.id) ?? []
+    const item = candidates.length === 1 ? candidates[0] : null
+    if (item && (!persisted || item.basis === 'text') && sentiment(item.sentiment)
+      && original(review) && quoted(item.evidence, [original(review)])) {
+      return {review_id:review.id, sentiment:item.sentiment, basis:'text', evidence:item.evidence as string}
+    }
+    return ratingClassification(review)
+  })
+}
+
 /** No review text is truncated or silently excluded. Empty reviews use the tie-breaker without AI. */
 export function consultantBatches(reviews: ReputationReview[]) {
   const batches: ReputationReview[][] = []
@@ -38,17 +57,7 @@ export function validateConsultantBatch(raw: unknown, reviews: ReputationReview[
   const result = object(raw)
   if (!result || !Array.isArray(result.classifications) || !Array.isArray(result.findings)) throw new Error('REPORT_INVALID_ANALYSIS')
   const byId = new Map(reviews.map(review => [review.id, review]))
-  const classifications = new Map<string, Classification>()
-  for (const value of result.classifications) {
-    const item = object(value), review = item && byId.get(String(item.review_id))
-    if (!item || !review || classifications.has(review.id) || !['positive','negative','insufficient'].includes(String(item.sentiment))) throw new Error('REPORT_INVALID_CLASSIFICATION')
-    if (item.sentiment === 'insufficient' || !original(review)) classifications.set(review.id, ratingClassification(review))
-    else {
-      if (!quoted(item.evidence, [original(review)])) throw new Error('REPORT_UNGROUNDED_CLASSIFICATION')
-      classifications.set(review.id, {review_id:review.id, sentiment:item.sentiment as AnalyticalSentiment, basis:'text', evidence:item.evidence as string})
-    }
-  }
-  if (classifications.size !== byId.size) throw new Error('REPORT_CLASSIFICATION_INCOMPLETE')
+  const classifications = finalClassifications(reviews, result.classifications)
   const findings = new Map<string, ConsultantFinding>()
   let rejectedCount = 0
   for (const value of result.findings) {
@@ -58,7 +67,7 @@ export function validateConsultantBatch(raw: unknown, reviews: ReputationReview[
     const finding = item as unknown as ConsultantFinding
     findings.set(`${review.id}:${finding.theme_key}:${finding.sentiment}`, finding)
   }
-  return {classifications:[...classifications.values()], findings:[...findings.values()], rejectedCount}
+  return {classifications, findings:[...findings.values()], rejectedCount, classificationFallbackCount:classifications.filter(item=>item.basis==='rating').length}
 }
 
 const string = {type:'string'}
@@ -88,9 +97,10 @@ export async function extractConsultantBatch(reviews: ReputationReview[], record
 export function consultantMetrics(reviews: ReputationReview[], classifications: Classification[], findings: ConsultantFinding[]) {
   const ids = new Set(reviews.map(review => review.id))
   if (ids.size !== reviews.length) throw new Error('REPORT_DUPLICATE_REVIEW')
-  const classified = new Map(classifications.map(item => [item.review_id,item]))
-  if (classified.size !== ids.size || classifications.length !== ids.size || [...classified.values()].some(item => !ids.has(item.review_id) || !sentiment(item.sentiment))) throw new Error('REPORT_CLASSIFICATION_INCOMPLETE')
-  const positive = classifications.filter(item => item.sentiment === 'positive').length
+  const final = finalClassifications(reviews, classifications, true)
+  const positive = final.filter(item => item.sentiment === 'positive').length
+  const negative = final.filter(item => item.sentiment === 'negative').length
+  if (positive + negative !== ids.size) throw new Error('REPORT_CLASSIFICATION_TOTAL_MISMATCH')
   const groups = new Map<string, {theme_key:string;axis:Axis;sentiment:AnalyticalSentiment;review_ids:string[];mentions:number}>()
   for (const finding of findings) {
     if (!ids.has(finding.review_id) || !Object.hasOwn(CATALOG,finding.theme_key) || !sentiment(finding.sentiment)) throw new Error('REPORT_INVALID_FINDINGS')
@@ -101,7 +111,7 @@ export function consultantMetrics(reviews: ReputationReview[], classifications: 
     groups.set(key,group)
   }
   const themes = [...groups.values()].sort((a,b) => b.mentions-a.mentions || a.theme_key.localeCompare(b.theme_key))
-  return {total:ids.size,positive,negative:ids.size-positive,themes,axes:AXES.map(key => ({key,
+  return {total:ids.size,positive,negative,classifications:final,classificationFallbackCount:final.filter(item=>item.basis==='rating').length,themes,axes:AXES.map(key => ({key,
     positive:new Set(themes.filter(theme => theme.axis===key && theme.sentiment==='positive').flatMap(theme=>theme.review_ids)).size,
     negative:new Set(themes.filter(theme => theme.axis===key && theme.sentiment==='negative').flatMap(theme=>theme.review_ids)).size,
   }))}
