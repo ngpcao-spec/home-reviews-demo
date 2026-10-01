@@ -28,6 +28,7 @@ const successResult = {
 const resolveEstablishment = vi.fn()
 const addEstablishment = vi.fn()
 const retryEstablishmentImport = vi.fn()
+let establishmentCount = 0
 
 vi.mock('../app/AppContext', () => ({
   useApp: () => ({
@@ -37,7 +38,7 @@ vi.mock('../app/AppContext', () => ({
     acknowledgeInitialImport: vi.fn(),
     refreshInitialImports: vi.fn().mockResolvedValue(undefined),
     initialImportJobs: [],
-    establishments: [],
+    establishments: Array.from({ length: establishmentCount }, (_, index) => ({ id: `establishment-${index + 1}` })),
     notifications: [],
     plan: { maxEstablishments: 5 },
     monitoringIntervalHours: 12,
@@ -76,12 +77,21 @@ describe('confirmation d’ajout d’un établissement', () => {
   afterEach(() => cleanup())
 
   beforeEach(() => {
+    establishmentCount = 0
     resolveEstablishment.mockReset().mockResolvedValue(candidate)
     addEstablishment.mockReset().mockResolvedValue(successResult)
     retryEstablishmentImport.mockReset().mockResolvedValue({
       negativeReviewCount: 18,
       nextSyncAt: successResult.nextSyncAt,
     })
+  })
+
+  it.each([4, 5, 6, 10])('permet l’ajout avec %i établissements existants', async (count) => {
+    establishmentCount = count
+    await completeSuccessfulAdd()
+
+    expect(addEstablishment).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/quota d’établissements/i)).not.toBeInTheDocument()
   })
 
   it('conserve l’écran de succès et affiche toutes les informations attendues', async () => {
