@@ -4,20 +4,9 @@ import { OutscraperError } from '../_shared/outscraper.ts'
 import { ApifyError } from '../_shared/apify.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { preferredLanguageForUser, resolveEstablishmentCandidate } from '../_shared/sync-service.ts'
+import { normalizeGoogleMapsLink } from '../_shared/google-maps-link.ts'
 
 interface RequestBody { input?: unknown }
-
-function isSupportedGoogleMapsUrl(input: string): boolean {
-  try {
-    const url = new URL(input)
-    if (url.protocol !== 'https:') return false
-    const host = url.hostname.toLowerCase()
-    return host === 'maps.app.goo.gl'
-      || ((host === 'google.com' || host.endsWith('.google.com')) && url.pathname.includes('/maps'))
-  } catch {
-    return false
-  }
-}
 
 Deno.serve(async (request) => {
   const preflightResponse = preflight(request)
@@ -28,7 +17,9 @@ Deno.serve(async (request) => {
     const { user, admin } = await requireUser(request)
     enforceRateLimit(`resolve-establishment:${user.id}`, 10, 60_000)
     const body = await request.json() as RequestBody
-    if (typeof body.input !== 'string' || body.input.length > 500 || !isSupportedGoogleMapsUrl(body.input.trim())) {
+    const normalizedLink = typeof body.input === 'string' && body.input.length <= 500
+      ? normalizeGoogleMapsLink(body.input) : null
+    if (!normalizedLink) {
       return json({ error: 'INVALID_GOOGLE_MAPS_LINK' }, 400)
     }
 
@@ -42,7 +33,7 @@ Deno.serve(async (request) => {
     if (membershipError || !membership) return json({ error: 'FORBIDDEN' }, 403)
 
     const language = await preferredLanguageForUser(admin, user.id)
-    const resolved = await resolveEstablishmentCandidate(body.input.trim(), language)
+    const resolved = await resolveEstablishmentCandidate(normalizedLink, language)
     const { data: existing, error: existingError } = await admin
       .from('establishments')
       .select('id')
