@@ -184,7 +184,7 @@ interface NotificationRow {
   id: string
   organization_id: string
   user_id: string
-  review_id: string
+  review_id: string | null
   establishment_id: string
   type: string
   title: string
@@ -383,11 +383,11 @@ function mapNotification(row: NotificationRow): AppNotification {
     organizationId: row.organization_id,
     userId: row.user_id,
     establishmentId: row.establishment_id,
-    reviewId: row.review_id,
+    reviewId: row.review_id ?? undefined,
     type: row.type,
     title: row.title,
     body: row.body,
-    severity: 'high',
+    severity: row.type === 'initial_import_completed' ? 'info' : 'high',
     readAt: row.read_at ?? undefined,
     pushStatus: row.push_status,
     createdAt: row.created_at,

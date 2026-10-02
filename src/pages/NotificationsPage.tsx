@@ -13,9 +13,10 @@ export function NotificationsPage() {
   const sorted = [...notifications].sort((a, b) => Number(Boolean(a.readAt)) - Number(Boolean(b.readAt))
     || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-  const openNotification = async (notificationId: string, reviewId?: string) => {
+  const openNotification = async (notificationId: string, reviewId?: string, establishmentId?: string) => {
     await markNotificationRead(notificationId)
     if (reviewId) navigate(`/avis/${reviewId}`)
+    else if (establishmentId) navigate(`/etablissements/${establishmentId}`)
   }
 
   return <>
@@ -30,11 +31,11 @@ export function NotificationsPage() {
       return <button
         key={item.id}
         className={`notification-item card ${item.readAt ? 'read' : ''}`}
-        onClick={() => void openNotification(item.id, item.reviewId)}
+        onClick={() => void openNotification(item.id, item.reviewId, item.establishmentId)}
       >
         <span className={`notification-severity ${item.severity}`}><Bell size={18} /></span>
         <span>
-          <strong>{establishment?.name ?? item.title}</strong>
+          <strong>{item.type === 'initial_import_completed' ? item.title : establishment?.name ?? item.title}</strong>
           {review && <span className="notification-meta"><Star size={13} fill="currentColor" /> {review.rating}★ · {relativeTime(item.createdAt)}</span>}
           <p>{item.body}</p>
           {!review && <small>{relativeTime(item.createdAt)}</small>}

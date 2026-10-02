@@ -20,6 +20,8 @@ import {
   type InitializationFetchResult,
 } from '../_shared/sync-service.ts'
 import { configuredInteger, mapWithConcurrency, retryPolicy } from '../_shared/sync-queue.ts'
+import { sendPushToUser } from '../_shared/push.ts'
+import { dispatchImportCompletionNotifications } from '../_shared/import-completion-notifications.ts'
 
 interface InitialImportJob {
   id: string
@@ -424,5 +426,21 @@ Deno.serve(async (request) => {
   }))
   const results = await mapWithConcurrency(jobs ?? [], config.concurrency, (job) =>
     processJob(admin, job, worker, config))
+  try {
+    await dispatchImportCompletionNotifications({
+      claim: async () => await requireSuccess(admin.rpc('claim_import_completion_pushes')) ?? [],
+      send: (userId, payload) => sendPushToUser(admin, userId, payload),
+      finish: async (notice, status) => {
+        const saved = await requireSuccess(admin.rpc('finish_import_completion_push', {
+          p_notification_id: notice.notification_id,
+          p_lease_token: notice.lease_token,
+          p_status: status,
+        }))
+        if (!saved) throw new Error('IMPORT_PUSH_LEASE_LOST')
+      },
+    })
+  } catch {
+    console.error('IMPORT_COMPLETION_PUSH_DISPATCH_FAILED')
+  }
   return json({ claimed: jobs?.length ?? 0, results })
 })
