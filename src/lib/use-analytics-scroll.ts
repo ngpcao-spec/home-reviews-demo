@@ -16,7 +16,22 @@ export function useAnalyticsScroll(cache:AnalyticsSessionCache,key:string,ready:
   useLayoutEffect(()=>{
     if(!key) return
     const save=()=>{if(state.current.done)cache.saveScroll(key,window.scrollY)}
-    window.addEventListener('scroll',save,{passive:true})
-    return ()=>window.removeEventListener('scroll',save)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let lastTop: number | undefined
+    const schedule=()=>{
+      if(!state.current.done) return
+      lastTop=window.scrollY
+      if(!timer)timer=setTimeout(()=>{timer=undefined;if(lastTop!==undefined)cache.saveScroll(key,lastTop)},150)
+    }
+    window.addEventListener('scroll',schedule,{passive:true})
+    window.addEventListener('pagehide',save)
+    document.addEventListener('visibilitychange',save)
+    return ()=>{
+      clearTimeout(timer)
+      if(lastTop!==undefined)cache.saveScroll(key,lastTop)
+      window.removeEventListener('scroll',schedule)
+      window.removeEventListener('pagehide',save)
+      document.removeEventListener('visibilitychange',save)
+    }
   },[cache,key])
 }

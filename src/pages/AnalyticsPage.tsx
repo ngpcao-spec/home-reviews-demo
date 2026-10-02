@@ -92,7 +92,7 @@ export function AnalyticsPage() {
     if (!resolvedEstablishmentId || !preferredLanguage || demoMode || !supabase) return
     const historical = periodMode === 'historical'
     const client = supabase
-    void cache.load(activeCacheKey,async()=>{
+    const readReport=async()=>{
       if (historical) {
         const { data, error: reportError } = await client
           .from('historical_establishment_reports')
@@ -108,7 +108,17 @@ export function AnalyticsPage() {
       })
       if(functionError || !data?.report) throw functionError ?? new Error('REPORT_MISSING')
       return {report:mapWeeklyReport(data.report),revision:data.report.generated_at ?? ''}
-    },{force:requestVersion>0,revalidate:historical})
+    }
+    void cache.load(activeCacheKey,readReport,{force:requestVersion>0,revalidate:historical})
+    // A foreground return may only READ a historical report, never generate one.
+    const refresh=()=>{
+      if(historical && document.visibilityState==='visible') void cache.load(activeCacheKey,readReport,{revalidate:true})
+    }
+    const online=()=>{if(historical) void cache.load(activeCacheKey,readReport,{force:true,revalidate:true})}
+    window.addEventListener('focus',refresh)
+    document.addEventListener('visibilitychange',refresh)
+    window.addEventListener('online',online)
+    return ()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('online',online)}
   }, [cache,activeCacheKey,demoMode,periodMode,periodStart,preferredLanguage,requestVersion,resolvedEstablishmentId])
 
   const generateHistoricalReport = async () => {

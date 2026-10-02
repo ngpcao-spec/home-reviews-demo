@@ -4,6 +4,7 @@ import { useApp } from './app/AppContext'
 import { AppShell } from './components/ui/AppShell'
 import { NotificationOnboarding } from './components/NotificationOnboarding'
 import { LanguageSelection } from './components/LanguageSelection'
+import { NavigationResume } from './components/NavigationResume'
 
 const AddEstablishmentPage=lazy(()=>import('./pages/AddEstablishmentPage').then(m=>({default:m.AddEstablishmentPage})))
 const AnalyticsPage=lazy(()=>import('./pages/AnalyticsPage').then(m=>({default:m.AnalyticsPage})))
@@ -44,11 +45,13 @@ function PasswordRecoveryScreen() {
 
 function ProtectedApp() {
   const { authReady, dataReady, dataLoading, dataError, demoMode, isAuthenticated, preferredLanguage, retryData } = useApp()
-  if (!authReady || dataLoading || (isAuthenticated && !dataReady)) return <div className="route-loading" aria-label="Chargement des données"><span/></div>
+  // Session/IndexedDB hydration is local: keep a branded shell, not a black spinner.
+  if (!authReady || (isAuthenticated && !dataReady && !dataLoading)) return <main className="auth-page" aria-busy="true"><div className="auth-brand"><span>H</span><div><strong>HOME</strong><small>REVIEWS</small></div></div></main>
+  if (isAuthenticated && !dataReady) return <div className="route-loading" aria-label="Chargement des données"><span/></div>
   if (dataError) return <main className="auth-page"><section className="auth-card card"><span className="eyebrow">Connexion aux données</span><h1>Données indisponibles</h1><p>{dataError}</p><button className="primary-button full-width" onClick={() => void retryData()}>Réessayer</button></section></main>
   if (!demoMode && !isAuthenticated) return <Navigate to="/connexion" replace />
   if (!demoMode && !preferredLanguage) return <LanguageSelection />
-  return <><AppShell /><NotificationOnboarding /></>
+  return <><NavigationResume /><AppShell /><NotificationOnboarding /></>
 }
 
 export default function App(){const { passwordRecovery }=useApp();if(passwordRecovery)return <PasswordRecoveryScreen/>;return <Suspense fallback={<div className="route-loading" aria-label="Chargement"><span/></div>}><Routes><Route path="/connexion" element={<AuthPage/>}/><Route path="/test/notifications/reset" element={<NotificationOnboardingResetPage/>}/><Route element={<ProtectedApp/>}><Route index element={<HomePage/>}/><Route path="etablissements" element={<EstablishmentsPage/>}/><Route path="etablissements/ajouter" element={<AddEstablishmentPage/>}/><Route path="etablissements/:id" element={<EstablishmentDetailPage/>}/><Route path="avis" element={<ReviewsPage/>}/><Route path="avis/:id" element={<ReviewDetailPage/>}/><Route path="analyses" element={<AnalyticsPage/>}/><Route path="notifications" element={<NotificationsPage/>}/><Route path="plus" element={<SettingsPage/>}/><Route path="reglages" element={<Navigate to="/plus" replace/>}/><Route path="*" element={<NotFoundPage/>}/></Route></Routes></Suspense>}

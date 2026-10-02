@@ -1,9 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { demoPlan, seedEstablishments, seedNotifications, seedReviews } from '../data/mock-data'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import { resetAnalyticsCache } from '../lib/analytics-cache'
+import { analyticsSession, resetAnalyticsCache } from '../lib/analytics-cache'
+import { cacheGeneration, purgeAppCache, readAppCache, writeAppCache } from '../lib/app-cache'
+import { clearNavigationState } from '../lib/navigation-state'
+import { RefreshGate } from '../lib/refresh-gate'
 import { nextSyncAtFromLastSync } from '../lib/monitoring-schedule'
 import { localizedReviewText } from '../lib/review-translation'
 import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
@@ -438,7 +441,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState(initial.notifications)
   const [actions, setActions] = useState(initial.actions)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const activeUser = useRef<string | null>(null)
+  const readyUser = useRef<string | null>(null)
+  const organizationIds = useRef<string[]>([])
+  const refreshGate = useRef(new RefreshGate())
+  const authEpoch = useRef(0)
   const demoMode = !authUser && allowDemo
+  const authUserId = authUser?.id
 
   const pushToast = useCallback((text: string) => {
     const id = Date.now()
@@ -446,8 +455,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 2800)
   }, [])
 
-  const loadRealData = useCallback(async (options?: { background?: boolean }) => {
-    const background = options?.background === true
+  const loadRealData = useCallback(async (options?: { background?: boolean; foreground?: boolean }) => {
+    const userId = authUser?.id
+    if (!userId || activeUser.current !== userId) return
+    const epoch = authEpoch.current
+    const current = () => activeUser.current === userId && authEpoch.current === epoch
+    return refreshGate.current.run(async () => {
+    if (!current()) return
+    const background = options?.background === true || readyUser.current === userId
     if (!supabase) {
       setDataError('Supabase n’est pas configuré pour ce déploiement.')
       setDataReady(true)
@@ -455,25 +470,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     if (!background) {
       setDataLoading(true)
-      setDataReady(false)
       setDataError(null)
     }
-
+    try {
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult, initialImportsResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
-      supabase.from('organizations').select('monitoring_interval_hours').limit(1).maybeSingle(),
+      supabase.from('organizations').select('id,monitoring_interval_hours'),
       supabase.from('profiles').select('preferred_language').eq('user_id', authUser?.id ?? '').maybeSingle(),
       supabase.from('initial_import_jobs').select('id,organization_id,user_id,query,expected_google_id,establishment_id,status,reviews_target,reviews_fetched,reviews_inserted,error_code,candidate_snapshot,result,created_at,updated_at').is('acknowledged_at', null).order('created_at', { ascending: false }).limit(10),
     ])
+    if (!current()) return
     if (!background) {
       setDataLoading(false)
       setDataReady(true)
     }
     if (establishmentsResult.error || reviewsResult.error || notificationsResult.error || organizationResult.error || profileResult.error || initialImportsResult.error) {
       if (background) {
-        pushToast('Les données seront actualisées à la prochaine ouverture.')
+        // Keep the last usable screen, including when offline.
       } else {
         setEstablishments([])
         setReviews([])
@@ -483,30 +498,65 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       return
     }
+    organizationIds.current = (organizationResult.data as Array<{ id: string }>).map(org => org.id)
+    analyticsSession(userId).configure(userId, organizationIds.current, (establishmentsResult.data as EstablishmentRow[]).map(e => e.id))
+    readyUser.current = userId
+    setDataReady(true)
+    setDataLoading(false)
+    setDataError(null)
     setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
     setInitialImportJobs((initialImportsResult.data as InitialImportJobRow[]).map(mapInitialImportJob))
     const profile = profileResult.data as ProfileRow | null
     const language = profile?.preferred_language === 'vi' ? 'vi' : 'fr'
     setPreferredLanguage(profile?.preferred_language ?? null)
     setReviews((reviewsResult.data as ReviewRow[]).map((row) => mapReview(row, language)))
-    setNotifications((notificationsResult.data as NotificationRow[]).map(mapNotification))
+    setNotifications((notificationsResult.data as NotificationRow[])
+      .filter(row => organizationIds.current.includes(row.organization_id)).map(mapNotification))
     setActions([])
-    const organization = organizationResult.data as OrganizationRow | null
+    const organization = (organizationResult.data as OrganizationRow[])[0]
     if (organization?.monitoring_interval_hours) setMonitoringIntervalHours(organization.monitoring_interval_hours)
-  }, [authUser?.id, pushToast])
+    } catch {
+      if (current() && readyUser.current !== userId) {
+        setDataError('Impossible de charger vos données Supabase. Vérifiez votre connexion puis réessayez.')
+        setDataReady(true)
+      }
+    } finally {
+      if (current()) setDataLoading(false)
+    }
+    }, options?.foreground)
+  }, [authUser?.id])
 
   useEffect(() => {
     if (!supabase) return
     let active = true
-    void supabase.auth.getSession().then(({ data }) => {
+    let authEventSeen = false
+    const acceptUser = (user: User | null) => {
       if (!active) return
-      setAuthUser(data.session?.user ?? null)
+      const nextId = user?.id ?? null
+      if (activeUser.current !== nextId) {
+        const previous = activeUser.current
+        activeUser.current = nextId
+        authEpoch.current += 1
+        readyUser.current = null
+        organizationIds.current = []
+        refreshGate.current = new RefreshGate()
+        resetAnalyticsCache()
+        if (previous) { void purgeAppCache(previous); clearNavigationState(previous) }
+        setEstablishments([]); setReviews([]); setNotifications([]); setInitialImportJobs([]); setActions([])
+        setPreferredLanguage(null); setDataError(null); setDataReady(false); setDataLoading(false)
+      }
+      setAuthUser(user)
       setAuthReady(true)
+    }
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!authEventSeen) acceptUser(data.session?.user ?? null)
+    }).catch(() => {
+      // Without a restored session, never guess the owner from a display cache.
+      if (!authEventSeen) acceptUser(null)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') resetAnalyticsCache()
-      setAuthUser(session?.user ?? null)
-      setAuthReady(true)
+      authEventSeen = true
+      acceptUser(session?.user ?? null)
       if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true)
     })
     return () => {
@@ -517,9 +567,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!authReady) return
+    let active = true
     const timer = window.setTimeout(() => {
-      if (authUser) {
-        void loadRealData()
+      const userId = authUser?.id
+      if (userId) {
+        const epoch = authEpoch.current
+        void (async () => {
+          const cached = await readAppCache(userId)
+          if (!active || activeUser.current !== userId || authEpoch.current !== epoch) return
+          if (cached && readyUser.current !== userId) {
+            organizationIds.current = cached.organizationIds
+            const data = cached.data
+            analyticsSession(userId).configure(userId, cached.organizationIds, data.establishments.map(e => e.id), cached.analytics)
+            setEstablishments(data.establishments); setReviews(data.reviews); setNotifications(data.notifications)
+            setInitialImportJobs(data.initialImportJobs); setMonitoringIntervalHours(data.monitoringIntervalHours)
+            setPreferredLanguage(data.preferredLanguage)
+            readyUser.current = userId
+            setDataReady(true); setDataLoading(false); setDataError(null)
+          }
+          void loadRealData({ background: readyUser.current === userId })
+        })()
         return
       }
       if (allowDemo) {
@@ -536,45 +603,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setDataReady(true)
       }
     }, 0)
-    return () => window.clearTimeout(timer)
-  }, [authReady, authUser, loadRealData])
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [authReady, authUser?.id, loadRealData])
+
+  useEffect(() => {
+    const userId = authUser?.id
+    if (!userId || readyUser.current !== userId || activeUser.current !== userId) return
+    void writeAppCache(userId, organizationIds.current, {
+      establishments, reviews, notifications, initialImportJobs, monitoringIntervalHours, preferredLanguage,
+    }, cacheGeneration(userId))
+  }, [authUser?.id, establishments, reviews, notifications, initialImportJobs, monitoringIntervalHours, preferredLanguage])
 
   useEffect(() => {
     if (demoMode) localStorage.setItem(STORAGE_KEY, JSON.stringify({ establishments, reviews, notifications, actions }))
   }, [demoMode, establishments, reviews, notifications, actions])
 
   useEffect(() => {
-    if (!supabase || !authUser || demoMode) return
+    if (!supabase || !authUserId || demoMode) return
     const client = supabase
     const channel = client
-      .channel(`notifications:${authUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${authUser.id}` }, () => {
-        void loadRealData()
+      .channel(`notifications:${authUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${authUserId}` }, () => {
+        void loadRealData({ background: true })
       })
       .subscribe()
     return () => { void client.removeChannel(channel) }
-  }, [authUser, demoMode, loadRealData])
+  }, [authUserId, demoMode, loadRealData])
 
   useEffect(() => {
-    if (!supabase || !authUser || demoMode) return
+    if (!supabase || !authUserId || demoMode) return
     const client = supabase
     const channel = client
-      .channel(`initial-imports:${authUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'initial_import_jobs', filter: `user_id=eq.${authUser.id}` }, () => {
+      .channel(`initial-imports:${authUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'initial_import_jobs', filter: `user_id=eq.${authUserId}` }, () => {
         void loadRealData({ background: true })
       })
       .subscribe()
     const refreshOnForeground = () => {
-      if (document.visibilityState === 'visible') void loadRealData({ background: true })
+      if (document.visibilityState === 'visible' && readyUser.current === authUserId) void loadRealData({ background: true, foreground: true })
     }
+    const refreshOnline = () => { void loadRealData({ background: true }) }
     document.addEventListener('visibilitychange', refreshOnForeground)
     window.addEventListener('focus', refreshOnForeground)
+    window.addEventListener('online', refreshOnline)
     return () => {
       document.removeEventListener('visibilitychange', refreshOnForeground)
       window.removeEventListener('focus', refreshOnForeground)
+      window.removeEventListener('online', refreshOnline)
       void client.removeChannel(channel)
     }
-  }, [authUser, demoMode, loadRealData])
+  }, [authUserId, demoMode, loadRealData])
 
   const logAction = (reviewId: string, actionType: ReviewAction['actionType']) => {
     setActions((items) => [...items, { id: crypto.randomUUID(), reviewId, actionType, createdAt: new Date().toISOString() }])
@@ -908,14 +986,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     if (!supabase) return
+    const userId = authUser?.id
     const { error } = await supabase.auth.signOut({ scope: 'local' })
     if (error) throw error
-    setEstablishments([])
-    setReviews([])
-    setNotifications([])
-    setActions([])
-    setPreferredLanguage(null)
-    setDataReady(true)
+    // Auth callback clears the visible state synchronously. Wait for durable purge
+    // as well, without clearing a different account signed in in the meantime.
+    if (userId) { clearNavigationState(userId); await purgeAppCache(userId) }
   }
 
   const completePasswordRecovery = async (password: string) => {

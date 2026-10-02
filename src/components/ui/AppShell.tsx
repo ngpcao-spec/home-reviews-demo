@@ -1,6 +1,6 @@
 import { BarChart3, Building2, Ellipsis, Home, Star, WifiOff } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useApp } from '../../app/AppContext'
 import { useI18n } from '../../i18n'
 
@@ -24,7 +24,7 @@ export function AppShell() {
 
   return <div className="app-shell">
     {!online && <div className="offline-banner"><WifiOff size={16} /> {messages.shell.offline}</div>}
-    <main className={`page-frame${location.pathname === '/analyses' ? ' page-frame-analytics' : ''}`}><Outlet /></main>
+    <main className={`page-frame${location.pathname === '/analyses' ? ' page-frame-analytics' : ''}`}><Suspense fallback={<div role="status" className="card" style={{padding:24}}>HOME Reviews…</div>}><Outlet /></Suspense></main>
     <nav className="bottom-nav" aria-label={messages.shell.navigation}>
       {links.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
         <span className="nav-icon"><Icon size={21} strokeWidth={2.2} /></span><span>{label}</span>
