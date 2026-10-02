@@ -14,7 +14,7 @@ test('compiled PWA cold-boots offline to its cached report without an API cache 
     const requests=await Promise.all((await caches.keys()).map(async key=>(await(await caches.open(key)).keys()).map(r=>r.url)))
     return requests.flat()
   })
-  expect(cachedRequests.some(url=>/supabase|rest\/v1|auth\/v1/.test(url))).toBe(false)
+  expect(cachedRequests.some(value=>{const url=new URL(value);return url.hostname.endsWith('.supabase.co') || /\/(rest|auth|functions)\/v1\//.test(url.pathname)})).toBe(false)
   expect(cachedRequests.some(url=>/assets\/.*\.js$/.test(url))).toBe(true)
   await context.setOffline(true)
   await page.goto('about:blank')

@@ -1,8 +1,12 @@
 // Only aliased by vite.resume.config.ts. Never part of a production build.
+import type { HistoricalRun } from '../../../src/lib/historical-generation'
 type Listener = (event: string, session: { user: ReturnType<typeof user> } | null) => void
 const listeners=new Set<Listener>()
 const user=()=>({id:localStorage.getItem('resume-user') || 'account-a',email:'test@example.test',user_metadata:{}})
 export const resumeHarness={queries:[] as string[],invocations:[] as string[],delay:0,fail:false,
+  stepCalls:[] as Record<string,unknown>[], stepDelay:500, loseResponse:false,
+  get run():HistoricalRun|null{return JSON.parse(localStorage.getItem('resume-run') ?? 'null')},
+  set run(run:HistoricalRun|null){localStorage.setItem('resume-run',JSON.stringify(run))},
   emit(event:string,id?:string){if(id)localStorage.setItem('resume-user',id);listeners.forEach(fn=>fn(event,event==='SIGNED_OUT'?null:{user:user()}))},
 }
 const place=(id:string)=>({id:`place-${id}`,organization_id:`org-${id}`,name:id==='account-a'?'Artisan Cafe & Eatery':'Other account restaurant',
@@ -46,5 +50,22 @@ export const supabase={
     signOut:async()=>{resumeHarness.emit('SIGNED_OUT');return {error:null}},
   },
   channel:()=>({on(){return this},subscribe(){return this}}),removeChannel:async()=>undefined,
-  functions:{invoke:async(name:string)=>{resumeHarness.invocations.push(name);return{data:null,error:new Error('NO_AI_ALLOWED_IN_RESUME_TEST')}}},
+  functions:{invoke:async(name:string, options?:{body:Record<string,unknown>})=>{
+    resumeHarness.invocations.push(name)
+    if(name==='get-historical-report-status'){
+      if(!navigator.onLine || localStorage.getItem('resume-offline')==='true')return{data:null,error:new Error('offline')}
+      return{data:{run:resumeHarness.run},error:null}
+    }
+    if(name==='generate-historical-report' && resumeHarness.run?.status==='running'){
+      resumeHarness.stepCalls.push(options?.body ?? {})
+      const run=resumeHarness.run
+      resumeHarness.run={...run,resumable:false}
+      await new Promise(resolve=>setTimeout(resolve,resumeHarness.stepDelay))
+      const progress=run.progress+1
+      resumeHarness.run={...run,progress,status:progress>=5?'completed':'running',resumable:!resumeHarness.loseResponse}
+      if(resumeHarness.loseResponse)return{data:null,error:new Error('CLIENT_REQUEST_INTERRUPTED')}
+      return{data:progress>=5?{report:report(user().id)}:{pending:true,generation_id:run.generation_id,progress,total_steps:5},error:null}
+    }
+    return{data:null,error:new Error('NO_AI_ALLOWED_IN_RESUME_TEST')}
+  }},
 }

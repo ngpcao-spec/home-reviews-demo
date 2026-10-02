@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { useSearchParams } from 'react-router-dom'
 import { analyticsSession, resolveAnalyticsSelection, type AnalyticsMode, type AnalyticsSelection } from '../lib/analytics-cache'
 import { useAnalyticsScroll } from '../lib/use-analytics-scroll'
+import { useHistoricalGeneration } from '../lib/use-historical-generation'
 import { useApp } from '../app/AppContext'
 import { ReputationReport } from '../components/ReputationReport'
 import { ConsultantReport } from '../components/ConsultantReport'
@@ -29,7 +30,6 @@ import {
 } from '../lib/weekly-report'
 
 interface GenerateWeeklyReportPayload { report?: WeeklyReportRow; error?: string }
-interface GenerateHistoricalReportPayload { report?: HistoricalReportRow; error?: string; pending?: boolean; generation_id?: string; progress?: number; total_steps?: number }
 type HistoricalFeedback = 'success' | 'error' | 'empty' | null
 export function AnalyticsPage() {
   const { reviews, establishments, demoMode, preferredLanguage, currentUser } = useApp()
@@ -41,10 +41,14 @@ export function AnalyticsPage() {
   const selection=resolveAnalyticsSelection(searchParams,snapshot.selection,establishments.map(item=>item.id))
   const {establishmentId:resolvedEstablishmentId,mode:periodMode}=selection
   const [requestVersion, setRequestVersion] = useState(0)
-  const [historicalProgress, setHistoricalProgress] = useState('')
-  const [historicalGenerating, setHistoricalGenerating] = useState(false)
-  const [historicalFeedback, setHistoricalFeedback] = useState<HistoricalFeedback>(null)
-  const historicalGenerationLock = useRef(false)
+  const [demoFeedback, setDemoFeedback] = useState<HistoricalFeedback>(null)
+  const generation = useHistoricalGeneration(cache, currentUser.id ?? currentUser.email, resolvedEstablishmentId, preferredLanguage,
+    !demoMode && periodMode === 'historical')
+  const historicalGenerating = generation.phase === 'generating' || generation.phase === 'paused'
+  const historicalFeedback = demoMode ? demoFeedback : generation.phase === 'failed' ? 'error' : generation.feedback
+  const historicalProgress = generation.run?.total_steps
+    ? messages.reputation.progress.replace('{done}', String(generation.run.progress)).replace('{total}', String(generation.run.total_steps))
+    : generation.run ? (language === 'vi' ? `${generation.run.progress} bước đã hoàn tất` : `${generation.run.progress} étapes terminées`) : ''
   const periodStart = useMemo(() => periodMode === 'current'
     ? currentVietnamWeekStart()
     : lastCompletedVietnamWeekStart(), [periodMode])
@@ -110,7 +114,7 @@ export function AnalyticsPage() {
       return {report:mapWeeklyReport(data.report),revision:data.report.generated_at ?? ''}
     }
     void cache.load(activeCacheKey,readReport,{force:requestVersion>0,revalidate:historical})
-    // A foreground return may only READ a historical report, never generate one.
+    // Saved reports revalidate silently. Active runs are reconciled separately.
     const refresh=()=>{
       if(historical && document.visibilityState==='visible') void cache.load(activeCacheKey,readReport,{revalidate:true})
     }
@@ -122,53 +126,11 @@ export function AnalyticsPage() {
   }, [cache,activeCacheKey,demoMode,periodMode,periodStart,preferredLanguage,requestVersion,resolvedEstablishmentId])
 
   const generateHistoricalReport = async () => {
-    if (!selected || !preferredLanguage || historicalGenerationLock.current) return
-    historicalGenerationLock.current = true
-    setHistoricalFeedback(null)
-    setHistoricalGenerating(true)
-    setHistoricalProgress('')
-    try {
-      if (demoMode) {
-        if (!demoHistoricalReport || demoHistoricalReport.storedReviewsCount === 0) {
-          setHistoricalFeedback('empty')
-          return
-        }
-        cache.put(historicalCacheKey,demoHistoricalReport)
-        setHistoricalFeedback('success')
-        return
-      }
-      if (!supabase) throw new Error('SUPABASE_UNAVAILABLE')
-      let data: GenerateHistoricalReportPayload | null = null
-      let generationId: string | undefined
-      do {
-        const response = await supabase.functions.invoke<GenerateHistoricalReportPayload>('generate-historical-report', {
-          body: { establishment_id: selected.id, ...(generationId ? { generation_id: generationId } : { force: true }) },
-        })
-        if (response.error) throw response.error
-        data = response.data
-        if (data?.pending) {
-          if (!data.generation_id) throw new Error('REPORT_GENERATION_ID_MISSING')
-          generationId = data.generation_id
-          if (data.total_steps) setHistoricalProgress(messages.reputation.progress.replace('{done}', String(data.progress ?? 0)).replace('{total}', String(data.total_steps)))
-          await new Promise(resolve => window.setTimeout(resolve, 1500))
-        }
-      } while (data?.pending)
-      if (data?.error === 'NO_REVIEWS_AVAILABLE') {
-        setHistoricalFeedback('empty')
-        return
-      }
-      if (data?.error === 'REPORT_GENERATION_IN_PROGRESS') return
-      if (!data?.report) throw new Error(data?.error ?? 'HISTORICAL_REPORT_MISSING')
-      cache.put(historicalCacheKey,mapHistoricalReport(data.report as HistoricalReportRow))
-      setHistoricalFeedback('success')
-      window.setTimeout(() => setHistoricalFeedback((value) => value === 'success' ? null : value), 3500)
-    } catch (generationError) {
-      console.error('Historical report generation failed', generationError)
-      setHistoricalFeedback('error')
-    } finally {
-      historicalGenerationLock.current = false
-      setHistoricalGenerating(false)
-    }
+    if (!selected || !preferredLanguage) return
+    if (!demoMode) { await generation.start(); return }
+    if (!demoHistoricalReport || demoHistoricalReport.storedReviewsCount === 0) { setDemoFeedback('empty'); return }
+    cache.put(historicalCacheKey,demoHistoricalReport)
+    setDemoFeedback('success')
   }
 
   const visibleReport = demoReport ?? cachedReport ?? null
@@ -225,9 +187,10 @@ export function AnalyticsPage() {
       <div className="historical-report-action">
         <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
-          <span>{historicalGenerating ? messages.analytics.generatingHistorical : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
+          <span>{historicalGenerating ? (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours') : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
         </button>
         {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
+        {generation.phase === 'paused' && <small role="status">{language === 'vi' ? 'Tiến trình được giữ lại. Sẽ tự động kiểm tra và tiếp tục khi có kết nối.' : 'Progression conservée. Vérification et reprise automatiques au retour de la connexion.'}</small>}
         {visibleHistoricalReport?.generatedAt && <small>{messages.reputation.lastUpdated}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
         {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}

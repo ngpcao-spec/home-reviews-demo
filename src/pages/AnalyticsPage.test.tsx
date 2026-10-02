@@ -75,7 +75,7 @@ describe('manual historical report generation', () => {
     resetAnalyticsCache()
     mocks.language='vi'
     vi.spyOn(window,'scrollTo').mockImplementation(()=>{})
-    mocks.invoke.mockReset().mockResolvedValue({ data: { error: 'WEEKLY_TEST_RESPONSE' }, error: null })
+    mocks.invoke.mockReset().mockImplementation((name: string) => Promise.resolve({ data: name === 'get-historical-report-status' ? {run:null} : { error: 'WEEKLY_TEST_RESPONSE' }, error: null }))
     mocks.maybeSingle.mockReset().mockResolvedValue({ data: null, error: null })
   })
 
@@ -91,20 +91,22 @@ describe('manual historical report generation', () => {
     const pendingRequest = new Promise((resolve) => { resolveRequest = resolve })
     mocks.invoke.mockImplementation((name: string) => name === 'generate-historical-report'
       ? pendingRequest
-      : Promise.resolve({ data: { error: 'WEEKLY_TEST_RESPONSE' }, error: null }))
+      : Promise.resolve({ data: name === 'get-historical-report-status' ? {run:null} : { error: 'WEEKLY_TEST_RESPONSE' }, error: null }))
     renderPage()
     await selectHistoricalMode()
     const button = screen.getByRole('button', { name: 'Tạo báo cáo AI' })
     fireEvent.click(button)
     fireEvent.click(button)
-    expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(1)
+    await waitFor(() => expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(1))
     resolveRequest({ data: { error: 'NO_REVIEWS_AVAILABLE' }, error: null })
     expect(await screen.findByText('Chưa có đủ dữ liệu để tạo báo cáo.')).toBeVisible()
   })
 
   it('continues the same server generation without starting another report', async () => {
     let steps = 0
-    mocks.invoke.mockImplementation((name: string) => Promise.resolve(name !== 'generate-historical-report'
+    mocks.invoke.mockImplementation((name: string) => Promise.resolve(name === 'get-historical-report-status'
+      ? {data:{run:steps ? {establishment_id:'est-1',preferred_language:'vi',generation_id:'generation-1',status:'running',progress:1,total_steps:3,resumable:true,error_code:null} : null},error:null}
+      : name !== 'generate-historical-report'
       ? { data: { error: 'WEEKLY_TEST_RESPONSE' }, error: null }
       : ++steps === 1
         ? { data: { pending: true, generation_id: 'generation-1', progress: 1, total_steps: 3 }, error: null }
@@ -116,8 +118,8 @@ describe('manual historical report generation', () => {
     expect(await screen.findByText('Chưa có đủ dữ liệu để tạo báo cáo.', {}, {timeout:3000})).toBeVisible()
     const calls=mocks.invoke.mock.calls.filter(([name])=>name==='generate-historical-report')
     expect(calls).toHaveLength(2)
-    expect(calls[0][1].body).toEqual({establishment_id:'est-1',force:true})
-    expect(calls[1][1].body).toEqual({establishment_id:'est-1',generation_id:'generation-1'})
+    expect(calls[0][1].body).toEqual({establishment_id:'est-1',preferred_language:'vi',force:true})
+    expect(calls[1][1].body).toEqual({establishment_id:'est-1',preferred_language:'vi',generation_id:'generation-1'})
   })
 
   it('restores Artisan/historical and the cached V2 immediately after visiting another tab',async()=>{
@@ -132,7 +134,7 @@ describe('manual historical report generation', () => {
     expect(screen.getByLabelText('Khoảng thời gian')).toHaveValue('historical')
     expect(screen.getByTestId('location')).toHaveTextContent('establishment=est-2&mode=historical')
     expect(mocks.maybeSingle).toHaveBeenCalledTimes(1)
-    expect(mocks.invoke).not.toHaveBeenCalled()
+    expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(0)
   })
 
   it('switches the URL without showing the previous establishment report',async()=>{
@@ -167,6 +169,6 @@ describe('manual historical report generation', () => {
     mocks.maybeSingle.mockImplementation(()=>new Promise(()=>{}))
     renderPage('/analyses?establishment=est-2&mode=historical')
     expect(screen.queryByText('summary-est-2-vi')).not.toBeInTheDocument()
-    expect(mocks.invoke).not.toHaveBeenCalled()
+    expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(0)
   })
 })

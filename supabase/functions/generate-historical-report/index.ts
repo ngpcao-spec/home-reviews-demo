@@ -23,7 +23,7 @@ Deno.serve(async (request) => {
   try {
     const context = await requireUser(request)
     admin = context.admin
-    const body = await request.json() as {establishment_id?:string;generation_id?:string;force?:boolean}
+    const body = await request.json() as {establishment_id?:string;generation_id?:string;force?:boolean;preferred_language?:string}
     const id = body.establishment_id
     if (typeof id !== 'string') return json({error:'ESTABLISHMENT_ID_REQUIRED'},400)
     const [{data:e,error:ee},{data:profile,error:pe}] = await Promise.all([
@@ -34,6 +34,7 @@ Deno.serve(async (request) => {
     await assertMembership(context.client,context.user.id,e.organization_id,['owner','admin','manager'])
     if (pe || !['fr','vi'].includes(profile?.preferred_language)) return json({error:'PREFERRED_LANGUAGE_REQUIRED'},400)
     const language = profile.preferred_language as 'fr'|'vi'
+    if (body.preferred_language && body.preferred_language !== language) return json({error:'REPORT_LANGUAGE_CHANGED'},409)
     const {data:existing,error:re} = await context.client.from('historical_establishment_reports').select('*').eq('establishment_id',id).eq('preferred_language',language).maybeSingle()
     check(re,'REPORT_READ_FAILED')
     let {data:run,error:runError} = await admin.from('historical_report_runs').select('*').eq('establishment_id',id).eq('language',language).maybeSingle()
@@ -49,6 +50,8 @@ Deno.serve(async (request) => {
       return json({report:existing,cached:true})
     }
     if (body.generation_id && run?.generation_id !== body.generation_id) return json({error:'REPORT_GENERATION_CHANGED'},409)
+    // An automatic resume is never permission to restart a failed run.
+    if (body.generation_id && run?.status === 'failed') return json({error:'REPORT_RUN_FAILED'},409)
     if (body.generation_id && run?.status === 'completed') return json({report:existing})
     if (!run || run.status === 'completed' || run.status === 'failed') {
       enforceRateLimit('historical-report:'+context.user.id,12,3_600_000)

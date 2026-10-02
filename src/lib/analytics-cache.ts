@@ -2,6 +2,8 @@ import type { HistoricalReport } from './historical-report'
 import type { WeeklyReport } from './weekly-report'
 import { cacheGeneration, writeAnalyticsCache } from './app-cache'
 import { readUiState, saveUiState } from './navigation-state'
+import type { HistoricalGeneration } from './historical-generation'
+import type { HistoricalReportRow } from './historical-report'
 
 export type AnalyticsMode = 'current' | 'completed' | 'historical'
 export interface AnalyticsSelection { establishmentId: string; mode: AnalyticsMode }
@@ -24,6 +26,12 @@ export class AnalyticsSessionCache {
   private pending = new Map<string, Promise<void>>()
   private scroll = new Map<string, number>()
   private retired = false
+  private generations = new Map<string, HistoricalGeneration<HistoricalReportRow>>()
+  generation(key: string, create: () => HistoricalGeneration<HistoricalReportRow>) {
+    let controller = this.generations.get(key)
+    if (!controller) { controller = create(); this.generations.set(key, controller) }
+    return controller
+  }
   private owner?: { userId: string; organizationIds: string[]; establishmentIds: string[]; generation: number }
   configure(userId: string, organizationIds: string[], establishmentIds: string[], persisted?: unknown) {
     if (this.retired) return
@@ -88,7 +96,7 @@ export class AnalyticsSessionCache {
     this.scroll.set(key,Math.max(0,position))
     if(this.owner) saveUiState(this.owner.userId, `analytics-scroll:${key}`, Math.max(0,position))
   }
-  dispose() { this.retired=true;this.state={entries:{}};this.scroll.clear();this.listeners.forEach(listener=>listener()) }
+  dispose() { this.generations.forEach(controller=>controller.dispose());this.generations.clear();this.retired=true;this.state={entries:{}};this.scroll.clear();this.listeners.forEach(listener=>listener()) }
 }
 
 const sessions=new Map<string,AnalyticsSessionCache>()
