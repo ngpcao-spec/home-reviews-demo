@@ -1,6 +1,6 @@
 import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
-import { consultantBatches } from '../_shared/consultant-report.ts'
+import { historicalRunStatus } from '../_shared/historical-run-status.ts'
 
 // Read-only projection. Never expose the private snapshot/findings or mutate a run.
 Deno.serve(async request => {
@@ -20,17 +20,12 @@ Deno.serve(async request => {
     if (profileError || !['fr', 'vi'].includes(profile?.preferred_language)) return json({ error: 'PREFERRED_LANGUAGE_REQUIRED' }, 400)
     if (body.preferred_language && body.preferred_language !== profile.preferred_language) return json({ error: 'REPORT_LANGUAGE_CHANGED' }, 409)
     const { data: run, error: runError } = await context.admin.from('historical_report_runs')
-      .select('establishment_id,language,generation_id,status,cursor,error_code,locked_by,lease_until,snapshot')
-      .eq('organization_id', establishment.organization_id).eq('establishment_id', establishment.id).eq('language', profile.preferred_language).maybeSingle()
+      .select('establishment_id,language,generation_id,status,cursor,error_code,total_steps,snapshot')
+      .eq('organization_id', establishment.organization_id).eq('establishment_id', establishment.id).eq('language', profile.preferred_language)
+      .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle()
     if (runError) throw new Error('REPORT_RUN_READ_FAILED')
     if (!run) return json({ run: null })
-    let totalSteps: number | null = null
-    try { totalSteps = consultantBatches(run.snapshot.reviews).length + 1 } catch { /* Progress alone remains safe to display. */ }
-    return json({ run: {
-      establishment_id: run.establishment_id, preferred_language: run.language, generation_id: run.generation_id,
-      status: run.status, progress: run.cursor, total_steps: totalSteps, error_code: run.error_code,
-      resumable: run.status === 'running' && (!run.lease_until || Date.parse(run.lease_until) <= Date.now()),
-    } })
+    return json({ run: historicalRunStatus(run) })
   } catch (error) {
     const code = error instanceof Error && ['UNAUTHORIZED', 'FORBIDDEN'].includes(error.message) ? error.message : 'REPORT_STATUS_UNAVAILABLE'
     console.warn('Historical report status unavailable', { code })

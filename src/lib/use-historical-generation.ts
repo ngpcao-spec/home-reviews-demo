@@ -21,10 +21,10 @@ export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: st
         if (error || !data || !Object.hasOwn(data, 'run')) throw new Error('REPORT_STATUS_UNAVAILABLE')
         return data.run
       },
-      step: async body => {
+      enqueue: async body => {
         if (!supabase) throw new Error('SUPABASE_UNAVAILABLE')
         const { data, error } = await supabase.functions.invoke<GenerationReply<HistoricalReportRow>>('generate-historical-report', {
-          body, signal: AbortSignal.timeout(120_000),
+          body, signal: AbortSignal.timeout(20_000),
         })
         if (error || !data) throw new Error('REPORT_STEP_INTERRUPTED')
         return data

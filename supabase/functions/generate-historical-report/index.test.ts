@@ -16,7 +16,7 @@ describe('historical report resume integration with mocked database/AI',()=>{
     const digest=await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({reviews,language:'vi',googleTotal:1615,googleRating:4.8,version:3})))
     const source_fingerprint=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')
     const oldFinding={review_id:'review-0',theme_key:'food_quality',sentiment:'positive',evidence:'Good food'}
-    let run:Row={id:'run-1',organization_id:'org-1',establishment_id:'est-1',language:'vi',generation_id:'generation-1',status:'failed',snapshot:{reviews,base:{source_fingerprint,analysis_version:3}},findings:[oldFinding],classifications:reviews.slice(0,cursor*20).map(r=>({review_id:r.id,sentiment:'positive',basis:'text',evidence:'Good food'})),cursor,input_tokens:11436,output_tokens:17797,ai_calls:3,rejected_findings_count:0,token_usage_complete:false,updated_at:'2026-10-01T00:00:00Z'}
+    let run:Row={id:'run-1',organization_id:'org-1',establishment_id:'est-1',language:'vi',generation_id:'generation-1',status:'running',attempt_count:1,snapshot:{reviews,base:{source_fingerprint,analysis_version:3}},findings:[oldFinding],classifications:reviews.slice(0,cursor*20).map(r=>({review_id:r.id,sentiment:'positive',basis:'text',evidence:'Good food'})),cursor,input_tokens:11436,output_tokens:17797,ai_calls:3,rejected_findings_count:0,token_usage_complete:false,updated_at:'2026-10-01T00:00:00Z'}
     const writes:{table:string;values:Row}[]=[]
     class Query {
       filters:Record<string,unknown>={};values:Row|null=null;offset=0
@@ -45,7 +45,7 @@ describe('historical report resume integration with mocked database/AI',()=>{
       then(resolve:(value:ReturnType<Query['execute']>)=>unknown){return Promise.resolve(this.execute()).then(resolve)}
     }
     const database={from:(table:string)=>new Query(table),rpc:vi.fn(async(_name:string,args:Row)=>{
-      run={...run,locked_by:args.p_worker_id,status:'running'};return {data:true,error:null}
+      writes.push({table:'historical_report_runs',values:args.p_values as Row});run={...run,...args.p_values as Row};return {data:true,error:null}
     })}
     mocks.requireUser.mockResolvedValue({user:{id:'user'},client:database,admin:database})
     mocks.assertMembership.mockResolvedValue('owner')
@@ -54,14 +54,9 @@ describe('historical report resume integration with mocked database/AI',()=>{
       await recordUsage({input_tokens:500,output_tokens:700})
       return {findings:empty?[]:[{...oldFinding,review_id:batch[0].id}],classifications:batch.map((r:{id:string})=>({review_id:r.id,sentiment:'positive',basis:'text',evidence:'Good food'})),rejectedCount:1,usage:{input_tokens:500,output_tokens:700}}
     })
-    let handler:((request:Request)=>Promise<Response>)|undefined
-    vi.stubGlobal('crypto',webcrypto)
-    vi.stubGlobal('Deno',{serve:(fn:typeof handler)=>{handler=fn}})
-    vi.resetModules()
-    await import('./index.ts')
-    const response=await handler!(new Request('https://example.test',{method:'POST',body:JSON.stringify({establishment_id:'est-1',force:true})}))
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({pending:true,generation_id:'generation-1',progress:cursor+1})
+    const {processHistoricalRun}=await import('../_shared/historical-report-worker.ts')
+    const response=await processHistoricalRun(database as never,structuredClone(run) as never,'worker')
+    expect(response).toMatchObject({status:'running',generation_id:'generation-1',cursor:cursor+1})
     expect(mocks.extractThemes).toHaveBeenCalledTimes(1)
     expect(mocks.overallSummary).not.toHaveBeenCalled()
     expect(run).toMatchObject({generation_id:'generation-1',cursor:cursor+1,status:'running',ai_calls:4,input_tokens:11936,output_tokens:18497,rejected_findings_count:1,token_usage_complete:false})

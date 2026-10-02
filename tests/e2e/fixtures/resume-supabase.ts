@@ -54,6 +54,7 @@ export const supabase={
     resumeHarness.invocations.push(name)
     if(name==='get-historical-report-status'){
       if(!navigator.onLine || localStorage.getItem('resume-offline')==='true')return{data:null,error:new Error('offline')}
+      if(localStorage.getItem('server-owned-report-test')==='true')return {data:await (await fetch('/__test/historical-status')).json(),error:null}
       return{data:{run:resumeHarness.run},error:null}
     }
     if(name==='generate-historical-report' && resumeHarness.run?.status==='running'){

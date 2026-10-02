@@ -102,24 +102,22 @@ describe('manual historical report generation', () => {
     expect(await screen.findByText('Chưa có đủ dữ liệu để tạo báo cáo.')).toBeVisible()
   })
 
-  it('continues the same server generation without starting another report', async () => {
+  it('enqueues once and observes the server generation without client batches', async () => {
     let steps = 0
     mocks.invoke.mockImplementation((name: string) => Promise.resolve(name === 'get-historical-report-status'
       ? {data:{run:steps ? {establishment_id:'est-1',preferred_language:'vi',generation_id:'generation-1',status:'running',progress:1,total_steps:3,resumable:true,error_code:null} : null},error:null}
       : name !== 'generate-historical-report'
       ? { data: { error: 'WEEKLY_TEST_RESPONSE' }, error: null }
       : ++steps === 1
-        ? { data: { pending: true, generation_id: 'generation-1', progress: 1, total_steps: 3 }, error: null }
+        ? { data: { run: {establishment_id:'est-1',preferred_language:'vi',generation_id:'generation-1',status:'running',progress:1,total_steps:3,resumable:false,error_code:null} }, error: null }
         : { data: { error: 'NO_REVIEWS_AVAILABLE' }, error: null }))
     renderPage()
     await selectHistoricalMode()
     fireEvent.click(screen.getByRole('button', { name: 'Tạo báo cáo AI' }))
     expect(await screen.findByText('Phân tích theo nhóm: 1 / 3')).toBeVisible()
-    expect(await screen.findByText('Chưa có đủ dữ liệu để tạo báo cáo.', {}, {timeout:3000})).toBeVisible()
     const calls=mocks.invoke.mock.calls.filter(([name])=>name==='generate-historical-report')
-    expect(calls).toHaveLength(2)
+    expect(calls).toHaveLength(1)
     expect(calls[0][1].body).toEqual({establishment_id:'est-1',preferred_language:'vi',force:true})
-    expect(calls[1][1].body).toEqual({establishment_id:'est-1',preferred_language:'vi',generation_id:'generation-1'})
   })
 
   it('restores Artisan/historical and the cached V2 immediately after visiting another tab',async()=>{

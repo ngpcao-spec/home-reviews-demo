@@ -73,54 +73,54 @@ test('account switch purges persisted account data and ignores stale in-flight r
   expect(await page.evaluate(()=>localStorage.getItem('home-reviews:last-route'))).not.toContain('account-a')
 })
 
-test('historical run survives leaving the route then resumes with the same generation and no force',async({page})=>{
-  await page.addInitScript(()=>localStorage.setItem('resume-run',JSON.stringify({establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing',status:'running',progress:3,total_steps:5,resumable:true,error_code:null})))
+test('server completes while the app is closed; reopening only reads status',async({page,context})=>{
+  let run={establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing',status:'running',progress:3,total_steps:5,resumable:false,error_code:null as string|null}
+  await context.route('**/__test/historical-status',route=>route.fulfill({json:{run}}))
+  await page.addInitScript(()=>localStorage.setItem('server-owned-report-test','true'))
   await page.goto(`${url}#${report}`)
-  await expect(page.getByRole('button',{name:'Đang phân tích'})).toBeVisible()
-  await expect.poll(()=>page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(1)
+  await expect(page.getByRole('button',{name:'Đang phân tích'})).toBeDisabled()
+  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(0)
+  await page.close()
+  // The mocked server evolves outside any browser document, like worker checkpoints.
+  run={...run,status:'completed',progress:5}
+  const reopened=await context.newPage()
+  await reopened.goto(`${url}#/`)
+  await expect(reopened.getByRole('button',{name:'Tạo lại phân tích'})).toBeEnabled()
+  await expect(reopened.getByText('Cached historical summary').first()).toBeVisible()
+  expect(await reopened.evaluate(()=>window.resumeHarness.invocations.filter(n=>n==='generate-historical-report'))).toEqual([])
+})
+
+test('changing route and backgrounding never steps the run; foreground observes server progress',async({page,context})=>{
+  let run={establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing',status:'running',progress:3,total_steps:5,resumable:false,error_code:null}
+  let reads=0
+  await context.route('**/__test/historical-status',route=>{reads++;return route.fulfill({json:{run}})})
+  await page.addInitScript(()=>localStorage.setItem('server-owned-report-test','true'))
+  await page.goto(`${url}#${report}`)
+  await expect(page.getByRole('button',{name:'Đang phân tích'})).toBeDisabled()
   await page.evaluate(()=>{location.hash='/etablissements'})
-  await expect(page.getByText('Artisan Cafe & Eatery').first()).toBeVisible()
-  await page.waitForTimeout(2200)
-  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(1)
-  expect(await page.evaluate(()=>window.resumeHarness.run?.progress)).toBe(4)
+  await expect(page.getByRole('button',{name:'Đang phân tích'})).toHaveCount(0)
+  run={...run,progress:4}
   await page.evaluate(()=>{location.hash='/analyses'})
-  await expect.poll(()=>page.evaluate(()=>window.resumeHarness.run?.status)).toBe('completed')
-  await expect(page.getByText('Không thể tạo báo cáo. Vui lòng thử lại.')).toHaveCount(0)
-  expect(await page.evaluate(()=>window.resumeHarness.stepCalls)).toEqual([
-    {establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing'},
-    {establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing'},
-  ])
-})
-
-test('hidden page pauses steps, double foreground resumes once without a red error',async({page})=>{
-  await page.addInitScript(()=>localStorage.setItem('resume-run',JSON.stringify({establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing',status:'running',progress:3,total_steps:5,resumable:true,error_code:null})))
-  await page.goto(`${url}#${report}`)
-  await expect.poll(()=>page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(1)
+  await expect(page.getByText('Phân tích theo nhóm: 4 / 5')).toBeVisible()
   await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'))})
-  await page.waitForTimeout(2300)
-  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(1)
+  await page.waitForTimeout(100)
+  const before=reads
+  await page.waitForTimeout(5200)
+  expect(reads).toBe(before)
+  run={...run,status:'completed',progress:5}
   await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));dispatchEvent(new Event('focus'));dispatchEvent(new Event('focus'))})
-  await expect.poll(()=>page.evaluate(()=>window.resumeHarness.run?.status)).toBe('completed')
-  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(2)
+  await expect(page.getByRole('button',{name:'Tạo lại phân tích'})).toBeEnabled()
+  expect(reads).toBe(before+1)
   await expect(page.locator('.historical-feedback.error')).toHaveCount(0)
+  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(0)
 })
 
-test('lost response remains neutral; completion elsewhere is read without a new AI call',async({page})=>{
+test('retry server status remains neutral and does not start client generation',async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('resume-run',JSON.stringify({establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing',status:'retry',progress:3,total_steps:5,resumable:false,error_code:'OPENAI_HTTP_429'})))
   await page.goto(`${url}#${report}`)
-  await expect(page.getByText('Cached historical summary').first()).toBeVisible()
-  await page.evaluate(()=>{
-    window.resumeHarness.loseResponse=true
-    window.resumeHarness.run={establishment_id:'place-account-a',preferred_language:'vi',generation_id:'khouse-existing',status:'running',progress:3,total_steps:5,resumable:true,error_code:null}
-  })
-  await page.waitForTimeout(1100)
-  await page.evaluate(()=>dispatchEvent(new Event('focus')))
-  await expect.poll(()=>page.evaluate(()=>window.resumeHarness.run?.progress)).toBe(4)
+  await expect(page.getByRole('button',{name:'Đang phân tích'})).toBeDisabled()
   await expect(page.locator('.historical-feedback.error')).toHaveCount(0)
-  await page.evaluate(()=>{const run=window.resumeHarness.run!;window.resumeHarness.run={...run,status:'completed',resumable:false}})
-  await page.waitForTimeout(1100)
-  await page.evaluate(()=>dispatchEvent(new Event('focus')))
-  await expect(page.getByRole('button',{name:'Tạo lại phân tích'})).toBeEnabled()
-  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(1)
+  expect(await page.evaluate(()=>window.resumeHarness.stepCalls.length)).toBe(0)
 })
 
 test('confirmed failed backend run alone displays generation failure',async({page})=>{

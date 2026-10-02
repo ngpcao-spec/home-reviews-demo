@@ -9,6 +9,7 @@ async function setup(mode: 'running' | 'locked' | 'expired' | 'completed' | 'fai
     filters: Record<string, unknown> = {}
     constructor(private table: string) {}
     select() { return this }
+    order() { return this } limit() { return this }
     eq(key: string, value: unknown) { this.filters[key] = value; return this }
     async single() {
       reads.push({ table: this.table, filters: this.filters })
@@ -35,12 +36,12 @@ describe('read-only historical run status', () => {
     const response = await h.call()
     expect(response.status).toBe(200)
     const body = await response.json()
-    expect(body.run).toEqual({establishment_id:'est',preferred_language:'vi',generation_id:'existing-id',status:'running',progress:3,total_steps:5,resumable:true,error_code:null})
+    expect(body.run).toEqual({establishment_id:'est',preferred_language:'vi',generation_id:'existing-id',status:'running',progress:3,total_steps:5,resumable:false,error_code:null})
     expect(JSON.stringify(body)).not.toContain('Private review text')
     expect(h.reads.at(-1)).toEqual({table:'historical_report_runs',filters:{organization_id:'org',establishment_id:'est',language:'vi'}})
     expect(mocks.assertMembership).toHaveBeenCalledWith(expect.anything(),'user','org',['owner','admin','manager'])
   })
-  it.each([['locked',false],['expired',true],['completed',false],['failed',false]] as const)('reports %s without starting any step', async (mode, resumable) => {
+  it.each([['locked',false],['expired',false],['completed',false],['failed',false]] as const)('reports %s without starting any step', async (mode, resumable) => {
     const h = await setup(mode)
     expect((await (await h.call()).json()).run.resumable).toBe(resumable)
   })

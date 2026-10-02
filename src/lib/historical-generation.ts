@@ -1,17 +1,18 @@
-/** Client observer/step runner. The server owns checkpoints and terminal states. */
+/** Client observer only. The server owns scheduling, steps, retries and completion. */
 export interface HistoricalRun {
   establishment_id: string
   preferred_language: string
   generation_id: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'queued' | 'running' | 'retry' | 'completed' | 'failed'
   progress: number
   total_steps: number | null
   resumable: boolean
   error_code: string | null
 }
 export interface GenerationReply<T> {
-  report?: T; error?: string; pending?: boolean; generation_id?: string; progress?: number; total_steps?: number
+  report?: T; run?: HistoricalRun; error?: string; pending?: boolean; generation_id?: string; progress?: number; total_steps?: number
 }
+export const activeHistoricalRun = (run: HistoricalRun | null) => !!run && ['queued','running','retry'].includes(run.status)
 export interface GenerationState {
   phase: 'idle' | 'generating' | 'paused' | 'failed'
   run: HistoricalRun | null
@@ -21,7 +22,7 @@ interface Dependencies<T> {
   establishmentId: string
   language: string
   readStatus: () => Promise<HistoricalRun | null>
-  step: (body: { establishment_id: string; preferred_language: string; generation_id?: string; force?: true }) => Promise<GenerationReply<T>>
+  enqueue: (body: { establishment_id: string; preferred_language: string; force: true }) => Promise<GenerationReply<T>>
   readReport: () => Promise<void>
   saveReport: (report: T) => void
   persist: (run: HistoricalRun | null) => void
@@ -39,7 +40,7 @@ export class HistoricalGeneration<T> {
   constructor(private deps: Dependencies<T>, saved?: HistoricalRun) {
     const run = saved?.establishment_id === deps.establishmentId && saved.preferred_language === deps.language ? saved : null
     // Local storage is a hint, never evidence of server failure or authority to generate.
-    this.state = { phase: run?.status === 'running' ? 'paused' : 'idle', run, feedback: null }
+    this.state = { phase: activeHistoricalRun(run) ? 'paused' : 'idle', run, feedback: null }
   }
   getSnapshot = () => this.state
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
@@ -73,8 +74,8 @@ export class HistoricalGeneration<T> {
   start = () => this.execute(true)
   private async observe(run: HistoricalRun | null) {
     if (this.retired) return
-    this.emit({ run, phase: run?.status === 'failed' ? 'failed' : run?.status === 'running'
-      ? this.canRun() ? 'generating' : 'paused' : 'idle', feedback: null })
+    this.emit({ run, phase: run?.status === 'failed' ? 'failed' : activeHistoricalRun(run)
+      ? this.canRun() ? 'generating' : 'paused' : 'idle', feedback: run?.status==='failed' && run.error_code==='NO_REVIEWS_AVAILABLE'?'empty':null })
     if (run?.status === 'completed') await this.deps.readReport()
   }
   private async execute(manual: boolean) {
@@ -89,23 +90,20 @@ export class HistoricalGeneration<T> {
       if (this.retired) return
       await this.observe(run)
       if (!this.canRun()) return
-      if (run?.status !== 'running' && !manual) return
-      if (run?.status === 'running' && !run.resumable) { this.later(); return }
+      if (activeHistoricalRun(run)) { this.later(); return }
+      if (!manual) return
       this.emit({ ...this.state, phase: 'generating', feedback: null })
-      const result = await this.deps.step({ establishment_id: this.deps.establishmentId, preferred_language: this.deps.language,
-        ...(run?.status === 'running' ? { generation_id: run.generation_id } : { force: true as const }) })
+      // The ONLY mutating client request: an explicit user's click, never a timer/foreground return.
+      const result = await this.deps.enqueue({ establishment_id: this.deps.establishmentId, preferred_language: this.deps.language, force: true })
       if (this.retired) return
       if (result.report) {
         this.deps.saveReport(result.report)
         this.emit({ phase: 'idle', run: this.state.run ? { ...this.state.run, status: 'completed', resumable: false } : null, feedback: 'success' })
       } else if (result.error === 'NO_REVIEWS_AVAILABLE') {
         this.emit({ phase: 'idle', run: null, feedback: 'empty' })
-      } else if (result.pending && result.generation_id) {
-        this.emit({ phase: this.canRun() ? 'generating' : 'paused', feedback: null,
-          run: { establishment_id: this.deps.establishmentId, preferred_language: this.deps.language,
-            generation_id: result.generation_id, status: 'running', progress: result.progress ?? 0,
-            total_steps: result.total_steps ?? run?.total_steps ?? null, resumable: false, error_code: null } })
-        this.later(1500)
+      } else if (result.run) {
+        await this.observe(result.run)
+        if(activeHistoricalRun(result.run)) this.later()
       } else {
         // Includes concurrent generation, 409, malformed/lost response: verify, never infer failure.
         throw new Error('REPORT_RESPONSE_REQUIRES_RECONCILIATION')

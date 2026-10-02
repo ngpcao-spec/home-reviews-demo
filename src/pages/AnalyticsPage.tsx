@@ -45,7 +45,7 @@ export function AnalyticsPage() {
   const generation = useHistoricalGeneration(cache, currentUser.id ?? currentUser.email, resolvedEstablishmentId, preferredLanguage,
     !demoMode && periodMode === 'historical')
   const historicalGenerating = generation.phase === 'generating' || generation.phase === 'paused'
-  const historicalFeedback = demoMode ? demoFeedback : generation.phase === 'failed' ? 'error' : generation.feedback
+  const historicalFeedback = demoMode ? demoFeedback : generation.feedback === 'empty' ? 'empty' : generation.phase === 'failed' ? 'error' : generation.feedback
   const historicalProgress = generation.run?.total_steps
     ? messages.reputation.progress.replace('{done}', String(generation.run.progress)).replace('{total}', String(generation.run.total_steps))
     : generation.run ? (language === 'vi' ? `${generation.run.progress} bước đã hoàn tất` : `${generation.run.progress} étapes terminées`) : ''
@@ -187,10 +187,10 @@ export function AnalyticsPage() {
       <div className="historical-report-action">
         <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
-          <span>{historicalGenerating ? (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours') : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
+          <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
         </button>
         {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
-        {generation.phase === 'paused' && <small role="status">{language === 'vi' ? 'Tiến trình được giữ lại. Sẽ tự động kiểm tra và tiếp tục khi có kết nối.' : 'Progression conservée. Vérification et reprise automatiques au retour de la connexion.'}</small>}
+        {historicalGenerating && <small role="status">{language === 'vi' ? 'Bạn có thể đóng ứng dụng. Máy chủ sẽ tiếp tục phân tích.' : 'Vous pouvez fermer l’application. L’analyse continue côté serveur.'}</small>}
         {visibleHistoricalReport?.generatedAt && <small>{messages.reputation.lastUpdated}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
         {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
