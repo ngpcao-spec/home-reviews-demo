@@ -7,6 +7,20 @@ test('V3 summary second, nine fixed sections, compact details and no generation 
     await expect(page.locator('.weekly-section')).toHaveCount(9)
     await expect(page.locator('.weekly-section').nth(1)).toHaveClass(/consultant-synthesis/)
     await expect(page.locator('.consultant-axis-tile')).toHaveCount(4)
+    await expect(page.locator('.consultant-axis-section')).toHaveCount(4)
+    for(const section of await page.locator('.consultant-axis-section').all()){
+      await expect(section.locator('dt')).toHaveText(language==='vi'?['Đánh giá tích cực','Đánh giá tiêu cực']:['Avis positifs','Avis négatifs'])
+      const paragraph=section.locator('.consultant-axis-prose')
+      // Exercise long Vietnamese/French prose with the same production layout.
+      await paragraph.evaluate((el,lang)=>{el.textContent=lang==='vi'
+        ? 'Khách hàng đánh giá cao sự thân thiện và thái độ chu đáo của nhân viên trong suốt bữa ăn. Một số ý kiến đề cập đến thời gian chờ đợi khi nhà hàng đông khách, cũng như việc các món ăn được phục vụ vào những thời điểm khác nhau. Những nhận xét này phản ánh trải nghiệm của các khách hàng đã để lại đánh giá.'
+        : 'Les clients apprécient la disponibilité et l’accueil du personnel pendant le repas. Certains commentaires mentionnent toutefois une attente importante lors des périodes de forte fréquentation et des plats servis à des moments différents. Ces constats reflètent les expériences décrites dans les avis disponibles.'},language)
+      expect(await paragraph.evaluate(el=>{
+        const box=el.getBoundingClientRect(),parent=el.parentElement!,style=getComputedStyle(parent)
+        const width=parent.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)
+        return Math.abs(box.width-width)<1 && el.scrollWidth<=el.clientWidth && getComputedStyle(el).textAlign==='justify'
+      })).toBe(true)
+    }
     await expect(page.locator('.consultant-total')).toContainText('501')
     await expect(page.locator('.consultant-sentiments dd')).toHaveText(['458','43'])
     await expect(page.locator('.consultant-axis-tile dd')).toHaveText(['184','19','339','48','31','42','292','16'])

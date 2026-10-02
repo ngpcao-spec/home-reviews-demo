@@ -2,6 +2,7 @@ import { useI18n } from '../i18n'
 import type { ReactNode } from 'react'
 import { AXES, type ConsultantReportData } from '../../supabase/functions/_shared/consultant-contract'
 import './ReputationReport.css'
+import { axisSummaryText } from '../lib/report-presentation'
 
 function ReportSection({index,title,className='',children}:{index:number;title:string;className?:string;children:ReactNode}) {
   return <section className={`weekly-section ${className}`}><article className="card reputation-theme-card consultant-section-card">
@@ -35,9 +36,9 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
     </ReportSection>
     {AXES.map((key,index)=>{
       const axis=report.axes?.find(item=>item.key===key)
-      return <ReportSection key={key} index={index+3} title={label[key]}>
-        <dl className="reputation-replies"><div><dt>{m.axisPositive.replace('{axis}',label[key])}</dt><dd>{axis?.positive ?? '—'}</dd></div><div><dt>{m.axisNegative.replace('{axis}',label[key])}</dt><dd>{axis?.negative ?? '—'}</dd></div></dl>
-        <p className="consultant-prose">{axis?.summary || m.insufficientAnalysis}</p>
+      return <ReportSection key={key} index={index+3} title={label[key]} className="consultant-axis-section">
+        <dl className="reputation-replies"><div><dt>{m.axisPositive}</dt><dd>{axis?.positive ?? '—'}</dd></div><div><dt>{m.axisNegative}</dt><dd>{axis?.negative ?? '—'}</dd></div></dl>
+        <p className="consultant-prose consultant-axis-prose" lang={language}>{axis?.summary ? axisSummaryText(axis.summary,label[key]) : m.insufficientAnalysis}</p>
       </ReportSection>
     })}
     <ReportSection index={7} title={m.positiveAspects} className="consultant-positive-details">{aspects(report.positive_aspects,false,true)}<small>{m.themeNote}</small></ReportSection>
