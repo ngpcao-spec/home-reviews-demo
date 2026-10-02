@@ -342,6 +342,7 @@ export async function fetchInitialization(
 export async function resolveEstablishmentCandidate(
   query: string,
   language: SupportedLanguage,
+  observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
 ) {
   const provider = providerName()
   const result = provider === 'mock'
@@ -352,7 +353,7 @@ export async function resolveEstablishmentCandidate(
         language,
         sort: 'newest',
         limit: 1,
-      })
+      }, observe)
       : await fetchOutscraperReviews({
       query,
       apiKey: outscraperKey(),

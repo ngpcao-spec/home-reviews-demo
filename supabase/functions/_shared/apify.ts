@@ -151,13 +151,16 @@ function runFromPayload(payload: JsonRecord): ApifyRunState {
 export async function startApifyRun(
   token: string,
   request: ApifyReviewRequest,
+  observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
 ): Promise<ApifyRunState> {
   if (!token.trim()) throw new ApifyError('APIFY_TOKEN_MISSING', 503)
+  observe?.('link_resolution')
   const resolvedUrl = await resolvePlaceUrl(request.placeUrl)
   const configuredChargeLimit = Number(Deno.env.get('APIFY_MAX_RUN_CHARGE_USD') ?? '1')
   const maxTotalChargeUsd = Number.isFinite(configuredChargeLimit)
     ? Math.min(10, Math.max(0.1, configuredChargeLimit))
     : 1
+  observe?.('run_start')
   const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}`, {
     method: 'POST',
     headers: apiHeaders(token, true),
@@ -319,9 +322,13 @@ export async function waitForApifyRun(
 export async function fetchApifyReviews(
   token: string,
   request: ApifyReviewRequest,
+  observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
 ): Promise<GoogleReviewsResult> {
-  const run = await startApifyRun(token, request)
+  const run = await startApifyRun(token, request, observe)
+  observe?.('run_wait')
   const completed = await waitForApifyRun(token, run)
+  observe?.('dataset_fetch')
   const items = await fetchApifyDataset(token, completed.datasetId)
+  observe?.('normalization')
   return normalizeApifyDataset(items, request.placeUrl, run.resolvedPlaceUrl)
 }

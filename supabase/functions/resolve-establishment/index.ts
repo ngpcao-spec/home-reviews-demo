@@ -5,6 +5,7 @@ import { ApifyError } from '../_shared/apify.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { preferredLanguageForUser, resolveEstablishmentCandidate } from '../_shared/sync-service.ts'
 import { normalizeGoogleMapsLink } from '../_shared/google-maps-link.ts'
+import { createResolutionDiagnostics } from '../_shared/resolution-diagnostics.ts'
 
 interface RequestBody { input?: unknown }
 
@@ -13,16 +14,21 @@ Deno.serve(async (request) => {
   if (preflightResponse) return preflightResponse
   if (request.method !== 'POST') return json({ error: 'METHOD_NOT_ALLOWED' }, 405)
 
+  const diagnostics = createResolutionDiagnostics()
   try {
+    diagnostics.step('authentication')
     const { user, admin } = await requireUser(request)
     enforceRateLimit(`resolve-establishment:${user.id}`, 10, 60_000)
+    diagnostics.step('validation')
     const body = await request.json() as RequestBody
     const normalizedLink = typeof body.input === 'string' && body.input.length <= 500
       ? normalizeGoogleMapsLink(body.input) : null
     if (!normalizedLink) {
+      diagnostics.failed(new Error('INVALID_GOOGLE_MAPS_LINK'))
       return json({ error: 'INVALID_GOOGLE_MAPS_LINK' }, 400)
     }
 
+    diagnostics.step('membership')
     const { data: membership, error: membershipError } = await admin
       .from('organization_members')
       .select('organization_id')
@@ -30,10 +36,16 @@ Deno.serve(async (request) => {
       .order('created_at', { ascending: true })
       .limit(1)
       .single()
-    if (membershipError || !membership) return json({ error: 'FORBIDDEN' }, 403)
+    if (membershipError || !membership) {
+      diagnostics.failed(new Error('FORBIDDEN'))
+      return json({ error: 'FORBIDDEN' }, 403)
+    }
 
+    diagnostics.step('language')
     const language = await preferredLanguageForUser(admin, user.id)
-    const resolved = await resolveEstablishmentCandidate(normalizedLink, language)
+    diagnostics.step('provider')
+    const resolved = await resolveEstablishmentCandidate(normalizedLink, language, diagnostics.step)
+    diagnostics.step('duplicate_check')
     const { data: existing, error: existingError } = await admin
       .from('establishments')
       .select('id')
@@ -41,10 +53,15 @@ Deno.serve(async (request) => {
       .eq('google_id', resolved.establishment.googleId)
       .maybeSingle()
     if (existingError) throw existingError
-    if (existing) return json({ error: 'ESTABLISHMENT_ALREADY_ADDED' }, 409)
+    if (existing) {
+      diagnostics.failed(new Error('ESTABLISHMENT_ALREADY_ADDED'))
+      return json({ error: 'ESTABLISHMENT_ALREADY_ADDED' }, 409)
+    }
 
+    diagnostics.completed()
     return json({ candidate: resolved.establishment })
   } catch (error) {
+    diagnostics.failed(error)
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)
     if (error instanceof ApifyError) return json({ error: error.code }, error.httpStatus)
     if (error instanceof SyntaxError) return json({ error: 'INVALID_JSON' }, 400)
