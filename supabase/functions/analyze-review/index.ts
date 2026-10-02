@@ -17,7 +17,6 @@ interface ReviewRow {
   text: string
   original_text: string
   language: string | null
-  ai_summary: string | null
   ai_suggested_reply: string | null
   ai_suggested_reply_language: string | null
   ai_detected_language: string | null
@@ -39,7 +38,6 @@ interface ReviewRow {
 interface LocalizedDraftRow {
   id: string
   language: 'fr' | 'vi'
-  ai_summary: string | null
   ai_suggested_reply: string | null
   draft_text: string | null
   draft_updated_at: string | null
@@ -156,7 +154,7 @@ Deno.serve(async (request) => {
 
     const { data, error } = await reader
       .from('reviews')
-      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_summary,ai_suggested_reply,ai_suggested_reply_language,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version,review_context,review_detailed_rating,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,negative_feedback_model,negative_feedback_status')
+      .select('id,organization_id,establishment_id,historical_import,rating,text,original_text,language,ai_suggested_reply,ai_suggested_reply_language,ai_detected_language,ai_analyzed_at,ai_status,ai_error,ai_error_history,ai_attempt_count,reply_draft_version,review_context,review_detailed_rating,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,negative_feedback_model,negative_feedback_status')
       .eq('id', reviewId)
       .single()
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
@@ -180,7 +178,7 @@ Deno.serve(async (request) => {
 
     const { data: existingData, error: existingError } = await admin
       .from('review_reply_drafts')
-      .select('id,language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error')
+      .select('id,language,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error')
       .eq('review_id', review.id)
       .eq('language', workingLanguage)
       .maybeSingle()
@@ -189,7 +187,6 @@ Deno.serve(async (request) => {
 
     if (localized?.ai_status === 'completed' && localized.draft_text && !body.regenerate) {
       return json({
-        ai_summary: localized.ai_summary,
         ai_suggested_reply: localized.ai_suggested_reply,
         ai_suggested_reply_language: localized.language,
         reply_draft_text: localized.draft_text,
@@ -256,7 +253,6 @@ Deno.serve(async (request) => {
       const { error: draftError } = await admin.from('review_reply_drafts').upsert({
         review_id: review.id,
         language: workingLanguage,
-        ai_summary: result.negative_feedback_summary,
         ai_suggested_reply: result.ai_suggested_reply,
         draft_text: result.ai_suggested_reply,
         draft_updated_at: analyzedAt,
@@ -272,7 +268,6 @@ Deno.serve(async (request) => {
         requires_attention: true,
         requires_ai_analysis: true,
         status: 'to_process',
-        ai_summary: result.negative_feedback_summary,
         ai_suggested_reply: result.ai_suggested_reply,
         ai_suggested_reply_language: workingLanguage,
         reply_draft_text: result.ai_suggested_reply,
@@ -293,7 +288,6 @@ Deno.serve(async (request) => {
       }
       return json({
         ...result,
-        ai_summary: result.negative_feedback_summary,
         ai_suggested_reply_language: workingLanguage,
         reply_draft_text: result.ai_suggested_reply,
         reply_draft_language: workingLanguage,
@@ -310,7 +304,7 @@ Deno.serve(async (request) => {
         .update({ ai_status: 'processing', ai_error: null, updated_at: new Date().toISOString() })
         .eq('id', localized.id)
         .neq('ai_status', 'processing')
-        .select('id,language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error')
+        .select('id,language,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error')
         .maybeSingle()
       if (claimError) throw claimError
       if (!claimed) return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
@@ -320,7 +314,7 @@ Deno.serve(async (request) => {
         review_id: review.id,
         language: workingLanguage,
         ai_status: 'processing',
-      }).select('id,language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error').maybeSingle()
+      }).select('id,language,ai_suggested_reply,draft_text,draft_updated_at,draft_version,ai_status,ai_error').maybeSingle()
       if (inserted.error?.code === '23505') return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
       if (inserted.error || !inserted.data) throw inserted.error ?? new Error('AI_DRAFT_CLAIM_FAILED')
       localized = inserted.data as LocalizedDraftRow
@@ -344,7 +338,6 @@ Deno.serve(async (request) => {
     const currentDraftVersion = localized.draft_version ?? 0
     const nextDraftVersion = currentDraftVersion + 1
     const { error: localizedSaveError } = await admin.from('review_reply_drafts').update({
-      ai_summary: result.ai_summary,
       ai_suggested_reply: result.ai_suggested_reply,
       draft_text: result.ai_suggested_reply,
       draft_updated_at: analyzedAt,
@@ -365,14 +358,12 @@ Deno.serve(async (request) => {
       ai_output_tokens: result.usage?.output_tokens ?? null,
       ai_reasoning_tokens: result.usage?.output_tokens_details?.reasoning_tokens ?? null,
       ai_total_tokens: result.usage?.total_tokens ?? null,
-      ai_last_rejected_summary: null,
       ai_last_rejected_reply: null,
       ai_last_rejected_language: null,
       ai_validation_error: null,
     }
     if (!review.ai_suggested_reply) {
       Object.assign(reviewUpdate, {
-        ai_summary: result.ai_summary,
         ai_suggested_reply: result.ai_suggested_reply,
         ai_suggested_reply_language: workingLanguage,
         reply_draft_text: result.ai_suggested_reply,
@@ -386,7 +377,7 @@ Deno.serve(async (request) => {
 
     if (automatic) {
       // Notification and push failures must never fail review analysis or synchronization.
-      await runNonBlockingNotification(() => notifyNewReview(admin, review, result.ai_summary))
+      await runNonBlockingNotification(() => notifyNewReview(admin, review, review.text || review.original_text || ''))
     }
 
     if (userId) {
@@ -427,7 +418,6 @@ Deno.serve(async (request) => {
     }
     if (reviewId) {
       const failedReviewUpdate: Record<string, unknown> = {
-        ai_last_rejected_summary: rejected?.ai_summary ?? null,
         ai_last_rejected_reply: rejected?.ai_suggested_reply ?? null,
         ai_last_rejected_language: rejected?.detected_language ?? null,
         ai_validation_error: rejected ? code : null,

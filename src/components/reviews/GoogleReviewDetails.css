@@ -1,0 +1,14 @@
+.google-review-details.card{margin-top:16px;padding:18px 20px}
+.google-review-details h2{margin:0 0 14px;color:var(--text);font-size:1.05rem;line-height:1.35;font-weight:600}
+.google-review-details dl{margin:0}
+.google-review-details dt,.google-review-details dd{margin:0;min-width:0}
+.google-subratings{display:grid;gap:10px}
+.google-subratings>div{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.google-subratings dt{color:var(--muted)}
+.google-subratings dd{color:var(--champagne);font-weight:600;white-space:nowrap;flex-shrink:0;font-variant-numeric:tabular-nums}
+.google-visit-info{display:grid;gap:13px}
+.google-visit-info dt{display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--muted);line-height:1.35;margin-bottom:4px}
+.google-visit-info dd{font-size:.94rem;line-height:1.5;overflow-wrap:anywhere}
+.google-visit-noise dt{color:var(--champagne)}
+.google-visit-noise dt svg{flex-shrink:0}
+@media(min-width:650px){.google-visit-info{grid-template-columns:1fr 1fr;column-gap:24px}}

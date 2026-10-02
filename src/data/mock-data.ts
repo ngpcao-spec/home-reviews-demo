@@ -14,15 +14,15 @@ export const seedEstablishments: Establishment[] = [
   { id: 'est-4', organizationId: demoOrganizationId, name: "L'Indochine", address: '4 place des Vosges', city: 'Paris', category: 'Cuisine fusion', googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=Indochine+Paris', photoUrl: '/restaurants/hanoi.png', currentRating: 4.7, currentReviewCount: 412, isActive: true, syncEnabled: true, lastSyncedAt: ago(.25), syncStatus: 'ok' },
 ]
 
-const aiResults: Record<string, { summary: string; reply: string }> = {
-  wait: { summary: "Le client signale un temps d'attente de 45 minutes sans information de la part de l'équipe.", reply: "Bonjour, merci d’avoir pris le temps de partager votre expérience. Nous sommes désolés pour ce temps d’attente et le manque d’information. Votre retour est pris très au sérieux." },
-  staff: { summary: 'Le client rapporte un échange agressif avec un membre du personnel devant les autres clients.', reply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés que cet échange vous ait laissé une impression aussi négative et prenons votre retour très au sérieux." },
-  clean: { summary: "Le client signale que la table et les sanitaires n'étaient pas propres, malgré un emplacement agréable.", reply: "Bonjour, merci pour votre retour. Nous sommes désolés que la propreté de la table et des sanitaires n’ait pas répondu à vos attentes. Votre remarque est importante pour nous." },
-  price: { summary: "Le client juge les portions trop chères et signale un supplément inexpliqué sur l'addition.", reply: "Bonjour, merci d’avoir partagé votre retour. Nous sommes désolés que le rapport entre le prix et les portions ainsi que ce supplément inexpliqué aient dégradé votre expérience." },
-  mixed: { summary: "Le client a apprécié les plats, mais déplore une attente de presque une heure.", reply: "Bonjour, merci pour votre retour et pour votre appréciation de nos plats. Nous sommes désolés pour cette attente particulièrement longue et prenons votre remarque au sérieux." },
-  vague: { summary: "Le client décrit une expérience correcte mais peu mémorable, tout en appréciant le cadre.", reply: "Bonjour, merci d’avoir pris le temps de partager votre expérience. Nous prenons note de votre retour et sommes heureux que le cadre vous ait plu." },
-  service: { summary: "Le client signale une commande oubliée puis servie froide, malgré les excuses de l'équipe.", reply: "Bonjour, merci pour votre retour. Nous sommes désolés que votre commande ait été oubliée puis servie froide. Nous apprécions que vous nous ayez fait part de cette expérience." },
-  reservation: { summary: "Le client indique que sa réservation était introuvable et qu'aucune solution ne lui a été proposée.", reply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés pour la difficulté rencontrée avec votre réservation et comprenons votre déception." },
+const aiResults: Record<string, { reply: string }> = {
+  wait: { reply: "Bonjour, merci d’avoir pris le temps de partager votre expérience. Nous sommes désolés pour ce temps d’attente et le manque d’information. Votre retour est pris très au sérieux." },
+  staff: { reply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés que cet échange vous ait laissé une impression aussi négative et prenons votre retour très au sérieux." },
+  clean: { reply: "Bonjour, merci pour votre retour. Nous sommes désolés que la propreté de la table et des sanitaires n’ait pas répondu à vos attentes. Votre remarque est importante pour nous." },
+  price: { reply: "Bonjour, merci d’avoir partagé votre retour. Nous sommes désolés que le rapport entre le prix et les portions ainsi que ce supplément inexpliqué aient dégradé votre expérience." },
+  mixed: { reply: "Bonjour, merci pour votre retour et pour votre appréciation de nos plats. Nous sommes désolés pour cette attente particulièrement longue et prenons votre remarque au sérieux." },
+  vague: { reply: "Bonjour, merci d’avoir pris le temps de partager votre expérience. Nous prenons note de votre retour et sommes heureux que le cadre vous ait plu." },
+  service: { reply: "Bonjour, merci pour votre retour. Nous sommes désolés que votre commande ait été oubliée puis servie froide. Nous apprécions que vous nous ayez fait part de cette expérience." },
+  reservation: { reply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés pour la difficulté rencontrée avec votre réservation et comprenons votre déception." },
 }
 
 const reviewSeeds = [
@@ -54,7 +54,7 @@ export const seedReviews: Review[] = reviewSeeds.map(([id, establishmentId, auth
     id, organizationId: demoOrganizationId, establishmentId, externalReviewId: `mock-${id}`, authorName, rating,
     reviewText, reviewLanguage: 'fr', publishedAt: ago(hours), sourceUrl: seedEstablishments.find((e) => e.id === establishmentId)!.googleMapsUrl,
     isHistoricalImport: hours > 48, requiresAction: rating <= 3, status,
-    aiSummary: ai?.summary, aiSuggestedReply: ai?.reply, aiDetectedLanguage: ai ? 'fr' : undefined,
+    aiSuggestedReply: ai?.reply, aiDetectedLanguage: ai ? 'fr' : undefined,
     aiAnalyzedAt: ai ? ago(Math.max(0, hours - 1)) : undefined, aiStatus: ai ? 'completed' : undefined,
   }
 })

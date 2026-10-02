@@ -145,6 +145,9 @@ describe('ReviewDetailPage translation toggle', () => {
 
   it('copie directement le draft lorsque la langue originale et la langue de travail sont françaises', () => {
     renderReview('french-fr')
+    expect(screen.queryByText('Le service était lent.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Résumé IA')).not.toBeInTheDocument()
+    expect(appMocks.generateResponse).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Copier la réponse' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Traduire pour le client' })).not.toBeInTheDocument()
   })
@@ -166,6 +169,9 @@ describe('ReviewDetailPage translation toggle', () => {
 
   it('copie directement lorsque l’avis original et le draft sont vietnamiens', () => {
     renderReview('vietnamese-vi', 'vi')
+    expect(screen.queryByText('Tóm tắt AI')).not.toBeInTheDocument()
+    expect(screen.queryByText('Khách hàng phàn nàn về dịch vụ chậm.')).not.toBeInTheDocument()
+    expect(appMocks.generateResponse).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Sao chép phản hồi' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Dịch cho khách hàng' })).not.toBeInTheDocument()
   })

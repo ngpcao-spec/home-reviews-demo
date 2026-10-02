@@ -3,6 +3,17 @@ import type { HistoricalRun } from '../../../src/lib/historical-generation'
 type Listener = (event: string, session: { user: ReturnType<typeof user> } | null) => void
 const listeners=new Set<Listener>()
 const user=()=>({id:localStorage.getItem('resume-user') || 'account-a',email:'test@example.test',user_metadata:{}})
+const reviewFixture=()=>localStorage.getItem('review-details-test')
+const reviewLanguage=()=>localStorage.getItem('review-details-language') || 'vi'
+const review=()=>({id:'xom-review',organization_id:'org-account-a',establishment_id:'place-account-a',external_review_id:'google-fixture',
+  author_name:'Client',rating:2,text:'Avis de test',original_text:'Avis de test',original_language:'fr',status:'to_process',
+  published_at:'2026-10-01T00:00:00Z',created_at:'2026-10-01T00:00:00Z',historical_import:true,ai_status:'completed',
+  ai_summary:'OLD SUMMARY MUST NOT APPEAR',review_translations:[],
+  review_detailed_rating:reviewFixture()==='empty'?{}:reviewFixture()==='partial'?{service:3}:{'Đồ ăn':4,'Dịch vụ':1,'Bầu không khí':2},
+  review_context:reviewFixture()==='empty'?{}:reviewFixture()==='partial'?{'Độ ồn':'Ồn ào, nhưng bạn vẫn trò chuyện được'}:{
+    'Độ ồn':'Ồn ào, nhưng bạn vẫn trò chuyện được','Giá mỗi người':'700-800\u00a0N\u00a0₫','Loại hình bữa ăn':'Bữa tối','Quy mô nhóm':'Phù hợp với mọi quy mô nhóm'},
+  review_reply_drafts:[{language:reviewLanguage(),draft_text:'Réponse déjà enregistrée',ai_suggested_reply:'Réponse déjà enregistrée',ai_status:'completed',draft_version:1}],
+})
 export const resumeHarness={queries:[] as string[],invocations:[] as string[],delay:0,fail:false,
   stepCalls:[] as Record<string,unknown>[], stepDelay:500, loseResponse:false,
   get run():HistoricalRun|null{return JSON.parse(localStorage.getItem('resume-run') ?? 'null')},
@@ -31,7 +42,8 @@ class Query implements PromiseLike<{data: unknown;error:null}> {
     if(resumeHarness.fail || localStorage.getItem('resume-offline')==='true' || !navigator.onLine)throw new Error('offline')
     const data=this.table==='establishments'?[place(this.account)]
       :this.table==='organizations'?[{id:`org-${this.account}`,monitoring_interval_hours:12}]
-      :this.table==='profiles'?{preferred_language:'vi',notification_onboarding_seen:true,notification_permission_status:'denied'}
+      :this.table==='profiles'?{preferred_language:reviewLanguage(),notification_onboarding_seen:true,notification_permission_status:'denied'}
+      :this.table==='reviews' && reviewFixture()?[review()]
       :this.table==='historical_establishment_reports'?report(this.account):[]
     return {data,error:null}
   }

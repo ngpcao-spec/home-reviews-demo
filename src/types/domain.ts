@@ -38,7 +38,8 @@ export interface Review {
   negativeFeedbackSummary?: string
   negativeFeedbackCheckedAt?: string
   status: ReviewStatus
-  aiSummary?: string
+  reviewDetailedRating?: Record<string, unknown> | null
+  reviewContext?: Record<string, unknown> | null
   aiSuggestedReply?: string
   aiSuggestedReplyLanguage?: string
   replyDraftText?: string

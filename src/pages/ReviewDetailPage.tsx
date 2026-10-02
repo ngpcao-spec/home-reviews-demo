@@ -6,6 +6,7 @@ import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
 import { useI18n } from '../i18n'
+import { GoogleReviewDetails } from '../components/reviews/GoogleReviewDetails'
 
 function baseLanguage(language?: string | null) {
   return language?.trim().toLowerCase().split(/[-_]/)[0] ?? ''
@@ -96,7 +97,6 @@ export function ReviewDetailPage() {
     window.open(review.sourceUrl || establishment.googleMapsUrl, '_blank', 'noopener,noreferrer')
   }
 
-  const completed = review.aiStatus === 'completed' && Boolean(review.aiSummary) && Boolean(review.aiSuggestedReply)
   const needsLocalizedDraft = Boolean(review.hasLegacyCompletedAnalysis && !review.hasLocalizedReply)
   const statusCopy = review.aiStatus === 'failed'
     ? messages.reviews.analysisFailed
@@ -148,12 +148,12 @@ export function ReviewDetailPage() {
       <span className="author">— {review.authorName}</span>
     </section>
 
-    <section className="ai-panel card">
-      <div className="ai-heading"><span><Sparkles size={20}/>{messages.reviews.aiSummary}</span></div>
-      {completed
-        ? <div className="ai-summary-copy">{review.aiSummary}</div>
-        : <div className="ai-empty"><p>{statusCopy}</p><button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {generating ? '…' : needsLocalizedDraft ? messages.reviews.prepareReply : messages.reviews.relaunch}</button></div>}
-    </section>
+    <GoogleReviewDetails ratings={review.reviewDetailedRating} context={review.reviewContext} language={preferredLanguage ?? 'fr'}/>
+
+    {!response && <section className="response-panel card">
+      <div className="response-title"><h2><Sparkles size={18}/>{messages.reviews.suggestedReply}</h2></div>
+      <div className="ai-empty"><p>{statusCopy}</p><button className="secondary-button" onClick={handleGenerate} disabled={generating}>{generating ? <LoaderCircle className="spin"/> : <RefreshCw size={17}/>} {generating ? '…' : needsLocalizedDraft ? messages.reviews.prepareReply : messages.reviews.relaunch}</button></div>
+    </section>}
 
     {response
       ? <>

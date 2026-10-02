@@ -137,6 +137,8 @@ interface ReviewRow {
   rating: number
   text: string
   original_text: string
+  review_detailed_rating: Record<string, unknown> | null
+  review_context: Record<string, unknown> | null
   original_language: string | null
   review_translations: Array<{ language: PreferredLanguage; translated_text: string }> | null
   language: string | null
@@ -149,7 +151,6 @@ interface ReviewRow {
   negative_feedback_summary: string | null
   negative_feedback_checked_at: string | null
   status: ReviewStatus
-  ai_summary: string | null
   ai_suggested_reply: string | null
   ai_suggested_reply_language: string | null
   reply_draft_text: string | null
@@ -170,7 +171,6 @@ interface ReviewRow {
 
 interface LocalizedReplyDraftRow {
   language: PreferredLanguage
-  ai_summary: string | null
   ai_suggested_reply: string | null
   draft_text: string | null
   draft_updated_at: string | null
@@ -198,7 +198,6 @@ interface NotificationRow {
 }
 
 interface AnalyzePayload {
-  ai_summary?: string
   ai_suggested_reply?: string
   detected_language?: string
   ai_analyzed_at?: string
@@ -275,7 +274,7 @@ const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
 const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
-const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,original_language,language,published_at,created_at,review_url,historical_import,requires_attention,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,status,ai_summary,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text),review_reply_drafts(language,ai_summary,ai_suggested_reply,draft_text,draft_updated_at,draft_version,translated_reply_text,translated_reply_language,translated_from_draft_version,translated_at,ai_status,ai_error)'
+const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,review_detailed_rating,review_context,original_language,language,published_at,created_at,review_url,historical_import,requires_attention,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text),review_reply_drafts(language,ai_suggested_reply,draft_text,draft_updated_at,draft_version,translated_reply_text,translated_reply_language,translated_from_draft_version,translated_at,ai_status,ai_error)'
 const REVIEW_LOAD_PAGE_SIZE = 500
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
@@ -351,6 +350,8 @@ function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review
     reviewText: localized.displayText,
     originalText: localized.originalText,
     translatedText: localized.translatedText,
+    reviewDetailedRating: row.review_detailed_rating,
+    reviewContext: row.review_context,
     reviewLanguage: row.original_language ?? row.language ?? 'fr',
     publishedAt: row.published_at ?? row.created_at,
     sourceUrl: row.review_url ?? '',
@@ -360,7 +361,6 @@ function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review
     negativeFeedbackSummary: row.negative_feedback_summary ?? undefined,
     negativeFeedbackCheckedAt: row.negative_feedback_checked_at ?? undefined,
     status,
-    aiSummary: localizedReply?.ai_summary ?? undefined,
     aiSuggestedReply: localizedReply?.ai_suggested_reply ?? undefined,
     aiSuggestedReplyLanguage: localizedReply?.language,
     replyDraftText: localizedReply?.draft_text ?? undefined,
@@ -933,7 +933,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       authorName: 'Alex M.', rating: 1, reviewText: "Nous avons attendu une heure et personne n'est venu nous expliquer la situation.",
       reviewLanguage: 'fr', publishedAt: new Date().toISOString(), sourceUrl: establishment.googleMapsUrl, isHistoricalImport: false,
       originalText: "Nous avons attendu une heure et personne n'est venu nous expliquer la situation.",
-      requiresAction: true, status: 'to_process', aiSummary: "Le client signale une attente d’une heure sans information de l’équipe.", aiSuggestedReply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés pour cette longue attente sans information et prenons votre retour au sérieux.", aiDetectedLanguage: 'fr', aiAnalyzedAt: new Date().toISOString(), aiStatus: 'completed',
+      requiresAction: true, status: 'to_process', aiSuggestedReply: "Bonjour, merci d’avoir partagé votre expérience. Nous sommes désolés pour cette longue attente sans information et prenons votre retour au sérieux.", aiDetectedLanguage: 'fr', aiAnalyzedAt: new Date().toISOString(), aiStatus: 'completed',
     }
     setReviews((items) => [review, ...items])
     setNotifications((items) => [{ id: crypto.randomUUID(), establishmentId: establishment.id, reviewId: id, type: 'new_negative_review', title: `Nouvel avis 1★ — ${establishment.name}`, body: "Le client signale un problème d'attente.", severity: 'high', createdAt: new Date().toISOString() }, ...items])
