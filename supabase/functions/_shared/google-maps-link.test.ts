@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeGoogleMapsLink } from './google-maps-link'
+import { apifyGoogleMapsUrl, normalizeGoogleMapsLink } from './google-maps-link'
 
 describe('Google Maps iOS sharing links', () => {
+  it.each(['https://maps.google.com','https://www.google.com/maps'])('converts ftid precisely from %s', base => {
+    const result = new URL(apifyGoogleMapsUrl(`${base}?ftid=0x317067a3002ce2c1:0x49158083af30d8d5&q=Other+name&g_st=ipc`))
+    expect(result.searchParams.get('cid')).toBe(BigInt('0x49158083af30d8d5').toString())
+    expect([...result.searchParams.keys()]).toEqual(['cid'])
+  })
+  it('does not round 64-bit identifiers or rewrite canonical place URLs', () => {
+    expect(apifyGoogleMapsUrl('https://www.google.com/maps?ftid=0x1:0xffffffffffffffff')).toBe('https://www.google.com/maps?cid=18446744073709551615')
+    const place='https://www.google.com/maps/place/Mai+Huong/data=!4m2!3m1!1s0x1:0x2'
+    expect(apifyGoogleMapsUrl(place)).toBe(place)
+    const cid='https://www.google.com/maps?cid=18446744073709551615'
+    expect(apifyGoogleMapsUrl(cid)).toBe(cid)
+  })
+  it('rejects malformed ftid instead of falling back to a name search', () => {
+    expect(()=>apifyGoogleMapsUrl('https://www.google.com/maps?ftid=broken&q=Restaurant')).toThrow('INVALID_GOOGLE_MAPS_LINK')
+  })
   it.each([
     'https://maps.app.goo.gl/6La6uPKKozVswAJ4A?g_st=ic',
     'https://maps.app.goo.gl/cxbMu5sF4YozN1Pd7?g_st=ipc',

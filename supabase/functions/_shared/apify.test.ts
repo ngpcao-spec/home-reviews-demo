@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { apifyActorInput, normalizeApifyDataset, normalizeApifyReview } from './apify.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { apifyActorInput, normalizeApifyDataset, normalizeApifyReview, startApifyRun } from './apify.ts'
 import { DEFAULT_INITIAL_REVIEWS_LIMIT } from './initial-import'
 
 const item = {
@@ -36,6 +36,24 @@ const item = {
 }
 
 describe('ApifyReviewProvider normalization', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it.each([
+    'https://maps.app.goo.gl/6La6uPKKozVswAJ4A?g_st=ic',
+    'https://maps.app.goo.gl/cxbMu5sF4YozN1Pd7?g_st=ipc',
+  ])('converts the resolved iOS ftid before sending startUrls: %s', async shortUrl => {
+    const resolved = 'https://www.google.com/maps?ftid=0x317067a3002ce2c1:0x49158083af30d8d5&g_st=ipc'
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok:true, url:resolved })
+      .mockResolvedValueOnce({ ok:true, status:201, json:async()=>({data:{id:'mock-run',defaultDatasetId:'mock-dataset',status:'RUNNING'}}) })
+    vi.stubGlobal('fetch',fetchMock)
+    vi.stubGlobal('Deno',{env:{get:()=>undefined}})
+    const result = await startApifyRun('mock-token',{placeUrl:shortUrl,language:'vi',sort:'newest',limit:100})
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body)
+    expect(body.startUrls).toEqual([{url:`https://www.google.com/maps?cid=${BigInt('0x49158083af30d8d5')}`}])
+    expect(body).toMatchObject({maxReviews:100,reviewsSort:'newest',language:'vi',personalData:true,reviewsOrigin:'google'})
+    expect(result.resolvedPlaceUrl).toBe(resolved)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
   it('requests one newest-first initial sample capped at 100 reviews', () => {
     expect(apifyActorInput({
       placeUrl: item.url,

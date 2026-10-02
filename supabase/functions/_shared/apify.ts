@@ -1,3 +1,4 @@
+import { apifyGoogleMapsUrl } from './google-maps-link.ts'
 import type {
   GoogleReviewsResult,
   NormalizedEstablishment,
@@ -116,7 +117,7 @@ async function apiJson(
 
 export function apifyActorInput(request: ApifyReviewRequest) {
   return {
-    startUrls: [{ url: request.placeUrl }],
+    startUrls: [{ url: apifyGoogleMapsUrl(request.placeUrl) }],
     reviewsOrigin: 'google',
     reviewsSort: request.sort === 'lowest_rating' ? 'lowestRanking' : 'newest',
     language: request.language,
