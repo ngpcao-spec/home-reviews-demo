@@ -1,5 +1,5 @@
 import { afterEach,describe,expect,it,vi } from 'vitest'
-import { narrativePriorities, priorityRecommendation, sentenceCount, validPriorityKeys, type PriorityTopic } from './consultant-priorities.ts'
+import { narrativePriorities, priceThematicOptions, priorityRecommendation, sentenceCount, validPriorityKeys, type PriorityTopic } from './consultant-priorities.ts'
 import { assembleConsultantReport, CATALOG, consultantNarrative, type consultantMetrics } from './consultant-report.ts'
 import { AXES } from './consultant-contract.ts'
 const topic=(key:string,mentions:number,sentiment:'positive'|'negative'='negative'):PriorityTopic=>({key:`${key}:${sentiment}`,axis:CATALOG[key][0],label:CATALOG[key][1],mentions,sentiment})
@@ -79,7 +79,72 @@ describe('V4 narrative assembly and model boundary',()=>{
     expect(body.reasoning).toEqual({effort:'low'})
     const input=JSON.parse(body.input[1].content)
     expect(input.priority_context.axes.service.recommendation_priorities.map((t:PriorityTopic)=>t.key)).toEqual(['communication:negative','wait_time:negative'])
+    expect(input.price_balance_handled_by_server).toBe(true)
+    const branches=body.text.format.schema.properties.axes.items.anyOf
+    expect(branches[0].properties.key.enum).toEqual(['service','quality','atmosphere'])
+    expect(branches[1].properties.summary.enum).toEqual(input.price_thematic_summary_options)
+    expect(branches[1].properties.key.enum).toEqual(['price'])
     expect(body.input[0].content).toContain('never invent frequency')
     expect(body.input[0].content).toContain('if negative exceeds positive')
+  })
+})
+
+describe('V4.1 narrative finishing without count changes',()=>{
+  it('uses food quality and atmosphere for Artisan, retaining noise and every detailed theme',()=>{
+    const topics=[topic('food_quality',315,'positive'),topic('noise',194,'positive'),topic('atmosphere',170,'positive'),topic('decor',156,'positive'),topic('friendly_staff',100,'positive'),topic('professionalism',90,'positive'),topic('food_quality',34),topic('price_level',32)]
+    const before=structuredClone(topics),p=narrativePriorities(505,topics)
+    expect(p.global_positive.map(t=>t.key)).toEqual(['food_quality:positive','atmosphere:positive'])
+    expect(p.global_negative.map(t=>t.key)).toEqual(['food_quality:negative','price_level:negative'])
+    expect(p.axes.atmosphere.positive[0]).toEqual(topic('noise',194,'positive'))
+    expect(topics).toEqual(before)
+    expect(narrativePriorities(505,[...topics].reverse())).toEqual(p)
+  })
+  it('selects a second axis, not a second high-volume quality theme',()=>{
+    const p=narrativePriorities(300,[topic('food_quality',200,'positive'),topic('drinks',180,'positive'),topic('friendly_staff',100,'positive'),topic('atmosphere',90,'positive')])
+    expect(p.global_positive.map(t=>t.key)).toEqual(['food_quality:positive','friendly_staff:positive'])
+  })
+  it('falls back to the same axis when necessary, and handles zero/one positive theme',()=>{
+    expect(narrativePriorities(300,[topic('food_quality',200,'positive'),topic('drinks',180,'positive')]).global_positive.map(t=>t.key)).toEqual(['food_quality:positive','drinks:positive'])
+    expect(narrativePriorities(100,[]).global_positive).toEqual([])
+    expect(narrativePriorities(100,[topic('noise',9,'positive')]).global_positive).toHaveLength(1)
+  })
+  it('does not demote recurring negative noise at K.HOUSE',()=>{
+    const p=narrativePriorities(101,[topic('food_quality',76,'positive'),topic('noise',50,'positive'),topic('atmosphere',40,'positive'),topic('noise',9),topic('comfort',3)])
+    expect(p.global_positive.map(t=>t.key)).toEqual(['food_quality:positive','atmosphere:positive'])
+    expect(p.axes.atmosphere.recommendation_priorities.map(t=>t.key)).toEqual(['noise:negative','comfort:negative'])
+    expect(p.global_negative[0].key).toBe('noise:negative')
+  })
+  it.each(['fr','vi'] as const)('owns price balance exactly once and rejects even paraphrased duplicates in %s',language=>{
+    const {metrics,raw}=fixture()
+    metrics.axes.find(a=>a.key==='price')!.negative=43
+    const axis=raw.axes.find(a=>a.key==='price')!
+    const balance=language==='fr'?'Les critiques liées au prix dépassent les retours positifs.':'Phản hồi tiêu cực về giá nhiều hơn phản hồi tích cực.'
+    const thematic=language==='fr'?'Les critiques récurrentes concernent principalement ces thèmes : niveau des prix et rapport qualité/prix.':'Mức giá và giá trị so với giá tiền là các phàn nàn lặp lại chính.'
+    axis.summary=thematic
+    const report=assembleConsultantReport(metrics,raw,language,4)
+    expect(report.axes.find(a=>a.key==='price')!.summary).toBe(balance+' '+thematic)
+    for(const bad of [balance+' '+thematic,'Le prix est davantage critiqué qu’apprécié.','Giá trị so với giá tiền nhận được phản hồi tích cực, nhưng phản hồi tiêu cực về giá cả vượt phản hồi tích cực.']) {
+      axis.summary=bad
+      const repaired=assembleConsultantReport(metrics,raw,language,4)
+      expect(repaired.axes.find(a=>a.key==='price')!.summary).toBe(balance+' '+thematic)
+      expect(repaired.axes.filter(a=>a.key!=='price')).toEqual(report.axes.filter(a=>a.key!=='price'))
+      expect(repaired.positive_aspects).toEqual(report.positive_aspects)
+      expect(repaired.negative_aspects).toEqual(report.negative_aspects)
+    }
+    expect(report.version).toBe(4)
+  })
+  it('does not inject a price balance when counts are equal or positive dominates',()=>{
+    for(const negative of [29,30]) {
+      const {metrics,raw}=fixture()
+      metrics.axes.find(a=>a.key==='price')!.negative=negative
+      expect(assembleConsultantReport(metrics,raw,'fr',4).axes.find(a=>a.key==='price')!.summary).toBe('Constat issu des avis.')
+    }
+  })
+  it('uses isolated wording below threshold, and can preserve an evidenced positive price theme',()=>{
+    const p=narrativePriorities(505,[topic('billing',2),topic('value',10,'positive')])
+    const options=priceThematicOptions(p.axes.price,'fr')
+    expect(options[0]).toContain('sans thème négatif récurrent')
+    expect(options[1]).toContain('Des retours positifs portent sur le thème « rapport qualité/prix ».')
+    expect(options.every(s=>!s.includes('dépassent'))).toBe(true)
   })
 })

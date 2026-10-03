@@ -1,7 +1,7 @@
 import { normalizeEvidence, structuredCall, THEME_CATALOG, type Usage } from './reputation-themes.ts'
 import { relevantContext, type ReputationReview } from './reputation-metrics.ts'
 import { AXES, type Axis, type AnalyticalSentiment, type ConsultantReportData } from './consultant-contract.ts'
-import { narrativePriorities, priorityConclusion, priorityRecommendation, sentenceCount, validPriorityKeys } from './consultant-priorities.ts'
+import { narrativePriorities, priceSummary, priceThematicOptions, priorityConclusion, priorityRecommendation, sentenceCount, validPriorityKeys } from './consultant-priorities.ts'
 
 export const CATALOG = {
   ...Object.fromEntries(Object.entries(THEME_CATALOG).filter(([key]) => key !== 'overall_experience').map(([key, [category, fr, vi]]) => [key, [category === 'food' ? 'quality' : key === 'value' || key === 'billing' ? 'price' : key === 'location' ? 'atmosphere' : category, fr, vi]])),
@@ -122,10 +122,15 @@ export function consultantMetrics(reviews: ReputationReview[], classifications: 
 export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string, version:3|4=3) {
   const topics = metrics.themes.map(theme => ({key:`${theme.theme_key}:${theme.sentiment}`,axis:theme.axis,sentiment:theme.sentiment,mentions:theme.mentions,label:CATALOG[theme.theme_key][language==='fr'?1:2]}))
   const priorities=narrativePriorities(metrics.total,topics)
+  const price=metrics.axes.find(axis=>axis.key==='price')!
+  const priceBalanceHandled=version===4 && price.negative>price.positive
+  const thematicOptions=priceThematicOptions(priorities.axes.price,language)
+  const axisSchema=(keys:readonly string[],summary:Record<string,unknown>)=>strictObject({key:{type:'string',enum:[...keys]},summary,recommendation:string,supporting_keys:{type:'array',items:string}})
   const v4Instructions=[
     'The server priority_context is authoritative, not a suggestion. Do not choose your own principal themes. For each axis use only recommendation_priorities in supporting_keys, including the first priority, with at most two keys. Do not promote isolated negatives above recurring negatives.',
     'Axis summary: start with the main positive theme if present, then the principal recurring negative and optionally the second. Distinguish below-threshold isolated criticism from other recurring criticism; never call secondary recurring themes isolated. Do not enumerate all topics.',
-    'Use the supplied axis balance: if negative exceeds positive, state this explicitly, especially for price; if positive exceeds negative keep the summary proportionate. Do not infer axis counts by summing themes.',
+    'For service, quality and atmosphere use the supplied axis balance: if negative exceeds positive, state this explicitly; if positive exceeds negative keep the summary proportionate. Do not infer axis counts by summing themes.',
+    'For price when price_balance_handled_by_server is true, return ONLY one of price_thematic_summary_options as its summary. Never add or paraphrase the balance: do not say negatives exceed positives, dominate, or that price is more criticized than appreciated. The server alone adds that comparison. Otherwise describe price normally.',
     'When mode is maintain, recommend preserving the selected positive strengths, never invent a weakness. When mode is observe, acknowledge isolated feedback without asserting a recurrent issue or inventing positive evidence.',
     'Recommend concrete directions, not invented internal processes: never invent frequency, schedules, assigned roles, mandatory steps, investments, tools, staffing or policies. Strengthen order checking is acceptable; a mandatory confirmation stage before kitchen transmission is not.',
     'Conclusion: at most three short sentences. Overall satisfaction, then at most the two global_positive strengths, then at most the two global_negative improvement priorities supplied by the server. No secondary problems, numbers or percentages. Return conclusion_supporting_keys exactly matching these global keys; these are references, not prose. If there are no recurring negatives, do not invent a priority.',
@@ -138,8 +143,9 @@ export async function consultantNarrative(metrics: ReturnType<typeof consultantM
     'Conclusion: a short balanced synthesis of overall satisfaction, principal strengths and problems, without repeating statistics. No introduction. No establishment name, address, neighbourhood, owner or other identifying information.',
     'Do not write numeric counts in prose: the server displays exact counts separately. Do not use approximations such as about, many dozens. Theme and axis counts overlap and must never be added to obtain total reviews.',
   ].join(' ')+(version===4?' '+v4Instructions:''), {total:metrics.total,positive:metrics.positive,negative:metrics.negative,axes:metrics.axes,topics,
-    ...(version===4?{priority_context:priorities}: {})}, strictObject({
-    axes:{type:'array',items:strictObject({key:{type:'string',enum:[...AXES]},summary:string,recommendation:string,supporting_keys:{type:'array',items:string}})},
+    ...(version===4?{priority_context:priorities,price_balance_handled_by_server:priceBalanceHandled,
+      ...(priceBalanceHandled?{price_thematic_summary_options:thematicOptions}:{})}: {})}, strictObject({
+    axes:{type:'array',items:priceBalanceHandled?{anyOf:[axisSchema(AXES.filter(key=>key!=='price'),string),axisSchema(['price'],{type:'string',enum:thematicOptions})]}:axisSchema(AXES,string)},
     explanations:{type:'array',items:strictObject({key:string,text:string})},conclusion:string,
     ...(version===4?{conclusion_supporting_keys:{type:'array',items:string}}:{}),
   }), 5500, recordUsage, model)
@@ -162,12 +168,8 @@ export function assembleConsultantReport(metrics: ReturnType<typeof consultantMe
     if (version===3 && (!Array.isArray(item.supporting_keys) || !item.supporting_keys.length || item.supporting_keys.some(support=>!eligible.includes(String(support))))) throw new Error('REPORT_UNGROUNDED_RECOMMENDATION')
     const recommendation=version===4 && !validPriorityKeys(item.supporting_keys,priorities.axes[key])
       ? priorityRecommendation(priorities.axes[key],language):prose(item.recommendation)
-    let summary=prose(item.summary)
-    // Always make a price imbalance explicit; do not rely on model interpretation.
-    if(version===4 && key==='price' && counts.negative>counts.positive) {
-      const balance=language==='fr'?'Les critiques liées au prix dépassent les retours positifs.':'Phản hồi tiêu cực về giá nhiều hơn phản hồi tích cực.'
-      if(!summary.startsWith(balance)) summary=balance+' '+summary
-    }
+    const summary=version===4 && key==='price' && counts.negative>counts.positive
+      ? priceSummary(priorities.axes.price,item.summary,language):prose(item.summary)
     return {...counts,summary,recommendation}
   })
   const aspects = metrics.themes.map(theme => {
