@@ -22,7 +22,7 @@ describe('enqueue-only user endpoint',()=>{
     const replies=await Promise.all([h.call(),h.call()])
     expect(replies.map(r=>r.status)).toEqual([202,202])
     for(const reply of replies)expect(await reply.json()).toMatchObject({run:{generation_id:'one-generation',status:'queued'}})
-    expect(h.rpc).toHaveBeenCalledWith('enqueue_historical_report',{p_establishment_id:'place',p_organization_id:'org',p_user_id:'user',p_language:'vi',p_model:'gpt-6.1-sol'})
+    expect(h.rpc).toHaveBeenCalledWith('enqueue_historical_report',{p_establishment_id:'place',p_organization_id:'org',p_user_id:'user',p_language:'vi',p_model:'gpt-6.1-sol',p_analysis_version:4})
     expect(h.database.from.mock.calls.map(call=>call[0])).not.toContain('reviews')
   })
   it.each([['unauthorized',401],['forbidden',403]])('rejects %s without enqueuing',async(mode,status)=>{

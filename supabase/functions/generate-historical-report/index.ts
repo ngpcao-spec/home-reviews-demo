@@ -3,6 +3,7 @@ import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { historicalRunStatus } from '../_shared/historical-run-status.ts'
 import { newHistoricalModel } from '../_shared/historical-model.ts'
+import { CONSULTANT_VERSION } from '../_shared/consultant-contract.ts'
 
 // This endpoint only enqueues. No provider/AI call and no review pagination.
 Deno.serve(async request => {
@@ -36,7 +37,7 @@ Deno.serve(async request => {
     }
     enforceRateLimit('historical-enqueue:'+context.user.id,30,60_000)
     const {data:run,error}=await context.admin.rpc('enqueue_historical_report',{
-      p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language,p_model:newHistoricalModel(),
+      p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language,p_model:newHistoricalModel(),p_analysis_version:CONSULTANT_VERSION,
     })
     if(error || !run) throw new Error('REPORT_ENQUEUE_FAILED')
     return json({pending:true,...historicalRunStatus(run),run:historicalRunStatus(run)},202)

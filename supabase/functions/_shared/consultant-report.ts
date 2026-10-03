@@ -1,6 +1,7 @@
 import { normalizeEvidence, structuredCall, THEME_CATALOG, type Usage } from './reputation-themes.ts'
 import { relevantContext, type ReputationReview } from './reputation-metrics.ts'
-import { AXES, CONSULTANT_VERSION, type Axis, type AnalyticalSentiment, type ConsultantReportData } from './consultant-contract.ts'
+import { AXES, type Axis, type AnalyticalSentiment, type ConsultantReportData } from './consultant-contract.ts'
+import { narrativePriorities, priorityConclusion, priorityRecommendation, sentenceCount, validPriorityKeys } from './consultant-priorities.ts'
 
 export const CATALOG = {
   ...Object.fromEntries(Object.entries(THEME_CATALOG).filter(([key]) => key !== 'overall_experience').map(([key, [category, fr, vi]]) => [key, [category === 'food' ? 'quality' : key === 'value' || key === 'billing' ? 'price' : key === 'location' ? 'atmosphere' : category, fr, vi]])),
@@ -118,8 +119,17 @@ export function consultantMetrics(reviews: ReputationReview[], classifications: 
 }
 
 /** Final narrative sees anonymous, server-counted topics only, never names, addresses or review quotes. */
-export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string) {
+export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string, version:3|4=3) {
   const topics = metrics.themes.map(theme => ({key:`${theme.theme_key}:${theme.sentiment}`,axis:theme.axis,sentiment:theme.sentiment,mentions:theme.mentions,label:CATALOG[theme.theme_key][language==='fr'?1:2]}))
+  const priorities=narrativePriorities(metrics.total,topics)
+  const v4Instructions=[
+    'The server priority_context is authoritative, not a suggestion. Do not choose your own principal themes. For each axis use only recommendation_priorities in supporting_keys, including the first priority, with at most two keys. Do not promote isolated negatives above recurring negatives.',
+    'Axis summary: start with the main positive theme if present, then the principal recurring negative and optionally the second. Distinguish below-threshold isolated criticism from other recurring criticism; never call secondary recurring themes isolated. Do not enumerate all topics.',
+    'Use the supplied axis balance: if negative exceeds positive, state this explicitly, especially for price; if positive exceeds negative keep the summary proportionate. Do not infer axis counts by summing themes.',
+    'When mode is maintain, recommend preserving the selected positive strengths, never invent a weakness. When mode is observe, acknowledge isolated feedback without asserting a recurrent issue or inventing positive evidence.',
+    'Recommend concrete directions, not invented internal processes: never invent frequency, schedules, assigned roles, mandatory steps, investments, tools, staffing or policies. Strengthen order checking is acceptable; a mandatory confirmation stage before kitchen transmission is not.',
+    'Conclusion: at most three short sentences. Overall satisfaction, then at most the two global_positive strengths, then at most the two global_negative improvement priorities supplied by the server. No secondary problems, numbers or percentages. Return conclusion_supporting_keys exactly matching these global keys; these are references, not prose. If there are no recurring negatives, do not invent a priority.',
+  ].join(' ')
   const result = await structuredCall([
     `Write ALL prose exclusively in ${language==='fr'?'French':'Vietnamese'}. You are a Google reviews consultant. Use ONLY the supplied anonymous, validated topics and exact counts. No external knowledge.`,
     'Return the four fixed axes service, quality, price, atmosphere. For each provide a short factual summary and one concrete recommendation grounded in its supplied topic keys. If there are no topics, return empty strings and no supporting keys; the server supplies an insufficient-data message.',
@@ -127,14 +137,17 @@ export async function consultantNarrative(metrics: ReturnType<typeof consultantM
     'Separate observed customer perceptions from recommended actions. Do not invent causes, dishes, delays, incidents or details absent from supplied topics. No generic recommendations unrelated to the cited topics. Positive-only axes may recommend maintaining the documented strength, not invent a weakness.',
     'Conclusion: a short balanced synthesis of overall satisfaction, principal strengths and problems, without repeating statistics. No introduction. No establishment name, address, neighbourhood, owner or other identifying information.',
     'Do not write numeric counts in prose: the server displays exact counts separately. Do not use approximations such as about, many dozens. Theme and axis counts overlap and must never be added to obtain total reviews.',
-  ].join(' '), {total:metrics.total,positive:metrics.positive,negative:metrics.negative,axes:metrics.axes,topics}, strictObject({
+  ].join(' ')+(version===4?' '+v4Instructions:''), {total:metrics.total,positive:metrics.positive,negative:metrics.negative,axes:metrics.axes,topics,
+    ...(version===4?{priority_context:priorities}: {})}, strictObject({
     axes:{type:'array',items:strictObject({key:{type:'string',enum:[...AXES]},summary:string,recommendation:string,supporting_keys:{type:'array',items:string}})},
     explanations:{type:'array',items:strictObject({key:string,text:string})},conclusion:string,
+    ...(version===4?{conclusion_supporting_keys:{type:'array',items:string}}:{}),
   }), 5500, recordUsage, model)
-  return {report:assembleConsultantReport(metrics,result.data,language),usage:result.usage}
+  return {report:assembleConsultantReport(metrics,result.data,language,version),usage:result.usage}
 }
 
-export function assembleConsultantReport(metrics: ReturnType<typeof consultantMetrics>, raw: Record<string, unknown>, language: 'fr'|'vi'): ConsultantReportData {
+export function assembleConsultantReport(metrics: ReturnType<typeof consultantMetrics>, raw: Record<string, unknown>, language: 'fr'|'vi', version:3|4=3): ConsultantReportData {
+  const priorities=narrativePriorities(metrics.total,metrics.themes.map(t=>({key:`${t.theme_key}:${t.sentiment}`,axis:t.axis,sentiment:t.sentiment,mentions:t.mentions,label:CATALOG[t.theme_key][language==='fr'?1:2]})))
   const prose = (value: unknown) => {
     if (typeof value !== 'string' || !value.trim() || value.length>3000 || /\p{N}|https?:\/\//u.test(value)) throw new Error('REPORT_INVALID_NARRATIVE')
     return value.trim()
@@ -146,8 +159,16 @@ export function assembleConsultantReport(metrics: ReturnType<typeof consultantMe
     const item = matches[0]!, counts = metrics.axes.find(axis=>axis.key===key)!
     const eligible = metrics.themes.filter(theme=>theme.axis===key).map(theme=>`${theme.theme_key}:${theme.sentiment}`)
     if (!eligible.length) return {...counts,summary:insufficient(language),recommendation:insufficient(language)}
-    if (!Array.isArray(item.supporting_keys) || !item.supporting_keys.length || item.supporting_keys.some(support=>!eligible.includes(String(support)))) throw new Error('REPORT_UNGROUNDED_RECOMMENDATION')
-    return {...counts,summary:prose(item.summary),recommendation:prose(item.recommendation)}
+    if (version===3 && (!Array.isArray(item.supporting_keys) || !item.supporting_keys.length || item.supporting_keys.some(support=>!eligible.includes(String(support))))) throw new Error('REPORT_UNGROUNDED_RECOMMENDATION')
+    const recommendation=version===4 && !validPriorityKeys(item.supporting_keys,priorities.axes[key])
+      ? priorityRecommendation(priorities.axes[key],language):prose(item.recommendation)
+    let summary=prose(item.summary)
+    // Always make a price imbalance explicit; do not rely on model interpretation.
+    if(version===4 && key==='price' && counts.negative>counts.positive) {
+      const balance=language==='fr'?'Les critiques liées au prix dépassent les retours positifs.':'Phản hồi tiêu cực về giá nhiều hơn phản hồi tích cực.'
+      if(!summary.startsWith(balance)) summary=balance+' '+summary
+    }
+    return {...counts,summary,recommendation}
   })
   const aspects = metrics.themes.map(theme => {
     const key = `${theme.theme_key}:${theme.sentiment}`
@@ -156,6 +177,13 @@ export function assembleConsultantReport(metrics: ReturnType<typeof consultantMe
     return {theme_key:theme.theme_key,axis:theme.axis,sentiment:theme.sentiment,label:CATALOG[theme.theme_key][language==='fr'?1:2],mentions:theme.mentions,explanation:prose(matches[0]!.text)}
   })
   if (raw.explanations.length!==aspects.length) throw new Error('REPORT_INVALID_EXPLANATIONS')
-  return {version:CONSULTANT_VERSION,language,total:metrics.total,positive:metrics.positive,negative:metrics.negative,axes,
-    positive_aspects:aspects.filter(theme=>theme.sentiment==='positive'),negative_aspects:aspects.filter(theme=>theme.sentiment==='negative'),conclusion:prose(raw.conclusion)}
+  let conclusion=prose(raw.conclusion)
+  const expectedKeys=[...priorities.global_positive,...priorities.global_negative].map(t=>t.key)
+  if(version===4 && metrics.themes.length>0 && (sentenceCount(conclusion)>3 || !Array.isArray(raw.conclusion_supporting_keys)
+    || raw.conclusion_supporting_keys.length!==expectedKeys.length || new Set(raw.conclusion_supporting_keys).size!==expectedKeys.length
+    || raw.conclusion_supporting_keys.some(key=>!expectedKeys.includes(String(key))))) {
+    conclusion=priorityConclusion(priorities,metrics.positive,metrics.negative,language)
+  }
+  return {version,language,total:metrics.total,positive:metrics.positive,negative:metrics.negative,axes,
+    positive_aspects:aspects.filter(theme=>theme.sentiment==='positive'),negative_aspects:aspects.filter(theme=>theme.sentiment==='negative'),conclusion}
 }

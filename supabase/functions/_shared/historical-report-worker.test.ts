@@ -1,5 +1,5 @@
 import { afterEach,describe,expect,it,vi } from 'vitest'
-import { processHistoricalRun,type HistoricalJob } from './historical-report-worker.ts'
+import { historicalNarrativeVersion,processHistoricalRun,type HistoricalJob } from './historical-report-worker.ts'
 import { historicalRetry } from './historical-report-policy.ts'
 const ai=vi.hoisted(()=>({extract:vi.fn(),narrative:vi.fn()}))
 vi.mock('./consultant-report.ts',async original=>({...await original<object>(),extractConsultantBatch:ai.extract,consultantNarrative:ai.narrative}))
@@ -37,6 +37,19 @@ function harness(){
   }
 }
 describe('durable worker without any frontend process',()=>{
+  it.each([3,4] as const)('keeps narrative version %i across worker restarts',async version=>{
+    const h=harness()
+    h.patch({snapshot:{...h.run.snapshot,analysis_version:version,base:{...h.run.snapshot.base,analysis_version:version}}})
+    await h.tick();await h.tick()
+    expect(ai.narrative.mock.calls[0][4]).toBe(version)
+    expect(h.publication).toMatchObject({analysis_version:version})
+  })
+  it('treats an old unsnapshotted run as V3; never upgrades an existing generation',()=>{
+    const h=harness()
+    expect(historicalNarrativeVersion({...h.run,snapshot:{}})).toBe(3)
+    expect(historicalNarrativeVersion(h.run)).toBe(3)
+    expect(()=>historicalNarrativeVersion({...h.run,snapshot:{...h.run.snapshot,analysis_version:4}})).toThrow('REPORT_VERSION_CHANGED')
+  })
   it.each(['gpt-5.6-terra','gpt-6.1-sol'])('pins %s through retry, recovered lease and publication despite environment changes',async(model)=>{
     vi.stubGlobal('Deno',{env:{get:()=>model==='gpt-6.1-sol'?'gpt-5.6-terra':'gpt-6.1-sol'}})
     const h=harness()

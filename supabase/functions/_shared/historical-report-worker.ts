@@ -1,6 +1,6 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { reputationMetrics, type ReputationReview } from './reputation-metrics.ts'
-import { CONSULTANT_VERSION as ANALYSIS_VERSION, AXES } from './consultant-contract.ts'
+import { AXES } from './consultant-contract.ts'
 import { assembleConsultantReport, consultantBatches, consultantMetrics, consultantNarrative, extractConsultantBatch, insufficient, ratingClassification, type Classification, type ConsultantFinding } from './consultant-report.ts'
 import { historicalRetry, HISTORICAL_REPORT_LEASE_SECONDS } from './historical-report-policy.ts'
 
@@ -10,7 +10,7 @@ export interface HistoricalJob {
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
-  snapshot:{reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
+  snapshot:{analysis_version?:3|4;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
   token_usage_complete:boolean; created_at:string; last_error:string|null; error_code?:string|null;
 }
 const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
@@ -19,7 +19,14 @@ async function fingerprint(value: unknown) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))
   return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2,'0')).join('')
 }
+export function historicalNarrativeVersion(run:HistoricalJob):3|4 {
+  const version=run.snapshot.analysis_version ?? run.snapshot.base?.analysis_version ?? 3
+  if(version!==3 && version!==4) throw new Error('REPORT_VERSION_CHANGED')
+  if(run.snapshot.base && run.snapshot.base.analysis_version!==version) throw new Error('REPORT_VERSION_CHANGED')
+  return version
+}
 async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
+  const ANALYSIS_VERSION=historicalNarrativeVersion(run)
   const id=run.establishment_id, language=run.language, end=run.created_at
   const {data:e,error} = await admin.from('establishments').select('id,organization_id,name,rating,total_reviews,created_at').eq('id',id).eq('organization_id',run.organization_id).single()
   check(error,'REPORT_ESTABLISHMENT_READ_FAILED')
@@ -40,7 +47,7 @@ async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
       if (!reviews.length) throw new Error('NO_REVIEWS_AVAILABLE')
       const sourceFingerprint = await fingerprint({reviews,language,googleTotal:e.total_reviews,googleRating:e.rating,version:ANALYSIS_VERSION})
       const dated = reviews.map(r=>r.published_at).filter((v):v is string=>!!v && Number.isFinite(Date.parse(v))).sort()
-      const snapshot = {reviews, base:{ organization_id:e.organization_id,establishment_id:id,preferred_language:language,
+      const snapshot = {analysis_version:ANALYSIS_VERSION,reviews, base:{ organization_id:e.organization_id,establishment_id:id,preferred_language:language,
         period_start:dated[0] ?? e.created_at,period_end:end,google_rating:e.rating,google_total_reviews:e.total_reviews,
         source_latest_published_at:dated.at(-1) ?? null,source_undated_count:reviews.length-dated.length,
         ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION}}
@@ -79,7 +86,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
       await updateRun({...prepared,attempt_count:0,locked_by:null,lease_until:null,error_code:null,last_error:null})
       return {generation_id:run.generation_id,status:'running',cursor:run.cursor}
     }
-    if(run.snapshot.base.analysis_version!==ANALYSIS_VERSION) throw new Error('REPORT_VERSION_CHANGED')
+    const version=historicalNarrativeVersion(run)
     const reviews=run.snapshot.reviews,language=run.language
     const batches=consultantBatches(reviews)
     // Also adopts legacy checkpoints without changing their cursor/findings/generation.
@@ -115,8 +122,8 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     await updateRun({classifications:metrics.classifications})
     const narrativeCall=metrics.themes.length>0
     if(narrativeCall){await updateRun({ai_calls:run.ai_calls+1});usageRecorded=false}
-    const result=narrativeCall ? await consultantNarrative(metrics,language,recordUsage,run.model) : {
-      report:assembleConsultantReport(metrics,{axes:AXES.map(key=>({key})),explanations:[],conclusion:insufficient(language)},language),
+    const result=narrativeCall ? await consultantNarrative(metrics,language,recordUsage,run.model,version) : {
+      report:assembleConsultantReport(metrics,{axes:AXES.map(key=>({key})),explanations:[],conclusion:insufficient(language)},language,version),
       usage:{input_tokens:0,output_tokens:0},
     }
     const {data:e,error:eError}=await admin.from('establishments').select('name').eq('id',run.establishment_id).single()

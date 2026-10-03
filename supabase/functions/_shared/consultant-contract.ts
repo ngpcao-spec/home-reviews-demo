@@ -1,4 +1,4 @@
-export const CONSULTANT_VERSION = 3
+export const CONSULTANT_VERSION = 4
 export const AXES = ['service', 'quality', 'price', 'atmosphere'] as const
 export type Axis = typeof AXES[number]
 export type AnalyticalSentiment = 'positive' | 'negative'
@@ -11,7 +11,7 @@ export interface ConsultantAspect {
   explanation: string
 }
 export interface ConsultantReportData {
-  version: 3
+  version: 3 | 4
   language: 'fr' | 'vi'
   total: number
   positive: number

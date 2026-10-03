@@ -76,8 +76,8 @@ describe('consultant report V3',()=>{
     expect(container.querySelectorAll('section')[7].querySelector('strong')).toHaveTextContent(/^1$/)
     expect(container.querySelector('.consultant-positive-details .eyebrow')).toHaveTextContent('07')
   })
-  it('maps V3 separately from rating-based V2 data',()=>{
-    const row={analysis_version:3,consultant_report:fixture('fr'),negative_reviews_count:4,negative_rate:80} as HistoricalReportRow
+  it.each([3,4] as const)('maps V%i separately from rating-based V2 data',version=>{
+    const row={analysis_version:version,consultant_report:{...fixture('fr'),version},negative_reviews_count:4,negative_rate:80} as HistoricalReportRow
     const result=mapHistoricalReport(row)
     expect(result.consultant?.negative).toBe(2)
     expect(result.negativeReviewsCount).toBe(4)
