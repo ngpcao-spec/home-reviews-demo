@@ -16,7 +16,7 @@ describe('historical report resume integration with mocked database/AI',()=>{
     const digest=await webcrypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({reviews,language:'vi',googleTotal:1615,googleRating:4.8,version:3})))
     const source_fingerprint=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('')
     const oldFinding={review_id:'review-0',theme_key:'food_quality',sentiment:'positive',evidence:'Good food'}
-    let run:Row={id:'run-1',organization_id:'org-1',establishment_id:'est-1',language:'vi',generation_id:'generation-1',status:'running',attempt_count:1,snapshot:{reviews,base:{source_fingerprint,analysis_version:3}},findings:[oldFinding],classifications:reviews.slice(0,cursor*20).map(r=>({review_id:r.id,sentiment:'positive',basis:'text',evidence:'Good food'})),cursor,input_tokens:11436,output_tokens:17797,ai_calls:3,rejected_findings_count:0,token_usage_complete:false,updated_at:'2026-10-01T00:00:00Z'}
+    let run:Row={model:'gpt-5.6-terra',id:'run-1',organization_id:'org-1',establishment_id:'est-1',language:'vi',generation_id:'generation-1',status:'running',attempt_count:1,snapshot:{reviews,base:{source_fingerprint,analysis_version:3}},findings:[oldFinding],classifications:reviews.slice(0,cursor*20).map(r=>({review_id:r.id,sentiment:'positive',basis:'text',evidence:'Good food'})),cursor,input_tokens:11436,output_tokens:17797,ai_calls:3,rejected_findings_count:0,token_usage_complete:false,updated_at:'2026-10-01T00:00:00Z'}
     const writes:{table:string;values:Row}[]=[]
     class Query {
       filters:Record<string,unknown>={};values:Row|null=null;offset=0

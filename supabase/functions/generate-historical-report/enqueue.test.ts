@@ -12,7 +12,7 @@ async function harness(mode='normal'){
   auth.requireUser.mockImplementation(async()=>{if(mode==='unauthorized')throw new Error('UNAUTHORIZED');return {client:database,admin:database,user:{id:'user'}}})
   auth.assertMembership.mockImplementation(async()=>{if(mode==='forbidden')throw new Error('FORBIDDEN')})
   let handler!:(r:Request)=>Promise<Response>
-  vi.stubGlobal('Deno',{serve:(fn:typeof handler)=>{handler=fn}})
+  vi.stubGlobal('Deno',{env:{get:()=> 'gpt-6.1-sol'},serve:(fn:typeof handler)=>{handler=fn}})
   vi.resetModules();await import('./index.ts')
   return {rpc,database,call:(body:object={establishment_id:'place',preferred_language:'vi'})=>handler(new Request('https://example.test',{method:'POST',body:JSON.stringify(body)}))}
 }
@@ -22,7 +22,7 @@ describe('enqueue-only user endpoint',()=>{
     const replies=await Promise.all([h.call(),h.call()])
     expect(replies.map(r=>r.status)).toEqual([202,202])
     for(const reply of replies)expect(await reply.json()).toMatchObject({run:{generation_id:'one-generation',status:'queued'}})
-    expect(h.rpc).toHaveBeenCalledWith('enqueue_historical_report',{p_establishment_id:'place',p_organization_id:'org',p_user_id:'user',p_language:'vi'})
+    expect(h.rpc).toHaveBeenCalledWith('enqueue_historical_report',{p_establishment_id:'place',p_organization_id:'org',p_user_id:'user',p_language:'vi',p_model:'gpt-6.1-sol'})
     expect(h.database.from.mock.calls.map(call=>call[0])).not.toContain('reviews')
   })
   it.each([['unauthorized',401],['forbidden',403]])('rejects %s without enqueuing',async(mode,status)=>{

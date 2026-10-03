@@ -15,6 +15,7 @@ describe('individual reply without summary tokens',()=>{
     expect(result).not.toHaveProperty('ai_summary')
     expect(fetcher).toHaveBeenCalledTimes(1)
     const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    expect(body.model).toBe('gpt-5.6-terra')
     expect(body.text.format.schema.required).toEqual(['ai_suggested_reply','detected_language'])
     expect(Object.keys(body.text.format.schema.properties)).toEqual(['ai_suggested_reply','detected_language'])
     expect(JSON.stringify(body)).not.toMatch(/ai_summary|summary|summari/i)
@@ -32,6 +33,7 @@ describe('individual reply without summary tokens',()=>{
     const result=await analyzeFourStarReviewWithOpenAI('Bon repas mais attente longue.','fr')
     expect(result.has_negative_feedback).toBe(true)
     expect(result.negative_feedback_summary).toBe('Attente longue.')
+    expect(JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string).model).toBe('gpt-5.6-terra')
     expect(result).not.toHaveProperty('ai_summary');expect(fetcher).toHaveBeenCalledTimes(1)
   })
   it('keeps the separate on-demand draft translation contract unchanged',async()=>{
@@ -39,5 +41,6 @@ describe('individual reply without summary tokens',()=>{
     expect(await translateReplyWithOpenAI('Merci pour votre retour.','fr','en')).toMatchObject({translated_reply_text:'Thank you for your feedback.'})
     const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
     expect(body.text.format.schema.required).toEqual(['translated_reply_text'])
+    expect(body.model).toBe('gpt-5.6-terra')
   })
 })

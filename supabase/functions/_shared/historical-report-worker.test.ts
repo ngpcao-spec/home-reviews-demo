@@ -3,11 +3,11 @@ import { processHistoricalRun,type HistoricalJob } from './historical-report-wor
 import { historicalRetry } from './historical-report-policy.ts'
 const ai=vi.hoisted(()=>({extract:vi.fn(),narrative:vi.fn()}))
 vi.mock('./consultant-report.ts',async original=>({...await original<object>(),extractConsultantBatch:ai.extract,consultantNarrative:ai.narrative}))
-afterEach(()=>vi.clearAllMocks())
+afterEach(()=>{vi.clearAllMocks();vi.unstubAllGlobals()})
 function harness(){
   const reviews=Array.from({length:80},(_,i)=>({id:'r'+i,rating:5,original_text:'Good food',review_context:null}))
   let run={id:'run',generation_id:'kept-generation',establishment_id:'place',organization_id:'org',language:'vi',status:'running',cursor:3,
-    ai_calls:3,input_tokens:300,output_tokens:600,attempt_count:1,rejected_findings_count:0,token_usage_complete:true,
+    model:'gpt-5.6-terra',ai_calls:3,input_tokens:300,output_tokens:600,attempt_count:1,rejected_findings_count:0,token_usage_complete:true,
     snapshot:{reviews,base:{analysis_version:3,organization_id:'org',establishment_id:'place',preferred_language:'vi'}},
     findings:Array.from({length:168},(_,i)=>({review_id:'r'+(i%60),theme_key:['food_quality','consistency','professionalism'][Math.floor(i/60)],sentiment:'positive',evidence:'Good food'})),
     classifications:[],created_at:new Date().toISOString(),last_error:null} as HistoricalJob
@@ -37,6 +37,21 @@ function harness(){
   }
 }
 describe('durable worker without any frontend process',()=>{
+  it.each(['gpt-5.6-terra','gpt-6.1-sol'])('pins %s through retry, recovered lease and publication despite environment changes',async(model)=>{
+    vi.stubGlobal('Deno',{env:{get:()=>model==='gpt-6.1-sol'?'gpt-5.6-terra':'gpt-6.1-sol'}})
+    const h=harness()
+    h.patch({model})
+    ai.extract.mockRejectedValueOnce(new Error('OPENAI_HTTP_429'))
+    await h.tick()
+    expect(h.run.cursor).toBe(3)
+    h.patch({status:'running',last_error:'REPORT_LEASE_RECOVERED',attempt_count:2})
+    await h.tick()
+    await h.tick()
+    expect(ai.extract.mock.calls.map(call=>call[2])).toEqual([model,model])
+    expect(ai.narrative.mock.calls[0][3]).toBe(model)
+    expect(h.publication).toMatchObject({ai_model:model})
+    expect(h.run.model).toBe(model)
+  })
   it('adopts cursor 3 / 168 findings, then finalizes without replaying earlier batches',async()=>{
     const h=harness(),original=structuredClone(h.run.findings)
     expect(await h.tick()).toMatchObject({status:'running',cursor:4,generation_id:'kept-generation'})

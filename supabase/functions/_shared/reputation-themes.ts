@@ -1,4 +1,5 @@
 import { needsAttention, relevantContext, type Category, type ReputationReview, type Sentiment } from './reputation-metrics.ts'
+import { HISTORICAL_REASONING_EFFORT, LEGACY_HISTORICAL_MODEL } from './historical-model.ts'
 
 // Shared vocabulary keeps synonyms from becoming separate themes across batches/languages.
 export const THEME_CATALOG = {
@@ -86,13 +87,13 @@ export function representativeIds(reviews: ReputationReview[], themes: Theme[], 
 
 export interface Usage { input_tokens: number; output_tokens: number }
 type RecordUsage = (usage: Usage) => Promise<void>
-export async function structuredCall(instructions: string, input: unknown, schema: unknown, maxTokens: number, recordUsage?: RecordUsage): Promise<{ data: Record<string, unknown>; usage: Usage }> {
+export async function structuredCall(instructions: string, input: unknown, schema: unknown, maxTokens: number, recordUsage?: RecordUsage, model = LEGACY_HISTORICAL_MODEL): Promise<{ data: Record<string, unknown>; usage: Usage }> {
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
   if (!key) throw new Error('AI_NOT_CONFIGURED')
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST', signal: AbortSignal.timeout(120_000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'gpt-5.6-terra', reasoning: { effort: 'low' }, store: false, max_output_tokens: maxTokens,
+    body: JSON.stringify({ model, reasoning: { effort: HISTORICAL_REASONING_EFFORT }, store: false, max_output_tokens: maxTokens,
       input: [{ role: 'system', content: instructions }, { role: 'user', content: JSON.stringify(input) }],
       text: { format: { type: 'json_schema', name: 'reputation_report', strict: true, schema } },
     }),

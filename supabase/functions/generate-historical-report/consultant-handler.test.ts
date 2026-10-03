@@ -8,7 +8,7 @@ type Row=Record<string,unknown>
 
 async function setup(mode:'normal'|'missing'|'locked'|'forbidden'|'unauthorized'|'noText'|'failed'='normal'){
   const reviews=[{id:'r1',rating:5,original_text:mode==='noText'?'':'Slow service',text:null,review_context:null},{id:'r2',rating:2,original_text:'',text:null,review_context:null}]
-  let run:Row={id:'run',generation_id:'generation',establishment_id:'est',organization_id:'org',language:'fr',attempt_count:1,status:'running',snapshot:{reviews,base:{establishment_id:'est',organization_id:'org',preferred_language:'fr',analysis_version:3,sample_reviews_count:2,negative_reviews_count:1,negative_rate:50}},cursor:mode==='noText'?0:1,
+  let run:Row={model:'gpt-5.6-terra',id:'run',generation_id:'generation',establishment_id:'est',organization_id:'org',language:'fr',attempt_count:1,status:'running',snapshot:{reviews,base:{establishment_id:'est',organization_id:'org',preferred_language:'fr',analysis_version:3,sample_reviews_count:2,negative_reviews_count:1,negative_rate:50}},cursor:mode==='noText'?0:1,
     classifications:mode==='missing'?[]:[{review_id:'r1',sentiment:mode==='noText'?'positive':'negative',basis:'text',evidence:'Slow service'},{review_id:'r2',sentiment:'negative',basis:'rating',evidence:''}],
     findings:mode==='noText'?[]:[{review_id:'r1',theme_key:'wait_time',sentiment:'negative',evidence:'Slow service'}],ai_calls:1,input_tokens:10,output_tokens:10,rejected_findings_count:0,token_usage_complete:true}
   const oldReport:Row={id:'old',generation_id:'old-generation',analysis_version:2,ai_status:'completed'}

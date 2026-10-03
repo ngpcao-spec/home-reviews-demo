@@ -7,7 +7,7 @@ import { historicalRetry, HISTORICAL_REPORT_LEASE_SECONDS } from './historical-r
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
 type InputReview = ReputationReview & { review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
 export interface HistoricalJob {
-  id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string;
+  id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
   snapshot:{reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
@@ -54,7 +54,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
   const started=Date.now()
   let usageRecorded=true
   const log=(event:string,extra:Record<string,unknown>={})=>console.info(event,{
-    generation_id:run.generation_id,establishment_id:run.establishment_id,cursor:run.cursor,batch:run.cursor+1,
+    generation_id:run.generation_id,model:run.model,establishment_id:run.establishment_id,cursor:run.cursor,batch:run.cursor+1,
     attempt:run.attempt_count,duration_ms:Date.now()-started,ai_calls:run.ai_calls,...extra,
   })
   if(run.status==='failed'){log('HISTORICAL_RUN_FAILED',{code:run.error_code});return {generation_id:run.generation_id,status:'failed'}}
@@ -73,6 +73,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     usageRecorded=true
   }
   try {
+    if(!run.model?.trim()) throw new Error('REPORT_MODEL_MISSING')
     if(!run.snapshot.reviews || !run.snapshot.base) {
       const prepared=await prepareSnapshot(admin,run)
       await updateRun({...prepared,attempt_count:0,locked_by:null,lease_until:null,error_code:null,last_error:null})
@@ -101,7 +102,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
       await updateRun({ai_calls:run.ai_calls+1})
       usageRecorded=false
       log('HISTORICAL_BATCH_STARTED')
-      const extracted=await extractConsultantBatch(batches[run.cursor],recordUsage)
+      const extracted=await extractConsultantBatch(batches[run.cursor],recordUsage,run.model)
       const findings=[...new Map([...run.findings,...extracted.findings].map((f:ConsultantFinding)=>[`${f.review_id}:${f.theme_key}:${f.sentiment}`,f])).values()]
       const classifications=[...new Map([...run.classifications,...extracted.classifications].map((item:Classification)=>[item.review_id,item])).values()]
       const batch=run.cursor+1
@@ -114,7 +115,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     await updateRun({classifications:metrics.classifications})
     const narrativeCall=metrics.themes.length>0
     if(narrativeCall){await updateRun({ai_calls:run.ai_calls+1});usageRecorded=false}
-    const result=narrativeCall ? await consultantNarrative(metrics,language,recordUsage) : {
+    const result=narrativeCall ? await consultantNarrative(metrics,language,recordUsage,run.model) : {
       report:assembleConsultantReport(metrics,{axes:AXES.map(key=>({key})),explanations:[],conclusion:insufficient(language)},language),
       usage:{input_tokens:0,output_tokens:0},
     }
@@ -124,7 +125,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     const generated=new Date().toISOString()
     const row={...run.snapshot.base,generation_id:run.generation_id,
       analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:{...result.report,classification_fallback_count:metrics.classificationFallbackCount},
-      ai_overall_summary:result.report.conclusion,ai_historical_summary:result.report.conclusion,ai_status:'completed',ai_error:null,ai_model:'gpt-5.6-terra',
+      ai_overall_summary:result.report.conclusion,ai_historical_summary:result.report.conclusion,ai_status:'completed',ai_error:null,ai_model:run.model,
       ai_input_tokens:run.input_tokens,ai_output_tokens:run.output_tokens,ai_total_tokens:run.input_tokens+run.output_tokens,ai_call_count:run.ai_calls,ai_cost_usd:null,
       accepted_findings_count:run.findings.length,rejected_findings_count:run.rejected_findings_count,
       processed_batches_count:run.cursor,token_usage_complete:run.token_usage_complete,generated_at:generated,updated_at:generated}
@@ -138,8 +139,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
         next_retry_at:policy.status==='retry'?new Date(Date.now()+policy.delay*1000).toISOString():null,
         locked_by:null,lease_until:null,...(!usageRecorded?{token_usage_complete:false}:{})})
       log(policy.status==='retry'?'HISTORICAL_RUN_RETRY':'HISTORICAL_RUN_FAILED',{code:policy.code})
-    } catch { console.warn('HISTORICAL_CHECKPOINT_UNAVAILABLE',{generation_id:run.generation_id,cursor:run.cursor}) }
+    } catch { log('HISTORICAL_CHECKPOINT_UNAVAILABLE') }
     return {generation_id:run.generation_id,status:policy.status,error:policy.code}
   }
 }
-
