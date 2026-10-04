@@ -65,7 +65,11 @@ export class AnalyticsSessionCache {
   put(key: string, report: Report | null, revision = report?.generatedAt ?? '') {
     const previous=this.state.entries[key]
     this.emit({...this.state,entries:{...this.state.entries,[key]:{
-      report: previous && previous.revision===revision && previous.report?.id===report?.id ? previous.report : report,
+      // A newer app may map the same database revision differently (e.g. V5).
+      // Do not retain a persisted, incomplete projection just because the row
+      // ID and timestamp have not changed. Preserve identity only for equal data.
+      report: previous && previous.revision===revision && previous.report?.id===report?.id
+        && JSON.stringify(previous.report)===JSON.stringify(report) ? previous.report : report,
       revision,checkedAt:Date.now(),loading:false,error:false,version:(previous?.version ?? 0)+1,
     }}})
     this.persist()

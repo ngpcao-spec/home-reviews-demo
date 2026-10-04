@@ -1,10 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AnalyticsSessionCache, analyticsSession, resetAnalyticsCache, resolveAnalyticsSelection } from './analytics-cache'
 import { buildDemoHistoricalReport } from './historical-report'
+import { shabuReport } from '../../tests/fixtures/consultant-v5'
 
 const report=(language:'fr'|'vi'='vi')=>buildDemoHistoricalReport('artisan',[],language,4.8,1615)
 afterEach(()=>{vi.useRealTimers();resetAnalyticsCache()})
 describe('analytics session cache',()=>{
+  it('repairs an old frontend projection of V5 at the same row ID and revision without generation',async()=>{
+    const cache=new AnalyticsSessionCache()
+    const old={...report(),reputation:undefined,consultant:undefined}
+    const revision='2026-10-04T22:39:20.142Z'
+    cache.put('historical:artisan:vi',old,revision)
+    const fresh={...old,consultant:shabuReport('vi')}
+    const read=vi.fn(async()=>({report:fresh,revision}))
+    await cache.load('historical:artisan:vi',read,{force:true,revalidate:true})
+    expect(read).toHaveBeenCalledTimes(1)
+    expect(cache.getSnapshot().entries['historical:artisan:vi'].report).toBe(fresh)
+    expect(cache.getSnapshot().entries['historical:artisan:vi'].report).toMatchObject({consultant:{version:5}})
+    cache.put('historical:artisan:vi',structuredClone(fresh),revision)
+    expect(cache.getSnapshot().entries['historical:artisan:vi'].report).toBe(fresh)
+  })
   it('keeps user and language caches separate and clears on sign-out',()=>{
     const cache=analyticsSession('account-a')
     cache.put('historical:artisan:vi',report())
