@@ -36,8 +36,8 @@ export function NotificationsPage() {
         <span className={`notification-severity ${item.severity}`}><Bell size={18} /></span>
         <span>
           <strong>{item.type === 'initial_import_completed' ? item.title : establishment?.name ?? item.title}</strong>
-          {review && <span className="notification-meta"><Star size={13} fill="currentColor" /> {review.rating}★ · {relativeTime(item.createdAt)}</span>}
-          <p>{item.body}</p>
+          {review && <span className="notification-meta"><Star size={13} fill="currentColor" /> {review.rating}★ · {relativeTime(review.publishedAt || item.createdAt)}</span>}
+          <p>{review?.reviewText?.trim() || review?.originalText?.trim() || item.body}</p>
           {!review && <small>{relativeTime(item.createdAt)}</small>}
         </span>
         {!item.readAt && <i aria-label={messages.notifications.unread} />}

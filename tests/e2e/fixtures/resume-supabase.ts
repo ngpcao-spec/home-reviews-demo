@@ -5,6 +5,7 @@ const listeners=new Set<Listener>()
 const user=()=>({id:localStorage.getItem('resume-user') || 'account-a',email:'test@example.test',user_metadata:{}})
 const reviewFixture=()=>localStorage.getItem('review-details-test')
 const reviewLanguage=()=>localStorage.getItem('review-details-language') || 'vi'
+const notificationFixture=()=>JSON.parse(localStorage.getItem('notification-review-fixture') || 'null')
 const review=()=>({id:'xom-review',organization_id:'org-account-a',establishment_id:'place-account-a',external_review_id:'google-fixture',
   author_name:'Client',rating:2,text:'Avis de test',original_text:'Avis de test',original_language:'fr',status:'to_process',
   published_at:'2026-10-01T00:00:00Z',created_at:'2026-10-01T00:00:00Z',historical_import:true,ai_status:'completed',
@@ -40,9 +41,12 @@ class Query implements PromiseLike<{data: unknown;error:null}> {
     resumeHarness.queries.push(this.table)
     if(resumeHarness.delay)await new Promise(resolve=>setTimeout(resolve,resumeHarness.delay))
     if(resumeHarness.fail || localStorage.getItem('resume-offline')==='true' || !navigator.onLine)throw new Error('offline')
-    const data=this.table==='establishments'?[place(this.account)]
+    const fixture=notificationFixture()
+    const data=this.table==='establishments'?[{...place(this.account),...(fixture?{name:fixture.name}:{})}]
       :this.table==='organizations'?[{id:`org-${this.account}`,monitoring_interval_hours:12}]
       :this.table==='profiles'?{preferred_language:reviewLanguage(),notification_onboarding_seen:true,notification_permission_status:'denied'}
+      :this.table==='reviews' && fixture?[{...review(),...fixture.review}]
+      :this.table==='notifications' && fixture?fixture.notifications.map((item:Record<string,unknown>)=>({organization_id:`org-${this.account}`,user_id:this.account,...item}))
       :this.table==='reviews' && reviewFixture()?[review()]
       :this.table==='historical_establishment_reports'?report(this.account):[]
     return {data,error:null}
