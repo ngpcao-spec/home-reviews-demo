@@ -5,8 +5,37 @@ import { ConsultantReport } from './ConsultantReport'
 import { axisSummaryText } from '../lib/report-presentation'
 import { AXES, type ConsultantReportData } from '../../supabase/functions/_shared/consultant-contract'
 import { mapHistoricalReport, type HistoricalReportRow } from '../lib/historical-report'
+import { shabuReport } from '../../tests/fixtures/consultant-v5'
 
 afterEach(cleanup)
+describe('consultant report V5 diagnostic presentation',()=>{
+  it.each(['fr','vi'] as const)('renders Google subratings and exact coverage without long aspect lists (%s)',language=>{
+    const report=shabuReport(language),before=JSON.stringify(report)
+    const {container}=render(<I18nProvider language={language}><ConsultantReport report={report}/></I18nProvider>)
+    expect(container.querySelectorAll('.weekly-section')).toHaveLength(8)
+    expect(container.querySelectorAll('.v5-quick-axis')).toHaveLength(4)
+    expect(container.querySelectorAll('.v5-decisions>div')).toHaveLength(4)
+    const price=container.querySelector('.v5-axis[data-axis="price"]')!
+    expect(price).toHaveTextContent('13 %')
+    expect(price.querySelector('.v5-score')).toBeNull()
+    expect(container.querySelector('.v5-axis[data-axis="service"]')).toHaveTextContent('4,95')
+    expect(container.querySelector('.v5-axis[data-axis="quality"]')).toHaveTextContent('4,91')
+    expect(container.querySelector('.v5-axis[data-axis="atmosphere"]')).toHaveTextContent('4,90')
+    expect(container.querySelector('.v5-axis[data-axis="atmosphere"] .v5-watch')).toHaveTextContent(language==='fr'?'À surveiller':'Cần theo dõi')
+    expect(price).toHaveTextContent(language==='fr'?'Données limitées':'Dữ liệu còn hạn chế')
+    expect(container.querySelector('.consultant-positive-details')).toBeNull()
+    expect(container.querySelector('.consultant-negative')).toBeNull()
+    for(const list of container.querySelectorAll('.v5-topics')) expect(list).toHaveTextContent(language==='fr'?'mentions':'lượt đề cập')
+    expect(JSON.stringify(report)).toBe(before)
+    const mapped=mapHistoricalReport({analysis_version:5,consultant_report:report} as HistoricalReportRow)
+    expect(mapped.consultant).toBe(report)
+  })
+  it('keeps the legacy V4 renderer',()=>{
+    const {container}=render(<I18nProvider language="fr"><ConsultantReport report={{...fixture('fr'),version:4}}/></I18nProvider>)
+    expect(container.querySelectorAll('.weekly-section')).toHaveLength(9)
+    expect(container.querySelector('.consultant-v5')).toBeNull()
+  })
+})
 const fixture=(language:'fr'|'vi'):ConsultantReportData=>({version:3,language,total:5,positive:3,negative:2,
   axes:AXES.map(key=>({key,positive:1,negative:1,summary:language==='fr'?'Constats disponibles.':'Nhận xét hiện có.',recommendation:language==='fr'?'Action liée aux constats.':'Hành động dựa trên nhận xét.'})),
   positive_aspects:[{theme_key:'food_quality',axis:'quality',sentiment:'positive',label:language==='fr'?'Qualité':'Chất lượng',mentions:1,explanation:language==='fr'?'Appréciation ponctuelle.':'Ý kiến tích cực riêng lẻ.'}],negative_aspects:[],conclusion:language==='fr'?'Synthèse.':'Tổng hợp.'})

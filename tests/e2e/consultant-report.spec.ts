@@ -1,4 +1,24 @@
 import { expect,test } from '@playwright/test'
+test('V5 Shabu diagnostic cards FR/VI, no overflow or network generation',async({page})=>{
+  const requests:string[]=[]
+  page.on('request',r=>{if(/functions\/v1|rest\/v1/.test(r.url()))requests.push(r.url())})
+  for(const language of ['fr','vi']){
+    await page.goto(`/tests/e2e/fixtures/reputation.html?version=5&language=${language}`)
+    await expect(page.locator('.weekly-section')).toHaveCount(8)
+    await expect(page.locator('.v5-quick-axis')).toHaveCount(4)
+    await expect(page.locator('.v5-axis[data-axis="service"] .v5-status')).toHaveText(language==='fr'?'Point fort majeur':'Điểm mạnh nổi bật')
+    await expect(page.locator('.v5-axis[data-axis="quality"] .v5-score')).toContainText('4,91')
+    await expect(page.locator('.v5-axis[data-axis="atmosphere"] .v5-status')).toHaveText(language==='fr'?'À surveiller':'Cần theo dõi')
+    await expect(page.locator('.v5-axis[data-axis="price"]')).toContainText('13 %')
+    await expect(page.locator('.v5-axis[data-axis="price"] .v5-score')).toHaveCount(0)
+    await expect(page.locator('.v5-decisions>div')).toHaveCount(4)
+    await expect(page.locator('.consultant-positive-details,.consultant-negative')).toHaveCount(0)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+    await page.locator('.weekly-section').nth(1).screenshot({path:`test-results/v5-quick-${language}-${test.info().project.name}.png`})
+    await page.locator('.weekly-section').nth(5).screenshot({path:`test-results/v5-atmosphere-${language}-${test.info().project.name}.png`})
+  }
+  expect(requests).toEqual([])
+})
 test('V3 summary second, nine fixed sections, compact details and no generation requests',async({page})=>{
   const requests:string[]=[]
   page.on('request',request=>{if(/functions\/v1|rest\/v1/.test(request.url()))requests.push(request.url())})

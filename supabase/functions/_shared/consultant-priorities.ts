@@ -2,7 +2,7 @@ import { AXES, type Axis, type AnalyticalSentiment } from './consultant-contract
 
 export interface PriorityTopic { key:string; axis:Axis; sentiment:AnalyticalSentiment; mentions:number; label:string }
 // Conclusion only: these preferences never change extraction or negative priorities.
-const HEADLINES:Record<Axis,string[]>={
+export const HEADLINES:Record<Axis,string[]>={
   quality:['food_quality','drinks','presentation','freshness','cooking','portions','variety','consistency','temperature'],
   service:['friendly_staff','professionalism','attentiveness','communication','wait_time','coordination','order_accuracy'],
   atmosphere:['atmosphere','decor','comfort','cleanliness','location','noise'],

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { AXES, type ConsultantReportData } from '../../supabase/functions/_shared/consultant-contract'
 import './ReputationReport.css'
 import { axisSummaryText } from '../lib/report-presentation'
+import { ConsultantReportV5 } from './ConsultantReportV5'
 
 function ReportSection({index,title,className='',children}:{index:number;title:string;className?:string;children:ReactNode}) {
   return <section className={`weekly-section ${className}`}><article className="card reputation-theme-card consultant-section-card">
@@ -15,6 +16,7 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
   const {messages, language} = useI18n()
   const m = messages.reputation
   if (report.language !== language) return <p role="status">{m.languageUnavailable}</p>
+  if (report.version === 5) return <ConsultantReportV5 report={report}/>
   const label = {service:m.service,quality:m.quality,price:m.price,atmosphere:m.atmosphere}
   const aspects = (items: ConsultantReportData['positive_aspects'] = [], compact = false, countOnly = false) => {
     const displayed = compact ? [...items].sort((a,b)=>b.mentions-a.mentions).slice(0,5) : items

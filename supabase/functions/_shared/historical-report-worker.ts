@@ -10,7 +10,7 @@ export interface HistoricalJob {
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
-  snapshot:{analysis_version?:3|4;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
+  snapshot:{analysis_version?:3|4|5;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
   token_usage_complete:boolean; created_at:string; last_error:string|null; error_code?:string|null;
 }
 const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
@@ -19,9 +19,9 @@ async function fingerprint(value: unknown) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))
   return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2,'0')).join('')
 }
-export function historicalNarrativeVersion(run:HistoricalJob):3|4 {
+export function historicalNarrativeVersion(run:HistoricalJob):3|4|5 {
   const version=run.snapshot.analysis_version ?? run.snapshot.base?.analysis_version ?? 3
-  if(version!==3 && version!==4) throw new Error('REPORT_VERSION_CHANGED')
+  if(version!==3 && version!==4 && version!==5) throw new Error('REPORT_VERSION_CHANGED')
   if(run.snapshot.base && run.snapshot.base.analysis_version!==version) throw new Error('REPORT_VERSION_CHANGED')
   return version
 }
@@ -122,8 +122,8 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     await updateRun({classifications:metrics.classifications})
     const narrativeCall=metrics.themes.length>0
     if(narrativeCall){await updateRun({ai_calls:run.ai_calls+1});usageRecorded=false}
-    const result=narrativeCall ? await consultantNarrative(metrics,language,recordUsage,run.model,version) : {
-      report:assembleConsultantReport(metrics,{axes:AXES.map(key=>({key})),explanations:[],conclusion:insufficient(language)},language,version),
+    const result=narrativeCall ? await consultantNarrative(metrics,language,recordUsage,run.model,version,run.snapshot.base) : {
+      report:assembleConsultantReport(metrics,{axes:AXES.map(key=>({key})),explanations:[],conclusion:insufficient(language)},language,version,run.snapshot.base),
       usage:{input_tokens:0,output_tokens:0},
     }
     const {data:e,error:eError}=await admin.from('establishments').select('name').eq('id',run.establishment_id).single()

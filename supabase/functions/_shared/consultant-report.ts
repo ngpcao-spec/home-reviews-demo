@@ -2,6 +2,8 @@ import { normalizeEvidence, structuredCall, THEME_CATALOG, type Usage } from './
 import { relevantContext, type ReputationReview } from './reputation-metrics.ts'
 import { AXES, type Axis, type AnalyticalSentiment, type ConsultantReportData } from './consultant-contract.ts'
 import { narrativePriorities, priceSummary, priceThematicOptions, priorityConclusion, priorityRecommendation, sentenceCount, validPriorityKeys } from './consultant-priorities.ts'
+import { assembleV5, consultantNarrativeV5 } from './consultant-v5.ts'
+import type { DiagnosticSource } from './consultant-diagnostics.ts'
 
 export const CATALOG = {
   ...Object.fromEntries(Object.entries(THEME_CATALOG).filter(([key]) => key !== 'overall_experience').map(([key, [category, fr, vi]]) => [key, [category === 'food' ? 'quality' : key === 'value' || key === 'billing' ? 'price' : key === 'location' ? 'atmosphere' : category, fr, vi]])),
@@ -119,7 +121,8 @@ export function consultantMetrics(reviews: ReputationReview[], classifications: 
 }
 
 /** Final narrative sees anonymous, server-counted topics only, never names, addresses or review quotes. */
-export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string, version:3|4=3) {
+export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string, version:3|4|5=3, source:DiagnosticSource={}) {
+  if(version===5) return consultantNarrativeV5(v5Input(metrics,language,source),language,recordUsage,model)
   const topics = metrics.themes.map(theme => ({key:`${theme.theme_key}:${theme.sentiment}`,axis:theme.axis,sentiment:theme.sentiment,mentions:theme.mentions,label:CATALOG[theme.theme_key][language==='fr'?1:2]}))
   const priorities=narrativePriorities(metrics.total,topics)
   const price=metrics.axes.find(axis=>axis.key==='price')!
@@ -152,7 +155,11 @@ export async function consultantNarrative(metrics: ReturnType<typeof consultantM
   return {report:assembleConsultantReport(metrics,result.data,language,version),usage:result.usage}
 }
 
-export function assembleConsultantReport(metrics: ReturnType<typeof consultantMetrics>, raw: Record<string, unknown>, language: 'fr'|'vi', version:3|4=3): ConsultantReportData {
+function v5Input(metrics:ReturnType<typeof consultantMetrics>,language:'fr'|'vi',source:DiagnosticSource) {
+  return {total:metrics.total,positive:metrics.positive,negative:metrics.negative,source,topics:metrics.themes.map(t=>({...t,key:`${t.theme_key}:${t.sentiment}`,label:CATALOG[t.theme_key][language==='fr'?1:2]}))}
+}
+export function assembleConsultantReport(metrics: ReturnType<typeof consultantMetrics>, raw: Record<string, unknown>, language: 'fr'|'vi', version:3|4|5=3, source:DiagnosticSource={}): ConsultantReportData {
+  if(version===5) return assembleV5(v5Input(metrics,language,source),language,raw)
   const priorities=narrativePriorities(metrics.total,metrics.themes.map(t=>({key:`${t.theme_key}:${t.sentiment}`,axis:t.axis,sentiment:t.sentiment,mentions:t.mentions,label:CATALOG[t.theme_key][language==='fr'?1:2]})))
   const prose = (value: unknown) => {
     if (typeof value !== 'string' || !value.trim() || value.length>3000 || /\p{N}|https?:\/\//u.test(value)) throw new Error('REPORT_INVALID_NARRATIVE')

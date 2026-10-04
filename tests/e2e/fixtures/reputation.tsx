@@ -7,6 +7,7 @@ import { ReputationReport } from '../../../src/components/ReputationReport'
 import { ConsultantReport } from '../../../src/components/ConsultantReport'
 import { AXES, type ConsultantReportData } from '../../../supabase/functions/_shared/consultant-contract'
 import { buildDemoHistoricalReport } from '../../../src/lib/historical-report'
+import { shabuReport } from '../../fixtures/consultant-v5'
 import '../../../src/styles/global.css'
 import '../../../src/styles/pages.css'
 import '../../../src/styles/reference.css'
@@ -26,4 +27,4 @@ const consultant: ConsultantReportData={version:3,language,total:501,positive:45
   axes:AXES.map((key,index)=>({key,positive:[184,339,31,292][index],negative:[19,48,42,16][index],summary:language==='fr'?'Les avis disponibles expriment des perceptions positives et des réserves ponctuelles.':'Các đánh giá hiện có thể hiện cảm nhận tích cực và một số ý kiến cần lưu ý.',recommendation:language==='fr'?'Maintenir les points appréciés et vérifier les difficultés signalées.':'Duy trì những điểm được đánh giá cao và kiểm tra các khó khăn được phản ánh.'})),
   positive_aspects:Array.from({length:7},(_,i)=>({theme_key:`positive-${i}`,axis:'quality',sentiment:'positive',label:language==='fr'?'Qualité et saveur des plats préparés sur place':'Chất lượng và hương vị món ăn',mentions:100+i,explanation:'EXPLANATION_HIDDEN'})),negative_aspects:[],conclusion:language==='fr'?'Les retours sont majoritairement positifs.':'Phản hồi chủ yếu tích cực.'}
 consultant.negative_aspects=consultant.positive_aspects.map(item=>({...item,sentiment:'negative',mentions:item.mentions-90}))
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language={language}><main style={{maxWidth: 1000, margin: 'auto', padding: 16}}>{params.get('version')==='3'?<ConsultantReport report={consultant}/>:<><h1>{name}</h1><ReputationReport report={report}/></>}</main></I18nProvider></MemoryRouter></QueryClientProvider>)
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language={language}><main style={{maxWidth: 1000, margin: 'auto', padding: 16}}>{params.get('version')==='5'?<ConsultantReport report={shabuReport(language)}/>:params.get('version')==='3'?<ConsultantReport report={consultant}/>:<><h1>{name}</h1><ReputationReport report={report}/></>}</main></I18nProvider></MemoryRouter></QueryClientProvider>)
