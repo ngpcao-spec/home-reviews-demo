@@ -1,6 +1,37 @@
 import {afterEach,describe,it,expect,vi} from 'vitest'
 import {analyzeReviewWithOpenAI,analyzeFourStarReviewWithOpenAI,translateReplyWithOpenAI,reviewAiSchema} from './ai.ts'
 afterEach(()=>vi.unstubAllGlobals())
+
+describe('idiomatic reply wording instructions (mocked provider, not a live language evaluation)',()=>{
+  it.each([
+    ['Tom yum missing ingredients.','en','thành phần món ăn chưa đáp ứng kỳ vọng','thiếu nguyên liệu như mong đợi'],
+    ['Portion too small.','en','khẩu phần chưa đáp ứng mong đợi','sự đầy đặn của món ăn'],
+    ['冬阴功汤少了配料。','zh','thành phần món ăn chưa đáp ứng kỳ vọng','thiếu nguyên liệu như mong đợi'],
+    ['양이 너무 적어요.','ko','khẩu phần chưa đáp ứng mong đợi','sự đầy đặn của món ăn'],
+    ['Порция слишком маленькая.','ru','khẩu phần chưa đáp ứng mong đợi','sự đầy đặn của món ăn'],
+  ])('sends semantic wording guidance with the unchanged original: %s',async(text,detected,preferred,forbidden)=>{
+    const fetcher=provider({ai_suggested_reply:'Cảm ơn quý khách đã chia sẻ phản hồi.',detected_language:detected})
+    await analyzeReviewWithOpenAI(2,text,'vi')
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    const prompt=body.input[0].content
+    expect(body.input[1].content).toContain(text)
+    expect(prompt).toContain(`never “${forbidden}”`)
+    expect(prompt).toContain(`use “${preferred}”`)
+    for(const rule of ['native restaurant manager','Do not translate complaint phrases literally','Avoid unnatural nominal phrases','not mandatory templates','Choose only the category supported','without broadening the complaint or changing its certainty','Missing ingredients do not establish poor freshness','Never add an absent defect','3 or 4 sentences','at most two themes','one concise forward-looking commitment','short courteous closing','never more than 100 words']) expect(prompt).toContain(rule)
+    expect(body.model).toBe('gpt-6.1-sol')
+    expect(body.reasoning).toEqual({effort:'low'})
+    expect(body.text.format.schema.required).toEqual(['ai_suggested_reply','detected_language'])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+  it('also requests idiomatic French without inventing a defect',async()=>{
+    const fetcher=provider({ai_suggested_reply:'Merci pour votre retour.',detected_language:'en'})
+    await analyzeReviewWithOpenAI(2,'The portion was not filling enough.','fr')
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    expect(body.input[0].content).toContain('In French also avoid literal calques')
+    expect(body.input[0].content).toContain('only when supported')
+    expect(body.input[0].content).toContain('entirely in French')
+  })
+})
 function provider(output:object, model?:string){
   const fetcher=vi.fn(async()=>new Response(JSON.stringify({output_text:JSON.stringify(output),usage:{input_tokens:100,output_tokens:35,total_tokens:135}}),{status:200}))
   vi.stubGlobal('fetch',fetcher);vi.stubGlobal('Deno',{env:{get:(name:string)=>name==='REVIEW_REPLY_MODEL'?model:'test-key-never-used'}})
