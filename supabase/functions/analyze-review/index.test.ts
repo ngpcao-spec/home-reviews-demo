@@ -43,9 +43,17 @@ async function setup({cached=false,automatic=false,rating=2,historical=true,dupl
   vi.stubGlobal('Deno',{env:{get:()=> 'test-value'},serve:(fn:typeof handler)=>{handler=fn}})
   vi.resetModules();await import('./index.ts')
   return {provider,writes,selects,get review(){return review},get draft(){return draft},
-    call:()=>handler(new Request('https://example.test',{method:'POST',headers:automatic?{'x-home-reviews-webhook':'test-webhook-secret'}:{},body:JSON.stringify({review_id:'review'})}))}
+    call:(regenerate=false)=>handler(new Request('https://example.test',{method:'POST',headers:automatic?{'x-home-reviews-webhook':'test-webhook-secret'}:{},body:JSON.stringify({review_id:'review',regenerate})}))}
 }
 describe('analyze-review reply-only persistence',()=>{
+  it('explicit regeneration uses the short reply prompt once, while preserving legacy summary',async()=>{
+    const h=await setup({cached:true})
+    expect((await h.call(true)).status).toBe(200)
+    expect(h.provider).toHaveBeenCalledTimes(1)
+    const body=JSON.parse((h.provider.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    expect(body.input[0].content).toContain('Do not summarize or restate the full review')
+    expect(h.draft?.ai_summary).toBe('OLD LOCALIZED SUMMARY')
+  })
   it('generates one reply, records usage, never selects/writes/returns a summary and leaves legacy values untouched',async()=>{
     const h=await setup();const response=await h.call()
     expect(response.status).toBe(200)
