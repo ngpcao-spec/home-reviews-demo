@@ -27,3 +27,13 @@ test('notification and review list show identical localized text and Google age'
   await page.screenshot({path:testInfo.outputPath('reviews.png'),fullPage:true})
   expect(await page.evaluate(()=> (window as unknown as {resumeHarness:{invocations:string[]}}).resumeHarness.invocations)).toEqual([])
 })
+test('missing Google date uses notification date, not review import date',async({page})=>{
+  await page.route(/https:\/\/.*/,route=>route.abort())
+  await page.clock.install({time:new Date('2026-10-03T23:00:00Z')})
+  await page.addInitScript(value=>{
+    localStorage.setItem('notification-review-fixture',JSON.stringify({...value,review:{...value.review,published_at:null}}))
+    localStorage.setItem('review-details-language','vi')
+  },fixture)
+  await page.goto('/tests/e2e/fixtures/resume.html#/notifications')
+  await expect(page.locator('.notification-meta')).toContainText('2★ · 2 giờ trước')
+})

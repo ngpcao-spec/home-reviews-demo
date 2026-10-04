@@ -68,6 +68,10 @@ describe('review notification reading consistency',()=>{
     setup();reviews[0].publishedAt='';openPage()
     expect(document.querySelector('.notification-meta')).toHaveTextContent('2 giờ trước')
   })
+  it('does not mistake the mapper import-date fallback for a Google publication date',()=>{
+    setup();reviews[0].hasGooglePublicationDate=false;openPage()
+    expect(document.querySelector('.notification-meta')).toHaveTextContent('2 giờ trước')
+  })
   it('uses the original when no translation is available',()=>{
     setup('fr',false);openPage();expect(screen.getByText(original)).toBeInTheDocument()
   })

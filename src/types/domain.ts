@@ -31,6 +31,7 @@ export interface Review {
   translatedText?: string
   reviewLanguage: string
   publishedAt: string
+  hasGooglePublicationDate?: boolean
   sourceUrl: string
   isHistoricalImport: boolean
   requiresAction: boolean

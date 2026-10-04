@@ -354,6 +354,7 @@ function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review
     reviewContext: row.review_context,
     reviewLanguage: row.original_language ?? row.language ?? 'fr',
     publishedAt: row.published_at ?? row.created_at,
+    hasGooglePublicationDate: Boolean(row.published_at),
     sourceUrl: row.review_url ?? '',
     isHistoricalImport: row.historical_import,
     requiresAction: actionable,
