@@ -84,6 +84,12 @@ export interface ReviewAiUsage {
   output_tokens_details?: { reasoning_tokens?: number }
 }
 
+const DEFAULT_REVIEW_REPLY_MODEL = 'gpt-6.1-sol'
+
+// Standard replies only; four-star triage and translation keep their own model.
+const reviewReplyModel = () =>
+  Deno.env.get('REVIEW_REPLY_MODEL')?.trim() || DEFAULT_REVIEW_REPLY_MODEL
+
 export async function analyzeFourStarReviewWithOpenAI(
   text: string,
   workingLanguage: 'fr' | 'vi' = 'fr',
@@ -175,7 +181,7 @@ export async function analyzeReviewWithOpenAI(
   workingLanguage: 'fr' | 'vi' = 'fr',
 ): Promise<ReviewAiResult & { model: string; usage?: ReviewAiUsage }> {
   const key = Deno.env.get('OPENAI_API_KEY')?.trim()
-  const model = 'gpt-5.6-terra'
+  const model = reviewReplyModel()
   if (!key) throw new Error('AI_NOT_CONFIGURED')
   const workingLanguageName = workingLanguage === 'vi' ? 'Vietnamese' : 'French'
 

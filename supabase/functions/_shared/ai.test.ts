@@ -1,9 +1,9 @@
 import {afterEach,describe,it,expect,vi} from 'vitest'
 import {analyzeReviewWithOpenAI,analyzeFourStarReviewWithOpenAI,translateReplyWithOpenAI,reviewAiSchema} from './ai.ts'
 afterEach(()=>vi.unstubAllGlobals())
-function provider(output:object){
+function provider(output:object, model?:string){
   const fetcher=vi.fn(async()=>new Response(JSON.stringify({output_text:JSON.stringify(output),usage:{input_tokens:100,output_tokens:35,total_tokens:135}}),{status:200}))
-  vi.stubGlobal('fetch',fetcher);vi.stubGlobal('Deno',{env:{get:()=> 'test-key-never-used'}})
+  vi.stubGlobal('fetch',fetcher);vi.stubGlobal('Deno',{env:{get:(name:string)=>name==='REVIEW_REPLY_MODEL'?model:'test-key-never-used'}})
   return fetcher
 }
 describe('individual reply without summary tokens',()=>{
@@ -15,7 +15,7 @@ describe('individual reply without summary tokens',()=>{
     expect(result).not.toHaveProperty('ai_summary')
     expect(fetcher).toHaveBeenCalledTimes(1)
     const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
-    expect(body.model).toBe('gpt-5.6-terra')
+    expect(body.model).toBe('gpt-6.1-sol')
     expect(body.text.format.schema.required).toEqual(['ai_suggested_reply','detected_language'])
     expect(Object.keys(body.text.format.schema.properties)).toEqual(['ai_suggested_reply','detected_language'])
     expect(JSON.stringify(body)).not.toContain('ai_summary')
@@ -88,7 +88,7 @@ describe('general improvement commitment prompt contract (no real model calls)',
     const prompt=body.input[0].content
     for(const rule of ['Prefer three sentences','one concise forward-looking commitment','those same concerns','at most two themes and no new concern','only one problem','general commitment to improve the experience','Never claim that corrective action has already been taken','specific procedures, staffing changes, training, investigations, compensation, refunds, sanctions, investments, contact, timelines or guarantees','normally use “quý khách” at most once','service flow for waiting','cleanliness standards for hygiene','consistent food quality']) expect(prompt).toContain(rule)
     expect(prompt).not.toMatch(/Never invent facts, causes, corrective actions|or imply any internal action|no invented action or promise|no restaurant action was invented/)
-    expect(body.model).toBe('gpt-5.6-terra')
+    expect(body.model).toBe(rating===4?'gpt-5.6-terra':'gpt-6.1-sol')
     expect(body.reasoning).toEqual({effort:'low'})
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
@@ -106,5 +106,32 @@ describe('general improvement commitment prompt contract (no real model calls)',
     expect((reply.match(/quý khách/giu)||[]).length).toBeLessThanOrEqual(1)
     for(const term of terms) expect(reply.split('.').at(-2)).toContain(term)
     expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('standard reply model configuration isolated from other workloads',()=>{
+  it.each([undefined,'','  ','gpt-5.6-terra',' gpt-6.1-sol '])('resolves override %s without changing request parameters',async configured=>{
+    const fetcher=provider({ai_suggested_reply:'Merci pour votre retour.',detected_language:'fr'},configured)
+    const result=await analyzeReviewWithOpenAI(2,'Attente longue.','vi')
+    expect(result.model).toBe(configured?.trim()||'gpt-6.1-sol')
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+  it('changes only model between Terra and Sol requests, including prompt and schema',async()=>{
+    const requests:Record<string,unknown>[]=[]
+    for(const model of ['gpt-5.6-terra','gpt-6.1-sol']){
+      const fetcher=provider({ai_suggested_reply:'Merci pour votre retour.',detected_language:'fr'},model)
+      await analyzeReviewWithOpenAI(2,'Attente longue.','vi')
+      requests.push(JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string))
+    }
+    expect({...requests[0],model:'gpt-6.1-sol'}).toEqual(requests[1])
+    expect(requests[1].reasoning).toEqual({effort:'low'})
+    expect(requests[1].max_output_tokens).toBe(500)
+  })
+  it.each(['gpt-6.1-sol','gpt-5.6-terra','irrelevant-model'])('never changes triage or translation with override %s',async model=>{
+    const triage=provider({has_negative_feedback:false,negative_feedback_summary:null,ai_suggested_reply:null,detected_language:'fr'},model)
+    expect((await analyzeFourStarReviewWithOpenAI('Excellent.')).model).toBe('gpt-5.6-terra')
+    expect(JSON.parse((triage.mock.calls[0] as unknown as [string,RequestInit])[1].body as string).model).toBe('gpt-5.6-terra')
+    provider({translated_reply_text:'Thank you.'},model)
+    expect((await translateReplyWithOpenAI('Merci.','fr','en')).model).toBe('gpt-5.6-terra')
   })
 })

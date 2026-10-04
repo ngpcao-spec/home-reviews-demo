@@ -40,7 +40,7 @@ async function setup({cached=false,automatic=false,rating=2,historical=true,dupl
   const provider=vi.fn(async()=>new Response(JSON.stringify({output_text:JSON.stringify(output),usage:{input_tokens:100,output_tokens:30,total_tokens:130}}),{status:200}))
   vi.stubGlobal('fetch',provider);vi.stubGlobal('crypto',webcrypto)
   let handler!:(request:Request)=>Promise<Response>
-  vi.stubGlobal('Deno',{env:{get:()=> 'test-value'},serve:(fn:typeof handler)=>{handler=fn}})
+  vi.stubGlobal('Deno',{env:{get:(name:string)=>name==='REVIEW_REPLY_MODEL'?undefined:'test-value'},serve:(fn:typeof handler)=>{handler=fn}})
   vi.resetModules();await import('./index.ts')
   return {provider,writes,selects,get review(){return review},get draft(){return draft},
     call:(regenerate=false)=>handler(new Request('https://example.test',{method:'POST',headers:automatic?{'x-home-reviews-webhook':'test-webhook-secret'}:{},body:JSON.stringify({review_id:'review',regenerate})}))}
@@ -53,6 +53,8 @@ describe('analyze-review reply-only persistence',()=>{
     const body=JSON.parse((h.provider.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
     expect(body.input[0].content).toContain('Do not summarize or restate the full review')
     expect(h.draft?.ai_summary).toBe('OLD LOCALIZED SUMMARY')
+    expect(h.review.ai_model).toBe('gpt-6.1-sol')
+    expect(h.draft?.draft_version).toBe(2)
   })
   it('generates one reply, records usage, never selects/writes/returns a summary and leaves legacy values untouched',async()=>{
     const h=await setup();const response=await h.call()
@@ -65,7 +67,7 @@ describe('analyze-review reply-only persistence',()=>{
     expect(JSON.stringify(h.writes)).not.toContain('ai_summary')
     expect(JSON.stringify(h.writes)).not.toContain('ai_last_rejected_summary')
     expect(h.review.ai_summary).toBe('OLD VALUE MUST REMAIN')
-    expect(h.review).toMatchObject({ai_output_tokens:30,ai_total_tokens:130,ai_status:'completed'})
+    expect(h.review).toMatchObject({ai_model:'gpt-6.1-sol',ai_input_tokens:100,ai_output_tokens:30,ai_total_tokens:130,ai_status:'completed'})
     expect(h.draft).toMatchObject({draft_version:1,ai_status:'completed',draft_text:payload.ai_suggested_reply})
     expect(mocks.sendPushToUser).not.toHaveBeenCalled()
   })
