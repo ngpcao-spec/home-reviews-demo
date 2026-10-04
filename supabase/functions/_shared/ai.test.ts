@@ -2,6 +2,39 @@ import {afterEach,describe,it,expect,vi} from 'vitest'
 import {analyzeReviewWithOpenAI,analyzeFourStarReviewWithOpenAI,translateReplyWithOpenAI,reviewAiSchema} from './ai.ts'
 afterEach(()=>vi.unstubAllGlobals())
 
+describe('category compression prompt contract (no live model evaluation)',()=>{
+  it.each([
+    ['Tom yum was mostly broth, missing shrimp and ingredients.', 'dish composition', 'not a broth/shrimp inventory'],
+    ['Waited 40 minutes in the heat with empty tables.', 'waiting time', 'only needs waiting time'],
+    ['The toilets had a filthy floor, dirty sinks and overflowing bins.', 'cleanliness', 'only needs cleanliness'],
+    ['I received a different dish than I ordered.', 'order accuracy', 'độ chính xác của đơn hàng'],
+    ['The portion was tiny.', 'portions', 'a small portion is not poor food quality'],
+    ['My dish was cold.', 'temperature', 'not undercooking'],
+    ['I ordered vegetarian but was served meat.', 'vegetarian/meat distinction', 'Retain only the minimum detail'],
+  ])('sends compression and meaning-preservation rules for %s',async(text,category,guard)=>{
+    const fetcher=provider({ai_suggested_reply:'Cảm ơn quý khách đã phản hồi.',detected_language:'en'})
+    await analyzeReviewWithOpenAI(2,text,'vi')
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    const prompt=body.input[0].content
+    expect(body.input[1].content).toContain(text)
+    for(const rule of [category,guard,'underlying service or hospitality issue','unless essential to identify','at most two supported categories','both the acknowledgement and the commitment','do not output an intermediate analysis','Never introduce a category unsupported','same category level','3 or 4 sentences','short courteous closing','use “quý khách” at most once']) expect(prompt).toContain(rule)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    expect(body.text.format.schema.required).toEqual(['ai_suggested_reply','detected_language'])
+    expect(body.reasoning).toEqual({effort:'low'})
+    expect(body.model).toBe('gpt-6.1-sol')
+  })
+  it('limits category compression to the reply in four-star triage',async()=>{
+    const fetcher=provider({has_negative_feedback:true,negative_feedback_summary:'Attente de 40 minutes.',ai_suggested_reply:'Merci pour votre avis.',detected_language:'fr'})
+    const result=await analyzeFourStarReviewWithOpenAI('Bon repas mais attente de 40 minutes.','fr')
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    expect(result.negative_feedback_summary).toBe('Attente de 40 minutes.')
+    expect(body.input[0].content).toContain('For ai_suggested_reply only')
+    expect(body.input[0].content).toContain('at most two supported categories')
+    expect(body.model).toBe('gpt-5.6-terra')
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('idiomatic reply wording instructions (mocked provider, not a live language evaluation)',()=>{
   it.each([
     ['Tom yum missing ingredients.','en','thành phần món ăn chưa đáp ứng kỳ vọng','thiếu nguyên liệu như mong đợi'],
