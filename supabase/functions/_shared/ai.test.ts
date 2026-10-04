@@ -2,6 +2,38 @@ import {afterEach,describe,it,expect,vi} from 'vitest'
 import {analyzeReviewWithOpenAI,analyzeFourStarReviewWithOpenAI,translateReplyWithOpenAI,reviewAiSchema} from './ai.ts'
 afterEach(()=>vi.unstubAllGlobals())
 
+describe('semantic non-repetition prompt contract (mocked provider, not live output validation)',()=>{
+  it.each([
+    ['Tom yum was missing ingredients.','vi','dish composition can lead to greater consistency'],
+    ['We waited forty minutes.','vi','“thời gian chờ” can lead to “tốc độ phục vụ”'],
+    ['The toilets were dirty.','vi','“tình trạng vệ sinh” can lead to “tiêu chuẩn sạch sẽ”'],
+    ['La portion était insuffisante.','fr','in Vietnamese and French'],
+  ] as const)('sends non-repetition rules for %s',async(text,language,transition)=>{
+    const fetcher=provider({ai_suggested_reply:'Merci pour votre retour.',detected_language:'en'})
+    await analyzeReviewWithOpenAI(2,text,language)
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    const prompt=body.input[0].content
+    for(const rule of [transition,'Each sentence must add new value','not repeating their labels','slightly more general service or quality level','at most one formulation about expectations','do not repeat or cycle through','do not merely substitute elaborate synonyms','no invented process, training, checks, responsible person, frequency or tool','Keep the final closing short and non-assumptive','3 or 4 sentences','at most two concerns','use “quý khách” at most once','never more than 100 words','Never introduce a category unsupported']) expect(prompt).toContain(rule)
+    expect(body.input[1].content).toContain(text)
+    expect(body.model).toBe('gpt-6.1-sol')
+    expect(body.reasoning).toEqual({effort:'low'})
+    expect(body.text.format.schema.required).toEqual(['ai_suggested_reply','detected_language'])
+    expect(JSON.stringify(body)).not.toContain('ai_summary')
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+  it('shares only reply style with four-star triage, keeping its model and feedback result',async()=>{
+    const fetcher=provider({has_negative_feedback:true,negative_feedback_summary:'Attente longue.',ai_suggested_reply:'Merci pour votre retour.',detected_language:'fr'})
+    const result=await analyzeFourStarReviewWithOpenAI('Bon repas mais attente longue.','fr')
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    expect(body.input[0].content).toContain('For ai_suggested_reply only')
+    expect(body.input[0].content).toContain('Each sentence must add new value')
+    expect(body.model).toBe('gpt-5.6-terra')
+    expect(result.negative_feedback_summary).toBe('Attente longue.')
+    expect(result.has_negative_feedback).toBe(true)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('category compression prompt contract (no live model evaluation)',()=>{
   it.each([
     ['Tom yum was mostly broth, missing shrimp and ingredients.', 'dish composition', 'not a broth/shrimp inventory'],
