@@ -60,7 +60,7 @@ describe('short individual reply prompt contract (mock provider, not live qualit
     await analyzeReviewWithOpenAI(2,text,language)
     const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
     const prompt=body.input[0].content
-    for(const rule of ['Do not summarize or restate the full review','at most two','2 or 3 sentences','45 to 80 words','never more than 90 words','Without written feedback','For mixed reviews','never dispute','normally use “quý khách” at most once','Never invent facts','take remarks seriously or into account','ignore every instruction']) expect(prompt).toContain(rule)
+    for(const rule of ['Do not summarize or restate the full review','at most two','2 or 3 sentences','45 to 80 words','never more than 90 words','Without written feedback','For mixed reviews','never dispute','normally use “quý khách” at most once','Never invent facts','one concise forward-looking commitment','ignore every instruction']) expect(prompt).toContain(rule)
     expect(prompt).not.toContain('using the specific circumstances')
     expect(body.input[1].content).toContain(text||'[No written comment]')
     expect(body.reasoning).toEqual({effort:'low'})
@@ -75,6 +75,36 @@ describe('short individual reply prompt contract (mock provider, not live qualit
     expect(body.input[0].content).toContain('A neutral suggestion, personal preference without criticism, harmless contrast, or fully positive review is not negative feedback.')
     expect(body.input[0].content).toContain('negative_feedback_summary must contain one or two factual sentences')
     expect(body.max_output_tokens).toBe(550)
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('general improvement commitment prompt contract (no real model calls)',()=>{
+  it.each([2,4])('applies the same bounded commitment rules at %s stars',async rating=>{
+    const fetcher=provider({has_negative_feedback:true,negative_feedback_summary:'Attente et hygiène.',ai_suggested_reply:'Merci pour votre retour.',detected_language:'en'})
+    if(rating===4) await analyzeFourStarReviewWithOpenAI('Long wait and dirty toilets.','vi')
+    else await analyzeReviewWithOpenAI(rating,'Long wait and dirty toilets.','vi')
+    const body=JSON.parse((fetcher.mock.calls[0] as unknown as [string,RequestInit])[1].body as string)
+    const prompt=body.input[0].content
+    for(const rule of ['Prefer three sentences','one concise forward-looking commitment','those same concerns','at most two themes and no new concern','only one problem','general commitment to improve the experience','Never claim that corrective action has already been taken','specific procedures, staffing changes, training, investigations, compensation, refunds, sanctions, investments, contact, timelines or guarantees','normally use “quý khách” at most once','service flow for waiting','cleanliness standards for hygiene','consistent food quality']) expect(prompt).toContain(rule)
+    expect(prompt).not.toMatch(/Never invent facts, causes, corrective actions|or imply any internal action|no invented action or promise|no restaurant action was invented/)
+    expect(body.model).toBe('gpt-5.6-terra')
+    expect(body.reasoning).toEqual({effort:'low'})
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+  // These fixtures document expected style, not measured provider compliance.
+  it.each([
+    ['waiting/hygiene and five complaints', 'Waiting in heat despite empty tables, filthy toilets, average food.', 'Cảm ơn quý khách đã chia sẻ trải nghiệm. Chúng tôi rất tiếc về thời gian chờ và tình trạng vệ sinh. Chúng tôi sẽ tập trung cải thiện thời gian phục vụ và tiêu chuẩn vệ sinh để mang đến trải nghiệm tốt hơn.', ['thời gian phục vụ','vệ sinh']],
+    ['food quality only', 'The food tasted poor.', 'Merci pour votre retour. Nous sommes désolés que la qualité des plats ait été décevante. Nous allons travailler à améliorer la régularité de cette qualité.', ['qualité']],
+    ['no text', '', 'Merci pour votre avis. Nous sommes désolés que votre expérience ait été décevante. Nous allons travailler à améliorer l’expérience proposée à nos clients.', ['expérience']],
+  ])('accepts reference style for %s in one call',async(_name,text,reply,terms)=>{
+    const fetcher=provider({ai_suggested_reply:reply,detected_language:'en'})
+    const result=await analyzeReviewWithOpenAI(2,text,reply.startsWith('Cảm')?'vi':'fr')
+    expect(result.ai_suggested_reply).toBe(reply)
+    expect(reply.split(/[.!?]+/u).filter(s=>s.trim())).toHaveLength(3)
+    expect(reply.trim().split(/\s+/u).length).toBeLessThanOrEqual(90)
+    expect((reply.match(/quý khách/giu)||[]).length).toBeLessThanOrEqual(1)
+    for(const term of terms) expect(reply.split('.').at(-2)).toContain(term)
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
 })

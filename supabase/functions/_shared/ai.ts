@@ -24,11 +24,13 @@ function individualReplyStyle(language: string) {
     `For ai_suggested_reply only: write entirely in natural ${language}, like a warm, calm restaurant manager, not an administrator.`,
     'Do not summarize or restate the full review. Identify the one or two most important customer concerns. Acknowledge them briefly and naturally. Do not retell or enumerate the full review. If there are many complaints, select at most two; omit minor details, exact times, durations unless indispensable, scene descriptions and lists of dishes.',
     'The reply must be 2 or 3 sentences, normally about 45 to 80 words, never more than 90 words. A short or textless review may receive a shorter reply; do not pad it to meet the target.',
-    'Thank the customer and express appropriate regret, briefly acknowledge the main concern or concerns, and optionally end with a non-promissory hope of welcoming them again. Never assume they will return or guarantee a better experience.',
+    'Prefer three sentences: thank the customer; briefly acknowledge the one or two main concerns and express regret; include one concise forward-looking commitment to improve those same concerns. Keep the commitment general and directly tied to the feedback, with at most two themes and no new concern. An optional hope for a better future experience must fit within that sentence; never assume the customer will return or guarantee an outcome.',
     'For mixed reviews, prioritize the negative concern; do not give every compliment a separate sentence. For severe criticism, never dispute, minimize, express surprise or compare with satisfied customers. Without written feedback, do not invent a reason for dissatisfaction.',
-    'Never invent facts, causes, corrective actions, training, investigation, procedural changes, contact, compensation, guarantees or legal admissions. Do not claim to take remarks seriously or into account, or imply any internal action without explicit HOME Reviews evidence. Preserve uncertainty and the customer’s point of view.',
+    'Without written feedback, a general commitment to improve the experience is acceptable, but do not name specific problems or measures. If only one problem is stated, the commitment must address only that problem.',
+    'Never invent facts or causes. Never claim that corrective action has already been taken without explicit HOME Reviews evidence. Do not invent specific procedures, staffing changes, training, investigations, compensation, refunds, sanctions, investments, contact, timelines or guarantees, and do not make legal admissions. Preserve uncertainty and the customer’s point of view. A general future improvement commitment is authorized; a fabricated implementation plan is not.',
+    'Express concerns as categories, not scenes. General commitments may address service flow for waiting, cleanliness standards for hygiene, consistent food quality, attention to cooking, client communication, order verification, consistent professional service, or value for money, only when those concerns are actually present. Prioritize clearly serious waiting and hygiene complaints over incidental scene details or mildly average food; never enumerate every complaint.',
     'Use idiomatic French rather than administrative formulas. In Vietnamese avoid literal translations and repeated forms of address: normally use “quý khách” at most once. Never mix languages except proper names or necessary quoted terms.',
-    'Before returning JSON, check brevity, at most two concerns, natural wording and no invented action or promise.',
+    'Before returning JSON, check brevity, at most two concerns, one matching general future commitment, natural wording, no unsupported past action and no invented specific measure.',
   ].join(' ')
 }
 
@@ -116,7 +118,7 @@ export async function analyzeFourStarReviewWithOpenAI(
             `When has_negative_feedback=true, negative_feedback_summary must contain one or two factual sentences in ${workingLanguageName}, covering only the concrete problem. Apply the following reply-only style to ai_suggested_reply.`,
             individualReplyStyle(workingLanguageName),
             'When has_negative_feedback=false, both negative_feedback_summary and ai_suggested_reply must be null.',
-            'Never invent facts, causes, corrective actions, promises, compensation, investigation or legal admissions. Preserve uncertainty and the customer’s point of view.',
+            'Keep negative_feedback_summary factual, with no restaurant commitment or action; the authorized general future commitment belongs only in ai_suggested_reply.',
             'Return the original review language as an ISO 639-1 code in detected_language.',
           ].join(' '),
         },
@@ -196,7 +198,7 @@ export async function analyzeReviewWithOpenAI(
             'First identify the original language of the review and return its ISO 639-1 code in detected_language.',
             `ai_suggested_reply MUST be written entirely in ${workingLanguageName}, the HOME Reviews manager's working language. It must be based directly on the ORIGINAL review below, never on an intermediary translation.`,
             individualReplyStyle(workingLanguageName),
-            `Before returning JSON, verify sentence by sentence that every factual statement is directly supported by the ORIGINAL review, that uncertainty and time boundaries are preserved, that no restaurant action was invented, and that ai_suggested_reply is natural ${workingLanguageName}.`,
+            `Before returning JSON, verify that every factual statement is supported by the ORIGINAL review, that uncertainty is preserved, that the future commitment follows the reply-only rules without claiming completed actions or specific measures, and that ai_suggested_reply is natural ${workingLanguageName}.`,
           ].join(' '),
         },
         {
@@ -214,7 +216,7 @@ export async function analyzeReviewWithOpenAI(
             additionalProperties: false,
             required: ['ai_suggested_reply', 'detected_language'],
             properties: {
-              ai_suggested_reply: { type: 'string', description: `Natural 2–3 sentence reply entirely in ${workingLanguageName}; normally 45–80 words, never more than 90; at most two main concerns, no full review recap or invented actions/promises.` },
+              ai_suggested_reply: { type: 'string', description: `Natural 2–3 sentence reply entirely in ${workingLanguageName}; normally 45–80 words, never more than 90; at most two main concerns and one general future improvement commitment tied to them, no full recap, invented past action or specific measures.` },
               detected_language: { type: 'string', description: 'Code ISO 639-1 de la langue originale de l’avis.' },
             },
           },
