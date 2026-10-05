@@ -1,6 +1,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { reputationMetrics, type ReputationReview } from './reputation-metrics.ts'
 import { AXES } from './consultant-contract.ts'
+import { structuredContextStats } from './structured-review-context.ts'
 import { assembleConsultantReport, consultantBatches, consultantMetrics, consultantNarrative, extractConsultantBatch, insufficient, ratingClassification, type Classification, type ConsultantFinding } from './consultant-report.ts'
 import { historicalRetry, HISTORICAL_REPORT_LEASE_SECONDS } from './historical-report-policy.ts'
 
@@ -10,7 +11,7 @@ export interface HistoricalJob {
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
-  snapshot:{analysis_version?:3|4|5;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
+  snapshot:{analysis_version?:3|4|5|6;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
   token_usage_complete:boolean; created_at:string; last_error:string|null; error_code?:string|null;
 }
 const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
@@ -19,9 +20,9 @@ async function fingerprint(value: unknown) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))
   return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2,'0')).join('')
 }
-export function historicalNarrativeVersion(run:HistoricalJob):3|4|5 {
+export function historicalNarrativeVersion(run:HistoricalJob):3|4|5|6 {
   const version=run.snapshot.analysis_version ?? run.snapshot.base?.analysis_version ?? 3
-  if(version!==3 && version!==4 && version!==5) throw new Error('REPORT_VERSION_CHANGED')
+  if(version!==3 && version!==4 && version!==5 && version!==6) throw new Error('REPORT_VERSION_CHANGED')
   if(run.snapshot.base && run.snapshot.base.analysis_version!==version) throw new Error('REPORT_VERSION_CHANGED')
   return version
 }
@@ -53,7 +54,7 @@ async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
         ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION}}
       const classifications = reviews.filter(review=>!(review.original_text ?? review.text ?? '').trim()).map(ratingClassification)
 
-  return {snapshot,classifications,total_steps:consultantBatches(reviews).length+1}
+  return {snapshot,classifications,total_steps:consultantBatches(reviews,ANALYSIS_VERSION).length+1}
 }
 
 /** One durable unit per invocation: snapshot OR extraction batch OR final narrative. */
@@ -88,7 +89,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     }
     const version=historicalNarrativeVersion(run)
     const reviews=run.snapshot.reviews,language=run.language
-    const batches=consultantBatches(reviews)
+    const batches=consultantBatches(reviews,version)
     // Also adopts legacy checkpoints without changing their cursor/findings/generation.
     await updateRun({total_steps:batches.length+1,lease_until:new Date(Date.now()+HISTORICAL_REPORT_LEASE_SECONDS*1000).toISOString()})
     const {data:existing,error:existingError}=await admin.from('historical_establishment_reports').select('*').eq('establishment_id',run.establishment_id).eq('preferred_language',language).maybeSingle()
@@ -109,7 +110,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
       await updateRun({ai_calls:run.ai_calls+1})
       usageRecorded=false
       log('HISTORICAL_BATCH_STARTED')
-      const extracted=await extractConsultantBatch(batches[run.cursor],recordUsage,run.model)
+      const extracted=await extractConsultantBatch(batches[run.cursor],recordUsage,run.model,version)
       const findings=[...new Map([...run.findings,...extracted.findings].map((f:ConsultantFinding)=>[`${f.review_id}:${f.theme_key}:${f.sentiment}`,f])).values()]
       const classifications=[...new Map([...run.classifications,...extracted.classifications].map((item:Classification)=>[item.review_id,item])).values()]
       const batch=run.cursor+1
@@ -131,7 +132,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     if(e.name && JSON.stringify(result.report).normalize('NFC').toLowerCase().includes(e.name.normalize('NFC').toLowerCase())) throw new Error('REPORT_IDENTITY_DISCLOSURE')
     const generated=new Date().toISOString()
     const row={...run.snapshot.base,generation_id:run.generation_id,
-      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:{...result.report,classification_fallback_count:metrics.classificationFallbackCount},
+      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:{...result.report,classification_fallback_count:metrics.classificationFallbackCount,...(version===6?{structured_context_stats:structuredContextStats(reviews)}:{})},
       ai_overall_summary:result.report.conclusion,ai_historical_summary:result.report.conclusion,ai_status:'completed',ai_error:null,ai_model:run.model,
       ai_input_tokens:run.input_tokens,ai_output_tokens:run.output_tokens,ai_total_tokens:run.input_tokens+run.output_tokens,ai_call_count:run.ai_calls,ai_cost_usd:null,
       accepted_findings_count:run.findings.length,rejected_findings_count:run.rejected_findings_count,

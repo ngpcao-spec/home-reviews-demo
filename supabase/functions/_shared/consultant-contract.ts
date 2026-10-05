@@ -1,4 +1,5 @@
-export const CONSULTANT_VERSION = 5
+import type { StructuredContextStats } from './structured-review-context.ts'
+export const CONSULTANT_VERSION = 6
 export const AXES = ['service', 'quality', 'price', 'atmosphere'] as const
 export type Axis = typeof AXES[number]
 export type AnalyticalSentiment = 'positive' | 'negative'
@@ -11,7 +12,7 @@ export interface ConsultantAspect {
   explanation: string
 }
 export interface ConsultantReportData {
-  version: 3 | 4 | 5
+  version: 3 | 4 | 5 | 6
   language: 'fr' | 'vi'
   total: number
   positive: number
@@ -23,6 +24,7 @@ export interface ConsultantReportData {
   sample_average_rating?: number | null
   axis_diagnostics?: Record<Axis, AxisDiagnostic>
   decision_summary?: DecisionSummary
+  structured_context_stats?: StructuredContextStats
 }
 
 export type CoverageLevel = 'strong' | 'medium' | 'limited'

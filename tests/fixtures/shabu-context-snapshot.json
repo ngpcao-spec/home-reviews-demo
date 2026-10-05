@@ -1,0 +1,601 @@
+[
+  {
+    "id": "1",
+    "review_context": {
+      "Quy mô nhóm": "1 người, Phù hợp với mọi quy mô nhóm",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "2",
+    "review_context": {}
+  },
+  {
+    "id": "3",
+    "review_context": {}
+  },
+  {
+    "id": "4",
+    "review_context": {}
+  },
+  {
+    "id": "5",
+    "review_context": {}
+  },
+  {
+    "id": "6",
+    "review_context": {}
+  },
+  {
+    "id": "7",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "Trên 1.000.000 ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "8",
+    "review_context": {}
+  },
+  {
+    "id": "9",
+    "review_context": {}
+  },
+  {
+    "id": "10",
+    "review_context": {}
+  },
+  {
+    "id": "11",
+    "review_context": {}
+  },
+  {
+    "id": "12",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "300-400 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "13",
+    "review_context": {}
+  },
+  {
+    "id": "14",
+    "review_context": {}
+  },
+  {
+    "id": "15",
+    "review_context": {}
+  },
+  {
+    "id": "16",
+    "review_context": {}
+  },
+  {
+    "id": "17",
+    "review_context": {}
+  },
+  {
+    "id": "18",
+    "review_context": {
+      "Giá mỗi người": "800-900 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "19",
+    "review_context": {}
+  },
+  {
+    "id": "20",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "5 đến 8 người",
+      "Giá mỗi người": "Trên 1.000.000 ₫",
+      "Loại hình bữa ăn": "Khác"
+    }
+  },
+  {
+    "id": "21",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "1 người, 2 người, 3 đến 4 người",
+      "Giá mỗi người": "1-100.000 ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "22",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "100-200 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "23",
+    "review_context": {
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "24",
+    "review_context": {}
+  },
+  {
+    "id": "25",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "700-800 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "26",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "700-800 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "27",
+    "review_context": {
+      "Độ ồn": "Rất yên tĩnh",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "300-400 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "28",
+    "review_context": {
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "29",
+    "review_context": {}
+  },
+  {
+    "id": "30",
+    "review_context": {}
+  },
+  {
+    "id": "31",
+    "review_context": {}
+  },
+  {
+    "id": "32",
+    "review_context": {}
+  },
+  {
+    "id": "33",
+    "review_context": {
+      "Quy mô nhóm": "2 người, 3 đến 4 người",
+      "Thời gian chờ": "Không cần chờ",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "34",
+    "review_context": {}
+  },
+  {
+    "id": "35",
+    "review_context": {}
+  },
+  {
+    "id": "36",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "300-400 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "37",
+    "review_context": {}
+  },
+  {
+    "id": "38",
+    "review_context": {}
+  },
+  {
+    "id": "39",
+    "review_context": {}
+  },
+  {
+    "id": "40",
+    "review_context": {}
+  },
+  {
+    "id": "41",
+    "review_context": {}
+  },
+  {
+    "id": "42",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "Trên 1.000.000 ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "43",
+    "review_context": {
+      "Giá mỗi người": "100-200 N ₫"
+    }
+  },
+  {
+    "id": "44",
+    "review_context": {}
+  },
+  {
+    "id": "45",
+    "review_context": {}
+  },
+  {
+    "id": "46",
+    "review_context": {}
+  },
+  {
+    "id": "47",
+    "review_context": {}
+  },
+  {
+    "id": "48",
+    "review_context": {
+      "Độ ồn": "Ồn ào, nhưng bạn vẫn trò chuyện được",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "700-800 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "49",
+    "review_context": {}
+  },
+  {
+    "id": "50",
+    "review_context": {}
+  },
+  {
+    "id": "51",
+    "review_context": {
+      "Giá mỗi người": "600-700 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "52",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "2 người, 3 đến 4 người",
+      "Giá mỗi người": "Trên 1.000.000 ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "53",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "400-500 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "54",
+    "review_context": {}
+  },
+  {
+    "id": "55",
+    "review_context": {
+      "Độ ồn": "Rất yên tĩnh",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "300-400 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "56",
+    "review_context": {}
+  },
+  {
+    "id": "57",
+    "review_context": {}
+  },
+  {
+    "id": "58",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "59",
+    "review_context": {
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "60",
+    "review_context": {
+      "Độ ồn": "Ồn ào, nhưng bạn vẫn trò chuyện được",
+      "Quy mô nhóm": "2 người, 3 đến 4 người",
+      "Giá mỗi người": "400-500 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "61",
+    "review_context": {}
+  },
+  {
+    "id": "62",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "Trên 1.000.000 ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "63",
+    "review_context": {}
+  },
+  {
+    "id": "64",
+    "review_context": {}
+  },
+  {
+    "id": "65",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "200-300 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "66",
+    "review_context": {
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "100-200 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "67",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "2 người, 3 đến 4 người, 5 đến 8 người",
+      "Giá mỗi người": "400-500 N ₫",
+      "Loại hình bữa ăn": "Khác"
+    }
+  },
+  {
+    "id": "68",
+    "review_context": {}
+  },
+  {
+    "id": "69",
+    "review_context": {
+      "Quy mô nhóm": "3 đến 4 người",
+      "Thời gian chờ": "Tới 10 phút",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "70",
+    "review_context": {}
+  },
+  {
+    "id": "71",
+    "review_context": {}
+  },
+  {
+    "id": "72",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "800-900 N ₫",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "73",
+    "review_context": {
+      "Giá mỗi người": "500-600 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "74",
+    "review_context": {
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "100-200 N ₫",
+      "Loại hình bữa ăn": "Bữa tối",
+      "Những món ăn đề xuất": "Рамен С Уткой"
+    }
+  },
+  {
+    "id": "75",
+    "review_context": {
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "76",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "2 người",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "77",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "3 đến 4 người, 5 đến 8 người",
+      "Giá mỗi người": "200-300 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "78",
+    "review_context": {
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "79",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "Phù hợp với mọi quy mô nhóm",
+      "Giá mỗi người": "100-200 N ₫",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "80",
+    "review_context": {}
+  },
+  {
+    "id": "81",
+    "review_context": {
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "82",
+    "review_context": {}
+  },
+  {
+    "id": "83",
+    "review_context": {
+      "Quy mô nhóm": "5 đến 8 người",
+      "Giá mỗi người": "300-400 N ₫"
+    }
+  },
+  {
+    "id": "84",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Giá mỗi người": "100-200 N ₫",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "85",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "2 người",
+      "Giá mỗi người": "800-900 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "86",
+    "review_context": {}
+  },
+  {
+    "id": "87",
+    "review_context": {
+      "Giá mỗi người": "800-900 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "88",
+    "review_context": {}
+  },
+  {
+    "id": "89",
+    "review_context": {}
+  },
+  {
+    "id": "90",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "Trên 1.000.000 ₫"
+    }
+  },
+  {
+    "id": "91",
+    "review_context": {}
+  },
+  {
+    "id": "92",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Giá mỗi người": "900 N ₫ - 1 Tr ₫",
+      "Loại hình bữa ăn": "Bữa trưa"
+    }
+  },
+  {
+    "id": "93",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "3 đến 4 người",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "94",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "2 người",
+      "Giá mỗi người": "100-200 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "95",
+    "review_context": {
+      "Độ ồn": "Yên tĩnh, dễ trò chuyện",
+      "Quy mô nhóm": "2 người, 3 đến 4 người",
+      "Giá mỗi người": "200-300 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  },
+  {
+    "id": "96",
+    "review_context": {}
+  },
+  {
+    "id": "97",
+    "review_context": {}
+  },
+  {
+    "id": "98",
+    "review_context": {}
+  },
+  {
+    "id": "99",
+    "review_context": {}
+  },
+  {
+    "id": "100",
+    "review_context": {
+      "Độ ồn": "Ồn ào ở mức vừa phải",
+      "Quy mô nhóm": "2 người, 3 đến 4 người, 5 đến 8 người",
+      "Giá mỗi người": "200-300 N ₫",
+      "Loại hình bữa ăn": "Bữa tối"
+    }
+  }
+]

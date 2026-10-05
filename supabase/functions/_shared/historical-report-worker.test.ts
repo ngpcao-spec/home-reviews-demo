@@ -37,13 +37,15 @@ function harness(){
   }
 }
 describe('durable worker without any frontend process',()=>{
-  it.each([3,4,5] as const)('keeps narrative version %i across worker restarts',async version=>{
+  it.each([3,4,5,6] as const)('keeps narrative version %i across worker restarts',async version=>{
     const h=harness()
     h.patch({snapshot:{...h.run.snapshot,analysis_version:version,base:{...h.run.snapshot.base,analysis_version:version}}})
     await h.tick();await h.tick()
     expect(ai.narrative.mock.calls[0][4]).toBe(version)
     expect(ai.narrative.mock.calls[0][5]).toEqual(h.run.snapshot.base)
     expect(h.publication).toMatchObject({analysis_version:version})
+    expect(ai.extract.mock.calls[0][3]).toBe(version)
+    if(version===6) expect(h.publication).toHaveProperty('consultant_report.structured_context_stats')
   })
   it('treats an old unsnapshotted run as V3; never upgrades an existing generation',()=>{
     const h=harness()

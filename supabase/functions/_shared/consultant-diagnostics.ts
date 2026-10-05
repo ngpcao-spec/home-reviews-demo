@@ -1,5 +1,6 @@
 import { AXES, type Axis, type AxisDiagnostic, type CoverageLevel, type DiagnosticStatus, type DiagnosticTopic, type DecisionSummary } from './consultant-contract.ts'
 import { HEADLINES } from './consultant-priorities.ts'
+import { formatNaturalList } from './natural-list.ts'
 
 export interface DiagnosticSource {
   sample_average_rating?:number|null
@@ -21,7 +22,7 @@ export function axisStatus(average:number|null,coverage:number,negative:Diagnost
   if(average!==null && average>=4.5) return 'strength'
   return 'neutral'
 }
-const labels=(topics:DiagnosticTopic[],fr:boolean)=>topics.map(t=>t.label).join(fr?' et ':' và ')
+const labels=(topics:DiagnosticTopic[],fr:boolean)=>formatNaturalList(topics.map(t=>t.label),fr?'fr':'vi')
 export function diagnosticSummary(d:AxisDiagnostic,language:'fr'|'vi') {
   const fr=language==='fr'
   const assessment:Record<DiagnosticStatus,string>=fr?{
@@ -31,8 +32,8 @@ export function diagnosticSummary(d:AxisDiagnostic,language:'fr'|'vi') {
   }:{major_strength:'Đây là một điểm mạnh nổi bật.',strength:'Đây là một điểm mạnh.',
     watch:d.subrating_average!==null && d.subrating_average>=4.5?'Khía cạnh này vẫn được chấm điểm rất tốt, nhưng có điểm cần theo dõi.':'Có tín hiệu lặp lại cần được chú ý.',
     priority:'Có tín hiệu tiêu cực mạnh cần được ưu tiên cải thiện.',limited_data:'Dữ liệu còn quá hạn chế để đưa ra kết luận chắc chắn.',neutral:'Chưa có tín hiệu nổi bật.'}
-  const positive=d.top_positive.length?(fr?`Les points appréciés cités sont : ${labels(d.top_positive,fr)}.`:`Các điểm được đánh giá cao gồm : ${labels(d.top_positive,fr)}.`):''
-  const concern=d.recurring_negative.length?(fr?`Les points à surveiller concernent : ${labels(d.recurring_negative,fr)}.`:`Các điểm cần theo dõi gồm : ${labels(d.recurring_negative,fr)}.`)
+  const positive=d.top_positive.length?(fr?`Les points appréciés cités sont : ${labels(d.top_positive,fr)}.`:`Các điểm được đánh giá cao gồm: ${labels(d.top_positive,fr)}.`):''
+  const concern=d.recurring_negative.length?(fr?`Les points à surveiller concernent : ${labels(d.recurring_negative,fr)}.`:`Các điểm cần theo dõi gồm: ${labels(d.recurring_negative,fr)}.`)
     :d.isolated_negative.length?(fr?'Les critiques disponibles restent sous le seuil de récurrence.':'Các phàn nàn hiện có chưa đạt ngưỡng lặp lại.')
     :(fr?'Aucun problème récurrent n’est détecté dans les avis analysés.':'Không phát hiện vấn đề lặp lại trong các đánh giá được phân tích.')
   return [assessment[d.status],positive,concern].filter(Boolean).join(' ')
@@ -78,12 +79,12 @@ export function globalDecisionSummary(axes:Record<Axis,AxisDiagnostic>,language:
   const fr=language==='fr'
   const preserve=strengths.length?(fr?'Préserver les points forts documentés. ':'Duy trì các điểm mạnh đã ghi nhận. '):''
   const manager_summary=preserve+(manager_priorities.length
-    ?(fr?`Concentrer l’attention sur : ${labels(manager_priorities,fr)}.`:`Tập trung theo dõi : ${labels(manager_priorities,fr)}.`)
+    ?(fr?`Concentrer l’attention sur : ${labels(manager_priorities,fr)}.`:`Tập trung theo dõi: ${labels(manager_priorities,fr)}.`)
     :(fr?'Suivre les retours avant de définir une priorité d’amélioration.':'Theo dõi phản hồi trước khi xác định ưu tiên cải thiện.'))
   return {strengths,watch,limited_axes:AXES.filter(axis=>axes[axis].coverage_level==='limited'),manager_priorities,manager_summary}
 }
 export function diagnosticConclusion(decision:DecisionSummary,positive:number,negative:number,language:'fr'|'vi') {
   const fr=language==='fr'
   const overall=positive>negative?(fr?'Les retours sont globalement positifs.':'Phản hồi nhìn chung tích cực.'):negative>positive?(fr?'Les retours négatifs prédominent.':'Phản hồi tiêu cực chiếm ưu thế.'):(fr?'Les retours sont partagés.':'Phản hồi còn trái chiều.')
-  return [overall,decision.strengths.length?(fr?`Les principales forces sont : ${labels(decision.strengths,fr)}.`:`Các điểm mạnh chính là : ${labels(decision.strengths,fr)}.`):'',decision.manager_priorities.length?(fr?`Les points à surveiller en priorité sont : ${labels(decision.manager_priorities,fr)}.`:`Các điểm cần ưu tiên theo dõi là : ${labels(decision.manager_priorities,fr)}.`):(fr?'Aucun thème négatif n’atteint le seuil de récurrence.':'Không có chủ đề tiêu cực đạt ngưỡng lặp lại.')].filter(Boolean).join(' ')
+  return [overall,decision.strengths.length?(fr?`Les principales forces sont : ${labels(decision.strengths,fr)}.`:`Các điểm mạnh chính là: ${labels(decision.strengths,fr)}.`):'',decision.manager_priorities.length?(fr?`Les points à surveiller en priorité sont : ${labels(decision.manager_priorities,fr)}.`:`Các điểm cần ưu tiên theo dõi là: ${labels(decision.manager_priorities,fr)}.`):(fr?'Aucun thème négatif n’atteint le seuil de récurrence.':'Không có chủ đề tiêu cực đạt ngưỡng lặp lại.')].filter(Boolean).join(' ')
 }

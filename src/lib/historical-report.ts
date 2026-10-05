@@ -82,7 +82,7 @@ export interface HistoricalReportRow extends Partial<ReputationData> {
 
 export function mapHistoricalReport(row: HistoricalReportRow): HistoricalReport {
   return {
-    consultant: (row.analysis_version === 3 || row.analysis_version === 4 || row.analysis_version === 5) && row.consultant_report?.version === row.analysis_version ? row.consultant_report : undefined,
+    consultant: (row.analysis_version === 3 || row.analysis_version === 4 || row.analysis_version === 5 || row.analysis_version === 6) && row.consultant_report?.version === row.analysis_version ? row.consultant_report : undefined,
     reputation: row.analysis_version === 2 ? row as HistoricalReportRow & ReputationData : undefined,
     id: row.id,
     organizationId: row.organization_id,

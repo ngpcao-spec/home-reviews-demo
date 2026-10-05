@@ -18,3 +18,7 @@
 .consultant-v5 .v5-quick-axis small{font-size:.75rem}
 .consultant-v5 p,.consultant-v5 li,.consultant-v5 small{overflow-wrap:anywhere}
 @media(max-width:380px){.consultant-v5 .v5-grid{grid-template-columns:1fr}}
+.v6-google-context { margin-top: 1.25rem; padding: 1rem; border: 1px solid var(--border, #514a40); border-radius: 14px; color: var(--text-secondary, #c4bcae); }
+.v6-google-context ul { list-style: none; padding: 0; }
+.v6-google-context li { display: flex; justify-content: space-between; gap: 1rem; margin: .5rem 0; }
+.v6-google-context li span:last-child { flex-shrink: 0; }

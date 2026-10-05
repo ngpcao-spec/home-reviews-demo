@@ -1,4 +1,22 @@
 import { expect,test } from '@playwright/test'
+test('V6 neutral Google context is distinct from opinions in FR and VI',async({page})=>{
+  const requests:string[]=[]
+  page.on('request',r=>{if(/functions\/v1|rest\/v1/.test(r.url()))requests.push(r.url())})
+  for(const language of ['fr','vi']) {
+    await page.goto(`/tests/e2e/fixtures/reputation.html?version=6&language=${language}`)
+    await expect(page.locator('.weekly-section')).toHaveCount(8)
+    await expect(page.locator('.v6-google-context')).toHaveCount(3)
+    const noise=page.locator('[data-context-axis="atmosphere"]')
+    await expect(noise.locator('li span:last-child')).toHaveText(['15','14','2'])
+    await expect(noise).toContainText(language==='fr'?'Informations Google':'Thông tin Google')
+    await expect(page.locator('.v5-axis[data-axis="atmosphere"] .v5-status')).toHaveText(language==='fr'?'Point fort majeur':'Điểm mạnh nổi bật')
+    await expect(page.locator('.v5-axis[data-axis="price"] .v5-score')).toHaveCount(0)
+    await expect(noise.locator('.v5-watch,.v5-priority')).toHaveCount(0)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+    await noise.screenshot({path:`test-results/v6-context-${language}-${test.info().project.name}.png`})
+  }
+  expect(requests).toEqual([])
+})
 test('V5 Shabu diagnostic cards FR/VI, no overflow or network generation',async({page})=>{
   const requests:string[]=[]
   page.on('request',r=>{if(/functions\/v1|rest\/v1/.test(r.url()))requests.push(r.url())})
