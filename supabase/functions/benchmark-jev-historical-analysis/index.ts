@@ -2,6 +2,7 @@ import { requireUser, assertMembership } from '../_shared/auth.ts'
 import { benchmarkHandler } from '../_shared/jev-benchmark-handler.ts'
 import type { BenchmarkSource } from '../_shared/jev-benchmark.ts'
 import { eligibleJevSources } from '../_shared/jev-benchmark-read.ts'
+import {LANGUAGE_REFERENCE_ID,type LanguageReference} from '../_shared/jev-language-effect.ts'
 
 declare const EdgeRuntime: { waitUntil(work:Promise<void>):void }
 
@@ -56,6 +57,16 @@ Deno.serve(benchmarkHandler({
           if(data)return data
         }
         return null
+      },
+      readLanguageReference:async source=>{
+        const {data:benchmark,error}=await context.admin.from('jev_benchmark_runs').select('id,source_generation_id,source_analysis_version,status,benchmark_type,comparison,decisions')
+          .eq('id',LANGUAGE_REFERENCE_ID).eq('organization_id',source.organization_id).eq('establishment_id',source.establishment_id).eq('status','completed').eq('benchmark_type','themes_phase2').eq('source_analysis_version',6).maybeSingle()
+        if(error)throw new Error('SOURCE_LANGUAGE_REFERENCE_READ_FAILED')
+        if(!benchmark)return null
+        const {data:baseline,error:baselineError}=await context.admin.from('historical_report_runs').select('generation_id,organization_id,establishment_id,status,model,snapshot,classifications,findings,input_tokens,output_tokens,token_usage_complete,started_at,completed_at')
+          .eq('generation_id',benchmark.source_generation_id).eq('organization_id',source.organization_id).eq('establishment_id',source.establishment_id).eq('status','completed').eq('snapshot->>analysis_version','6').single()
+        if(baselineError||!baseline)throw new Error('SOURCE_LANGUAGE_REFERENCE_READ_FAILED')
+        return {benchmark:benchmark as unknown as LanguageReference,source:baseline as BenchmarkSource}
       },
       insertBenchmark:async row=>{
         const {error}=await benchmarks.insert(row)

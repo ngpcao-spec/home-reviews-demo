@@ -26,9 +26,10 @@ export function JevBenchmarkPage() {
   const primary=sources.data?.find(s=>s.source_generation_id===selected || s.snapshots?.some(v=>v.source_generation_id===selected))??sources.data?.[0]
   const source=primary?{...primary,...primary.snapshots?.find(v=>v.source_generation_id===selected)}:undefined
   const sourceId=source?.source_generation_id,user=currentUser.id??''
+  const directThemes=source?.source_analysis_version===7
   const chooseSource=(id:string)=>{setSelected(id);selectJevSource(user,id);setLaunchError('')}
   const queryKey=['jev-run',user,sourceId]
-  const runQuery=useQuery<JevRun|null>({queryKey,enabled:access.data===true && !!sourceId && visible,retry:false,staleTime:0,
+  const runQuery=useQuery<JevRun|null>({queryKey,enabled:access.data===true && !!sourceId && visible && !directThemes,retry:false,staleTime:0,
     queryFn:async()=>{
       const known=client.getQueryData<JevRun|null>(['jev-run',user,sourceId])
       // Initial/reopened page resolves the server's preferred run. Polling a known
@@ -61,15 +62,16 @@ export function JevBenchmarkPage() {
     }catch(error){setLaunchError(error instanceof Error?error.message:'JEV_CONNECTION_ERROR');await client.invalidateQueries({queryKey:launchedKey})}
     finally{busy.current=false;setStarting(false)}
   }
-  const loading=access.isPending || (access.data===true && (sources.isPending || (!!sourceId && runQuery.isPending)))
+  const loading=access.isPending || (access.data===true && (sources.isPending || (!!sourceId && !directThemes && runQuery.isPending)))
   return <><PageHeader title={t.title} back/><div className="jev-page">
     <header className="jev-intro"><span className="jev-tag"><FlaskConical size={14}/>{t.experimental}</span><h2>{t.title}</h2><p>{t.subtitle}</p></header>
     {loading?<p role="status" className="jev-notice"><LoaderCircle className="jev-spinner" size={18}/>{t.loading}</p>:access.data!==true?<section className="card jev-card"><p>{t.denied}</p><Link to="/plus">{language==='fr'?'Retour à Plus':'Quay lại Thêm'}</Link></section>:<>
       {sources.isError?<p role="alert">{t.readFailed}</p>:!source?<p className="card jev-card">{t.noSources}</p>:<>
         <EnglishReviewPreparation key={source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/>
         <section className="card jev-card jev-source"><label htmlFor="jev-source">{t.establishment}</label><select id="jev-source" value={primary!.source_generation_id} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{sources.data!.map(s=><option key={s.source_generation_id} value={s.source_generation_id}>{s.name} · {s.reviews_total} {t.reviews}</option>)}</select>
-          {(primary?.snapshots?.length??0)>1&&<><label className="jev-snapshot-label" htmlFor="jev-snapshot">{t.dataset} · V6 / V7</label><select id="jev-snapshot" value={sourceId} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{primary!.snapshots!.map((s,i)=><option key={s.source_generation_id} value={s.source_generation_id}>{s.reviews_total} {t.reviews} · {new Date(s.completed_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}{i===0?` · ${language==='fr'?'Dernier rapport':'Báo cáo mới nhất'}`:''}</option>)}</select></>}
+          {(primary?.snapshots?.length??0)>1&&<><label className="jev-snapshot-label" htmlFor="jev-snapshot">{t.dataset} · V6 / V7</label><select id="jev-snapshot" value={sourceId} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{primary!.snapshots!.map(s=><option key={s.source_generation_id} value={s.source_generation_id}>V{s.source_analysis_version} · {s.reviews_total} {t.reviews} · {s.source_analysis_version===7?'Analyse EN':language==='fr'?'Langues originales':'Ngôn ngữ gốc'} · {new Date(s.completed_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</option>)}</select></>}
           <p>{sourceId===primary?.source_generation_id?t.reportDate:language==='fr'?'Rapport sélectionné':'Báo cáo đã chọn'} · {new Date(source.completed_at).toLocaleDateString(language==='fr'?'fr-FR':'vi-VN')}</p>{source.source_analysis_version===7&&<span className="jev-tag">Analyse EN · V7</span>}<div className="jev-meta"><span>{t.model}<strong>Jev latest</strong></span><span>{t.repeats}<strong>3</strong></span><span>{t.dataset}<strong>{source.reviews_total} {t.reviews}</strong></span></div></section>
+        {!directThemes&&<>
         {(runQuery.isError || launchError) && <section className="card jev-card jev-error" role="alert"><p>{launchError==='JEV_NOT_CONFIGURED'?t.notConfigured:pending?t.unknown:t.readFailed}</p><button className="secondary-button" disabled={runQuery.isFetching} onClick={()=>void runQuery.refetch()}>{t.retryRead}</button></section>}
         {!run && pending && <section className="card jev-card" role="status"><p>{t.unknown}</p></section>}
         {(!run || run.status==='failed') && !pending && <>
@@ -78,8 +80,9 @@ export function JevBenchmarkPage() {
         </>}
         {run?.status==='running' && <section className="card jev-card jev-running" role="status"><LoaderCircle className="jev-spinner" size={26}/><h3>{t.running}</h3><strong>{source.name}</strong><p>{run.reviews_total} {t.reviews} · {run.requested_model} · {run.repeat_count} {t.repeats.toLowerCase()}</p><small>{t.started} {new Date(run.created_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</small><p>{t.continue}</p><button className="secondary-button" disabled>{t.running}</button></section>}
         {run?.status==='completed' && <JevBenchmarkResults run={run} name={source.name}/>}
-        {run?.status==='completed' && <JevThemesPhase key={sourceId} user={user} source={source} visible={visible}/>}
         {run?.status==='failed' && <JevTechnicalDetails run={run}/>}
+        </>}
+        {(directThemes||run?.status==='completed') && <JevThemesPhase key={sourceId} user={user} source={source} visible={visible}/>}
       </>}
     </>}
     <p className="jev-footnote">{t.production}</p>

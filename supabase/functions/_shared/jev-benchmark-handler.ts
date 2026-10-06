@@ -5,6 +5,7 @@ import type { EligibleJevSource } from './jev-benchmark-read.ts'
 import { benchmarkType,type BenchmarkType } from './jev-benchmark-type.ts'
 import { compareThemes,themePayload,parseThemes,type ThemeDecision } from './jev-themes.ts'
 import { compareService,servicePayload,parseService,type Phase2Reference } from './jev-service.ts'
+import {compareLanguageEffect,type LanguageReference} from './jev-language-effect.ts'
 
 type Row = Record<string,unknown>
 export interface BenchmarkRepository {
@@ -16,6 +17,7 @@ export interface BenchmarkRepository {
   readBenchmark:(id:string)=>Promise<Row|null>
   listEligible?:()=>Promise<EligibleJevSource[]>
   readLatest?:(sourceId:string,type?:BenchmarkType)=>Promise<Row|null>
+  readLanguageReference?:(source:BenchmarkSource)=>Promise<{benchmark:LanguageReference;source:BenchmarkSource}|null>
 }
 export interface HandlerDependencies {
   authenticate:(request:Request)=>Promise<BenchmarkRepository>
@@ -72,7 +74,12 @@ export function benchmarkHandler(deps:HandlerDependencies) {
       if(!source)return json({error:'SOURCE_NOT_FOUND'},404)
       await repo.authorize(source.organization_id)
       validateSource(source)
-      if(benchmark_type==='themes_phase2') {
+      let languageReference:{benchmark:LanguageReference;source:BenchmarkSource}|null=null
+      if(benchmark_type==='themes_phase2'&&benchmarkVersion(source)===7) {
+        languageReference=await repo.readLanguageReference?.(source)??null
+        if(!languageReference)throw new Error('SOURCE_LANGUAGE_REFERENCE_REQUIRED')
+      }
+      if(benchmark_type==='themes_phase2'&&benchmarkVersion(source)===6) {
         const phase1=await repo.readLatest?.(source.generation_id,'axes_phase1')
         if(phase1?.status!=='completed')throw new Error('SOURCE_PHASE1_REQUIRED')
       }
@@ -88,8 +95,13 @@ export function benchmarkHandler(deps:HandlerDependencies) {
       const scope={benchmark_id:id,source_generation_id:source.generation_id,benchmark_type}
       const log=(event:string,fields:Row={})=>deps.log?.(event,{...scope,...fields})
       const started=Date.now()
-      const patch=()=>{
+      const patch=(completed=false)=>{
         const comparison=benchmark_type==='themes_phase2b_service'?compareService(source,state as BenchmarkState<ThemeDecision>,options,rates,phase2Reference):benchmark_type==='themes_phase2'?compareThemes(source,state as BenchmarkState<ThemeDecision>,options,rates):compareBenchmark(source,state as BenchmarkState,options,rates)
+        if(languageReference&&benchmark_type==='themes_phase2') {
+          const themes=comparison as ReturnType<typeof compareThemes>
+          for(const metrics of Object.values(themes.theme_metrics))for(const labels of Object.values(metrics))for(const label of Object.values(labels))Object.assign(label,{support_sol_reference:label.support_sol_v6})
+          Object.assign(comparison,{reference:'Persisted Sol V7 findings are a reference, not ground truth.',question_set_unchanged_from_phase2_v6:true,sol_reference:{...themes.sol_v6_baseline,source_analysis_version:7,source_generation_id:source.generation_id,scope:'Full Sol V7 extraction + narrative, including worker/cron orchestration.'},language_effect:compareLanguageEffect(languageReference.benchmark,languageReference.source,source,themes,state.decisions as Parameters<typeof compareLanguageEffect>[4],completed)})
+        }
         return {decisions:state.decisions,served_models:state.served_models,request_count:state.request_count,retry_count:state.retry_count,jev_input_tokens:state.jev_input_tokens,jev_output_tokens:state.jev_output_tokens,jev_elapsed_ms:state.jev_elapsed_ms,estimated_jev_cost_usd:comparison.jev.estimated_jev_cost_usd,comparison}
       }
       const textual=source.snapshot.reviews.filter(r=>benchmarkText(r,benchmarkVersion(source)).trim()).length
@@ -98,7 +110,7 @@ export function benchmarkHandler(deps:HandlerDependencies) {
       const work=async()=>{
         log('JEV_BENCHMARK_STARTED',{model:options.model,repeat_count:options.repeat_count,concurrency:options.concurrency})
         try {
-          await runJevBenchmark<JevDecision|ThemeDecision>(source,options,apiKey,state,{log,...(benchmark_type==='themes_phase2b_service'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(servicePayload(model,alias,text),parseService)}:benchmark_type==='themes_phase2'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(themePayload(model,alias,text),parseThemes)}:{}),checkpoint:async()=>{
+          await runJevBenchmark<JevDecision|ThemeDecision>(source,options,apiKey,state,{log,preserveQuestionSet:benchmark_type==='themes_phase2',...(benchmark_type==='themes_phase2b_service'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(servicePayload(model,alias,text),parseService)}:benchmark_type==='themes_phase2'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(themePayload(model,alias,text),parseThemes)}:{}),checkpoint:async()=>{
             state.jev_elapsed_ms=Date.now()-started
             await repo.updateBenchmark(id,patch())
             // Bound execution to leave time to save partial results within Edge limits.
@@ -106,7 +118,7 @@ export function benchmarkHandler(deps:HandlerDependencies) {
           }})
           state.jev_elapsed_ms=Date.now()-started
           const failed=state.errors.length>0
-          await repo.updateBenchmark(id,{...patch(),status:failed?'failed':'completed',error_code:failed?'JEV_PARTIAL_FAILURE':null,completed_at:new Date().toISOString()})
+          await repo.updateBenchmark(id,{...patch(!failed),status:failed?'failed':'completed',error_code:failed?'JEV_PARTIAL_FAILURE':null,completed_at:new Date().toISOString()})
           log(failed?'JEV_BENCHMARK_FAILED':'JEV_BENCHMARK_COMPLETED',{duration_ms:state.jev_elapsed_ms,model:state.served_models.join(','),request_count:state.request_count,retry_count:state.retry_count})
         } catch(error) {
           state.jev_elapsed_ms=Date.now()-started

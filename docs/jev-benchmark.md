@@ -261,3 +261,37 @@ npm exec --yes --package=deno -- deno check --node-modules-dir=none --no-lock su
 Les tests utilisent uniquement des mocks HTTP. Ils ne lancent ni Jev ni OpenAI.
 Le client utilise le contrat officiel TypeSafe :
 [OpenAPI System One](https://api.typesafe.ai/redoc).
+# Phase 2 V7: English language experiment
+
+Shabu source `b73ec894-d5fd-4b11-9fe6-cd89c117e9de` is selected dynamically
+from completed V7 reports. The V6 reference is explicitly pinned to completed
+Phase 2 benchmark `789ba38c-6f37-4ee9-ae5f-95ea767aee2e` (source
+`382c46aa-2505-44de-8693-71ab1fa92d11`); organization/establishment/version/type
+are checked on both server reads. Phase 2B is excluded. This first experiment
+is Shabu-specific; other V7 establishments need their own comparable reference.
+
+For Phase 2 only, preserve the exact `jev-themes.ts` payload/questions through
+the client wrapper. `benchmarkText(review, 7)` supplies only `analysis_text` to
+the existing `original_text` state field; its name is historical, its content
+is the English analytical text. Never include Russian original alongside it.
+V6 still selects the original. No taxonomy/definitions/threshold/metric changes.
+V7 Phase 2 does not require running an additional V7 Phase 1. UI parameters
+remain jev-latest / 3 repeats / concurrency 8. English preparation and report
+generation are not dependencies invoked by this benchmark.
+
+On successful completion, only the new benchmark row receives `language_effect`.
+Counts of all snapshot IDs and common textual IDs are separate. Stored F1 and
+axis deltas compare each benchmark against its own persisted Sol reference;
+reference label/support changes are stated explicitly. Theme/sentiment deltas
+require support >=5 in both benchmarks. Choice agreement pairs the same
+repetition index on common textual reviews and stores only review ID, theme,
+repeat and changed Choice values. Internal V7 repeat stability is separate.
+Cost/tokens, latency, served-model differences and parameter consistency are
+recorded. The descriptive verdict never changes production; dataset or model
+differences are confounders and prevent attributing a difference solely to language.
+
+The mobile selector labels V6 original languages and V7 English. V7 directly
+offers “Lancer Phase 2 V7”; opening, selecting and foreground only read. Durable
+references and the existing per-source/type running unique index prevent double
+launches. No migration or production-report modification is needed for this update.
+Deployments never execute the benchmark; the first real run remains manual on iPhone.

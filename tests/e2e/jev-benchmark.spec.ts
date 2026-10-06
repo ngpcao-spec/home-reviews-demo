@@ -1,4 +1,20 @@
 import { test,expect } from '@playwright/test'
+test('V7 language effect FR/VI mobile: service precision/recall, served-model warning, no external calls',async({page})=>{
+  const calls:string[]=[];page.on('request',r=>{if(/api\.typesafe|api\.openai|functions\/v1|rest\/v1/.test(r.url()))calls.push(r.url())})
+  for(const language of ['fr','vi']){
+    await page.goto('/tests/e2e/fixtures/jev.html?phase=v7&language='+language)
+    await expect(page.locator('[data-language-target]')).toHaveCount(4)
+    await expect(page.getByRole('heading',{name:'PHASE 2 V7 · ENGLISH'})).toBeVisible()
+    await expect(page.getByRole('heading',{name:language==='fr'?'Comparaison langue':'So sánh ngôn ngữ'})).toBeVisible()
+    await expect(page.locator('.jev-language-effect>.jev-warning')).toContainText(language==='fr'?'version Jev servie diffère':'Phiên bản Jev khác nhau')
+    expect(await page.locator('[data-language-target="attentiveness"]').textContent()).toContain(language==='fr'?'Précision':'Precision')
+    expect(await page.locator('[data-language-target="professionalism"]').textContent()).toContain(language==='fr'?'Rappel':'Recall')
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+    expect(await page.locator('.jev-card').evaluateAll(cards=>cards.every(card=>card.scrollWidth<=card.clientWidth+1))).toBe(true)
+    await page.screenshot({path:`test-results/jev-v7-${language}-${test.info().project.name}.png`,fullPage:true})
+  }
+  expect(calls).toEqual([])
+})
 test('Jev results FR/VI on mobile and iPad: no overflow, weak axes visible, no production calls',async({page})=>{
   const calls:string[]=[]
   page.on('request',r=>{if(/api\.typesafe|api\.openai|functions\/v1|rest\/v1/.test(r.url()))calls.push(r.url())})

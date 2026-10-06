@@ -81,7 +81,7 @@ export async function launchJevOnce<C=JevComparison>(user:string,source:string,t
     }catch(error) {
       // These definite pre-launch rejections cannot have created a run.
       const code=error instanceof Error?error.message:''
-      if(['JEV_NOT_CONFIGURED','UNAUTHORIZED','FORBIDDEN','INVALID_REPEAT_COUNT','INVALID_CONCURRENCY','INVALID_BENCHMARK_TYPE','SOURCE_NOT_FOUND','SOURCE_PHASE1_REQUIRED','SOURCE_PHASE2_REQUIRED','SOURCE_PHASE2_MISMATCH'].includes(code))localStorage.removeItem(lock)
+      if(['JEV_NOT_CONFIGURED','UNAUTHORIZED','FORBIDDEN','INVALID_REPEAT_COUNT','INVALID_CONCURRENCY','INVALID_BENCHMARK_TYPE','SOURCE_NOT_FOUND','SOURCE_PHASE1_REQUIRED','SOURCE_PHASE2_REQUIRED','SOURCE_PHASE2_MISMATCH','SOURCE_LANGUAGE_REFERENCE_REQUIRED','SOURCE_LANGUAGE_REFERENCE_READ_FAILED'].includes(code))localStorage.removeItem(lock)
       throw error
     }
   }

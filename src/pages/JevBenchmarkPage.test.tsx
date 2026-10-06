@@ -15,6 +15,14 @@ function mount(language:'fr'|'vi'='fr'){return render(<QueryClientProvider clien
 beforeEach(()=>{access.data=true;Object.defineProperty(document,'hidden',{configurable:true,value:false});vi.spyOn(jevApi,'sources').mockResolvedValue([jevSource]);vi.spyOn(jevApi,'latest').mockResolvedValue(null);vi.spyOn(jevApi,'read').mockResolvedValue({...jevResult,status:'running'});vi.spyOn(jevApi,'post').mockResolvedValue({benchmark_id:jevResult.id})})
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.useRealTimers()})
 describe('Jev mobile page',()=>{
+  it('V7 selection is labelled English and directly offers Phase 2 without a Phase 1 launch',async()=>{
+    const english={source_generation_id:'b73ec894-d5fd-4b11-9fe6-cd89c117e9de',source_analysis_version:7,reviews_total:101,completed_at:'2026-10-06T09:00:00Z'}
+    vi.mocked(jevApi.sources).mockResolvedValue([{...jevSource,...english,snapshots:[english,{source_generation_id:'382c46aa-2505-44de-8693-71ab1fa92d11',source_analysis_version:6,reviews_total:101,completed_at:'2026-10-05T09:00:00Z'}]}])
+    mount();expect(await screen.findByRole('button',{name:'Lancer Phase 2 V7'})).toBeEnabled()
+    expect(screen.getByRole('option',{name:/V7 · 101 avis · Analyse EN/})).toBeInTheDocument();expect(screen.getByRole('option',{name:/V6 · 101 avis · Langues originales/})).toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Lancer le test Jev'})).not.toBeInTheDocument();expect(jevApi.post).not.toHaveBeenCalled()
+    expect(jevApi.latest).toHaveBeenCalledWith(english.source_generation_id,'themes_phase2')
+  })
   it('A: discovers current Shabu V6 dynamically and never launches on page load',async()=>{
     mount();expect(await screen.findByRole('button',{name:'Lancer le test Jev'})).toBeEnabled()
     expect(screen.getByRole('option')).toHaveTextContent('Shabu Ssam BBQ Restaurant · 100 avis')

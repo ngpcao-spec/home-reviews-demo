@@ -1,7 +1,8 @@
 import type { JevRun,JevComparison,AxisScores } from './jev-benchmark'
-export interface ThemeMetrics extends AxisScores {support_sol_v6:number;support_level:'high'|'medium'|'low'|'none';sufficient_support:boolean;tp:number;tn:number;fp:number;fn:number;agreement_with_sol_v6:number|null}
+export interface ThemeMetrics extends AxisScores {support_sol_reference?:number;support_sol_v6:number;support_level:'high'|'medium'|'low'|'none';sufficient_support:boolean;tp:number;tn:number;fp:number;fn:number;agreement_with_sol_v6:number|null}
 export interface ThemeAxisMetrics {positive_micro_f1:number|null;negative_micro_f1:number|null;global_micro_f1:number|null;supported_labels:number;positive_supported_labels:number;negative_supported_labels:number}
 export interface JevThemeComparison {
+  language_effect?:ReturnType<typeof import('../../supabase/functions/_shared/jev-language-effect').compareLanguageEffect>
   benchmark_type:'themes_phase2';metrics_complete:boolean;catalog:string[];theme_axes:Record<string,string>
   dataset:JevComparison['dataset'];jev:JevComparison['jev'] & {individual_http_requests:{p50_ms:number|null;p95_ms:number|null;max_ms:number|null}}
   sol_v6_baseline:JevComparison['sol_v6_baseline']

@@ -133,7 +133,7 @@ export function compareBenchmark(source:BenchmarkSource, state:BenchmarkState, o
 export function newBenchmarkState<D=JevDecision>(source:BenchmarkSource, options:BenchmarkOptions):BenchmarkState<D> {
   return {decisions:source.snapshot.reviews.map(r=>({review_id:r.id,repetitions:Array(options.repeat_count).fill(null)})),served_models:[],request_count:0,retry_count:0,jev_input_tokens:0,jev_output_tokens:0,jev_elapsed_ms:0,request_durations_ms:[],evaluation_durations_ms:[],errors:[]}
 }
-export async function runJevBenchmark<D=JevDecision>(source:BenchmarkSource, options:BenchmarkOptions, apiKey:string|undefined, state:BenchmarkState<D>, hooks:{client?:JevClientOptions;evaluate?:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>Promise<{decision:D}>;checkpoint?:(state:BenchmarkState<D>)=>Promise<void>;log?:(event:string,fields:Record<string,unknown>)=>void}={}) {
+export async function runJevBenchmark<D=JevDecision>(source:BenchmarkSource, options:BenchmarkOptions, apiKey:string|undefined, state:BenchmarkState<D>, hooks:{preserveQuestionSet?:boolean;client?:JevClientOptions;evaluate?:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>Promise<{decision:D}>;checkpoint?:(state:BenchmarkState<D>)=>Promise<void>;log?:(event:string,fields:Record<string,unknown>)=>void}={}) {
   const clientOptions=hooks.client??{}
   // Validate secret before touching source or state.
   createJevClient(apiKey,clientOptions)
@@ -154,7 +154,7 @@ export async function runJevBenchmark<D=JevDecision>(source:BenchmarkSource, opt
           onUsage:(usage,model)=>{state.jev_input_tokens+=usage.input_tokens;state.jev_output_tokens+=usage.output_tokens;if(!state.served_models.includes(model))state.served_models.push(model)},
         })
         const client:ReturnType<typeof createJevClient>={...rawClient,
-          evaluatePayload:(payload,parse)=>rawClient.evaluatePayload(benchmarkPayload(payload,benchmarkVersion(source)),parse),
+          evaluatePayload:(payload,parse)=>rawClient.evaluatePayload(hooks.preserveQuestionSet?payload:benchmarkPayload(payload,benchmarkVersion(source)),parse),
           evaluate:(model,alias,text)=>rawClient.evaluatePayload(benchmarkPayload(jevPayload(model,alias,text),benchmarkVersion(source)),parseJev),
         }
         try {

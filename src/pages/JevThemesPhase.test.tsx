@@ -13,6 +13,15 @@ function mount(content=<JevThemesPhase user="user" source={source} visible/>,lan
 beforeEach(()=>{vi.spyOn(jevApi,'latest').mockResolvedValue(null);vi.spyOn(jevApi,'post').mockResolvedValue({benchmark_id:themeResult.id});vi.spyOn(jevApi,'read').mockResolvedValue({...themeResult,status:'running'})})
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks()})
 describe('Manual Phase 2 and typed persistence',()=>{
+  it('V7 directly offers manual Phase 2 with English title, persists its own run and does not launch on opening',async()=>{
+    const english={...source,source_analysis_version:7,source_generation_id:'b73ec894-d5fd-4b11-9fe6-cd89c117e9de'}
+    vi.mocked(jevApi.read).mockResolvedValue({...themeResult,source_generation_id:english.source_generation_id,status:'running'})
+    mount(<JevThemesPhase user="user" source={english} visible/>);const button=await screen.findByRole('button',{name:'Lancer Phase 2 V7'})
+    expect(screen.getByRole('heading',{name:'Phase 2 — Thèmes · V7 anglais'})).toBeVisible();expect(jevApi.post).not.toHaveBeenCalled()
+    fireEvent.click(button);fireEvent.click(button);await screen.findByRole('heading',{name:'Analyse des thèmes en cours…'})
+    expect(jevApi.post).toHaveBeenCalledExactlyOnceWith(english.source_generation_id,'themes_phase2')
+    expect(readJevReference('user',english.source_generation_id,'themes_phase2')?.benchmark_id).toBe(themeResult.id)
+  })
   it('opening Phase 2 performs GET only; legacy Phase 1 reference does not block a manual Phase 2 click',async()=>{
     saveJevReference('user',source.source_generation_id,{benchmark_id:'2199bd35-628f-49aa-bf7e-cd706ef1eedc',created_at:'today',pending:false})
     mount();const button=await screen.findByRole('button',{name:'Lancer Phase 2'})
