@@ -3,7 +3,7 @@ const UI_PREFIX = 'home-reviews:ui:'
 export function restorableRoute(route: string) {
   if (!route.startsWith('/') || route.startsWith('//')) return false
   const [pathname, query = ''] = route.split('?')
-  if (!/^(\/|\/etablissements(?:\/[\w-]+)?|\/avis(?:\/[\w-]+)?|\/analyses|\/notifications|\/plus)$/.test(pathname)
+  if (!/^(\/|\/etablissements(?:\/[\w-]+)?|\/avis(?:\/[\w-]+)?|\/analyses|\/notifications|\/plus(?:\/(?:jev-benchmark|gold-set))?)$/.test(pathname)
     || pathname === '/etablissements/ajouter') return false
   return !/(?:access_token|refresh_token|token|code|type)=/i.test(query)
 }

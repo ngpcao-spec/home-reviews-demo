@@ -11,6 +11,7 @@ import type { JevServiceComparison,JevServiceRun } from '../lib/jev-service-benc
 import { serviceMessages } from '../i18n/jev-service'
 import { JevServiceResults } from './JevServiceResults'
 import {JevLanguageEffectResults} from './JevLanguageEffectResults'
+import {GoldSetEntry} from './GoldSetPage'
 
 export function JevThemesPhase({user,source,visible,kind='themes_phase2'}:{user:string;source:JevSource;visible:boolean;kind?:'themes_phase2'|'themes_phase2b_service'}) {
   const {language}=useI18n(),english=source.source_analysis_version===7&&kind==='themes_phase2',base=kind==='themes_phase2b_service'?serviceMessages[language]:themeMessages[language],t=english?{...base,title:language==='fr'?'Phase 2 — Thèmes · V7 anglais':'Giai đoạn 2 — Chủ đề · V7 tiếng Anh',intro:language==='fr'?'Mesurer Jev sur les mêmes thèmes en utilisant les avis standardisés en anglais.':'Đo Jev trên cùng các chủ đề với đánh giá được chuẩn hóa bằng tiếng Anh.',start:language==='fr'?'Lancer Phase 2 V7':'Chạy Phase 2 V7'}:base,common=jevMessages[language],client=useQueryClient()
@@ -47,6 +48,7 @@ export function JevThemesPhase({user,source,visible,kind='themes_phase2'}:{user:
       {run?.status==='failed'&&<div className="card jev-card jev-error" role="alert"><h3>{common.failed}</h3><small>{run.error_code}</small></div>}
       {(!run || run.status==='failed') && !pending && <button className="primary-button full-width jev-launch" disabled={starting || query.isPending || query.isError || !visible} onClick={()=>void launch()}>{starting?common.starting:run?.status==='failed'?common.retry:t.start}</button>}
       {run?.status==='running'&&<div className="card jev-card jev-running" role="status"><LoaderCircle size={26} className="jev-spinner"/><h3>{t.running}</h3><strong>{source.name}</strong><p>{kind==='themes_phase2b_service'?`7 ${language==='fr'?'thèmes':'chủ đề'} · ${run.comparison.dataset.reviews_with_text} ${common.text}`:`${run.reviews_total} ${common.reviews}`} · {run.repeat_count} {common.repeats.toLowerCase()} · {run.requested_model}</p><small>{new Date(run.created_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</small><p>{common.continue}</p></div>}
+      {english&&run?.status==='completed'&&run.id==='4c634678-17a9-47b3-89e1-fad0641f5d86'&&<GoldSetEntry/>}
       {run?.status==='completed'&&(kind==='themes_phase2b_service'?<JevServiceResults run={run as JevServiceRun}/>:<><JevThemeResults run={run as JevThemeRun}/>{!english&&<JevThemesPhase user={user} source={source} visible={visible} kind="themes_phase2b_service"/>}</>)}
     </>}
   </section>
