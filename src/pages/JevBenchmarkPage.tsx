@@ -74,8 +74,8 @@ export function JevBenchmarkPage() {
           <button className="primary-button full-width jev-launch" disabled={starting || runQuery.isPending || runQuery.isError || sources.isError || !visible} onClick={()=>void launch()}>{starting?<><LoaderCircle size={18} className="jev-spinner"/>{t.starting}</>:run?.status==='failed'?t.retry:t.start}</button>
         </>}
         {run?.status==='running' && <section className="card jev-card jev-running" role="status"><LoaderCircle className="jev-spinner" size={26}/><h3>{t.running}</h3><strong>{source.name}</strong><p>{run.reviews_total} {t.reviews} · {run.requested_model} · {run.repeat_count} {t.repeats.toLowerCase()}</p><small>{t.started} {new Date(run.created_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</small><p>{t.continue}</p><button className="secondary-button" disabled>{t.running}</button></section>}
-        {run?.status==='completed' && <JevBenchmarkResults run={run} name={source.name}/>} 
-        {run?.status==='failed' && <JevTechnicalDetails run={run}/>} 
+        {run?.status==='completed' && <JevBenchmarkResults run={run} name={source.name}/>}
+        {run?.status==='failed' && <JevTechnicalDetails run={run}/>}
       </>}
     </>}
     <p className="jev-footnote">{t.production}</p>
