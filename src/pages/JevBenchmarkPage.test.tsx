@@ -15,6 +15,15 @@ function mount(language:'fr'|'vi'='fr'){return render(<QueryClientProvider clien
 beforeEach(()=>{access.data=true;Object.defineProperty(document,'hidden',{configurable:true,value:false});vi.spyOn(jevApi,'sources').mockResolvedValue([jevSource]);vi.spyOn(jevApi,'latest').mockResolvedValue(null);vi.spyOn(jevApi,'read').mockResolvedValue({...jevResult,status:'running'});vi.spyOn(jevApi,'post').mockResolvedValue({benchmark_id:jevResult.id})})
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.useRealTimers()})
 describe('Jev mobile page',()=>{
+  it('a persisted V6 selection offers a visible V7 shortcut; selection never posts and preparation is collapsed below launch',async()=>{
+    const old='382c46aa-2505-44de-8693-71ab1fa92d11',english={source_generation_id:'b73ec894-d5fd-4b11-9fe6-cd89c117e9de',source_analysis_version:7,reviews_total:101,completed_at:'2026-10-06T09:00:00Z'}
+    localStorage.setItem('jev-benchmark-selection:user',old)
+    vi.mocked(jevApi.sources).mockResolvedValue([{...jevSource,...english,snapshots:[english,{source_generation_id:old,source_analysis_version:6,reviews_total:101,completed_at:'2026-10-05T09:00:00Z'}]}])
+    mount();fireEvent.click(await screen.findByRole('button',{name:'Sélectionner V7 · Analyse EN'}))
+    expect(await screen.findByRole('button',{name:'Lancer Phase 2 V7'})).toBeEnabled();expect(jevApi.post).not.toHaveBeenCalled()
+    expect(screen.getByText('Préparation anglaise et rapport V7').closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByLabelText('Dataset · V6 / V7')).toHaveValue(english.source_generation_id)
+  })
   it('V7 selection is labelled English and directly offers Phase 2 without a Phase 1 launch',async()=>{
     const english={source_generation_id:'b73ec894-d5fd-4b11-9fe6-cd89c117e9de',source_analysis_version:7,reviews_total:101,completed_at:'2026-10-06T09:00:00Z'}
     vi.mocked(jevApi.sources).mockResolvedValue([{...jevSource,...english,snapshots:[english,{source_generation_id:'382c46aa-2505-44de-8693-71ab1fa92d11',source_analysis_version:6,reviews_total:101,completed_at:'2026-10-05T09:00:00Z'}]}])
