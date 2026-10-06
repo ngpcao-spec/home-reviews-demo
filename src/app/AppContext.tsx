@@ -8,7 +8,7 @@ import { cacheGeneration, purgeAppCache, readAppCache, writeAppCache } from '../
 import { clearNavigationState } from '../lib/navigation-state'
 import { RefreshGate } from '../lib/refresh-gate'
 import { nextSyncAtFromLastSync } from '../lib/monitoring-schedule'
-import { localizedReviewText } from '../lib/review-translation'
+import { localizedReviewText,type ReviewTranslationLanguage } from '../lib/review-translation'
 import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
 import type { AppNotification, Establishment, PreferredLanguage, Review, ReviewAction, ReviewStatus } from '../types/domain'
 
@@ -140,7 +140,7 @@ interface ReviewRow {
   review_detailed_rating: Record<string, unknown> | null
   review_context: Record<string, unknown> | null
   original_language: string | null
-  review_translations: Array<{ language: PreferredLanguage; translated_text: string }> | null
+  review_translations: Array<{ language: ReviewTranslationLanguage; translated_text: string }> | null
   language: string | null
   published_at: string | null
   created_at: string

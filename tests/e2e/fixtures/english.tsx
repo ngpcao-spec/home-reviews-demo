@@ -1,0 +1,11 @@
+import {createRoot} from 'react-dom/client'
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query'
+import {I18nProvider} from '../../../src/i18n'
+import {EnglishReviewPreparation} from '../../../src/pages/EnglishReviewPreparation'
+import '../../../src/styles/global.css'
+import '../../../src/styles/pages.css'
+import '../../../src/styles/reference.css'
+import '../../../src/styles/warm-theme.css'
+import '../../../src/pages/JevBenchmarkPage.css'
+const language=new URLSearchParams(location.search).get('language')==='vi'?'vi':'fr'
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><I18nProvider language={language}><main className="page-frame"><div className="jev-page"><EnglishReviewPreparation user="fixture-user" establishment="fixture-establishment" name="Shabu Ssam BBQ Restaurant" visible/></div></main></I18nProvider></QueryClientProvider>)

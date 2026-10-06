@@ -1,10 +1,11 @@
 import {fetchOutscraperGoogleReviews} from './outscraper.ts'
-import {fetchApifyReviews, type SupportedLanguage} from './apify.ts'
+import {fetchApifyReviews, type ProviderLanguage} from './apify.ts'
+import {GOOGLE_REVIEWS_IMPORT_LANGUAGE} from './review-language.ts'
 
 export interface PlaceCandidate{placeRef:string;name:string;address:string;rating:number;reviewCount:number;googleMapsUrl:string;photoUrl?:string;confidence:number}
 export interface ProviderReview{externalReviewId:string;authorName:string;authorAvatarUrl?:string;rating:number;text:string;translatedText?:string;language?:string;translatedLanguage?:string;publishedAt:string;sourceUrl:string;ownerResponse?:string}
 export interface ReviewPage{reviews:ProviderReview[];nextCursor?:string}
-export interface ReviewProvider{readonly name:'apify'|'outscraper'|'serpapi'|'mock';resolvePlace(input:string,language?:SupportedLanguage):Promise<PlaceCandidate[]>;getPlace(placeRef:string,language?:SupportedLanguage):Promise<PlaceCandidate>;fetchReviews(placeRef:string,options:{sort:'newest'|'lowest_rating';limit?:number;since?:string;cursor?:string;language?:SupportedLanguage}):Promise<ReviewPage>}
+export interface ReviewProvider{readonly name:'apify'|'outscraper'|'serpapi'|'mock';resolvePlace(input:string,language?:ProviderLanguage):Promise<PlaceCandidate[]>;getPlace(placeRef:string,language?:ProviderLanguage):Promise<PlaceCandidate>;fetchReviews(placeRef:string,options:{sort:'newest'|'lowest_rating';limit?:number;since?:string;cursor?:string;language?:ProviderLanguage}):Promise<ReviewPage>}
 
 const mockPlaces:PlaceCandidate[]=[
   {placeRef:'mock-le-petit-hanoi',name:'Le Petit Hanoi',address:'12 rue de la Paix, Paris',rating:4.2,reviewCount:318,googleMapsUrl:'https://www.google.com/maps/search/?api=1&query=Le+Petit+Hanoi',confidence:.98},
@@ -25,18 +26,18 @@ export class OutscraperReviewProvider implements ReviewProvider{
 export class ApifyReviewProvider implements ReviewProvider{
   readonly name='apify' as const
   constructor(private token:string){}
-  async resolvePlace(input:string,language:SupportedLanguage='fr'){
-    const result=await fetchApifyReviews(this.token,{placeUrl:input,language,sort:'newest',limit:1})
+  async resolvePlace(input:string,language:ProviderLanguage='en'){
+    const result=await fetchApifyReviews(this.token,{placeUrl:input,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,sort:'newest',limit:1})
     const place=result.establishment
     return[{placeRef:place.googleId,name:place.name,address:place.fullAddress,rating:place.rating,reviewCount:place.totalReviews,googleMapsUrl:place.locationLink??input,photoUrl:place.photo??undefined,confidence:.95}]
   }
-  async getPlace(placeRef:string,language:SupportedLanguage='fr'){
+  async getPlace(placeRef:string,language:ProviderLanguage='en'){
     const found=await this.resolvePlace(placeRef,language)
     if(!found[0])throw new Error('PLACE_NOT_FOUND')
     return found[0]
   }
-  async fetchReviews(placeRef:string,options:{sort:'newest'|'lowest_rating';limit?:number;since?:string;language?:SupportedLanguage}){
-    const result=await fetchApifyReviews(this.token,{placeUrl:placeRef,language:options.language??'fr',sort:options.sort,limit:options.limit,since:options.since})
+  async fetchReviews(placeRef:string,options:{sort:'newest'|'lowest_rating';limit?:number;since?:string;language?:ProviderLanguage}){
+    const result=await fetchApifyReviews(this.token,{placeUrl:placeRef,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,sort:options.sort,limit:options.limit,since:options.since})
     return{reviews:result.reviews.map(review=>({externalReviewId:review.externalReviewId,authorName:review.authorName,authorAvatarUrl:review.authorImage??undefined,rating:review.rating,text:review.text,translatedText:review.translatedText??undefined,language:review.language??undefined,translatedLanguage:review.translatedLanguage??undefined,publishedAt:review.publishedAt??new Date(0).toISOString(),sourceUrl:review.reviewUrl??result.establishment.locationLink??'https://maps.google.com',ownerResponse:review.ownerResponse??undefined}))}
   }
 }

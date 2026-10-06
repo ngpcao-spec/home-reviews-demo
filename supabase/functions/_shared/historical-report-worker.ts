@@ -4,14 +4,15 @@ import { AXES } from './consultant-contract.ts'
 import { structuredContextStats } from './structured-review-context.ts'
 import { assembleConsultantReport, consultantBatches, consultantMetrics, consultantNarrative, extractConsultantBatch, insufficient, ratingClassification, type Classification, type ConsultantFinding } from './consultant-report.ts'
 import { historicalRetry, HISTORICAL_REPORT_LEASE_SECONDS } from './historical-report-policy.ts'
+import { analysisTextForReview,analysisInputStats,groundingText } from './analysis-text.ts'
 
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
-type InputReview = ReputationReview & { review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
+type InputReview = ReputationReview & { review_translations?:{language:string;translated_text:string}[];review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
 export interface HistoricalJob {
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
-  snapshot:{analysis_version?:3|4|5|6;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
+  snapshot:{analysis_version?:3|4|5|6|7;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
   token_usage_complete:boolean; created_at:string; last_error:string|null; error_code?:string|null;
 }
 const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
@@ -20,9 +21,9 @@ async function fingerprint(value: unknown) {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value)))
   return Array.from(new Uint8Array(bytes), n => n.toString(16).padStart(2,'0')).join('')
 }
-export function historicalNarrativeVersion(run:HistoricalJob):3|4|5|6 {
+export function historicalNarrativeVersion(run:HistoricalJob):3|4|5|6|7 {
   const version=run.snapshot.analysis_version ?? run.snapshot.base?.analysis_version ?? 3
-  if(version!==3 && version!==4 && version!==5 && version!==6) throw new Error('REPORT_VERSION_CHANGED')
+  if(version!==3 && version!==4 && version!==5 && version!==6 && version!==7) throw new Error('REPORT_VERSION_CHANGED')
   if(run.snapshot.base && run.snapshot.base.analysis_version!==version) throw new Error('REPORT_VERSION_CHANGED')
   return version
 }
@@ -31,9 +32,10 @@ async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
   const id=run.establishment_id, language=run.language, end=run.created_at
   const {data:e,error} = await admin.from('establishments').select('id,organization_id,name,rating,total_reviews,created_at').eq('id',id).eq('organization_id',run.organization_id).single()
   check(error,'REPORT_ESTABLISHMENT_READ_FAILED')
+  if(!e)throw new Error('REPORT_ESTABLISHMENT_READ_FAILED')
       const reviews: ReputationReview[] = []
       for (let offset=0;;offset+=500) {
-        const {data,error} = await admin.from('reviews').select('id,rating,original_text,text,published_at,historical_import,has_negative_feedback,status,review_detailed_rating,review_context,ai_status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,review_reply_drafts(language,ai_status,draft_text,ai_suggested_reply)')
+        const {data,error} = await admin.from('reviews').select('id,rating,original_text,original_language,review_translations(language,translated_text),text,published_at,historical_import,has_negative_feedback,status,review_detailed_rating,review_context,ai_status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,review_reply_drafts(language,ai_status,draft_text,ai_suggested_reply)')
           .eq('organization_id',e.organization_id).eq('establishment_id',id).lte('created_at',end).gte('rating',1).lte('rating',5).order('id').range(offset,offset+499)
         check(error,'REPORT_REVIEWS_READ_FAILED')
         for (const r of (data ?? []) as InputReview[]) {
@@ -41,7 +43,7 @@ async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
           const hasDraft = r.reply_draft_text !== null && r.reply_draft_text !== undefined
           const ready = localized ? localized.ai_status === 'completed' && Boolean((localized.draft_text ?? localized.ai_suggested_reply)?.trim())
             : r.ai_status === 'completed' && languageOf(hasDraft ? r.reply_draft_language : r.ai_suggested_reply_language) === language && Boolean((hasDraft ? r.reply_draft_text : r.ai_suggested_reply)?.trim())
-          reviews.push({id:r.id,rating:r.rating,original_text:r.original_text,text:r.text,published_at:r.published_at,historical_import:r.historical_import,has_negative_feedback:r.has_negative_feedback,status:r.status,review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,ready})
+          reviews.push({id:r.id,rating:r.rating,original_text:r.original_text,text:r.text,published_at:r.published_at,historical_import:r.historical_import,has_negative_feedback:r.has_negative_feedback,status:r.status,review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,ready,...(ANALYSIS_VERSION>=7?{original_language:r.original_language,...analysisTextForReview(r)}:{})})
         }
         if ((data?.length ?? 0)<500) break
       }
@@ -51,8 +53,8 @@ async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
       const snapshot = {analysis_version:ANALYSIS_VERSION,reviews, base:{ organization_id:e.organization_id,establishment_id:id,preferred_language:language,
         period_start:dated[0] ?? e.created_at,period_end:end,google_rating:e.rating,google_total_reviews:e.total_reviews,
         source_latest_published_at:dated.at(-1) ?? null,source_undated_count:reviews.length-dated.length,
-        ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION}}
-      const classifications = reviews.filter(review=>!(review.original_text ?? review.text ?? '').trim()).map(ratingClassification)
+        ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION,...(ANALYSIS_VERSION>=7?{analysis_input_stats:analysisInputStats(reviews)}:{})}}
+      const classifications = reviews.filter(review=>!(ANALYSIS_VERSION>=7?groundingText(review,ANALYSIS_VERSION):(review.original_text ?? review.text ?? '')).trim()).map(ratingClassification)
 
   return {snapshot,classifications,total_steps:consultantBatches(reviews,ANALYSIS_VERSION).length+1}
 }
@@ -119,7 +121,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
       log('HISTORICAL_BATCH_COMPLETED',{batch,accepted:extracted.findings.length,rejected:extracted.rejectedCount,classification_fallback_count:extracted.classificationFallbackCount})
       return {generation_id:run.generation_id,status:'running',cursor:run.cursor}
     }
-    const metrics=consultantMetrics(reviews,run.classifications,run.findings)
+    const metrics=consultantMetrics(reviews,run.classifications,run.findings,version)
     await updateRun({classifications:metrics.classifications})
     const narrativeCall=metrics.themes.length>0
     if(narrativeCall){await updateRun({ai_calls:run.ai_calls+1});usageRecorded=false}
@@ -129,10 +131,12 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     }
     const {data:e,error:eError}=await admin.from('establishments').select('name').eq('id',run.establishment_id).single()
     check(eError,'REPORT_ESTABLISHMENT_READ_FAILED')
+    if(!e)throw new Error('REPORT_ESTABLISHMENT_READ_FAILED')
     if(e.name && JSON.stringify(result.report).normalize('NFC').toLowerCase().includes(e.name.normalize('NFC').toLowerCase())) throw new Error('REPORT_IDENTITY_DISCLOSURE')
     const generated=new Date().toISOString()
-    const row={...run.snapshot.base,generation_id:run.generation_id,
-      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:{...result.report,classification_fallback_count:metrics.classificationFallbackCount,...(version===6?{structured_context_stats:structuredContextStats(reviews)}:{})},
+    const {analysis_input_stats,...reportBase}=run.snapshot.base
+    const row={...reportBase,generation_id:run.generation_id,
+      analytical_positive_count:metrics.positive,analytical_negative_count:metrics.negative,consultant_report:{...result.report,classification_fallback_count:metrics.classificationFallbackCount,...(version>=6?{structured_context_stats:structuredContextStats(reviews)}:{}),...(version>=7?{analysis_input_stats}:{})},
       ai_overall_summary:result.report.conclusion,ai_historical_summary:result.report.conclusion,ai_status:'completed',ai_error:null,ai_model:run.model,
       ai_input_tokens:run.input_tokens,ai_output_tokens:run.output_tokens,ai_total_tokens:run.input_tokens+run.output_tokens,ai_call_count:run.ai_calls,ai_cost_usd:null,
       accepted_findings_count:run.findings.length,rejected_findings_count:run.rejected_findings_count,

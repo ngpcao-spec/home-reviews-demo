@@ -2,13 +2,13 @@ import { supabase } from './supabase'
 
 // Temporary experiment: remove the route/menu/page and this module to retire UI.
 export const JEV_EXPERIMENT_ENABLED = true
-export interface JevSource { establishment_id:string;organization_id:string;name:string;source_generation_id:string;reviews_total:number;completed_at:string;snapshots?:{source_generation_id:string;reviews_total:number;completed_at:string}[] }
+export interface JevSource { establishment_id:string;organization_id:string;name:string;source_generation_id:string;reviews_total:number;completed_at:string;source_analysis_version?:number;snapshots?:{source_generation_id:string;reviews_total:number;completed_at:string;source_analysis_version?:number}[] }
 export function selectedJevSource(user:string) {try{return localStorage.getItem('jev-benchmark-selection:'+user)??''}catch{return ''}}
 export function selectJevSource(user:string,source:string) {try{localStorage.setItem('jev-benchmark-selection:'+user,source)}catch{/* Latest source is the safe default on future visits. */}}
 export interface AxisScores { precision_vs_sol_reference:number|null;recall_vs_sol_reference:number|null;f1_vs_sol_reference:number|null }
 export interface JevComparison {
   metrics_complete:boolean
-  dataset:{reviews_total:number;reviews_with_text:number;textless_review:number}
+  dataset:{reviews_total:number;reviews_with_text:number;textless_review:number;source_analysis_version?:number;analysis_input_language?:string;analysis_input_stats?:{fallback_non_english_count:number;english_analysis_coverage_percent:number}}
   jev:{estimated_jev_cost_usd:number;elapsed_ms:number;served_models:string[];multiple_served_models:boolean;input_tokens:number;output_tokens:number}
   sol_v6_baseline:{estimated_sol_baseline_cost_usd:number;end_to_end_elapsed_ms:number}
   overall_sentiment:{pooled_raw_agreement_with_sol_v6:number|null}

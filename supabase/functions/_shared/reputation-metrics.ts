@@ -6,6 +6,10 @@ export interface ReputationReview {
   id: string
   rating: number
   original_text: string | null
+  original_language?:string|null
+  analysis_text?:string
+  analysis_language?:string|null
+  analysis_source?:'original_en'|'google_translation_en'|'fallback_original'|'textless'
   text: string | null
   published_at: string | null
   historical_import: boolean

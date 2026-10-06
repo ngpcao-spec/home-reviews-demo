@@ -4,6 +4,12 @@
 # working directory name when running `supabase init`.
 project_id = "home-reviews"
 
+[functions.backfill-review-english-translations]
+verify_jwt = true
+
+[functions.process-review-english-backfill-jobs]
+verify_jwt = false
+
 [functions.benchmark-jev-historical-analysis]
 verify_jwt = true
 

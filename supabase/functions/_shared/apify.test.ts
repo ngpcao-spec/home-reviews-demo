@@ -50,7 +50,7 @@ describe('ApifyReviewProvider normalization', () => {
     const result = await startApifyRun('mock-token',{placeUrl:shortUrl,language:'vi',sort:'newest',limit:100})
     const body = JSON.parse(fetchMock.mock.calls[1][1].body)
     expect(body.startUrls).toEqual([{url:`https://www.google.com/maps?cid=${BigInt('0x49158083af30d8d5')}`}])
-    expect(body).toMatchObject({maxReviews:100,reviewsSort:'newest',language:'vi',personalData:true,reviewsOrigin:'google'})
+    expect(body).toMatchObject({maxReviews:100,reviewsSort:'newest',language:'en',personalData:true,reviewsOrigin:'google'})
     expect(result.resolvedPlaceUrl).toBe(resolved)
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
@@ -64,7 +64,7 @@ describe('ApifyReviewProvider normalization', () => {
       startUrls: [{ url: item.url }],
       reviewsOrigin: 'google',
       reviewsSort: 'newest',
-      language: 'fr',
+      language: 'en',
       personalData: true,
       maxReviews: 100,
     })

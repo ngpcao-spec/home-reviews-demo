@@ -1,9 +1,9 @@
-export interface EligibleJevSource { establishment_id:string;organization_id:string;name:string;source_generation_id:string;reviews_total:number;completed_at:string;snapshots?:{source_generation_id:string;reviews_total:number;completed_at:string}[] }
+export interface EligibleJevSource { establishment_id:string;organization_id:string;name:string;source_generation_id:string;reviews_total:number;completed_at:string;source_analysis_version?:number;snapshots?:{source_generation_id:string;reviews_total:number;completed_at:string;source_analysis_version?:number}[] }
 export function eligibleJevSources(rows:{generation_id:string;organization_id:string;establishment_id:string;completed_at:string;snapshot:{analysis_version?:number;reviews?:unknown[]};establishments:{name:string}|null}[]):EligibleJevSource[] {
   const latest=new Map<string,EligibleJevSource>()
   for(const r of [...rows].sort((a,b)=>b.completed_at.localeCompare(a.completed_at)||b.generation_id.localeCompare(a.generation_id))) {
-    if(r.snapshot?.analysis_version!==6 || !Array.isArray(r.snapshot.reviews) || !r.establishments?.name)continue
-    const snapshot={source_generation_id:r.generation_id,reviews_total:r.snapshot.reviews.length,completed_at:r.completed_at}
+    if(![6,7].includes(r.snapshot?.analysis_version??0) || !Array.isArray(r.snapshot.reviews) || !r.establishments?.name)continue
+    const snapshot={source_generation_id:r.generation_id,reviews_total:r.snapshot.reviews.length,completed_at:r.completed_at,source_analysis_version:r.snapshot.analysis_version}
     const previous=latest.get(r.establishment_id)
     if(previous){previous.snapshots!.push(snapshot);continue}
     latest.set(r.establishment_id,{establishment_id:r.establishment_id,organization_id:r.organization_id,name:r.establishments.name,...snapshot,snapshots:[snapshot]})

@@ -1,6 +1,7 @@
+import {benchmarkText} from './analysis-text.ts'
 import type { SystemOnePayload } from './jev.ts'
 import { compareThemes,parseThemes,themePresence,type ThemeKey,type ThemeDecision } from './jev-themes.ts'
-import type { BenchmarkSource,BenchmarkState,BenchmarkOptions,CostRates } from './jev-benchmark.ts'
+import { benchmarkVersion,type BenchmarkSource,type BenchmarkState,type BenchmarkOptions,type CostRates } from './jev-benchmark.ts'
 
 export const SERVICE_QUESTION_SET_VERSION='service-disambiguation-v1'
 export const SERVICE_KEYS=['friendly_staff','attentiveness','wait_time','coordination','communication','order_accuracy','professionalism'] as const satisfies readonly ThemeKey[]
@@ -45,7 +46,7 @@ export function compareService(source:BenchmarkSource,state:BenchmarkState<Theme
     const n=now[theme][sentiment],o=old?.theme_metrics?.['0.50']?.[theme]?.[sentiment],before=f1(o),after=f1(n),eligible=comparable && n.support_sol_v6>=5 && (o?.support_sol_v6??0)>=5 && before!==null && after!==null
     return [`${theme}_${sentiment}`,{assessed:eligible,phase2_f1:before,phase2b_f1:after,passed:eligible?(theme==='friendly_staff' && after!>=.90)||after!>=before!-.03:null}]
   })))
-  const completeReviews=source.snapshot.reviews.filter(r=>r.original_text?.trim()).filter(r=>state.decisions.find(d=>d.review_id===r.id)?.repetitions.filter(Boolean).length===options.repeat_count)
+  const completeReviews=source.snapshot.reviews.filter(r=>benchmarkText(r,benchmarkVersion(source)).trim()).filter(r=>state.decisions.find(d=>d.review_id===r.id)?.repetitions.filter(Boolean).length===options.repeat_count)
   const by_theme=Object.fromEntries(SERVICE_KEYS.map(theme=>{
     let stable=0;const gaps:number[]=[]
     for(const r of completeReviews) {

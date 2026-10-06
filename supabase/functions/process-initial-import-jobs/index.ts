@@ -8,7 +8,7 @@ import {
   getApifyRun,
   normalizeApifyDataset,
   startApifyRun,
-  type SupportedLanguage,
+  type PreferredLanguage,
 } from '../_shared/apify.ts'
 import { canonicalEstablishmentName, initialHistoryComplete, prepareInitialReviews } from '../_shared/initial-import.ts'
 import {
@@ -22,6 +22,7 @@ import {
 import { configuredInteger, mapWithConcurrency, retryPolicy } from '../_shared/sync-queue.ts'
 import { sendPushToUser } from '../_shared/push.ts'
 import { dispatchImportCompletionNotifications } from '../_shared/import-completion-notifications.ts'
+import {GOOGLE_REVIEWS_IMPORT_LANGUAGE} from '../_shared/review-language.ts'
 
 interface InitialImportJob {
   id: string
@@ -30,7 +31,7 @@ interface InitialImportJob {
   query: string
   expected_google_id: string
   establishment_id: string | null
-  preferred_language: SupportedLanguage
+  preferred_language: PreferredLanguage
   status: string
   reviews_target: number
   attempts: number
@@ -43,11 +44,11 @@ const workerId = () => `initial-import:${crypto.randomUUID()}`
 const wait = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 
 async function requireSuccess<T>(
-  promise: PromiseLike<{ data: T; error: { message: string } | null }>,
+  promise: PromiseLike<{ data: T | null; error: { message: string } | null }>,
 ): Promise<T> {
   const { data, error } = await promise
   if (error) throw new Error(error.message)
-  return data
+  return data as T
 }
 
 async function continueJob(admin: SupabaseClient, jobId: string, worker: string, delaySeconds = 5) {
@@ -267,7 +268,7 @@ async function processApify(
     try {
       const run = await startApifyRun(token, {
         placeUrl: job.query,
-        language: job.preferred_language,
+        language: GOOGLE_REVIEWS_IMPORT_LANGUAGE,
         sort: 'newest',
         limit: job.reviews_target,
       })

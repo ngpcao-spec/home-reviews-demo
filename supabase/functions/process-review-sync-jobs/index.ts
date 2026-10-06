@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
+import {GOOGLE_REVIEWS_IMPORT_LANGUAGE,type ProviderLanguage} from '../_shared/review-language.ts'
 import {
   apifyToken,
   insertReviews,
@@ -43,18 +44,18 @@ const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
 
 async function requireSuccess<T>(
-  promise: PromiseLike<{ data: T; error: { message: string } | null }>,
+  promise: PromiseLike<{ data: T | null; error: { message: string } | null }>,
 ): Promise<T> {
   const { data, error } = await promise
   if (error) throw new Error(error.message)
-  return data
+  return data as T
 }
 
 interface ApifyCursor {
   provider: 'apify'
   runId: string
   datasetId: string
-  language: 'fr' | 'vi'
+  language: ProviderLanguage
 }
 
 function parseApifyCursor(value: string | null): ApifyCursor | null {
@@ -66,7 +67,7 @@ function parseApifyCursor(value: string | null): ApifyCursor | null {
       provider: 'apify',
       runId: parsed.runId,
       datasetId: parsed.datasetId,
-      language: parsed.language === 'vi' ? 'vi' : 'fr',
+      language: parsed.language === 'en'?'en':parsed.language === 'vi' ? 'vi' : 'fr',
     }
   } catch {
     return null
@@ -112,7 +113,7 @@ async function processApifyJob(
     }
 
     try {
-      const language = await preferredLanguageForOrganization(admin, job.organization_id)
+      const language = GOOGLE_REVIEWS_IMPORT_LANGUAGE
       const since = job.checkpoint_review_at
         ? new Date(Date.parse(job.checkpoint_review_at) - 5_000).toISOString()
         : new Date(Date.now() - 30 * 86_400_000).toISOString()

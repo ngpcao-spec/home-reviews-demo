@@ -1,5 +1,6 @@
+import {benchmarkText} from './analysis-text.ts'
 import { UNTRUSTED,parseUsage,type SystemOnePayload } from './jev.ts'
-import { V6_THEME_AXES,type BenchmarkSource,type BenchmarkState,type BenchmarkOptions,type CostRates } from './jev-benchmark.ts'
+import { V6_THEME_AXES,benchmarkVersion,benchmarkMetadata,type BenchmarkSource,type BenchmarkState,type BenchmarkOptions,type CostRates } from './jev-benchmark.ts'
 
 // Exact V6 vocabulary. Tests compare keys/axes to the production CATALOG.
 export const THEME_DEFINITIONS={
@@ -65,7 +66,7 @@ export function themesVerdict(micro:number|null,macro:number|null,stability:numb
   return 'insuffisant'
 }
 export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeDecision>,options:BenchmarkOptions,rates:CostRates,selectedKeys:readonly ThemeKey[]=THEME_KEYS) {
-  const textual=source.snapshot.reviews.filter(r=>r.original_text?.trim()),decisions=new Map(state.decisions.map(r=>[r.review_id,r.repetitions]))
+  const textual=source.snapshot.reviews.filter(r=>benchmarkText(r,benchmarkVersion(source)).trim()),decisions=new Map(state.decisions.map(r=>[r.review_id,r.repetitions]))
   const reference=new Set(source.findings.map(f=>`${f.review_id}:${f.theme_key}:${f.sentiment}`))
   const supports=Object.fromEntries(selectedKeys.map(theme=>[theme,Object.fromEntries(['positive','negative'].map(sentiment=>[sentiment,textual.filter(r=>reference.has(`${r.id}:${theme}:${sentiment}`)).length]))])) as Record<ThemeKey,Record<'positive'|'negative',number>>
   function labelCounts(theme:ThemeKey,sentiment:'positive'|'negative',repeat:number,threshold:number|'choice') {
@@ -116,8 +117,8 @@ export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeD
   const metrics_complete=state.errors.length===0 && completeReviews.length===textual.length
   const principal=threshold_comparison['0.50']
   const choice_presence_metrics=Object.fromEntries(selectedKeys.map(theme=>[theme,Object.fromEntries((['positive','negative'] as const).map(sentiment=>[sentiment,{support_sol_v6:supports[theme][sentiment],...pooled(Array.from({length:options.repeat_count},(_,repeat)=>labelCounts(theme,sentiment,repeat,'choice')))}]))]))
-  return {benchmark_type:'themes_phase2' as const,scope:'theme-detection benchmark',reference:'Sol V6 findings are a reference, not ground truth.',catalog:[...selectedKeys],theme_axes:V6_THEME_AXES,
-    dataset:{source_generation_id:source.generation_id,source_analysis_version:6,reviews_total:source.snapshot.reviews.length,reviews_with_text:textual.length,textless_review:source.snapshot.reviews.length-textual.length},
+  return {benchmark_type:'themes_phase2' as const,scope:'theme-detection benchmark',...benchmarkMetadata(source),reference:'Sol V6 findings are a reference, not ground truth.',catalog:[...selectedKeys],theme_axes:V6_THEME_AXES,
+    dataset:{source_generation_id:source.generation_id,...benchmarkMetadata(source),reviews_total:source.snapshot.reviews.length,reviews_with_text:textual.length,textless_review:source.snapshot.reviews.length-textual.length},
     jev:{requested_model:options.model,served_models:state.served_models,multiple_served_models:state.served_models.length>1,repeat_count:options.repeat_count,concurrency:options.concurrency,request_count:state.request_count,retry_count:state.retry_count,input_tokens:state.jev_input_tokens,output_tokens:state.jev_output_tokens,estimated_jev_cost_usd:state.jev_input_tokens/1_000_000*rates.jev_input,rate_used:rates.jev_input,cost_label:'ESTIMATION AU TARIF CONFIGURÉ',elapsed_ms:state.jev_elapsed_ms,individual_http_requests:duration(state.request_durations_ms),individual_evaluations_including_retries:duration(state.evaluation_durations_ms),usage_note:'API-returned tokens only; failed attempts without usage cannot be metered.'},
     sol_v6_baseline:{model:source.model,input_tokens:source.input_tokens,output_tokens:source.output_tokens,estimated_sol_baseline_cost_usd:(source.input_tokens*rates.sol_input+source.output_tokens*rates.sol_output)/1_000_000,end_to_end_elapsed_ms:Date.parse(source.completed_at)-Date.parse(source.started_at),rate_used:{input:rates.sol_input,output:rates.sol_output},scope:'Full Sol V6 extraction + narrative, including worker/cron orchestration.'},
     theme_metrics,choice_presence_metrics,threshold_comparison,best_benchmark_threshold,principal_threshold:.5,...principal,axis_metrics:principal.axes,stability,metrics_complete,errors:state.errors,

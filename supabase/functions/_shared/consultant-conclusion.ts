@@ -38,6 +38,6 @@ export function managerConclusion(decision:DecisionSummary,positive:number,negat
 
 /** Apply after assembly, without modifying any decision or any older version. */
 export function withManagerConclusion(report:ConsultantReportData):ConsultantReportData {
-  if(report.version!==6 || !report.decision_summary) return report
+  if((report.version!==6 && report.version!==7) || !report.decision_summary) return report
   return {...report,conclusion:managerConclusion(report.decision_summary,report.positive,report.negative,report.language)}
 }

@@ -1,4 +1,5 @@
-import { createJevClient, SIGNALS, type JevClientOptions, type JevDecision, type Choice } from './jev.ts'
+import { createJevClient, SIGNALS,benchmarkPayload,jevPayload,parseJev, type JevClientOptions, type JevDecision, type Choice } from './jev.ts'
+import {benchmarkText,analysisInputStats,type AnalysisReview} from './analysis-text.ts'
 
 export const JEV_BENCHMARK_CONCURRENCY = 8
 export const JEV_INPUT_USD_PER_MILLION = 0.042
@@ -11,7 +12,9 @@ export const V6_THEME_AXES: Record<string,string> = {
   atmosphere:'atmosphere',decor:'atmosphere',noise:'atmosphere',comfort:'atmosphere',cleanliness:'atmosphere',location:'atmosphere',
   value:'price',billing:'price',price_level:'price',
 }
-export interface BenchmarkReview { id:string; original_text:string|null; rating:number }
+export interface BenchmarkReview extends AnalysisReview { id:string; rating:number }
+export const benchmarkVersion=(source:BenchmarkSource)=>source.snapshot.analysis_version??source.snapshot.base?.analysis_version??6
+export const benchmarkMetadata=(source:BenchmarkSource)=>benchmarkVersion(source)>=7?{source_analysis_version:7,analysis_input_language:'en',analysis_input_stats:analysisInputStats(source.snapshot.reviews)}:{source_analysis_version:6,analysis_input_language:'original-language'}
 export interface BenchmarkSource {
   generation_id:string; organization_id:string; establishment_id:string; status:string; model:string
   snapshot:{analysis_version?:number;reviews:BenchmarkReview[];base?:{analysis_version?:number;source_fingerprint?:string}}
@@ -37,10 +40,11 @@ export function validateOptions(body:Record<string,unknown>, defaultModel='jev-l
 }
 export function validateSource(source:BenchmarkSource) {
   const version=source.snapshot?.analysis_version ?? source.snapshot?.base?.analysis_version
-  if (source.status!=='completed' || version!==6 || (source.snapshot.base?.analysis_version!==undefined && source.snapshot.base.analysis_version!==6)) throw new Error('SOURCE_NOT_COMPLETED_V6')
+  if (source.status!=='completed' || (version!==6 && version!==7) || (source.snapshot.base?.analysis_version!==undefined && source.snapshot.base.analysis_version!==version)) throw new Error('SOURCE_NOT_COMPLETED_V6')
   const reviews=source.snapshot.reviews
   if (!Array.isArray(reviews) || !reviews.length || reviews.length>500 || new Set(reviews.map(r=>r.id)).size!==reviews.length) throw new Error('SOURCE_INVALID_REVIEWS')
   if (reviews.some(r=>typeof r.id!=='string' || !(r.original_text===null || typeof r.original_text==='string') || !Number.isInteger(r.rating) || r.rating<1 || r.rating>5)) throw new Error('SOURCE_INVALID_REVIEWS')
+  if(version===7 && reviews.some(r=>typeof r.analysis_text!=='string' || !r.analysis_source))throw new Error('SOURCE_INVALID_ANALYSIS_TEXT')
   if (!Array.isArray(source.classifications) || !Array.isArray(source.findings)) throw new Error('SOURCE_INVALID_BASELINE')
   for (const review of reviews) {
     const labels=source.classifications.filter(c=>c.review_id===review.id)
@@ -59,7 +63,7 @@ export function axisBaseline(source:BenchmarkSource) {
   for (const f of source.findings) result.add(`${f.review_id}:${f.axis ?? V6_THEME_AXES[f.theme_key ?? '']}_${f.sentiment}`)
   return result
 }
-const hasText=(r:BenchmarkReview)=>Boolean(r.original_text?.trim())
+const hasText=(r:BenchmarkReview,version=6)=>Boolean(benchmarkText(r,version).trim())
 const fallback=(r:BenchmarkReview)=>r.rating>=4?'positive':'negative'
 const rate=(n:number,d:number)=>d?n/d:null
 const mean=(values:number[])=>values.length?values.reduce((a,b)=>a+b,0)/values.length:null
@@ -69,7 +73,7 @@ function distribution(values:number[]) {
   return {count:values.length,mean_ms:mean(values),p50_ms:quantile(.5),p95_ms:quantile(.95),max_ms:sorted.at(-1)??null}
 }
 export function compareBenchmark(source:BenchmarkSource, state:BenchmarkState, options:BenchmarkOptions, rates:CostRates) {
-  const reviews=source.snapshot.reviews, textual=reviews.filter(hasText), baseline=new Map(source.classifications.map(c=>[c.review_id,c.sentiment])), axes=axisBaseline(source)
+  const reviews=source.snapshot.reviews, textual=reviews.filter(r=>hasText(r,benchmarkVersion(source))), baseline=new Map(source.classifications.map(c=>[c.review_id,c.sentiment])), axes=axisBaseline(source)
   const decisionMap=new Map(state.decisions.map(d=>[d.review_id,d.repetitions]))
   function overall(repeat:number, withFallback:boolean, allReviews:boolean) {
     let agreed=0,total=0
@@ -77,8 +81,8 @@ export function compareBenchmark(source:BenchmarkSource, state:BenchmarkState, o
     const disagreements:{review_id:string;jev:Choice;sol:string}[]=[]
     for (const r of allReviews?reviews:textual) {
       const raw=decisionMap.get(r.id)?.[repeat]?.overall_choice
-      if (hasText(r) && !raw) continue
-      const choice=withFallback && (!hasText(r) || raw==='insufficient')?fallback(r):raw
+      if (hasText(r,benchmarkVersion(source)) && !raw) continue
+      const choice=withFallback && (!hasText(r,benchmarkVersion(source)) || raw==='insufficient')?fallback(r):raw
       if (!choice) continue
       const sol=baseline.get(r.id)!
       total++; confusion[sol][choice]++
@@ -116,8 +120,8 @@ export function compareBenchmark(source:BenchmarkSource, state:BenchmarkState, o
   const agreement=rate(pooledRaw.agreements,pooledRaw.total)
   const gaps=Object.values(probability_variation).flatMap(v=>v.per_review.map(r=>r.max_gap))
   return {
-    scope:'decision-layer benchmark',reference:'Persisted Sol V6 results are a reference, not ground truth.',
-    dataset:{source_generation_id:source.generation_id,source_analysis_version:6,reviews_total:reviews.length,reviews_with_text:textual.length,textless_review:reviews.length-textual.length,original_snapshot_order:true,source_snapshot_fingerprint:source.snapshot.base?.source_fingerprint??null},
+    scope:'decision-layer benchmark',reference:'Persisted Sol results are a reference, not ground truth.',...benchmarkMetadata(source),
+    dataset:{source_generation_id:source.generation_id,...benchmarkMetadata(source),reviews_total:reviews.length,reviews_with_text:textual.length,textless_review:reviews.length-textual.length,original_snapshot_order:true,source_snapshot_fingerprint:source.snapshot.base?.source_fingerprint??null},
     jev:{requested_model:options.model,served_models:state.served_models,multiple_served_models:state.served_models.length>1,repeat_count:options.repeat_count,concurrency:options.concurrency,request_count:state.request_count,retry_count:state.retry_count,input_tokens:state.jev_input_tokens,output_tokens:state.jev_output_tokens,estimated_jev_cost_usd:state.jev_input_tokens/1_000_000*rates.jev_input,rate_used:rates.jev_input,cost_label:'ESTIMATION AU TARIF CONFIGURÉ',elapsed_ms:state.jev_elapsed_ms,individual_http_requests:distribution(state.request_durations_ms),individual_evaluations_including_retries:distribution(state.evaluation_durations_ms),usage_note:'API-returned usage only; unsuccessful requests without usage cannot be metered here.'},
     sol_v6_baseline:{model:source.model,input_tokens:source.input_tokens,output_tokens:source.output_tokens,estimated_sol_baseline_cost_usd:(source.input_tokens*rates.sol_input+source.output_tokens*rates.sol_output)/1_000_000,rate_used:{input:rates.sol_input,output:rates.sol_output},cost_label:'ESTIMATION AU TARIF CONFIGURÉ',end_to_end_elapsed_ms:Date.parse(source.completed_at)-Date.parse(source.started_at),scope:'Full Sol run: extraction + narrative; elapsed includes worker/cron orchestration.'},
     overall_sentiment:{pooled_raw_agreement_with_sol_v6:agreement,by_repeat:overallByRepeat},axes_at_threshold:axisByThreshold,
@@ -134,7 +138,7 @@ export async function runJevBenchmark<D=JevDecision>(source:BenchmarkSource, opt
   // Validate secret before touching source or state.
   createJevClient(apiKey,clientOptions)
   validateSource(source); validateOptions({...options})
-  const start=Date.now(), indices=source.snapshot.reviews.map((r,i)=>hasText(r)?i:-1).filter(i=>i>=0)
+  const start=Date.now(), indices=source.snapshot.reviews.map((r,i)=>hasText(r,benchmarkVersion(source))?i:-1).filter(i=>i>=0)
   const log=hooks.log??(()=>{})
   const discovery=createJevClient(apiKey,clientOptions)
   await discovery.checkModel(options.model)
@@ -144,13 +148,18 @@ export async function runJevBenchmark<D=JevDecision>(source:BenchmarkSource, opt
       await Promise.all(indices.slice(offset,offset+options.concurrency).map(async index=>{
         const r=source.snapshot.reviews[index], alias='r'+String(index+1).padStart(2,'0'), requestStart=Date.now()
         const fields={review_alias:alias,repeat:repeat+1}
-        const client=createJevClient(apiKey,{...clientOptions,
+        const rawClient=createJevClient(apiKey,{...clientOptions,
           onAttempt:event=>{state.request_count++;state.request_durations_ms.push(event.duration_ms);log('JEV_REQUEST_COMPLETED',{...fields,...event})},
           onRetry:event=>{state.retry_count++;log('JEV_REQUEST_RETRY',{...fields,...event,model:options.model})},
           onUsage:(usage,model)=>{state.jev_input_tokens+=usage.input_tokens;state.jev_output_tokens+=usage.output_tokens;if(!state.served_models.includes(model))state.served_models.push(model)},
         })
+        const client:ReturnType<typeof createJevClient>={...rawClient,
+          evaluatePayload:(payload,parse)=>rawClient.evaluatePayload(benchmarkPayload(payload,benchmarkVersion(source)),parse),
+          evaluate:(model,alias,text)=>rawClient.evaluatePayload(benchmarkPayload(jevPayload(model,alias,text),benchmarkVersion(source)),parseJev),
+        }
         try {
-          const result=hooks.evaluate?await hooks.evaluate(client,options.model,alias,r.original_text!):await client.evaluate(options.model,alias,r.original_text!)
+          const text=benchmarkText(r,benchmarkVersion(source))
+          const result=hooks.evaluate?await hooks.evaluate(client,options.model,alias,text):await client.evaluate(options.model,alias,text)
           state.decisions[index].repetitions[repeat]=result.decision as D
         } catch(error) {
           const error_code=error instanceof Error && /^JEV_[A-Z0-9_]+$/.test(error.message)?error.message:'JEV_REQUEST_FAILED'

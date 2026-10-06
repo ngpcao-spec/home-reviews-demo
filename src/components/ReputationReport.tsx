@@ -35,7 +35,7 @@ export function ReputationReport({ report }: {report: HistoricalReport}) {
     {examplesLoading && !examples.length ? <p>{messages.common.loading}</p> : examplesError && !examples.length ? <p role="alert">{m.examplesFailed}</p> : !selectedIds.some(id=>examples.some(review=>review.id===id)) ? <p>{m.noExample}</p> : selectedIds.map(id=>{
       const review=examples.find(r=>r.id===id)
       if (!review) return null
-      const translated=review.review_translations.find(t=>t.language===language)?.translated_text
+      const translated=review.review_translations.find(t=>t.language===language)?.translated_text || review.review_translations.find(t=>t.language==='en')?.translated_text
       return <Link className="card reputation-example" key={id} to={`/avis/${id}`}>
         <strong>{review.rating} ★</strong><p>{translated || review.original_text || review.text}</p>
         {!translated && <small>{m.untranslated}</small>}

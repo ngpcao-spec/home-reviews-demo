@@ -7,7 +7,7 @@ import {
 } from './outscraper.ts'
 import {
   fetchApifyReviews,
-  type SupportedLanguage,
+  type PreferredLanguage,
 } from './apify.ts'
 import { reviewClassification, reviewsForPersistence } from './review-classification.ts'
 import {
@@ -16,6 +16,7 @@ import {
   prepareInitialReviews,
 } from './initial-import.ts'
 import { reviewPersistenceBatches } from './review-persistence.ts'
+import { GOOGLE_REVIEWS_IMPORT_LANGUAGE,translationLanguage,normalizeReviewLanguage } from './review-language.ts'
 
 const INCREMENTAL_WINDOW = 20
 const MAX_INCREMENTAL_PAGES = 5
@@ -59,7 +60,7 @@ export function apifyToken(): string {
 export async function preferredLanguageForUser(
   admin: SupabaseClient,
   userId: string,
-): Promise<SupportedLanguage> {
+): Promise<PreferredLanguage> {
   const { data, error } = await admin
     .from('profiles')
     .select('preferred_language')
@@ -72,7 +73,7 @@ export async function preferredLanguageForUser(
 export async function preferredLanguageForOrganization(
   admin: SupabaseClient,
   organizationId: string,
-): Promise<SupportedLanguage> {
+): Promise<PreferredLanguage> {
   const { data: organization, error: organizationError } = await admin
     .from('organizations')
     .select('created_by')
@@ -206,9 +207,9 @@ export async function insertReviews(
     ]))
     const translations = batch.flatMap((review) => {
       const reviewId = byExternalId.get(review.externalReviewId)
-      const language = review.translatedLanguage
+      const language = translationLanguage(review.translatedLanguage)
       const translatedText = review.translatedText?.trim()
-      if (!reviewId || (language !== 'fr' && language !== 'vi') || !translatedText) return []
+      if (!reviewId || !language || !translatedText) return []
       return [{ review_id: reviewId, language, translated_text: translatedText, updated_at: new Date().toISOString() }]
     })
     if (translations.length) {
@@ -218,8 +219,11 @@ export async function insertReviews(
         console.error('TRANSLATIONS_UPSERT_FAILED', translationError.message)
         throw new Error('TRANSLATIONS_UPSERT_FAILED')
       }
+      console.info('ENGLISH_TRANSLATION_PERSISTED',{establishment_id:establishment.id,count:translations.filter(t=>t.language==='en').length})
     }
     const observedAt = new Date().toISOString()
+    const missingEnglish=batch.filter(r=>r.text.trim() && normalizeReviewLanguage(r.language)!=='en' && !(translationLanguage(r.translatedLanguage)==='en' && r.translatedText?.trim())).length
+    if(missingEnglish)console.info('ENGLISH_TRANSLATION_MISSING',{establishment_id:establishment.id,count:missingEnglish})
     const providerPayloads = batch.flatMap((review) => {
       const reviewId = byExternalId.get(review.externalReviewId)
       if (!reviewId) return []
@@ -282,7 +286,7 @@ function sortNewest(reviews: NormalizedReview[]): NormalizedReview[] {
 
 export async function fetchInitialization(
   query: string,
-  language: SupportedLanguage,
+  language: PreferredLanguage,
 ): Promise<InitializationFetchResult> {
   const provider = providerName()
   const limit = initialReviewsLimit(Deno.env.get('INITIAL_REVIEWS_LIMIT'))
@@ -303,7 +307,7 @@ export async function fetchInitialization(
   if (provider === 'apify') {
     const result = await fetchApifyReviews(apifyToken(), {
       placeUrl: query,
-      language,
+      language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,
       sort: 'newest',
       limit,
     })
@@ -341,7 +345,7 @@ export async function fetchInitialization(
 
 export async function resolveEstablishmentCandidate(
   query: string,
-  language: SupportedLanguage,
+  language: PreferredLanguage,
   observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
 ) {
   const provider = providerName()
@@ -350,7 +354,7 @@ export async function resolveEstablishmentCandidate(
     : provider === 'apify'
       ? await fetchApifyReviews(apifyToken(), {
         placeUrl: query,
-        language,
+        language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,
         sort: 'newest',
         limit: 1,
       }, observe)
@@ -370,7 +374,7 @@ export async function initializeEstablishment(
   organizationId: string,
   query: string,
   expectedGoogleId?: string,
-  language: SupportedLanguage = 'fr',
+  language: PreferredLanguage = 'fr',
 ) {
   const provider = providerName()
   const result = await fetchInitialization(query, language)
@@ -535,7 +539,7 @@ export async function initializeEstablishment(
 export async function backfillHistoricalReviews(
   admin: SupabaseClient,
   establishment: EstablishmentRow,
-  language: SupportedLanguage = 'fr',
+  language: PreferredLanguage = 'fr',
 ) {
   const result = await fetchInitialization(establishment.google_maps_url || establishment.google_id, language)
   if (result.establishment.googleId !== establishment.google_id) {
@@ -585,7 +589,7 @@ export async function backfillHistoricalReviews(
 export async function fetchIncrementalPage(
   establishment: EstablishmentRow,
   cursor?: string,
-  _language: SupportedLanguage = 'fr',
+  _language: PreferredLanguage = 'fr',
 ): Promise<GoogleReviewsResult> {
   const provider = providerName()
   if (provider === 'mock') return getMockGoogleReviews(establishment.google_id)

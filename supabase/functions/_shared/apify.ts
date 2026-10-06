@@ -1,4 +1,6 @@
 import { apifyGoogleMapsUrl } from './google-maps-link.ts'
+import { GOOGLE_REVIEWS_IMPORT_LANGUAGE,type ProviderLanguage } from './review-language.ts'
+export type {PreferredLanguage,ProviderLanguage} from './review-language.ts'
 import type {
   GoogleReviewsResult,
   NormalizedEstablishment,
@@ -9,7 +11,6 @@ const APIFY_ACTOR = 'compass~google-maps-reviews-scraper'
 const APIFY_API = 'https://api.apify.com/v2'
 
 type JsonRecord = Record<string, unknown>
-export type SupportedLanguage = 'fr' | 'vi'
 
 export class ApifyError extends Error {
   constructor(
@@ -30,7 +31,7 @@ export interface ApifyRunState {
 
 export interface ApifyReviewRequest {
   placeUrl: string
-  language: SupportedLanguage
+  language: ProviderLanguage
   sort: 'newest' | 'lowest_rating'
   limit?: number
   since?: string
@@ -120,7 +121,7 @@ export function apifyActorInput(request: ApifyReviewRequest) {
     startUrls: [{ url: apifyGoogleMapsUrl(request.placeUrl) }],
     reviewsOrigin: 'google',
     reviewsSort: request.sort === 'lowest_rating' ? 'lowestRanking' : 'newest',
-    language: request.language,
+    language: GOOGLE_REVIEWS_IMPORT_LANGUAGE,
     personalData: true,
     ...(request.limit ? { maxReviews: request.limit } : {}),
     ...(request.since ? { reviewsStartDate: request.since } : {}),
@@ -162,6 +163,7 @@ export async function startApifyRun(
     ? Math.min(10, Math.max(0.1, configuredChargeLimit))
     : 1
   observe?.('run_start')
+  console.info('GOOGLE_REVIEWS_ENGLISH_FETCH_STARTED',{language:GOOGLE_REVIEWS_IMPORT_LANGUAGE})
   const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}`, {
     method: 'POST',
     headers: apiHeaders(token, true),
@@ -183,13 +185,14 @@ export function apifyRunSucceeded(status: string): boolean {
   return status === 'SUCCEEDED'
 }
 
-export async function fetchApifyDataset(token: string, datasetId: string): Promise<JsonRecord[]> {
+export async function fetchApifyDataset(token: string, datasetId: string,observeRequest?:()=>void): Promise<JsonRecord[]> {
   const items: JsonRecord[] = []
   const pageSize = 1_000
   for (let offset = 0; ; offset += pageSize) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 30_000)
     try {
+      observeRequest?.()
       const response = await fetch(
         `${APIFY_API}/datasets/${encodeURIComponent(datasetId)}/items?clean=true&format=json&offset=${offset}&limit=${pageSize}`,
         { headers: apiHeaders(token), signal: controller.signal },
@@ -221,7 +224,7 @@ export function normalizeApifyReview(item: JsonRecord): NormalizedReview | null 
     authorName: stringValue(item.name) ?? 'Client Google',
     authorImage: stringValue(item.reviewerPhotoUrl),
     rating,
-    text: stringValue(item.text) ?? '',
+    text: typeof item.text==='string'?item.text:'',
     translatedText: stringValue(item.textTranslated),
     translatedLanguage: stringValue(item.translatedLanguage),
     publishedAt: stringValue(item.publishedAtDate),
@@ -328,6 +331,7 @@ export async function fetchApifyReviews(
   const run = await startApifyRun(token, request, observe)
   observe?.('run_wait')
   const completed = await waitForApifyRun(token, run)
+  console.info('GOOGLE_REVIEWS_ENGLISH_FETCH_COMPLETED',{run_id:completed.runId,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE})
   observe?.('dataset_fetch')
   const items = await fetchApifyDataset(token, completed.datasetId)
   observe?.('normalization')

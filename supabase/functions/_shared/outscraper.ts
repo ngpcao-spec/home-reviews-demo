@@ -199,7 +199,7 @@ export function normalizeOutscraperPayload(
   if (!place) throw new OutscraperError('ESTABLISHMENT_NOT_FOUND', 404)
 
   const googleId = asString(place.google_id) ?? asString(place.place_id)
-  if (isMissingGoogleIdentifier(googleId)) throw new OutscraperError('ESTABLISHMENT_NOT_FOUND', 404)
+  if (!googleId || isMissingGoogleIdentifier(googleId)) throw new OutscraperError('ESTABLISHMENT_NOT_FOUND', 404)
 
   const allReviews = Array.isArray(place.reviews_data)
     ? place.reviews_data.filter(isRecord)

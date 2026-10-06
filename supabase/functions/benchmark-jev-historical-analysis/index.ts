@@ -41,7 +41,7 @@ Deno.serve(benchmarkHandler({
         // Server-only read; never return the snapshot texts to the frontend.
         const rows=[]
         for(let offset=0;;offset+=100) {
-          const {data,error}=await context.admin.from('historical_report_runs').select('generation_id,organization_id,establishment_id,completed_at,snapshot,establishments(name)').in('organization_id',organizations).eq('status','completed').eq('snapshot->>analysis_version','6').order('completed_at',{ascending:false}).order('generation_id',{ascending:false}).range(offset,offset+99)
+          const {data,error}=await context.admin.from('historical_report_runs').select('generation_id,organization_id,establishment_id,completed_at,snapshot,establishments(name)').in('organization_id',organizations).eq('status','completed').in('snapshot->>analysis_version',['6','7']).order('completed_at',{ascending:false}).order('generation_id',{ascending:false}).range(offset,offset+99)
           if(error)throw new Error('SOURCE_READ_FAILED')
           rows.push(...(data??[]))
           if((data?.length??0)<100)break
