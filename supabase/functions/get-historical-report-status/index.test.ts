@@ -26,11 +26,17 @@ async function setup(mode: 'running' | 'locked' | 'expired' | 'completed' | 'fai
   mocks.requireUser.mockImplementation(async () => { if (mode === 'unauthorized') throw new Error('UNAUTHORIZED'); return { client: database, admin: database, user: {id:'user'} } })
   mocks.assertMembership.mockImplementation(async () => { if (mode === 'forbidden') throw new Error('FORBIDDEN') })
   let handler!: (request: Request) => Promise<Response>
-  vi.stubGlobal('Deno', { serve: (fn: typeof handler) => { handler = fn } })
+  vi.stubGlobal('Deno', {env:{get:()=>undefined}, serve: (fn: typeof handler) => { handler = fn } })
   vi.resetModules(); await import('./index.ts')
-  return { reads, call: (language = 'vi') => handler(new Request('https://example.test', {method:'POST',body:JSON.stringify({establishment_id:'est',preferred_language:language})})) }
+  return { reads, getV7:()=>handler(new Request('https://example.test?establishment_id=est&preferred_language=vi&analysis_version=7&generation_id=v7-id')), call: (language = 'vi') => handler(new Request('https://example.test', {method:'POST',body:JSON.stringify({establishment_id:'est',preferred_language:language})})) }
 }
 describe('read-only historical run status', () => {
+  it('V7 GET is scoped by generation/version and allows browser GET without leaking review text',async()=>{
+    const h=await setup(),response=await h.getV7(),body=await response.json()
+    expect(response.status).toBe(200);expect(response.headers.get('Access-Control-Allow-Methods')).toContain('GET')
+    expect(h.reads.at(-1)?.filters).toMatchObject({organization_id:'org',establishment_id:'est',language:'vi',generation_id:'v7-id','snapshot->>analysis_version':'7'})
+    expect(body.run.analysis_version).toBe(7);expect(body.comparison).toBeNull();expect(JSON.stringify(body)).not.toContain('Private review text')
+  })
   it('returns a bounded projection, scoped to organization and profile language, without snapshot or writes', async () => {
     const h = await setup()
     const response = await h.call()

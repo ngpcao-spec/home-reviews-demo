@@ -36,6 +36,11 @@ Deno.serve(async request => {
       return json({pending:['queued','running','retry'].includes(run.status),...historicalRunStatus(run),run:historicalRunStatus(run)})
     }
     enforceRateLimit('historical-enqueue:'+context.user.id,30,60_000)
+    if(body.first_v7===true) {
+      const {data:run,error}=await context.admin.rpc('enqueue_first_v7_report',{p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language})
+      if(error || !run){const code=['ENGLISH_COVERAGE_REQUIRED','REPORT_OTHER_VERSION_RUNNING','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}
+      return json({pending:run.status!=='completed',run:historicalRunStatus(run)},run.status==='completed'?200:202)
+    }
     const {data:run,error}=await context.admin.rpc('enqueue_historical_report',{
       p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language,p_model:newHistoricalModel(),p_analysis_version:CONSULTANT_VERSION,
     })

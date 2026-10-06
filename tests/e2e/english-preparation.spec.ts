@@ -3,6 +3,7 @@ test('English preparation FR/VI: one explicit mock POST, durable retrieval, no r
   let posts=0,job:null|{id:string;status:string}=null
   const coverage={stored_reviews:101,reviews_with_text:95,original_english:5,english_translation_found:0,english_translation_missing:90,coverage_percent:5/95*100}
   await page.route('https://english-fixture.supabase.co/**',async route=>{
+    if(route.request().url().includes('get-historical-report-status')){await route.fulfill({status:200,contentType:'application/json',body:'{"run":null}'});return}
     if(route.request().method()==='POST'){posts++;job={id:'fixture-job',status:'running'}}
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({coverage,job})})
   })

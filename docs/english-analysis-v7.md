@@ -76,3 +76,39 @@ The user checks coverage first, then deliberately regenerates a historical repor
 
 No backfill, historical report or benchmark is launched as part of deployment.
 First real preparation is Shabu, manually from the iPhone.
+
+## First manual V7 report
+
+The experimental Test Jev screen now includes **Rapport V7 — Analyse en anglais**
+below English preparation (FR/VI labels). Its button is enabled only after a
+successful coverage read at exactly 100%. Opening, resuming or completing a
+backfill never launches a report. Select Shabu and press the button explicitly.
+
+The only enqueue request is `generate-historical-report` with `first_v7: true`.
+The service-only `enqueue_first_v7_report` RPC verifies organization membership
+and English coverage, shares the historical enqueue advisory lock and pins a new
+run to version 7 / gpt-6.1-sol. Existing active V7 runs and completed first V7 runs
+are reused; an active older version is not modified. Explicit retry uses existing
+V7 checkpoints. Reasoning low, extraction, taxonomy, grounding, diagnostics,
+structured context and FR/VI narrative remain the deployed V7 worker behavior.
+
+The reference is persisted by user, establishment and report language. Page
+return/reload/foreground use authenticated GET `get-historical-report-status`
+with version 7 and generation ID; polling stops while hidden or terminal. The
+autonomous historical worker continues even when the phone is closed. An
+ambiguous enqueue remains blocked until reconciliation finds its server run.
+
+Completed status returns safe summary fields and a deterministic comparison with
+the latest completed V6 run of the same organization/establishment. Review texts,
+evidence and private snapshots are never returned by this endpoint. Comparison
+uses common review IDs, sentiment agreement and distinct finding tuples
+(review_id, theme_key, sentiment); findings without stored axes use the unchanged
+25-theme taxonomy. Dataset differences, missing classifications, per-axis counts
+and the four watched Service themes are explicit. Full-run persisted tokens and
+timestamps drive cost/latency comparisons; configurable Sol rates default to
+2 USD/M input and 10 USD/M output. Costs are estimates, differences are not a
+quality verdict. No Jev, backfill or historical generation follows automatically.
+
+Deployment creates only the RPC and updates enqueue/status/UI. It never invokes
+the new RPC. The first real Shabu V7 is reserved for the user's manual iPhone
+click; the immutable V6 run remains the baseline.

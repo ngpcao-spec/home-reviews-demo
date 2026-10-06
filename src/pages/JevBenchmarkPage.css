@@ -55,3 +55,7 @@
 .jev-theme-detail h4 {font-size:14px;line-height:1.6;margin:0;overflow-wrap:anywhere}
 .jev-theme-detail>div {margin-top:16px}
 .jev-theme-detail p {font-size:13px}
+.historical-v7-test h4 {margin:22px 0 10px;color:var(--champagne)}
+.historical-v7-test details {border-top:1px solid var(--border);padding:14px 0}
+.historical-v7-test summary {cursor:pointer;min-height:30px;color:var(--champagne)}
+.historical-v7-test .jev-id {display:block;overflow-wrap:anywhere;margin:14px 0;color:var(--muted)}

@@ -17,6 +17,11 @@ async function harness(mode='normal'){
   return {rpc,database,call:(body:object={establishment_id:'place',preferred_language:'vi'})=>handler(new Request('https://example.test',{method:'POST',body:JSON.stringify(body)}))}
 }
 describe('enqueue-only user endpoint',()=>{
+  it('explicit first V7 uses the coverage-checked idempotent RPC and never starts an AI/provider call',async()=>{
+    const h=await harness();expect((await h.call({establishment_id:'place',preferred_language:'vi',first_v7:true})).status).toBe(202)
+    expect(h.rpc).toHaveBeenCalledWith('enqueue_first_v7_report',{p_establishment_id:'place',p_organization_id:'org',p_user_id:'user',p_language:'vi'})
+    expect(h.database.from.mock.calls.map(c=>c[0])).toEqual(['establishments','profiles'])
+  })
   it('concurrent clicks use transactional enqueue and return the same run, without fetching reviews/AI',async()=>{
     const h=await harness()
     const replies=await Promise.all([h.call(),h.call()])
