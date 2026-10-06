@@ -3,7 +3,43 @@
 Ce benchmark est un **decision-layer benchmark** : sentiment textuel et huit
 signaux d'axes. La V6 reste inchangée. Sol persisté est une référence de comparaison,
 pas une vérité absolue. Aucun appel OpenAI, aucune extraction de thèmes Jev,
-aucune rédaction et aucune modification de l'interface.
+aucune rédaction et aucune modification du pipeline de production.
+
+## Interface mobile temporaire
+
+Dans **Plus → Test Jev** (FR) / **Thêm → Thử nghiệm Jev** (VI), seuls les
+owner/admin/manager disposent de l'entrée. La route est `/plus/jev-benchmark`.
+Les paramètres restent fixes : `jev-latest`, trois répétitions, concurrency huit.
+
+La page lit les sources V6 terminées via le GET authentifié `?eligible=1`,
+puis retrouve le benchmark via `?source_generation_id=...` (priorité running,
+completed, failed). Aucun snapshot texte n'est retourné à l'application.
+Le suivi utilise exclusivement GET par `benchmark_id` toutes les 2,5 secondes
+pendant running et uniquement lorsque la page est visible. Le retour au premier
+plan relit l'état ; aucun événement de cycle de vie ne lance un POST.
+
+Le clic est protégé immédiatement, sérialisé entre onglets lorsque Web Locks
+est disponible, et précédé d'une nouvelle lecture de l'état serveur. Une petite
+référence est conservée dans localStorage par utilisateur + source. En cas
+d'issue réseau incertaine, un marqueur pending interdit de relancer automatiquement.
+Un échec confirmé peut être réessayé uniquement avec un nouveau clic explicite.
+
+Le dernier V6 terminé est proposé par défaut pour chaque établissement. Lorsqu'il
+existe plusieurs snapshots V6, un choix de dataset permet de sélectionner aussi
+la référence antérieure. Ce choix est mémorisé par utilisateur. Au 6 octobre,
+Shabu possède deux snapshots : 101 avis (le plus récent) et 100 avis (la référence
+initialement demandée). Pour le premier benchmark demandé, choisir **100 avis**.
+Le frontend ne contient aucun identifiant de génération codé en dur.
+
+Les résultats présentent coût, temps, accord, stabilité et F1 par axe au seuil
+0,50. Les faibles F1 (<0,80) restent visibles séparément. Les différences de
+workload, le tarif configuré et les trois répétitions sont explicitement signalés.
+Les détails techniques sont repliables ; jamais de clé ou de texte d'avis.
+
+Retrait facile : route dans `App.tsx`, entrée dans `SettingsPage.tsx`, page/style,
+traductions `i18n/jev.ts`, et modules `lib/jev-benchmark.ts` / `use-jev-access.ts`.
+Le drapeau `JEV_EXPERIMENT_ENABLED` permet également de masquer l'accès.
+Le backend reste indépendant de ce retrait.
 
 ## Configuration exclusivement Supabase
 

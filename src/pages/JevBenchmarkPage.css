@@ -1,0 +1,46 @@
+.jev-page {display:grid;gap:16px;padding-top:22px}
+.jev-intro h2 {font-size:27px;margin:12px 0 8px}
+.jev-intro p,.jev-card p {line-height:1.6;color:var(--muted);margin:10px 0}
+.jev-tag {display:inline-flex;gap:6px;align-items:center;border:1px solid var(--border);background:rgba(216,188,151,.07);border-radius:10px;padding:5px 9px;font-size:12px;color:var(--champagne);line-height:1.5;max-width:100%}
+.jev-card {padding:20px;min-width:0}
+.jev-card h3,.jev-section-heading h3 {font-size:18px;line-height:1.5;margin:0 0 12px}
+.jev-source label {display:block;font-size:13px;color:var(--muted);margin-bottom:10px}
+.jev-source .jev-snapshot-label {margin-top:16px}
+.jev-source select {width:100%;min-width:0;min-height:48px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);padding:10px;font:inherit;font-size:14px;text-overflow:ellipsis}
+.jev-meta {display:flex;flex-wrap:wrap;gap:15px;margin-top:16px}
+.jev-meta span {color:var(--muted);font-size:12px;flex:1;min-width:80px}
+.jev-meta strong {display:block;font-size:14px;color:var(--text);margin-top:6px}
+.jev-notice {display:flex;align-items:center;gap:10px;line-height:1.5;color:var(--muted)}
+.jev-launch {min-height:50px;display:flex;align-items:center;justify-content:center;gap:8px}
+.jev-running>.jev-spinner {color:var(--champagne);margin-bottom:12px}
+.jev-running .secondary-button {margin-top:10px;width:100%}
+.jev-running small {display:block;color:var(--muted);line-height:1.6}
+.jev-results {display:grid;gap:16px}
+.jev-dual {display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+.jev-dual small {display:block;color:var(--muted);margin-bottom:6px}
+.jev-dual strong {display:block;font-size:26px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.jev-dual em {font-style:normal;font-size:13px;color:var(--muted)}
+.jev-card .jev-highlight {color:var(--champagne);font-weight:600}
+.jev-card .jev-note,.jev-footnote,.jev-section-heading p {font-size:12px;line-height:1.65;color:var(--muted)}
+.jev-footnote {margin:0 4px 10px}
+.jev-score>strong {display:block;font-size:38px;color:var(--champagne);font-variant-numeric:tabular-nums;margin:8px 0 12px}
+.jev-pairs {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;font-size:13px;margin:16px 0 0}
+.jev-pairs dt {color:var(--muted)}
+.jev-pairs dd {margin:0;text-align:right;overflow-wrap:anywhere}
+.jev-axis-signal {border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
+.jev-axis-signal>div {display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}
+.jev-axis h4 {font-size:14px;margin:0}
+.jev-axis-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 2px}
+.jev-axis-metrics dt {font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.jev-axis-metrics dd {margin:6px 0 0;font-size:22px;font-variant-numeric:tabular-nums}
+.jev-warning,.jev-card .jev-warning {color:#e7b98d}
+.jev-error {border-color:#886449}
+.jev-error small {color:var(--muted);overflow-wrap:anywhere}
+.jev-verdict {margin:0;display:grid;gap:6px}
+.jev-verdict dt {font-size:12px;color:var(--muted);margin-top:10px}
+.jev-verdict dd {margin:0;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.jev-technical summary {cursor:pointer;color:var(--champagne);font-size:14px;min-height:24px}
+.jev-spinner {animation:jev-spin 1.2s linear infinite;flex-shrink:0}
+@keyframes jev-spin {to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.jev-spinner{animation:none}}
+@media(min-width:700px){.jev-dual{grid-template-columns:repeat(2,minmax(0,1fr))}}

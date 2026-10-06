@@ -1,5 +1,6 @@
 import { validateOptions, validateSource, sourceFingerprint, newBenchmarkState, runJevBenchmark, compareBenchmark, type BenchmarkSource, type CostRates } from './jev-benchmark.ts'
 import { createJevClient } from './jev.ts'
+import type { EligibleJevSource } from './jev-benchmark-read.ts'
 
 type Row = Record<string,unknown>
 export interface BenchmarkRepository {
@@ -9,6 +10,8 @@ export interface BenchmarkRepository {
   insertBenchmark:(row:Row)=>Promise<void>
   updateBenchmark:(id:string,row:Row)=>Promise<void>
   readBenchmark:(id:string)=>Promise<Row|null>
+  listEligible?:()=>Promise<EligibleJevSource[]>
+  readLatest?:(sourceId:string)=>Promise<Row|null>
 }
 export interface HandlerDependencies {
   authenticate:(request:Request)=>Promise<BenchmarkRepository>
@@ -32,12 +35,25 @@ export function benchmarkHandler(deps:HandlerDependencies) {
     try {
       const repo=await deps.authenticate(request)
       if(request.method==='GET') {
-        const id=new URL(request.url).searchParams.get('benchmark_id')
+        const params=new URL(request.url).searchParams
+        if(params.get('eligible')==='1') {
+          if(!repo.listEligible)throw new Error('JEV_READ_UNAVAILABLE')
+          return json({establishments:await repo.listEligible()})
+        }
+        const sourceId=params.get('source_generation_id')
+        if(sourceId!==null) {
+          if(!uuid(sourceId))return json({error:'SOURCE_GENERATION_ID_REQUIRED'},400)
+          if(!repo.readLatest)throw new Error('JEV_READ_UNAVAILABLE')
+          const row=await repo.readLatest(sourceId)
+          if(row)await repo.authorize(row.organization_id as string)
+          return json({benchmark:row})
+        }
+        const id=params.get('benchmark_id')
         if(!uuid(id))return json({error:'BENCHMARK_ID_REQUIRED'},400)
         const row=await repo.readBenchmark(id)
         if(!row)return json({error:'BENCHMARK_NOT_FOUND'},404)
         await repo.authorize(row.organization_id as string)
-        return json({benchmark_id:id,status:row.status,error_code:row.error_code,comparison:row.comparison})
+        return json({benchmark_id:id,...row})
       }
       // Missing key stops BEFORE parsing/loading/creating a run, and before any Jev request.
       const apiKey=deps.env('TYPESAFE_API_KEY')

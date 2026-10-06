@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test'
+export default defineConfig({testDir:'./tests/e2e',testMatch:'jev-benchmark.spec.ts',timeout:30_000,workers:1,use:{baseURL:'http://127.0.0.1:4173',screenshot:'only-on-failure'},webServer:{command:'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173',url:'http://127.0.0.1:4173',reuseExistingServer:true},projects:[360,390,430,768].map(width=>({name:width===768?'ipad':`mobile-${width}`,use:{browserName:'chromium',viewport:{width,height:width===768?1024:844}}}))})

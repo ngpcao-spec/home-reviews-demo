@@ -6,6 +6,9 @@ import { relativeTime, timeUntil } from '../lib/format'
 import { saveNotificationPreference } from '../lib/notification-preferences'
 import { useI18n } from '../i18n'
 import type { PreferredLanguage } from '../types/domain'
+import { Link } from 'react-router-dom'
+import { useJevAccess } from '../lib/use-jev-access'
+import { jevMessages } from '../i18n/jev'
 import {
   currentPushSubscription,
   disablePushNotifications,
@@ -36,6 +39,7 @@ function getStoredMonitoringInterval(): MonitoringIntervalHours {
 export function SettingsPage() {
   const { currentUser, establishments, demoMode, pushToast, monitoringIntervalHours, preferredLanguage, updatePreferredLanguage, updateMonitoringInterval: persistMonitoringInterval, signOut } = useApp()
   const { messages, language } = useI18n()
+  const jevAccess=useJevAccess(currentUser.id,demoMode)
   const [inApp, setInApp] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
   const [pushState, setPushState] = useState<PushUiState>(() => getPushUiState(
@@ -155,6 +159,7 @@ export function SettingsPage() {
   <section className="settings-intro"><h1>{messages.settings.heading}</h1><p>{messages.settings.intro}</p></section>
   <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>{messages.settings.googleAccount}</span></div></section>
   {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>{messages.settings.demo}</strong><span>{messages.settings.demoDetail}</span></div></div>}
+  {jevAccess.data===true&&<SettingsSection title={jevMessages[language].experimental}><Link className="setting-row clickable" to="/plus/jev-benchmark"><div className="setting-icon"><Sparkles/></div><div><strong>{jevMessages[language].menu}</strong><span>Jev / GPT-6.1 Sol</span></div><ChevronRight/></Link></SettingsSection>}
   <SettingsSection title={messages.settings.account}><SettingLink icon={<User/>} title={messages.settings.profile} detail={messages.settings.profileDetail}/><button className="setting-row"><div className="setting-icon google-setting-icon">G</div><div><strong>{messages.settings.googleLogin}</strong><span>{messages.settings.googleLoginDetail}</span></div></button><button className="setting-row clickable danger" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? '…' : messages.settings.signOut}</strong><span>{messages.settings.signOutDetail}</span></div><ChevronRight/></button></SettingsSection>
   <SettingsSection title={messages.language.settingTitle}><div className="settings-info card"><label htmlFor="preferred-language">{messages.language.settingDetail}</label><select id="preferred-language" className="monitoring-select" value={preferredLanguage ?? 'fr'} disabled={savingLanguage} onChange={(event) => void changeLanguage(event.target.value as PreferredLanguage)}><option value="fr">Français</option><option value="vi">Tiếng Việt</option></select></div></SettingsSection>
   <SettingsSection title={messages.settings.notifications}><div className="setting-row"><div className="setting-icon"><Bell/></div><div><strong>{messages.settings.inApp}</strong><span>HOME Reviews</span></div><Switch value={inApp} onChange={()=>setInApp(!inApp)}/></div><button className="setting-row clickable" onClick={() => void togglePush()} disabled={pushBusy}><div className="setting-icon"><Bell/></div><div><strong>{pushState === 'enabled' ? messages.settings.disableNotifications : messages.settings.enableNotifications}</strong><span>{pushState}</span>{isIosDevice() && !isStandalonePwa() && <span>iPhone · PWA</span>}</div><ChevronRight/></button></SettingsSection>

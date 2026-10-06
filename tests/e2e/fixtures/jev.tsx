@@ -1,0 +1,13 @@
+// Synthetic UI fixtures only. No real authentication, Jev, OpenAI or production data writes.
+import { createRoot } from 'react-dom/client'
+import { QueryClient,QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
+import { I18nProvider } from '../../../src/i18n'
+import { JevBenchmarkResults } from '../../../src/pages/JevBenchmarkPage'
+import { jevResult } from '../../fixtures/jev-benchmark'
+import '../../../src/styles/global.css'
+import '../../../src/styles/pages.css'
+import '../../../src/styles/reference.css'
+import '../../../src/styles/warm-theme.css'
+const params=new URLSearchParams(location.search),language=params.get('language')==='vi'?'vi':'fr'
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language={language}><div className="app-shell"><main className="page-frame"><div className="jev-page"><header className="jev-intro"><span className="jev-tag">{language==='fr'?'Expérimental':'Thử nghiệm'}</span><h2>{language==='fr'?'Benchmark Jev':'Thử nghiệm Jev'}</h2></header><JevBenchmarkResults run={jevResult} name="Shabu Ssam BBQ Restaurant"/></div></main></div></I18nProvider></MemoryRouter></QueryClientProvider>)

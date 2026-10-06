@@ -18,6 +18,7 @@ const NotFoundPage=lazy(()=>import('./pages/NotFoundPage').then(m=>({default:m.N
 const ReviewDetailPage=lazy(()=>import('./pages/ReviewDetailPage').then(m=>({default:m.ReviewDetailPage})))
 const ReviewsPage=lazy(()=>import('./pages/ReviewsPage').then(m=>({default:m.ReviewsPage})))
 const SettingsPage=lazy(()=>import('./pages/SettingsPage').then(m=>({default:m.SettingsPage})))
+const JevBenchmarkPage=lazy(()=>import('./pages/JevBenchmarkPage').then(m=>({default:m.JevBenchmarkPage})))
 
 
 function PasswordRecoveryScreen() {
@@ -54,4 +55,4 @@ function ProtectedApp() {
   return <><NavigationResume /><AppShell /><NotificationOnboarding /></>
 }
 
-export default function App(){const { passwordRecovery }=useApp();if(passwordRecovery)return <PasswordRecoveryScreen/>;return <Suspense fallback={<div className="route-loading" aria-label="Chargement"><span/></div>}><Routes><Route path="/connexion" element={<AuthPage/>}/><Route path="/test/notifications/reset" element={<NotificationOnboardingResetPage/>}/><Route element={<ProtectedApp/>}><Route index element={<HomePage/>}/><Route path="etablissements" element={<EstablishmentsPage/>}/><Route path="etablissements/ajouter" element={<AddEstablishmentPage/>}/><Route path="etablissements/:id" element={<EstablishmentDetailPage/>}/><Route path="avis" element={<ReviewsPage/>}/><Route path="avis/:id" element={<ReviewDetailPage/>}/><Route path="analyses" element={<AnalyticsPage/>}/><Route path="notifications" element={<NotificationsPage/>}/><Route path="plus" element={<SettingsPage/>}/><Route path="reglages" element={<Navigate to="/plus" replace/>}/><Route path="*" element={<NotFoundPage/>}/></Route></Routes></Suspense>}
+export default function App(){const { passwordRecovery }=useApp();if(passwordRecovery)return <PasswordRecoveryScreen/>;return <Suspense fallback={<div className="route-loading" aria-label="Chargement"><span/></div>}><Routes><Route path="/connexion" element={<AuthPage/>}/><Route path="/test/notifications/reset" element={<NotificationOnboardingResetPage/>}/><Route element={<ProtectedApp/>}><Route index element={<HomePage/>}/><Route path="etablissements" element={<EstablishmentsPage/>}/><Route path="etablissements/ajouter" element={<AddEstablishmentPage/>}/><Route path="etablissements/:id" element={<EstablishmentDetailPage/>}/><Route path="avis" element={<ReviewsPage/>}/><Route path="avis/:id" element={<ReviewDetailPage/>}/><Route path="analyses" element={<AnalyticsPage/>}/><Route path="notifications" element={<NotificationsPage/>}/><Route path="plus" element={<SettingsPage/>}/><Route path="plus/jev-benchmark" element={<JevBenchmarkPage/>}/><Route path="reglages" element={<Navigate to="/plus" replace/>}/><Route path="*" element={<NotFoundPage/>}/></Route></Routes></Suspense>}

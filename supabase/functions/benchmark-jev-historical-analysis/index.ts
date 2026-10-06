@@ -1,6 +1,7 @@
 import { requireUser, assertMembership } from '../_shared/auth.ts'
 import { benchmarkHandler } from '../_shared/jev-benchmark-handler.ts'
 import type { BenchmarkSource } from '../_shared/jev-benchmark.ts'
+import { eligibleJevSources } from '../_shared/jev-benchmark-read.ts'
 
 declare const EdgeRuntime: { waitUntil(work:Promise<void>):void }
 
@@ -15,6 +16,7 @@ Deno.serve(benchmarkHandler({
     // organization, authorize membership, then read the snapshot with an org filter.
     // Only the experimental table has any mutation capability in this function.
     const benchmarks=context.admin.from('jev_benchmark_runs')
+    const summaryFields='id,organization_id,establishment_id,source_generation_id,status,error_code,comparison,created_at,completed_at,requested_model,served_models,repeat_count,reviews_total,reviews_with_text,reviews_without_text,request_count,retry_count,jev_input_tokens,jev_output_tokens'
     return {
       authorize:async organizationId=>{await assertMembership(context.client,context.user.id,organizationId,['owner','admin','manager'])},
       readSource:async id=>{
@@ -27,9 +29,33 @@ Deno.serve(benchmarkHandler({
         return data as BenchmarkSource|null
       },
       readBenchmark:async id=>{
-        const {data,error}=await context.client.from('jev_benchmark_runs').select('id,organization_id,status,error_code,comparison').eq('id',id).maybeSingle()
+        const {data,error}=await context.client.from('jev_benchmark_runs').select(summaryFields).eq('id',id).maybeSingle()
         if(error)throw new Error('JEV_BENCHMARK_READ_FAILED')
         return data
+      },
+      listEligible:async()=>{
+        const {data:members,error:me}=await context.client.from('organization_members').select('organization_id').eq('user_id',context.user.id).in('role',['owner','admin','manager'])
+        if(me)throw new Error('FORBIDDEN')
+        const organizations=(members??[]).map(m=>m.organization_id)
+        if(!organizations.length)throw new Error('FORBIDDEN')
+        // Server-only read; never return the snapshot texts to the frontend.
+        const rows=[]
+        for(let offset=0;;offset+=100) {
+          const {data,error}=await context.admin.from('historical_report_runs').select('generation_id,organization_id,establishment_id,completed_at,snapshot,establishments(name)').in('organization_id',organizations).eq('status','completed').eq('snapshot->>analysis_version','6').order('completed_at',{ascending:false}).order('generation_id',{ascending:false}).range(offset,offset+99)
+          if(error)throw new Error('SOURCE_READ_FAILED')
+          rows.push(...(data??[]))
+          if((data?.length??0)<100)break
+        }
+        return eligibleJevSources(rows as unknown as Parameters<typeof eligibleJevSources>[0])
+      },
+      readLatest:async sourceId=>{
+        // Exact status priority, without a limit that could hide an older running run.
+        for(const status of ['running','completed','failed']) {
+          const {data,error}=await context.client.from('jev_benchmark_runs').select(summaryFields).eq('source_generation_id',sourceId).eq('status',status).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle()
+          if(error)throw new Error('JEV_BENCHMARK_READ_FAILED')
+          if(data)return data
+        }
+        return null
       },
       insertBenchmark:async row=>{
         const {error}=await benchmarks.insert(row)
