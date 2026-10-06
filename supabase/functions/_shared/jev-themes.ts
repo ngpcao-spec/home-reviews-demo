@@ -17,13 +17,13 @@ export interface ThemeDecision {themes:Record<ThemeKey,ThemeAnswer>}
 export function themePayload(model:string,review_alias:string,original_text:string):SystemOnePayload {
   return {model,state:{review_alias,original_text},questions:Object.fromEntries(THEME_KEYS.map(key=>[key,{type:'choice',instructions:`Determine whether the customer's ORIGINAL review text explicitly expresses an opinion about ${THEME_DEFINITIONS[key]}. Do not infer sentiment from stars, metadata, generic praise or assumptions. ${UNTRUSTED}`,criteria:{absent:'No explicit opinion about this theme.',positive:'Explicit positive opinion only about this theme.',negative:'Explicit negative opinion only about this theme.',both:'Explicit positive AND negative opinions about this theme in the same review.'}}]))}
 }
-export function parseThemes(raw:unknown) {
+export function parseThemes(raw:unknown,selectedKeys:readonly ThemeKey[]=THEME_KEYS) {
   const fail=()=>{throw new Error('JEV_INVALID_RESPONSE')}
   if(!raw || typeof raw!=='object' || Array.isArray(raw))return fail()
   const data=raw as Record<string,unknown>
   if(typeof data.model!=='string' || !data.model.trim() || !data.answers || typeof data.answers!=='object' || Array.isArray(data.answers))return fail()
   const answers=data.answers as Record<string,unknown>,themes={} as Record<ThemeKey,ThemeAnswer>
-  for(const key of THEME_KEYS) {
+  for(const key of selectedKeys) {
     const rawAnswer=answers[key]
     if(!rawAnswer || typeof rawAnswer!=='object')return fail()
     const answer=rawAnswer as Record<string,unknown>
@@ -64,10 +64,10 @@ export function themesVerdict(micro:number|null,macro:number|null,stability:numb
   if(micro>=.88 && macro>=.82 && stability>=.95)return 'prometteur'
   return 'insuffisant'
 }
-export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeDecision>,options:BenchmarkOptions,rates:CostRates) {
+export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeDecision>,options:BenchmarkOptions,rates:CostRates,selectedKeys:readonly ThemeKey[]=THEME_KEYS) {
   const textual=source.snapshot.reviews.filter(r=>r.original_text?.trim()),decisions=new Map(state.decisions.map(r=>[r.review_id,r.repetitions]))
   const reference=new Set(source.findings.map(f=>`${f.review_id}:${f.theme_key}:${f.sentiment}`))
-  const supports=Object.fromEntries(THEME_KEYS.map(theme=>[theme,Object.fromEntries(['positive','negative'].map(sentiment=>[sentiment,textual.filter(r=>reference.has(`${r.id}:${theme}:${sentiment}`)).length]))])) as Record<ThemeKey,Record<'positive'|'negative',number>>
+  const supports=Object.fromEntries(selectedKeys.map(theme=>[theme,Object.fromEntries(['positive','negative'].map(sentiment=>[sentiment,textual.filter(r=>reference.has(`${r.id}:${theme}:${sentiment}`)).length]))])) as Record<ThemeKey,Record<'positive'|'negative',number>>
   function labelCounts(theme:ThemeKey,sentiment:'positive'|'negative',repeat:number,threshold:number|'choice') {
     let tp=0,tn=0,fp=0,fn=0
     for(const r of textual) {
@@ -84,8 +84,8 @@ export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeD
     const per_repeat=Array.from({length:options.repeat_count},(_,repeat)=>({repeat:repeat+1,...labelCounts(theme,sentiment,repeat,threshold)}))
     return {support_sol_v6:support,support_level:supportLevel(support),sufficient_support:support>=5,per_repeat,...pooled(per_repeat)}
   }
-  const theme_metrics=Object.fromEntries(thresholds.map(threshold=>[threshold.toFixed(2),Object.fromEntries(THEME_KEYS.map(theme=>[theme,{positive:themeMetric(theme,'positive',threshold),negative:themeMetric(theme,'negative',threshold)}]))]))
-  const supported=THEME_KEYS.flatMap(theme=>(['positive','negative'] as const).filter(sentiment=>supports[theme][sentiment]>=5).map(sentiment=>({theme,sentiment,axis:V6_THEME_AXES[theme]})))
+  const theme_metrics=Object.fromEntries(thresholds.map(threshold=>[threshold.toFixed(2),Object.fromEntries(selectedKeys.map(theme=>[theme,{positive:themeMetric(theme,'positive',threshold),negative:themeMetric(theme,'negative',threshold)}]))]))
+  const supported=selectedKeys.flatMap(theme=>(['positive','negative'] as const).filter(sentiment=>supports[theme][sentiment]>=5).map(sentiment=>({theme,sentiment,axis:V6_THEME_AXES[theme]})))
   const axisKeys=['service','quality','price','atmosphere'] as const
   const threshold_comparison=Object.fromEntries(thresholds.map(threshold=>{
     const metrics=theme_metrics[threshold.toFixed(2)],labels=supported.map(l=>metrics[l.theme][l.sentiment]),micro=pooled(labels)
@@ -103,7 +103,7 @@ export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeD
   }))
   const completeReviews=textual.filter(r=>decisions.get(r.id)?.filter(Boolean).length===options.repeat_count)
   const stableByAxis=Object.fromEntries(axisKeys.map(axis=>[axis,{pairs:0,stable:0,gaps:[] as number[]}]))
-  for(const r of completeReviews)for(const theme of THEME_KEYS) {
+  for(const r of completeReviews)for(const theme of selectedKeys) {
     const answers=decisions.get(r.id)!.map(d=>d!.themes[theme]),axis=stableByAxis[V6_THEME_AXES[theme]]
     axis.pairs++;if(new Set(answers.map(a=>a.choice)).size===1)axis.stable++
     for(const sentiment of ['positive','negative'] as const) {
@@ -115,8 +115,8 @@ export function compareThemes(source:BenchmarkSource,state:BenchmarkState<ThemeD
   const stability={exact_theme_choice_stability_rate:options.repeat_count>1?ratio(allStable,allPairs):null,complete_reviews:completeReviews.length,missing_reviews:textual.length-completeReviews.length,theme_review_pairs:allPairs,...drift(gaps),by_axis:Object.fromEntries(axisKeys.map(axis=>[axis,{exact_theme_choice_stability_rate:options.repeat_count>1?ratio(stableByAxis[axis].stable,stableByAxis[axis].pairs):null,theme_review_pairs:stableByAxis[axis].pairs,...drift(stableByAxis[axis].gaps)}])),note:'Choice equality across all repetitions per review/theme. Drift = max-min of each presence probability; p95 uses nearest rank. Missing repetitions excluded and flagged.'}
   const metrics_complete=state.errors.length===0 && completeReviews.length===textual.length
   const principal=threshold_comparison['0.50']
-  const choice_presence_metrics=Object.fromEntries(THEME_KEYS.map(theme=>[theme,Object.fromEntries((['positive','negative'] as const).map(sentiment=>[sentiment,{support_sol_v6:supports[theme][sentiment],...pooled(Array.from({length:options.repeat_count},(_,repeat)=>labelCounts(theme,sentiment,repeat,'choice')))}]))]))
-  return {benchmark_type:'themes_phase2' as const,scope:'theme-detection benchmark',reference:'Sol V6 findings are a reference, not ground truth.',catalog:THEME_KEYS,theme_axes:V6_THEME_AXES,
+  const choice_presence_metrics=Object.fromEntries(selectedKeys.map(theme=>[theme,Object.fromEntries((['positive','negative'] as const).map(sentiment=>[sentiment,{support_sol_v6:supports[theme][sentiment],...pooled(Array.from({length:options.repeat_count},(_,repeat)=>labelCounts(theme,sentiment,repeat,'choice')))}]))]))
+  return {benchmark_type:'themes_phase2' as const,scope:'theme-detection benchmark',reference:'Sol V6 findings are a reference, not ground truth.',catalog:[...selectedKeys],theme_axes:V6_THEME_AXES,
     dataset:{source_generation_id:source.generation_id,source_analysis_version:6,reviews_total:source.snapshot.reviews.length,reviews_with_text:textual.length,textless_review:source.snapshot.reviews.length-textual.length},
     jev:{requested_model:options.model,served_models:state.served_models,multiple_served_models:state.served_models.length>1,repeat_count:options.repeat_count,concurrency:options.concurrency,request_count:state.request_count,retry_count:state.retry_count,input_tokens:state.jev_input_tokens,output_tokens:state.jev_output_tokens,estimated_jev_cost_usd:state.jev_input_tokens/1_000_000*rates.jev_input,rate_used:rates.jev_input,cost_label:'ESTIMATION AU TARIF CONFIGURÉ',elapsed_ms:state.jev_elapsed_ms,individual_http_requests:duration(state.request_durations_ms),individual_evaluations_including_retries:duration(state.evaluation_durations_ms),usage_note:'API-returned tokens only; failed attempts without usage cannot be metered.'},
     sol_v6_baseline:{model:source.model,input_tokens:source.input_tokens,output_tokens:source.output_tokens,estimated_sol_baseline_cost_usd:(source.input_tokens*rates.sol_input+source.output_tokens*rates.sol_output)/1_000_000,end_to_end_elapsed_ms:Date.parse(source.completed_at)-Date.parse(source.started_at),rate_used:{input:rates.sol_input,output:rates.sol_output},scope:'Full Sol V6 extraction + narrative, including worker/cron orchestration.'},

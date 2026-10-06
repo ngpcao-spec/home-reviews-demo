@@ -17,6 +17,23 @@ test('Jev results FR/VI on mobile and iPad: no overflow, weak axes visible, no p
   }
   expect(calls).toEqual([])
 })
+test('Phase 2B Service FR/VI: deltas, precision, seven collapsible themes, no external calls',async({page})=>{
+  const calls:string[]=[]
+  page.on('request',r=>{if(/api\.typesafe|api\.openai|functions\/v1|rest\/v1/.test(r.url()))calls.push(r.url())})
+  for(const language of ['fr','vi']) {
+    await page.goto('/tests/e2e/fixtures/jev.html?phase=2b&language='+language)
+    await expect(page.locator('[data-service-target]')).toHaveCount(4)
+    await expect(page.locator('[data-service-target="attentiveness"] .jev-axis-metrics>div')).toHaveCount(3)
+    await expect(page.locator('[data-service-target="professionalism"] .jev-axis-metrics>div')).toHaveCount(3)
+    await page.evaluate(async()=>{await document.fonts.ready;await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())))})
+    await page.screenshot({path:`test-results/jev-phase2b-summary-${language}-${test.info().project.name}.png`,animations:'disabled'})
+    await page.getByText(language==='fr'?'Voir les thèmes · 7':'Xem các chủ đề · 7',{exact:true}).click()
+    await expect(page.locator('.jev-theme-detail')).toHaveCount(7)
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+    expect(await page.locator('.jev-card').evaluateAll(cards=>cards.every(card=>card.scrollWidth<=card.clientWidth+1))).toBe(true)
+  }
+  expect(calls).toEqual([])
+})
 test('Phase 2 themes: mobile FR/VI, expanded themes, weak axes and support, no external calls',async({page})=>{
   const calls:string[]=[]
   page.on('request',r=>{if(/api\.typesafe|api\.openai|functions\/v1|rest\/v1/.test(r.url()))calls.push(r.url())})

@@ -6,42 +6,47 @@ import { jevMessages } from '../i18n/jev'
 import { themeMessages,themeLabels } from '../i18n/jev-themes'
 import { jevApi,launchJevOnce,readJevReference,rememberJevRun,type JevSource } from '../lib/jev-benchmark'
 import type { JevThemeComparison,JevThemeRun } from '../lib/jev-theme-benchmark'
+import type { JevRun } from '../lib/jev-benchmark'
+import type { JevServiceComparison,JevServiceRun } from '../lib/jev-service-benchmark'
+import { serviceMessages } from '../i18n/jev-service'
+import { JevServiceResults } from './JevServiceResults'
 
-export function JevThemesPhase({user,source,visible}:{user:string;source:JevSource;visible:boolean}) {
-  const {language}=useI18n(),t=themeMessages[language],common=jevMessages[language],client=useQueryClient()
+export function JevThemesPhase({user,source,visible,kind='themes_phase2'}:{user:string;source:JevSource;visible:boolean;kind?:'themes_phase2'|'themes_phase2b_service'}) {
+  const {language}=useI18n(),t=kind==='themes_phase2b_service'?serviceMessages[language]:themeMessages[language],common=jevMessages[language],client=useQueryClient()
   const [starting,setStarting]=useState(false),[error,setError]=useState(''),busy=useRef(false)
-  const id=source.source_generation_id,key=['jev-run',user,id,'themes_phase2']
-  const query=useQuery<JevThemeRun|null>({queryKey:key,enabled:visible,retry:false,staleTime:0,queryFn:async()=>{
-    const known=client.getQueryData<JevThemeRun|null>(key)
-    let run=known?.status==='running'?await jevApi.read<JevThemeComparison>(known.id):await jevApi.latest<JevThemeComparison>(id,'themes_phase2')
-    const saved=readJevReference(user,id,'themes_phase2')
-    if(!run && saved?.benchmark_id)run=await jevApi.read<JevThemeComparison>(saved.benchmark_id)
-    if(run && run.benchmark_type!=='themes_phase2')throw new Error('JEV_PHASE_MISMATCH')
+  type Comparison=JevThemeComparison|JevServiceComparison
+  const id=source.source_generation_id,key=['jev-run',user,id,kind]
+  const query=useQuery<JevRun<Comparison>|null>({queryKey:key,enabled:visible,retry:false,staleTime:0,queryFn:async()=>{
+    const known=client.getQueryData<JevRun<Comparison>|null>(key)
+    let run=known?.status==='running'?await jevApi.read<Comparison>(known.id):await jevApi.latest<Comparison>(id,kind)
+    const saved=readJevReference(user,id,kind)
+    if(!run && saved?.benchmark_id)run=await jevApi.read<Comparison>(saved.benchmark_id)
+    if(run && (run.benchmark_type!==kind || run.source_generation_id!==id))throw new Error('JEV_PHASE_MISMATCH')
     if(run)rememberJevRun(user,run)
     return run
-  },refetchInterval:q=>visible && (q.state.data?.status==='running' || readJevReference(user,id,'themes_phase2')?.pending)?2500:false})
+  },refetchInterval:q=>visible && (q.state.data?.status==='running' || readJevReference(user,id,kind)?.pending)?2500:false})
   useEffect(()=>{
-    const resume=()=>{if(!document.hidden)void client.invalidateQueries({queryKey:['jev-run',user,id,'themes_phase2']})}
+    const resume=()=>{if(!document.hidden)void client.invalidateQueries({queryKey:['jev-run',user,id,kind]})}
     window.addEventListener('pageshow',resume)
     return()=>window.removeEventListener('pageshow',resume)
-  },[user,id,client])
-  const run=query.data,pending=!!readJevReference(user,id,'themes_phase2')?.pending
+  },[user,id,client,kind])
+  const run=query.data,pending=!!readJevReference(user,id,kind)?.pending
   async function launch() {
     if(busy.current || pending || query.isPending || query.isError || (run && run.status!=='failed'))return
     busy.current=true;setStarting(true);setError('')
-    try {const result=await launchJevOnce<JevThemeComparison>(user,id,'themes_phase2');if(result)client.setQueryData(key,result)}
+    try {const result=await launchJevOnce<Comparison>(user,id,kind);if(result)client.setQueryData(key,result)}
     catch(e){setError(e instanceof Error?e.message:'JEV_CONNECTION_ERROR');await query.refetch()}
     finally{busy.current=false;setStarting(false)}
   }
   return <section className="jev-phase2" aria-label={t.title}>
-    <header className="jev-section-heading"><span className="jev-tag">25 {language==='fr'?'thèmes':'chủ đề'}</span><h3>{t.title}</h3><p>{t.intro}</p></header>
+    <header className="jev-section-heading"><span className="jev-tag">{kind==='themes_phase2b_service'?7:25} {language==='fr'?'thèmes':'chủ đề'}</span><h3>{t.title}</h3><p>{t.intro}</p></header>
     {query.isPending?<p className="jev-notice" role="status">{common.loading}</p>:<>
       {(query.isError || error) && <div className="card jev-card jev-error" role="alert"><p>{error==='JEV_NOT_CONFIGURED'?common.notConfigured:pending?common.unknown:common.readFailed}</p><button className="secondary-button" onClick={()=>void query.refetch()} disabled={query.isFetching}>{common.retryRead}</button></div>}
       {pending && !run && <p role="status" className="card jev-card">{common.unknown}</p>}
       {run?.status==='failed'&&<div className="card jev-card jev-error" role="alert"><h3>{common.failed}</h3><small>{run.error_code}</small></div>}
       {(!run || run.status==='failed') && !pending && <button className="primary-button full-width jev-launch" disabled={starting || query.isPending || query.isError || !visible} onClick={()=>void launch()}>{starting?common.starting:run?.status==='failed'?common.retry:t.start}</button>}
-      {run?.status==='running'&&<div className="card jev-card jev-running" role="status"><LoaderCircle size={26} className="jev-spinner"/><h3>{t.running}</h3><strong>{source.name}</strong><p>{run.reviews_total} {common.reviews} · {run.repeat_count} {common.repeats.toLowerCase()} · {run.requested_model}</p><small>{new Date(run.created_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</small><p>{common.continue}</p></div>}
-      {run?.status==='completed'&&<JevThemeResults run={run}/>}
+      {run?.status==='running'&&<div className="card jev-card jev-running" role="status"><LoaderCircle size={26} className="jev-spinner"/><h3>{t.running}</h3><strong>{source.name}</strong><p>{kind==='themes_phase2b_service'?`7 ${language==='fr'?'thèmes':'chủ đề'} · ${run.comparison.dataset.reviews_with_text} ${common.text}`:`${run.reviews_total} ${common.reviews}`} · {run.repeat_count} {common.repeats.toLowerCase()} · {run.requested_model}</p><small>{new Date(run.created_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</small><p>{common.continue}</p></div>}
+      {run?.status==='completed'&&(kind==='themes_phase2b_service'?<JevServiceResults run={run as JevServiceRun}/>:<><JevThemeResults run={run as JevThemeRun}/><JevThemesPhase user={user} source={source} visible={visible} kind="themes_phase2b_service"/></>)}
     </>}
   </section>
 }

@@ -7,6 +7,42 @@ aucune rédaction et aucune modification du pipeline de production.
 
 ## Interface mobile temporaire
 
+### Phase 2B — Service
+
+Type séparé `themes_phase2b_service`, version de questions **service-disambiguation-v1**.
+Seulement sept Choices : friendly_staff, attentiveness, wait_time, coordination,
+communication, order_accuracy, professionalism. Le state reste alias + texte original.
+Les nouveaux prompts interdisent les déductions depuis un autre thème ou un jugement
+générique du service. Les cas de contrat A–K sont des attentes explicites avec
+réponses mockées ; ils ne sont pas des mesures du comportement réel de Jev.
+La validation sémantique réelle appartient au benchmark lancé par l'utilisateur.
+
+Même moteur de comparaison que Phase 2, restreint aux sept thèmes : support unique,
+seuils 0.50/0.70/0.80, précision/rappel/F1, micro F1 Service, stabilité et dérives.
+Les labels support <5 ne participent pas au verdict. Stabilité/dérive également
+conservées pour chacun des sept thèmes, notamment les trois cibles principales.
+
+Le backend exige une Phase 2 completed sur le même source_generation_id. Sa référence
+et ses métriques sont capturées au lancement et conservées dans comparison, sans
+modifier cette Phase 2. En cas de source différente, aucun ancien score, delta,
+coût ou temps comparatif n'est calculé. Les coûts/temps viennent des champs persistés.
+
+Non-régression : friendly_staff positif >=0.90 OU baisse <=0.03 ; wait_time, pour
+chaque polarité suffisamment documentée, baisse <=0.03. Ces contrôles restent
+visibles ; une régression évaluée bloque un verdict de réussite. Le verdict SUCCESS
+requiert micro Service >=0.85, friendly >=0.90, attentiveness/professionalism >=0.80,
+stabilité >=0.98 et support suffisant des cibles. VERY_GOOD relève ces seuils à
+0.90/0.92/0.85/0.85/0.98. Sinon NEEDS_REVIEW ; aucun changement automatique.
+
+Le bloc Phase 2B suit une Phase 2 completed dans l'écran mobile. Les protections
+contre le double lancement et la récupération utilisent un namespace distinct
+par type. Aucun POST au chargement, reprise ou déploiement. Premier test Shabu :
+source `382c46aa-2505-44de-8693-71ab1fa92d11`, 101 avis / 95 textes / 6 sans texte,
+trois répétitions, concurrency huit, jev-latest. Ni Artisan ni nouveau rapport Sol.
+
+Ne pas changer silencieusement les définitions publiées de cette version : une
+modification sémantique ultérieure impose une nouvelle question_set_version.
+
 ### Phase 2 — thèmes détaillés
 
 Types explicites : `axes_phase1` (défaut, tous les anciens runs) et `themes_phase2`.

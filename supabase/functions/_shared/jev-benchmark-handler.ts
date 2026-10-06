@@ -3,6 +3,7 @@ import { createJevClient,type JevDecision } from './jev.ts'
 import type { EligibleJevSource } from './jev-benchmark-read.ts'
 import { benchmarkType,type BenchmarkType } from './jev-benchmark-type.ts'
 import { compareThemes,themePayload,parseThemes,type ThemeDecision } from './jev-themes.ts'
+import { compareService,servicePayload,parseService,type Phase2Reference } from './jev-service.ts'
 
 type Row = Record<string,unknown>
 export interface BenchmarkRepository {
@@ -74,13 +75,20 @@ export function benchmarkHandler(deps:HandlerDependencies) {
         const phase1=await repo.readLatest?.(source.generation_id,'axes_phase1')
         if(phase1?.status!=='completed')throw new Error('SOURCE_PHASE1_REQUIRED')
       }
+      let phase2Reference:Phase2Reference|null=null
+      if(benchmark_type==='themes_phase2b_service') {
+        const phase2=await repo.readLatest?.(source.generation_id,'themes_phase2')
+        if(phase2?.status!=='completed')throw new Error('SOURCE_PHASE2_REQUIRED')
+        if(phase2.source_generation_id!==source.generation_id)throw new Error('SOURCE_PHASE2_MISMATCH')
+        phase2Reference=phase2 as unknown as Phase2Reference
+      }
       const rates:CostRates={jev_input:configuredRate(deps.env('JEV_INPUT_USD_PER_MILLION'),.042),sol_input:configuredRate(deps.env('SOL_INPUT_USD_PER_MILLION'),2),sol_output:configuredRate(deps.env('SOL_OUTPUT_USD_PER_MILLION'),10)}
       const id=crypto.randomUUID(), fingerprint=await sourceFingerprint(source), state=newBenchmarkState<JevDecision|ThemeDecision>(source,options)
       const scope={benchmark_id:id,source_generation_id:source.generation_id,benchmark_type}
       const log=(event:string,fields:Row={})=>deps.log?.(event,{...scope,...fields})
       const started=Date.now()
       const patch=()=>{
-        const comparison=benchmark_type==='themes_phase2'?compareThemes(source,state as BenchmarkState<ThemeDecision>,options,rates):compareBenchmark(source,state as BenchmarkState,options,rates)
+        const comparison=benchmark_type==='themes_phase2b_service'?compareService(source,state as BenchmarkState<ThemeDecision>,options,rates,phase2Reference):benchmark_type==='themes_phase2'?compareThemes(source,state as BenchmarkState<ThemeDecision>,options,rates):compareBenchmark(source,state as BenchmarkState,options,rates)
         return {decisions:state.decisions,served_models:state.served_models,request_count:state.request_count,retry_count:state.retry_count,jev_input_tokens:state.jev_input_tokens,jev_output_tokens:state.jev_output_tokens,jev_elapsed_ms:state.jev_elapsed_ms,estimated_jev_cost_usd:comparison.jev.estimated_jev_cost_usd,comparison}
       }
       const textual=source.snapshot.reviews.filter(r=>r.original_text?.trim()).length
@@ -89,7 +97,7 @@ export function benchmarkHandler(deps:HandlerDependencies) {
       const work=async()=>{
         log('JEV_BENCHMARK_STARTED',{model:options.model,repeat_count:options.repeat_count,concurrency:options.concurrency})
         try {
-          await runJevBenchmark<JevDecision|ThemeDecision>(source,options,apiKey,state,{log,...(benchmark_type==='themes_phase2'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(themePayload(model,alias,text),parseThemes)}:{}),checkpoint:async()=>{
+          await runJevBenchmark<JevDecision|ThemeDecision>(source,options,apiKey,state,{log,...(benchmark_type==='themes_phase2b_service'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(servicePayload(model,alias,text),parseService)}:benchmark_type==='themes_phase2'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(themePayload(model,alias,text),parseThemes)}:{}),checkpoint:async()=>{
             state.jev_elapsed_ms=Date.now()-started
             await repo.updateBenchmark(id,patch())
             // Bound execution to leave time to save partial results within Edge limits.

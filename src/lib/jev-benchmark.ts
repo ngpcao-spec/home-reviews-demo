@@ -17,10 +17,10 @@ export interface JevComparison {
   verdict:{quality:string;stability:string;cost:string;latency:string;next_step:string}
   errors?:{review_alias:string;repeat:number;error_code:string}[]
 }
-export type JevBenchmarkType='axes_phase1'|'themes_phase2'
+export type JevBenchmarkType='axes_phase1'|'themes_phase2'|'themes_phase2b_service'
 export interface JevRun<C=JevComparison> { id:string;benchmark_type?:JevBenchmarkType;source_generation_id:string;status:'running'|'completed'|'failed';created_at:string;error_code:string|null;requested_model:string;served_models:string[];repeat_count:number;reviews_total:number;request_count:number;retry_count:number;jev_input_tokens:number;jev_output_tokens:number;comparison:C }
 export interface JevReference { benchmark_id:string|null;created_at:string;pending:boolean }
-const key=(user:string,source:string,type:JevBenchmarkType='axes_phase1')=>`jev-benchmark:${user}:${source}${type==='themes_phase2'?':themes_phase2':''}`
+const key=(user:string,source:string,type:JevBenchmarkType='axes_phase1')=>`jev-benchmark:${user}:${source}${type==='axes_phase1'?'':':'+type}`
 export function readJevReference(user:string,source:string,type:JevBenchmarkType='axes_phase1'):JevReference|null {
   try {const ref=JSON.parse(localStorage.getItem(key(user,source,type))??'null');return ref && typeof ref.created_at==='string' && (ref.benchmark_id===null || typeof ref.benchmark_id==='string')?ref:null}catch{return null}
 }
@@ -50,9 +50,9 @@ export const jevApi={
     return Boolean(data?.length)
   },
   async sources(){return (await invoke<{establishments:JevSource[]}>('?eligible=1')).establishments},
-  async latest<C=JevComparison>(source:string,type:JevBenchmarkType='axes_phase1'){return (await invoke<{benchmark:JevRun<C>|null}>('?source_generation_id='+encodeURIComponent(source)+(type==='themes_phase2'?'&benchmark_type=themes_phase2':''))).benchmark},
+  async latest<C=JevComparison>(source:string,type:JevBenchmarkType='axes_phase1'){return (await invoke<{benchmark:JevRun<C>|null}>('?source_generation_id='+encodeURIComponent(source)+(type==='axes_phase1'?'':'&benchmark_type='+encodeURIComponent(type)))).benchmark},
   async read<C=JevComparison>(id:string){return await invoke<JevRun<C>>('?benchmark_id='+encodeURIComponent(id))},
-  async post(source:string,type:JevBenchmarkType='axes_phase1'){return await invoke<{benchmark_id:string}>('','POST',{source_generation_id:source,repeat_count:3,concurrency:8,model:'jev-latest',...(type==='themes_phase2'?{benchmark_type:type}: {})})},
+  async post(source:string,type:JevBenchmarkType='axes_phase1'){return await invoke<{benchmark_id:string}>('','POST',{source_generation_id:source,repeat_count:3,concurrency:8,model:'jev-latest',...(type==='axes_phase1'?{}:{benchmark_type:type})})},
 }
 const launchLocks=new Set<string>()
 export async function launchJevOnce<C=JevComparison>(user:string,source:string,type:JevBenchmarkType='axes_phase1'):Promise<JevRun<C>|null> {
@@ -81,7 +81,7 @@ export async function launchJevOnce<C=JevComparison>(user:string,source:string,t
     }catch(error) {
       // These definite pre-launch rejections cannot have created a run.
       const code=error instanceof Error?error.message:''
-      if(['JEV_NOT_CONFIGURED','UNAUTHORIZED','FORBIDDEN','INVALID_REPEAT_COUNT','INVALID_CONCURRENCY','INVALID_BENCHMARK_TYPE','SOURCE_NOT_FOUND','SOURCE_PHASE1_REQUIRED'].includes(code))localStorage.removeItem(lock)
+      if(['JEV_NOT_CONFIGURED','UNAUTHORIZED','FORBIDDEN','INVALID_REPEAT_COUNT','INVALID_CONCURRENCY','INVALID_BENCHMARK_TYPE','SOURCE_NOT_FOUND','SOURCE_PHASE1_REQUIRED','SOURCE_PHASE2_REQUIRED','SOURCE_PHASE2_MISMATCH'].includes(code))localStorage.removeItem(lock)
       throw error
     }
   }
