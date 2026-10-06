@@ -21,9 +21,9 @@ export interface BenchmarkSource {
 }
 export interface BenchmarkOptions { repeat_count:number; concurrency:number; model:string }
 export interface CostRates { jev_input:number; sol_input:number; sol_output:number }
-export interface ReviewDecisions { review_id:string; repetitions:(JevDecision|null)[] }
-export interface BenchmarkState {
-  decisions:ReviewDecisions[]; served_models:string[]; request_count:number; retry_count:number
+export interface ReviewDecisions<D=JevDecision> { review_id:string; repetitions:(D|null)[] }
+export interface BenchmarkState<D=JevDecision> {
+  decisions:ReviewDecisions<D>[]; served_models:string[]; request_count:number; retry_count:number
   jev_input_tokens:number; jev_output_tokens:number; jev_elapsed_ms:number
   request_durations_ms:number[]; evaluation_durations_ms:number[]
   errors:{review_alias:string;repeat:number;error_code:string}[]
@@ -126,10 +126,10 @@ export function compareBenchmark(source:BenchmarkSource, state:BenchmarkState, o
     verdict:{quality:agreement===null?'not_evaluable':agreement>=.95?'excellent':agreement>=.9?'prometteur':'insuffisant pour remplacement direct',stability:stable_decision_rate===null?'not_evaluable':stable_decision_rate>=.98?'excellente':stable_decision_rate>=.95?'bonne':'à investiguer',cost:'Decision-layer estimate only; potential savings require a full hybrid benchmark.',latency:'Sol V6 end-to-end elapsed vs Jev decision benchmark elapsed: different workloads.',next_step:'Manual evaluation of each axis, especially Price and Atmosphere; no automatic production switch.'},
   }
 }
-export function newBenchmarkState(source:BenchmarkSource, options:BenchmarkOptions):BenchmarkState {
+export function newBenchmarkState<D=JevDecision>(source:BenchmarkSource, options:BenchmarkOptions):BenchmarkState<D> {
   return {decisions:source.snapshot.reviews.map(r=>({review_id:r.id,repetitions:Array(options.repeat_count).fill(null)})),served_models:[],request_count:0,retry_count:0,jev_input_tokens:0,jev_output_tokens:0,jev_elapsed_ms:0,request_durations_ms:[],evaluation_durations_ms:[],errors:[]}
 }
-export async function runJevBenchmark(source:BenchmarkSource, options:BenchmarkOptions, apiKey:string|undefined, state:BenchmarkState, hooks:{client?:JevClientOptions;checkpoint?:(state:BenchmarkState)=>Promise<void>;log?:(event:string,fields:Record<string,unknown>)=>void}={}) {
+export async function runJevBenchmark<D=JevDecision>(source:BenchmarkSource, options:BenchmarkOptions, apiKey:string|undefined, state:BenchmarkState<D>, hooks:{client?:JevClientOptions;evaluate?:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>Promise<{decision:D}>;checkpoint?:(state:BenchmarkState<D>)=>Promise<void>;log?:(event:string,fields:Record<string,unknown>)=>void}={}) {
   const clientOptions=hooks.client??{}
   // Validate secret before touching source or state.
   createJevClient(apiKey,clientOptions)
@@ -150,8 +150,8 @@ export async function runJevBenchmark(source:BenchmarkSource, options:BenchmarkO
           onUsage:(usage,model)=>{state.jev_input_tokens+=usage.input_tokens;state.jev_output_tokens+=usage.output_tokens;if(!state.served_models.includes(model))state.served_models.push(model)},
         })
         try {
-          const result=await client.evaluate(options.model,alias,r.original_text!)
-          state.decisions[index].repetitions[repeat]=result.decision
+          const result=hooks.evaluate?await hooks.evaluate(client,options.model,alias,r.original_text!):await client.evaluate(options.model,alias,r.original_text!)
+          state.decisions[index].repetitions[repeat]=result.decision as D
         } catch(error) {
           const error_code=error instanceof Error && /^JEV_[A-Z0-9_]+$/.test(error.message)?error.message:'JEV_REQUEST_FAILED'
           state.errors.push({...fields,error_code})

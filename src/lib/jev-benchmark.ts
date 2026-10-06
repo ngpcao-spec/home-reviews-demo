@@ -17,18 +17,19 @@ export interface JevComparison {
   verdict:{quality:string;stability:string;cost:string;latency:string;next_step:string}
   errors?:{review_alias:string;repeat:number;error_code:string}[]
 }
-export interface JevRun { id:string;source_generation_id:string;status:'running'|'completed'|'failed';created_at:string;error_code:string|null;requested_model:string;served_models:string[];repeat_count:number;reviews_total:number;request_count:number;retry_count:number;jev_input_tokens:number;jev_output_tokens:number;comparison:JevComparison }
+export type JevBenchmarkType='axes_phase1'|'themes_phase2'
+export interface JevRun<C=JevComparison> { id:string;benchmark_type?:JevBenchmarkType;source_generation_id:string;status:'running'|'completed'|'failed';created_at:string;error_code:string|null;requested_model:string;served_models:string[];repeat_count:number;reviews_total:number;request_count:number;retry_count:number;jev_input_tokens:number;jev_output_tokens:number;comparison:C }
 export interface JevReference { benchmark_id:string|null;created_at:string;pending:boolean }
-const key=(user:string,source:string)=>`jev-benchmark:${user}:${source}`
-export function readJevReference(user:string,source:string):JevReference|null {
-  try {const ref=JSON.parse(localStorage.getItem(key(user,source))??'null');return ref && typeof ref.created_at==='string' && (ref.benchmark_id===null || typeof ref.benchmark_id==='string')?ref:null}catch{return null}
+const key=(user:string,source:string,type:JevBenchmarkType='axes_phase1')=>`jev-benchmark:${user}:${source}${type==='themes_phase2'?':themes_phase2':''}`
+export function readJevReference(user:string,source:string,type:JevBenchmarkType='axes_phase1'):JevReference|null {
+  try {const ref=JSON.parse(localStorage.getItem(key(user,source,type))??'null');return ref && typeof ref.created_at==='string' && (ref.benchmark_id===null || typeof ref.benchmark_id==='string')?ref:null}catch{return null}
 }
-export function saveJevReference(user:string,source:string,ref:JevReference) {
+export function saveJevReference(user:string,source:string,ref:JevReference,type:JevBenchmarkType='axes_phase1') {
   // Refuse a launch if durable storage is unavailable: a reload must remain safe.
-  localStorage.setItem(key(user,source),JSON.stringify(ref))
+  localStorage.setItem(key(user,source,type),JSON.stringify(ref))
 }
-export function rememberJevRun(user:string,run:JevRun) {
-  try{saveJevReference(user,run.source_generation_id,{benchmark_id:run.id,created_at:run.created_at,pending:false})}catch{/* Server lookup remains authoritative when local storage is unavailable. */}
+export function rememberJevRun<C>(user:string,run:JevRun<C>) {
+  try{saveJevReference(user,run.source_generation_id,{benchmark_id:run.id,created_at:run.created_at,pending:false},run.benchmark_type??'axes_phase1')}catch{/* Server lookup remains authoritative when local storage is unavailable. */}
 }
 async function invoke<T>(suffix:string,method:'GET'|'POST'='GET',body?:Record<string,unknown>):Promise<T> {
   if(!supabase)throw new Error('UNAUTHORIZED')
@@ -49,38 +50,38 @@ export const jevApi={
     return Boolean(data?.length)
   },
   async sources(){return (await invoke<{establishments:JevSource[]}>('?eligible=1')).establishments},
-  async latest(source:string){return (await invoke<{benchmark:JevRun|null}>('?source_generation_id='+encodeURIComponent(source))).benchmark},
-  async read(id:string){return await invoke<JevRun>('?benchmark_id='+encodeURIComponent(id))},
-  async post(source:string){return await invoke<{benchmark_id:string}>('','POST',{source_generation_id:source,repeat_count:3,concurrency:8,model:'jev-latest'})},
+  async latest<C=JevComparison>(source:string,type:JevBenchmarkType='axes_phase1'){return (await invoke<{benchmark:JevRun<C>|null}>('?source_generation_id='+encodeURIComponent(source)+(type==='themes_phase2'?'&benchmark_type=themes_phase2':''))).benchmark},
+  async read<C=JevComparison>(id:string){return await invoke<JevRun<C>>('?benchmark_id='+encodeURIComponent(id))},
+  async post(source:string,type:JevBenchmarkType='axes_phase1'){return await invoke<{benchmark_id:string}>('','POST',{source_generation_id:source,repeat_count:3,concurrency:8,model:'jev-latest',...(type==='themes_phase2'?{benchmark_type:type}: {})})},
 }
 const launchLocks=new Set<string>()
-export async function launchJevOnce(user:string,source:string):Promise<JevRun|null> {
-  const lock=key(user,source)
+export async function launchJevOnce<C=JevComparison>(user:string,source:string,type:JevBenchmarkType='axes_phase1'):Promise<JevRun<C>|null> {
+  const lock=key(user,source,type)
   if(launchLocks.has(lock))throw new Error('JEV_LAUNCH_PENDING')
   launchLocks.add(lock)
   async function launch() {
     // Re-check the authoritative state immediately before any explicit POST,
     // including retries of a failed run. Existing completed runs are never replaced.
-    const existing=await jevApi.latest(source)
+    const existing=type==='axes_phase1'?await jevApi.latest<C>(source):await jevApi.latest<C>(source,type)
     if(existing && existing.status!=='failed'){rememberJevRun(user,existing);return existing}
-    const saved=readJevReference(user,source)
+    const saved=readJevReference(user,source,type)
     if(saved?.benchmark_id && !existing) {
-      const known=await jevApi.read(saved.benchmark_id)
-      if(known.source_generation_id!==source)throw new Error('JEV_LAUNCH_PENDING')
+      const known=await jevApi.read<C>(saved.benchmark_id)
+      if(known.source_generation_id!==source || (known.benchmark_type??'axes_phase1')!==type)throw new Error('JEV_LAUNCH_PENDING')
       if(known.status!=='failed'){rememberJevRun(user,known);return known}
     }
     if(saved?.pending)throw new Error('JEV_LAUNCH_PENDING')
-    saveJevReference(user,source,{benchmark_id:null,created_at:new Date().toISOString(),pending:true})
+    saveJevReference(user,source,{benchmark_id:null,created_at:new Date().toISOString(),pending:true},type)
     try {
-      const result=await jevApi.post(source)
+      const result=type==='axes_phase1'?await jevApi.post(source):await jevApi.post(source,type)
       if(!result?.benchmark_id)throw new Error('JEV_LAUNCH_PENDING')
-      saveJevReference(user,source,{benchmark_id:result.benchmark_id,created_at:new Date().toISOString(),pending:false})
+      saveJevReference(user,source,{benchmark_id:result.benchmark_id,created_at:new Date().toISOString(),pending:false},type)
       // Keep the durable id even if this read fails or the screen unmounts.
-      return await jevApi.read(result.benchmark_id)
+      return await jevApi.read<C>(result.benchmark_id)
     }catch(error) {
       // These definite pre-launch rejections cannot have created a run.
       const code=error instanceof Error?error.message:''
-      if(['JEV_NOT_CONFIGURED','UNAUTHORIZED','FORBIDDEN','INVALID_REPEAT_COUNT','INVALID_CONCURRENCY','SOURCE_NOT_FOUND'].includes(code))localStorage.removeItem(lock)
+      if(['JEV_NOT_CONFIGURED','UNAUTHORIZED','FORBIDDEN','INVALID_REPEAT_COUNT','INVALID_CONCURRENCY','INVALID_BENCHMARK_TYPE','SOURCE_NOT_FOUND','SOURCE_PHASE1_REQUIRED'].includes(code))localStorage.removeItem(lock)
       throw error
     }
   }

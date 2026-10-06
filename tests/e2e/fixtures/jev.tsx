@@ -5,9 +5,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { I18nProvider } from '../../../src/i18n'
 import { JevBenchmarkResults } from '../../../src/pages/JevBenchmarkPage'
 import { jevResult } from '../../fixtures/jev-benchmark'
+import { themeResult } from '../../fixtures/jev-themes'
+import { JevThemeResults } from '../../../src/pages/JevThemesPhase'
 import '../../../src/styles/global.css'
 import '../../../src/styles/pages.css'
 import '../../../src/styles/reference.css'
 import '../../../src/styles/warm-theme.css'
 const params=new URLSearchParams(location.search),language=params.get('language')==='vi'?'vi':'fr'
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language={language}><div className="app-shell"><main className="page-frame"><div className="jev-page"><header className="jev-intro"><span className="jev-tag">{language==='fr'?'Expérimental':'Thử nghiệm'}</span><h2>{language==='fr'?'Benchmark Jev':'Thử nghiệm Jev'}</h2></header><JevBenchmarkResults run={jevResult} name="Shabu Ssam BBQ Restaurant"/></div></main></div></I18nProvider></MemoryRouter></QueryClientProvider>)
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language={language}><div className="app-shell"><main className="page-frame"><div className="jev-page"><header className="jev-intro"><span className="jev-tag">{language==='fr'?'Expérimental':'Thử nghiệm'}</span><h2>{language==='fr'?'Benchmark Jev':'Thử nghiệm Jev'}</h2></header>{params.get('phase')==='2'?<JevThemeResults run={themeResult}/>:<JevBenchmarkResults run={jevResult} name="Shabu Ssam BBQ Restaurant"/>}</div></main></div></I18nProvider></MemoryRouter></QueryClientProvider>)

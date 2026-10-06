@@ -16,7 +16,7 @@ Deno.serve(benchmarkHandler({
     // organization, authorize membership, then read the snapshot with an org filter.
     // Only the experimental table has any mutation capability in this function.
     const benchmarks=context.admin.from('jev_benchmark_runs')
-    const summaryFields='id,organization_id,establishment_id,source_generation_id,status,error_code,comparison,created_at,completed_at,requested_model,served_models,repeat_count,reviews_total,reviews_with_text,reviews_without_text,request_count,retry_count,jev_input_tokens,jev_output_tokens'
+    const summaryFields='id,benchmark_type,organization_id,establishment_id,source_generation_id,status,error_code,comparison,created_at,completed_at,requested_model,served_models,repeat_count,reviews_total,reviews_with_text,reviews_without_text,request_count,retry_count,jev_input_tokens,jev_output_tokens'
     return {
       authorize:async organizationId=>{await assertMembership(context.client,context.user.id,organizationId,['owner','admin','manager'])},
       readSource:async id=>{
@@ -48,10 +48,10 @@ Deno.serve(benchmarkHandler({
         }
         return eligibleJevSources(rows as unknown as Parameters<typeof eligibleJevSources>[0])
       },
-      readLatest:async sourceId=>{
+      readLatest:async (sourceId,type='axes_phase1')=>{
         // Exact status priority, without a limit that could hide an older running run.
         for(const status of ['running','completed','failed']) {
-          const {data,error}=await context.client.from('jev_benchmark_runs').select(summaryFields).eq('source_generation_id',sourceId).eq('status',status).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle()
+          const {data,error}=await context.client.from('jev_benchmark_runs').select(summaryFields).eq('source_generation_id',sourceId).eq('benchmark_type',type).eq('status',status).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle()
           if(error)throw new Error('JEV_BENCHMARK_READ_FAILED')
           if(data)return data
         }

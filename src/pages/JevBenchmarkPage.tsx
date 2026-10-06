@@ -9,6 +9,7 @@ import { jevMessages } from '../i18n/jev'
 import { useJevAccess } from '../lib/use-jev-access'
 import { jevApi,launchJevOnce,readJevReference,rememberJevRun,selectedJevSource,selectJevSource,costComparison,latencyRatio,type JevRun } from '../lib/jev-benchmark'
 import './JevBenchmarkPage.css'
+import { JevThemesPhase } from './JevThemesPhase'
 
 export function JevBenchmarkPage() {
   const {currentUser,demoMode}=useApp(),{language}=useI18n(),t=jevMessages[language]
@@ -75,6 +76,7 @@ export function JevBenchmarkPage() {
         </>}
         {run?.status==='running' && <section className="card jev-card jev-running" role="status"><LoaderCircle className="jev-spinner" size={26}/><h3>{t.running}</h3><strong>{source.name}</strong><p>{run.reviews_total} {t.reviews} · {run.requested_model} · {run.repeat_count} {t.repeats.toLowerCase()}</p><small>{t.started} {new Date(run.created_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</small><p>{t.continue}</p><button className="secondary-button" disabled>{t.running}</button></section>}
         {run?.status==='completed' && <JevBenchmarkResults run={run} name={source.name}/>}
+        {run?.status==='completed' && <JevThemesPhase key={sourceId} user={user} source={source} visible={visible}/>}
         {run?.status==='failed' && <JevTechnicalDetails run={run}/>}
       </>}
     </>}

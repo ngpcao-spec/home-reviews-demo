@@ -44,3 +44,14 @@
 @keyframes jev-spin {to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.jev-spinner{animation:none}}
 @media(min-width:700px){.jev-dual{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.jev-phase2 {display:grid;gap:16px;border-top:1px solid var(--border);padding-top:24px;margin-top:8px}
+.jev-theme-kpis {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
+.jev-theme-kpis small {display:block;color:var(--muted);font-size:12px;line-height:1.5}
+.jev-theme-kpis strong {display:block;font-size:25px;color:var(--champagne);margin-top:6px;overflow-wrap:anywhere}
+.jev-theme-kpis>div:nth-child(4) strong {font-size:18px}
+.jev-theme-list {margin-top:14px}
+.jev-theme-list summary {color:var(--champagne);cursor:pointer;min-height:44px;display:list-item;line-height:44px}
+.jev-theme-detail {border-top:1px solid var(--border);padding-top:16px;margin-top:16px;min-width:0}
+.jev-theme-detail h4 {font-size:14px;line-height:1.6;margin:0;overflow-wrap:anywhere}
+.jev-theme-detail>div {margin-top:16px}
+.jev-theme-detail p {font-size:13px}

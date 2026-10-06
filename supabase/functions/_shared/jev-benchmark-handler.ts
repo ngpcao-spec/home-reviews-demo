@@ -1,6 +1,8 @@
-import { validateOptions, validateSource, sourceFingerprint, newBenchmarkState, runJevBenchmark, compareBenchmark, type BenchmarkSource, type CostRates } from './jev-benchmark.ts'
-import { createJevClient } from './jev.ts'
+import { validateOptions, validateSource, sourceFingerprint, newBenchmarkState, runJevBenchmark, compareBenchmark, type BenchmarkSource, type BenchmarkState, type CostRates } from './jev-benchmark.ts'
+import { createJevClient,type JevDecision } from './jev.ts'
 import type { EligibleJevSource } from './jev-benchmark-read.ts'
+import { benchmarkType,type BenchmarkType } from './jev-benchmark-type.ts'
+import { compareThemes,themePayload,parseThemes,type ThemeDecision } from './jev-themes.ts'
 
 type Row = Record<string,unknown>
 export interface BenchmarkRepository {
@@ -11,7 +13,7 @@ export interface BenchmarkRepository {
   updateBenchmark:(id:string,row:Row)=>Promise<void>
   readBenchmark:(id:string)=>Promise<Row|null>
   listEligible?:()=>Promise<EligibleJevSource[]>
-  readLatest?:(sourceId:string)=>Promise<Row|null>
+  readLatest?:(sourceId:string,type?:BenchmarkType)=>Promise<Row|null>
 }
 export interface HandlerDependencies {
   authenticate:(request:Request)=>Promise<BenchmarkRepository>
@@ -44,7 +46,7 @@ export function benchmarkHandler(deps:HandlerDependencies) {
         if(sourceId!==null) {
           if(!uuid(sourceId))return json({error:'SOURCE_GENERATION_ID_REQUIRED'},400)
           if(!repo.readLatest)throw new Error('JEV_READ_UNAVAILABLE')
-          const row=await repo.readLatest(sourceId)
+          const row=await repo.readLatest(sourceId,benchmarkType(params.get('benchmark_type')))
           if(row)await repo.authorize(row.organization_id as string)
           return json({benchmark:row})
         }
@@ -62,27 +64,32 @@ export function benchmarkHandler(deps:HandlerDependencies) {
       try {body=await request.json()}catch{throw new Error('INVALID_BODY')}
       if(!body || typeof body!=='object' || Array.isArray(body))throw new Error('INVALID_BODY')
       if(!uuid(body.source_generation_id))throw new Error('SOURCE_GENERATION_ID_REQUIRED')
+      const benchmark_type=benchmarkType(body.benchmark_type)
       const options=validateOptions(body,deps.env('JEV_MODEL')??'jev-latest',Number(deps.env('JEV_BENCHMARK_CONCURRENCY')??8))
       const source=await repo.readSource(body.source_generation_id)
       if(!source)return json({error:'SOURCE_NOT_FOUND'},404)
       await repo.authorize(source.organization_id)
       validateSource(source)
+      if(benchmark_type==='themes_phase2') {
+        const phase1=await repo.readLatest?.(source.generation_id,'axes_phase1')
+        if(phase1?.status!=='completed')throw new Error('SOURCE_PHASE1_REQUIRED')
+      }
       const rates:CostRates={jev_input:configuredRate(deps.env('JEV_INPUT_USD_PER_MILLION'),.042),sol_input:configuredRate(deps.env('SOL_INPUT_USD_PER_MILLION'),2),sol_output:configuredRate(deps.env('SOL_OUTPUT_USD_PER_MILLION'),10)}
-      const id=crypto.randomUUID(), fingerprint=await sourceFingerprint(source), state=newBenchmarkState(source,options)
-      const scope={benchmark_id:id,source_generation_id:source.generation_id}
+      const id=crypto.randomUUID(), fingerprint=await sourceFingerprint(source), state=newBenchmarkState<JevDecision|ThemeDecision>(source,options)
+      const scope={benchmark_id:id,source_generation_id:source.generation_id,benchmark_type}
       const log=(event:string,fields:Row={})=>deps.log?.(event,{...scope,...fields})
       const started=Date.now()
       const patch=()=>{
-        const comparison=compareBenchmark(source,state,options,rates)
+        const comparison=benchmark_type==='themes_phase2'?compareThemes(source,state as BenchmarkState<ThemeDecision>,options,rates):compareBenchmark(source,state as BenchmarkState,options,rates)
         return {decisions:state.decisions,served_models:state.served_models,request_count:state.request_count,retry_count:state.retry_count,jev_input_tokens:state.jev_input_tokens,jev_output_tokens:state.jev_output_tokens,jev_elapsed_ms:state.jev_elapsed_ms,estimated_jev_cost_usd:comparison.jev.estimated_jev_cost_usd,comparison}
       }
       const textual=source.snapshot.reviews.filter(r=>r.original_text?.trim()).length
-      await repo.insertBenchmark({id,organization_id:source.organization_id,establishment_id:source.establishment_id,source_generation_id:source.generation_id,source_analysis_version:6,source_fingerprint:fingerprint,requested_model:options.model,status:'running',repeat_count:options.repeat_count,concurrency:options.concurrency,reviews_total:source.snapshot.reviews.length,reviews_with_text:textual,reviews_without_text:source.snapshot.reviews.length-textual,rate_used:{jev_input:rates.jev_input,sol_input:rates.sol_input,sol_output:rates.sol_output,label:'ESTIMATION AU TARIF CONFIGURÉ'},sol_baseline_input_tokens:source.input_tokens,sol_baseline_output_tokens:source.output_tokens,estimated_sol_baseline_cost_usd:(source.input_tokens*rates.sol_input+source.output_tokens*rates.sol_output)/1_000_000,sol_baseline_elapsed_ms:Date.parse(source.completed_at)-Date.parse(source.started_at),...patch()})
+      await repo.insertBenchmark({id,benchmark_type,organization_id:source.organization_id,establishment_id:source.establishment_id,source_generation_id:source.generation_id,source_analysis_version:6,source_fingerprint:fingerprint,requested_model:options.model,status:'running',repeat_count:options.repeat_count,concurrency:options.concurrency,reviews_total:source.snapshot.reviews.length,reviews_with_text:textual,reviews_without_text:source.snapshot.reviews.length-textual,rate_used:{jev_input:rates.jev_input,sol_input:rates.sol_input,sol_output:rates.sol_output,label:'ESTIMATION AU TARIF CONFIGURÉ'},sol_baseline_input_tokens:source.input_tokens,sol_baseline_output_tokens:source.output_tokens,estimated_sol_baseline_cost_usd:(source.input_tokens*rates.sol_input+source.output_tokens*rates.sol_output)/1_000_000,sol_baseline_elapsed_ms:Date.parse(source.completed_at)-Date.parse(source.started_at),...patch()})
       // Only a manually authenticated POST starts work. No cron or scheduler registration.
       const work=async()=>{
         log('JEV_BENCHMARK_STARTED',{model:options.model,repeat_count:options.repeat_count,concurrency:options.concurrency})
         try {
-          await runJevBenchmark(source,options,apiKey,state,{log,checkpoint:async()=>{
+          await runJevBenchmark<JevDecision|ThemeDecision>(source,options,apiKey,state,{log,...(benchmark_type==='themes_phase2'?{evaluate:(client:ReturnType<typeof createJevClient>,model:string,alias:string,text:string)=>client.evaluatePayload(themePayload(model,alias,text),parseThemes)}:{}),checkpoint:async()=>{
             state.jev_elapsed_ms=Date.now()-started
             await repo.updateBenchmark(id,patch())
             // Bound execution to leave time to save partial results within Edge limits.
@@ -100,7 +107,7 @@ export function benchmarkHandler(deps:HandlerDependencies) {
         }
       }
       deps.waitUntil(work())
-      return json({benchmark_id:id,status:'running',source_generation_id:source.generation_id,requested_model:options.model,repeat_count:options.repeat_count,concurrency:options.concurrency,status_url:`?benchmark_id=${id}`,note:'Read the persisted summary with authenticated GET; do not re-POST to poll.'},202)
+      return json({benchmark_id:id,benchmark_type,status:'running',source_generation_id:source.generation_id,requested_model:options.model,repeat_count:options.repeat_count,concurrency:options.concurrency,status_url:`?benchmark_id=${id}`,note:'Read the persisted summary with authenticated GET; do not re-POST to poll.'},202)
     }catch(error) {
       const code=errorCode(error)
       const status=code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:code==='JEV_NOT_CONFIGURED'?503:code==='BENCHMARK_ALREADY_RUNNING'?409:code.startsWith('INVALID_') || code==='SOURCE_GENERATION_ID_REQUIRED' || code.startsWith('SOURCE_')?400:500

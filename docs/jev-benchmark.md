@@ -7,6 +7,52 @@ aucune rédaction et aucune modification du pipeline de production.
 
 ## Interface mobile temporaire
 
+### Phase 2 — thèmes détaillés
+
+Types explicites : `axes_phase1` (défaut, tous les anciens runs) et `themes_phase2`.
+La migration ajoute uniquement cette colonne et les index de la table expérimentale.
+Les recherches du dernier benchmark et les références locales sont séparées par
+type, sans modifier les données JSON du benchmark Phase 1 historique.
+
+Après une Phase 1 completed sur la source sélectionnée, le bloc **Phase 2 — Thèmes
+détaillés** propose un clic manuel. Le backend vérifie également cette condition.
+Pour le premier test : sélectionner Shabu **101 avis**, source
+`382c46aa-2505-44de-8693-71ab1fa92d11`. Paramètres inchangés : trois répétitions,
+concurrency huit, alias `jev-latest`. Les 95 textes impliquent 285 évaluations
+hors retries, jamais déclenchées par chargement, reprise, déploiement ou cron.
+
+Chaque requête contient les 25 thèmes exacts du catalogue V6, chacun avec une
+Choice `absent/positive/negative/both`. Le state ne contient que l'alias et le texte
+original. Aucune evidence, citation, explication, rédaction, nouvelle collecte
+Google ou nouvelle extraction Sol. Les 6 avis sans texte sont exclus des appels.
+
+Les décisions stockent uniquement review_id, thèmes, Choice et les quatre
+probabilités par répétition. Les probabilités de présence sont `p_positive+p_both`
+et `p_negative+p_both`. Les métriques sont conservées à 0.50, 0.70 et 0.80.
+Le support Sol est le nombre d'avis textuels uniques avec le label, pas le nombre
+de répétitions. Support high >=20, medium 5–19, low 1–4, none 0.
+Les labels support <5 sont affichés comme échantillon insuffisant et exclus des
+micro/macro F1 principaux, globalement et par axe. Les counts sont regroupés
+sur avis × répétitions. Les comparaisons Choice booléennes sont aussi conservées.
+
+Stabilité : égalité des trois Choices par avis/thème, puis globalement et par axe.
+Dérive : max-min des probabilités de présence positive et négative par avis/thème,
+puis moyenne/p95/max des écarts (p95 au rang supérieur) globalement et par axe.
+Aucune probabilité arrondie avant calcul. Les répétitions incomplètes sont exclues
+et signalées ; un benchmark partiel n'obtient pas de verdict concluant.
+
+Verdict au seuil principal 0.50 : excellent si micro >=0.92, macro >=0.88 et
+stabilité >=0.98 ; prometteur si micro >=0.88, macro >=0.82 et stabilité >=0.95 ;
+sinon insuffisant. Chaque axe suffisamment documenté avec micro <0.80 est signalé
+séparément. Le meilleur seuil par label est exploratoire, sur ce même snapshot,
+avec préférence au seuil le plus bas en cas d'égalité ; aucun réglage production.
+
+L'écran présente cinq indicateurs, quatre cartes d'axes et 25 thèmes repliables.
+Usage, coût au tarif configuré et latence proviennent des réponses API et du
+chronomètre serveur. Le comparatif est un **theme-detection benchmark**, face au
+run Sol complet avec orchestration. Aucune économie hybride définitive annoncée.
+Artisan et la Phase 3 exigent une nouvelle demande ; ils ne démarrent jamais seuls.
+
 Dans **Plus → Test Jev** (FR) / **Thêm → Thử nghiệm Jev** (VI), seuls les
 owner/admin/manager disposent de l'entrée. La route est `/plus/jev-benchmark`.
 Les paramètres restent fixes : `jev-latest`, trois répétitions, concurrency huit.

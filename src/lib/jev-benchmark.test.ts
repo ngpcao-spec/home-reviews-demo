@@ -73,4 +73,10 @@ describe('Jev browser API and launch protection',()=>{
     expect(costComparison(.02,.1)).toEqual({share:.19999999999999998,savings:.8})
     expect(costComparison(0,0)).toBeNull();expect(latencyRatio(0,100)).toBeNull();expect(latencyRatio(10,100)).toBe(10)
   })
+  it('Phase 2 POST is explicit and latest search uses the phase filter',async()=>{
+    invoke.mockResolvedValue({data:{benchmark:null,benchmark_id:'id'},error:null})
+    await jevApi.latest('source','themes_phase2');await jevApi.post('source','themes_phase2')
+    expect(invoke.mock.calls[0][0]).toBe('benchmark-jev-historical-analysis?source_generation_id=source&benchmark_type=themes_phase2')
+    expect(invoke.mock.calls[1][1]).toEqual({method:'POST',body:{source_generation_id:'source',benchmark_type:'themes_phase2',repeat_count:3,concurrency:8,model:'jev-latest'}})
+  })
 })
