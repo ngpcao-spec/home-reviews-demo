@@ -8,6 +8,7 @@ import { AppProvider, useApp } from './app/AppContext'
 import { I18nProvider } from './i18n'
 import {supabase} from './lib/supabase'
 import {authReturnKind,prepareAuthReturn} from './lib/auth-session'
+import {PwaUpdateNotice} from './components/PwaUpdateNotice'
 import './styles/global.css'
 import './styles/pages.css'
 import './styles/reference.css'
@@ -20,7 +21,7 @@ function AccountQueries({children}:{children:ReactNode}) {
 }
 function LocalizedApp(){
   const {preferredLanguage,currentUser}=useApp()
-  return <AccountQueries key={currentUser.id??'anonymous'}><I18nProvider language={preferredLanguage??'fr'}><App/></I18nProvider></AccountQueries>
+  return <AccountQueries key={currentUser.id??'anonymous'}><I18nProvider language={preferredLanguage??'fr'}><PwaUpdateNotice/><App/></I18nProvider></AccountQueries>
 }
 const root=createRoot(document.getElementById('root')!)
 async function mountApp(){
@@ -32,5 +33,3 @@ async function mountApp(){
   root.render(<StrictMode><Router><AppProvider><LocalizedApp/></AppProvider></Router></StrictMode>)
 }
 void mountApp()
-
-if('serviceWorker'in navigator&&import.meta.env.PROD)window.addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`))

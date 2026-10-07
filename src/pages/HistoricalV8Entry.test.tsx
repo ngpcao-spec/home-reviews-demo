@@ -1,0 +1,7 @@
+import {afterEach,it,expect,vi} from 'vitest'
+import {cleanup,render,screen,waitFor} from '@testing-library/react'
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query'
+import {I18nProvider} from '../i18n'
+import {HistoricalV8Entry} from './HistoricalV8Entry'
+const calls=vi.hoisted(()=>({english:vi.fn(),v8:vi.fn()}));vi.mock('../lib/english-backfill',()=>({englishBackfillApi:calls.english}));vi.mock('../lib/historical-v8',()=>({historicalV8Api:calls.v8}));afterEach(()=>{cleanup();vi.clearAllMocks();localStorage.clear()})
+it('visible V8 card reads current coverage/status only and explains that Jev V7 is historical',async()=>{calls.english.mockResolvedValue({coverage:{stored_reviews:102,reviews_with_text:96,original_english:9,english_translation_found:87,english_translation_missing:0,coverage_percent:100},job:null});calls.v8.mockResolvedValue({eligibility:{available:true},run:null});render(<QueryClientProvider client={new QueryClient()}><I18nProvider language="fr"><HistoricalV8Entry user="u" establishment="shabu-fixture" name="Shabu" visible/></I18nProvider></QueryClientProvider>);await waitFor(()=>expect(screen.getByRole('button',{name:'Lancer le rapport V8'})).toBeEnabled());expect(screen.getByText('102 avis · 96 avec texte · 100 % EN')).toBeVisible();expect(screen.getByText(/conservés en historique/)).toBeVisible();expect(calls.english).toHaveBeenCalledWith('shabu-fixture');expect(calls.v8.mock.calls.every(c=>!c[2])).toBe(true)})

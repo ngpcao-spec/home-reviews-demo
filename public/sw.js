@@ -4,7 +4,10 @@ const SHELL = [BASE, `${BASE}manifest.webmanifest`, `${BASE}favicon.svg`]
 const ASSETS = [] // BUILD_ASSETS
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll([...SHELL,...ASSETS.map(asset=>`${BASE}${asset}`)])))
+  // A new revision must fetch fresh HTML instead of inheriting an HTTP-cached
+  // index from the previous release. Keep the complete shell/chunk precache.
+  const requests=[...SHELL,...ASSETS.map(asset=>`${BASE}${asset}`)].map(path=>new Request(new URL(path,self.registration.scope),{cache:'reload'}))
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(requests)))
   // Taking control does not reload clients; no controllerchange reload handler.
   self.skipWaiting()
 })
