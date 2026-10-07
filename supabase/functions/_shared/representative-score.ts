@@ -1,0 +1,16 @@
+import {modelScores,type GoldSource,type GoldBenchmark,type GoldLabel} from './gold-core.ts'
+import type {GoldChoice} from './gold-taxonomy.ts'
+import {holdoutHash,type RepresentativeItem} from './representative-selection.ts'
+export interface PreviousDifficultResult {id:string;comparable_labels:number;human_uncertain:number;jev_agreement_percent:number|null;sol_agreement_percent:number|null}
+export async function scoreRepresentative(id:string,source:GoldSource,benchmark:GoldBenchmark,items:RepresentativeItem[],humanLabels:GoldLabel[],previous:PreviousDifficultResult){
+  const ids=items.filter(i=>!i.excluded).sort((a,b)=>a.position-b.position).map(i=>i.review_id),labels=new Map(humanLabels.map(l=>[l.review_id+':'+l.theme_key,l.choice]))
+  if(ids.length!==12||new Set(ids).size!==12)throw new Error('HOLDOUT_INCOMPLETE')
+  const a=modelScores(source,benchmark,ids,labels as Map<string,GoldChoice>,'sol',.5),b=modelScores(source,benchmark,ids,labels as Map<string,GoldChoice>,'jev',.5)
+  function result(m:typeof a){const counts=Object.values(m.themes).flatMap(t=>Object.values(t)),tp=counts.reduce((n,c)=>n+c.tp,0),fp=counts.reduce((n,c)=>n+c.fp,0),fn=counts.reduce((n,c)=>n+c.fn,0)
+    return {micro_f1_human:m.micro_f1_gold,macro_f1_human:m.macro_f1_gold,macro_supported_labels:m.macro_supported_labels,precision:tp+fp?tp/(tp+fp):null,recall:tp+fn?tp/(tp+fn):null,exact_choice_agreement_with_human:m.exact_choice_agreement_with_gold,exact_choice_compared:m.exact_choice_compared,themes:m.themes,axes:m.axes}}
+  const seed=await holdoutHash(id);let state=parseInt(seed.slice(0,8),16)||1;const rand=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return (state>>>0)/4294967296},distribution:number[]=[];let undefinedResamples=0
+  for(let sample=0;sample<2000;sample++){let at=0,af=0,an=0,bt=0,bf=0,bn=0;for(let draw=0;draw<12;draw++){const index=Math.floor(rand()*12),x=a.perReview[index],y=b.perReview[index];at+=x.tp;af+=x.fp;an+=x.fn;bt+=y.tp;bf+=y.fp;bn+=y.fn}const ad=2*at+af+an,bd=2*bt+bf+bn;if(!ad||!bd)undefinedResamples++;else distribution.push(2*bt/bd-2*at/ad)}
+  distribution.sort((x,y)=>x-y);const q=(p:number)=>distribution.length?distribution[Math.floor((distribution.length-1)*p)]:null,low=q(.025),high=q(.975)
+  const verdict:'jev_better_on_representative_holdout'|'sol_better_on_representative_holdout'|'inconclusive'=low===null||high===null||undefinedResamples>0?'inconclusive':low>0?'jev_better_on_representative_holdout':high<0?'sol_better_on_representative_holdout':'inconclusive'
+  return {methodology:'representative_holdout_v1',source_generation_id:source.generation_id,jev_benchmark_id:benchmark.id,served_models:benchmark.served_models,review_count:12,label_count:300,principal_threshold:.5,macro_support_threshold:3,sol:result(a),jev:result(b),bootstrap:{method:'paired_review_bootstrap',resamples:2000,seed_sha256:seed,valid_resamples:distribution.length,undefined_resamples:undefinedResamples,delta:a.micro_f1_gold===null||b.micro_f1_gold===null?null:b.micro_f1_gold-a.micro_f1_gold,ci_95_low:low,ci_95_high:high},previous_difficult_test:previous,verdict,note:'Independent small sample of remaining eligible English V7 reviews; not a global accuracy estimate. Difficult-test exact agreement and holdout presence F1 measure different samples and metrics.'}
+}

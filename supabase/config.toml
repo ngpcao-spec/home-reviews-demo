@@ -467,3 +467,6 @@ verify_jwt = true
 
 [functions.human-gold-adjudication]
 verify_jwt = true
+
+[functions.representative-human-test]
+verify_jwt = true

@@ -12,6 +12,7 @@ import type {adjudicationProjection} from '../../supabase/functions/_shared/gold
 import type {GoldTheme} from '../../supabase/functions/_shared/gold-taxonomy'
 import './JevBenchmarkPage.css'
 import './GoldSetPage.css'
+import {RepresentativeEntry} from './RepresentativeHumanPage'
 type Data=ReturnType<typeof adjudicationProjection>
 export function AdjudicationEntry(){
   const {currentUser}=useApp(),{language}=useI18n(),t=adjudicationMessages[language],navigate=useNavigate(),busy=useRef(false),[starting,setStarting]=useState(false),[error,setError]=useState(false)
@@ -48,5 +49,6 @@ export function AdjudicationResults({data}:{data:Data}){
     {(['attentiveness','professionalism','atmosphere'] as const).map(theme=><section className="card jev-card" key={theme}><h3>{data.taxonomy[theme][language]}</h3><dl className="jev-pairs"><dt>{t.controlled}</dt><dd>{c.by_theme[theme].controlled_cases}</dd><dt>{t.humanSol}</dt><dd>{c.by_theme[theme].human_matches_sol}</dd><dt>{t.humanJev}</dt><dd>{c.by_theme[theme].human_matches_jev}</dd><dt>{t.humanGold}</dt><dd>{c.by_theme[theme].human_matches_gold}</dd><dt>{t.uncertain}</dt><dd>{c.by_theme[theme].human_uncertain}</dd></dl></section>)}
     <section className="card jev-card"><h3>{t.comparison}</h3><dl className="jev-pairs"><dt>{t.solOnly}</dt><dd>{c.human_matches_sol_only}</dd><dt>{t.jevOnly}</dt><dd>{c.human_matches_jev_only}</dd><dt>{t.bothModels}</dt><dd>{c.human_matches_both}</dd><dt>{t.neither}</dt><dd>{c.human_matches_neither}</dd></dl></section>
     <section className="card jev-card"><h3>{t.mismatches}</h3>{cases(c.cases.filter(row=>row.gold_mismatch&&row.comparable))}</section><details className="card jev-card jev-theme-list"><summary>{t.allCases}</summary>{cases(c.cases)}</details>
+    {data.adjudication.id==='146615ca-d3cd-4914-8613-4e6e3d6219f7'&&<RepresentativeEntry/>}
   </div>
 }

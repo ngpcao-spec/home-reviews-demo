@@ -47,7 +47,7 @@ type Counts={tp:number;fp:number;fn:number;tn:number;support:number;uncertain:nu
 const empty=():Counts=>({tp:0,fp:0,fn:0,tn:0,support:0,uncertain:0})
 const sum=(rows:Counts[])=>rows.reduce((a,b)=>Object.fromEntries(Object.keys(a).map(k=>[k,a[k as keyof Counts]+b[k as keyof Counts]])) as Counts,empty())
 const metrics=(c:Counts)=>({...c,precision:c.tp+c.fp?c.tp/(c.tp+c.fp):null,recall:c.tp+c.fn?c.tp/(c.tp+c.fn):null,f1:2*c.tp+c.fp+c.fn?2*c.tp/(2*c.tp+c.fp+c.fn):null})
-function modelScores(source:GoldSource,jev:GoldBenchmark,ids:string[],labels:Map<string,GoldChoice>,model:'sol'|'jev',threshold:number) {
+export function modelScores(source:GoldSource,jev:GoldBenchmark,ids:string[],labels:Map<string,GoldChoice>,model:'sol'|'jev',threshold:number) {
   const perReview:Counts[]=[],themeCounts=Object.fromEntries(GOLD_KEYS.map(k=>[k,{positive:empty(),negative:empty()}])),exact={same:0,total:0}
   for(const id of ids){const row=empty();for(const theme of GOLD_KEYS){const gold=labels.get(id+':'+theme);if(!gold)throw new Error('GOLD_LABELS_INCOMPLETE');const prediction=model==='sol'?solChoice(source,id,theme):jevChoice(jev,id,theme,threshold);if(gold!=='uncertain'){exact.total++;if(prediction===gold)exact.same++}
     for(const polarity of ['positive','negative'] as const){const c=themeCounts[theme][polarity];if(gold==='uncertain'){c.uncertain++;continue}const g=presence(gold)[polarity],p=presence(prediction)[polarity],key=p?g?'tp':'fp':g?'fn':'tn';c[key]++;row[key]++;if(g){c.support++;row.support++}}}perReview.push(row)}
