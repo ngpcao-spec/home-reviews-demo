@@ -9,6 +9,7 @@ import { clearNavigationState } from '../lib/navigation-state'
 import { RefreshGate } from '../lib/refresh-gate'
 import { nextSyncAtFromLastSync } from '../lib/monitoring-schedule'
 import { localizedReviewText,type ReviewTranslationLanguage } from '../lib/review-translation'
+import {authStartupRecovery} from '../lib/auth-session'
 import { MockReviewProvider, type PlaceCandidate } from '../services/review-provider'
 import type { AppNotification, Establishment, PreferredLanguage, Review, ReviewAction, ReviewStatus } from '../types/domain'
 
@@ -433,7 +434,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dataLoading, setDataLoading] = useState(false)
   const [dataReady, setDataReady] = useState(allowDemo)
   const [dataError, setDataError] = useState<string | null>(() => !allowDemo && !isSupabaseConfigured ? 'Supabase n’est pas configuré pour ce déploiement.' : null)
-  const [passwordRecovery, setPasswordRecovery] = useState(() => window.location.hash.includes('type=recovery'))
+  const [passwordRecovery, setPasswordRecovery] = useState(() => authStartupRecovery()||window.location.hash.includes('type=recovery'))
   const [monitoringIntervalHours, setMonitoringIntervalHours] = useState(12)
   const [preferredLanguage, setPreferredLanguage] = useState<PreferredLanguage | null>(allowDemo ? 'fr' : null)
   const [establishments, setEstablishments] = useState(initial.establishments)

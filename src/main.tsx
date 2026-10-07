@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { AppProvider, useApp } from './app/AppContext'
 import { I18nProvider } from './i18n'
+import {supabase} from './lib/supabase'
+import {authReturnKind,prepareAuthReturn} from './lib/auth-session'
 import './styles/global.css'
 import './styles/pages.css'
 import './styles/reference.css'
@@ -20,6 +22,15 @@ function LocalizedApp(){
   const {preferredLanguage,currentUser}=useApp()
   return <AccountQueries key={currentUser.id??'anonymous'}><I18nProvider language={preferredLanguage??'fr'}><App/></I18nProvider></AccountQueries>
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><Router><AppProvider><LocalizedApp/></AppProvider></Router></StrictMode>)
+const root=createRoot(document.getElementById('root')!)
+async function mountApp(){
+  if(supabase&&authReturnKind(window.location.href)!=='none'){
+    // Consume/clean OAuth's fragment before HashRouter interprets it as a route.
+    root.render(<main className="auth-page"><div className="auth-brand"><span>H</span><div><strong>HOME</strong><small>REVIEWS</small></div></div><p role="status">Finalisation de la connexion Google…</p></main>)
+    await prepareAuthReturn(supabase.auth)
+  }
+  root.render(<StrictMode><Router><AppProvider><LocalizedApp/></AppProvider></Router></StrictMode>)
+}
+void mountApp()
 
 if('serviceWorker'in navigator&&import.meta.env.PROD)window.addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`))

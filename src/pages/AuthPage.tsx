@@ -1,16 +1,19 @@
-import { useState } from 'react'
+import { useState,useRef } from 'react'
 import { getGoogleOAuthOptions } from '../lib/auth-redirect'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import {authStartupError} from '../lib/auth-session'
 
 function GoogleMark() {
   return <span className="google-mark" aria-hidden="true">G</span>
 }
 
 export function AuthPage() {
-  const [error, setError] = useState('')
+  const [error, setError] = useState(authStartupError)
   const [busy, setBusy] = useState(false)
+  const starting=useRef(false)
 
   const continueWithGoogle = async () => {
+    if(starting.current)return
     setError('')
     if (!isSupabaseConfigured || !supabase) {
       setError('Supabase n’est pas configuré pour ce déploiement.')
@@ -18,15 +21,19 @@ export function AuthPage() {
     }
 
     setBusy(true)
+    starting.current=true
+    try {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: getGoogleOAuthOptions(),
     })
 
     if (oauthError) {
-      setError(oauthError.message)
+      setError('Impossible de démarrer la connexion Google. Réessayez.')
       setBusy(false)
+      starting.current=false
     }
+    }catch{setError('Impossible de démarrer la connexion Google. Vérifiez votre connexion puis réessayez.');setBusy(false);starting.current=false}
   }
 
   return <main className="auth-page">
