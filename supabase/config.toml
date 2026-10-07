@@ -464,3 +464,6 @@ enabled = true
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 [functions.human-gold-set]
 verify_jwt = true
+
+[functions.human-gold-adjudication]
+verify_jwt = true

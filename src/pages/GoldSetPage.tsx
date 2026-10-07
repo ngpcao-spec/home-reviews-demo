@@ -12,6 +12,7 @@ import type {GoldChoice,GoldTheme} from '../../supabase/functions/_shared/gold-t
 import type {blindGoldProjection} from '../../supabase/functions/_shared/gold-api'
 import './JevBenchmarkPage.css'
 import './GoldSetPage.css'
+import {AdjudicationEntry} from './GoldAdjudicationPage'
 type Existing=ReturnType<typeof blindGoldProjection>
 export function GoldSetEntry(){
   const {currentUser}=useApp(),{language}=useI18n(),t=goldMessages[language],navigate=useNavigate(),lock=useRef(false),[busy,setBusy]=useState(false),[error,setError]=useState(false)
@@ -59,5 +60,6 @@ export function GoldResults({data}:{data:Existing}) {
     <section className="card jev-card">{['friendly_staff','attentiveness','professionalism','wait_time','atmosphere'].map(theme)}</section>
     <section className="card jev-card"><h3>{t.resolution}</h3><dl className="jev-pairs">{[[t.solOnly,c.disagreement_resolution.gold_matches_sol_only],[t.jevOnly,c.disagreement_resolution.gold_matches_jev_only],[t.bothModels,c.disagreement_resolution.gold_matches_both],[t.neither,c.disagreement_resolution.gold_matches_neither],[t.goldUncertain,c.disagreement_resolution.gold_uncertain]].map(([label,value])=><div key={label} className="gold-resolution"><dt>{label}</dt><dd>{value}</dd></div>)}</dl><p className="jev-note">{t.bothNote}</p></section>
     <details className="card jev-card jev-theme-list"><summary>{t.allThemes}</summary>{Object.keys(data.taxonomy).map(theme)}</details><details className="card jev-card jev-technical"><summary>{t.technical}</summary><p>{data.gold_set.id}</p><p>{data.gold_set.taxonomy_version} · {data.gold_set.methodology}</p><p>{c.source_generation_id}<br/>{c.jev_benchmark_id}</p><p>Jev: {c.served_models.join(', ')}</p><p>{t.exact} · Sol {n(c.sol.exact_choice_agreement_with_gold)} · Jev {n(c.jev.exact_choice_agreement_with_gold)}</p><p>Bootstrap: {c.bootstrap.valid_resamples} / 2000 · {c.bootstrap.method}</p><h4>{t.exploratory}</h4>{Object.entries(c.exploratory).map(([threshold,scores])=><p key={threshold}>{threshold} · Jev {t.micro}: {n(scores.micro_f1_gold)}</p>)}</details>
+    {data.gold_set.id==='1d5cfc8c-ac77-4e44-a7a7-6153eb132385'&&<AdjudicationEntry/>}
   </div>
 }
