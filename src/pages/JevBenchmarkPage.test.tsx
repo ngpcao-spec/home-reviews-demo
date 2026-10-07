@@ -21,7 +21,7 @@ describe('Jev mobile page',()=>{
     vi.mocked(jevApi.sources).mockResolvedValue([{...jevSource,...english,snapshots:[english,{source_generation_id:old,source_analysis_version:6,reviews_total:101,completed_at:'2026-10-05T09:00:00Z'}]}])
     mount();fireEvent.click(await screen.findByRole('button',{name:'Sélectionner V7 · Analyse EN'}))
     expect(await screen.findByRole('button',{name:'Lancer Phase 2 V7'})).toBeEnabled();expect(jevApi.post).not.toHaveBeenCalled()
-    expect(screen.getByText('Préparation anglaise et rapport V7').closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByText('Préparation anglaise et rapports V7 / V8').closest('details')).not.toHaveAttribute('open')
     expect(screen.getByLabelText('Dataset · V6 / V7')).toHaveValue(english.source_generation_id)
   })
   it('V7 selection is labelled English and directly offers Phase 2 without a Phase 1 launch',async()=>{

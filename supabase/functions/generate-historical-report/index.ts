@@ -4,6 +4,7 @@ import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { historicalRunStatus } from '../_shared/historical-run-status.ts'
 import { newHistoricalModel } from '../_shared/historical-model.ts'
 import { CONSULTANT_VERSION } from '../_shared/consultant-contract.ts'
+import { FIRST_V8_SOURCE,FIRST_V8_ESTABLISHMENT } from '../_shared/historical-v8.ts'
 
 // This endpoint only enqueues. No provider/AI call and no review pagination.
 Deno.serve(async request => {
@@ -36,6 +37,13 @@ Deno.serve(async request => {
       return json({pending:['queued','running','retry'].includes(run.status),...historicalRunStatus(run),run:historicalRunStatus(run)})
     }
     enforceRateLimit('historical-enqueue:'+context.user.id,30,60_000)
+    if(body.first_v7===true&&body.first_v8===true)return json({error:'REPORT_VERSION_INVALID'},400)
+    if(body.first_v8===true) {
+      if(e.id!==FIRST_V8_ESTABLISHMENT)return json({error:'REPORT_V8_SOURCE_REQUIRED'},409)
+      const {data:run,error}=await context.admin.rpc('enqueue_first_v8_report',{p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language,p_source_generation_id:FIRST_V8_SOURCE})
+      if(error||!run){const code=['ENGLISH_COVERAGE_REQUIRED','REPORT_OTHER_VERSION_RUNNING','REPORT_V8_SOURCE_REQUIRED','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}
+      return json({pending:run.status!=='completed',run:historicalRunStatus(run)},run.status==='completed'?200:202)
+    }
     if(body.first_v7===true) {
       const {data:run,error}=await context.admin.rpc('enqueue_first_v7_report',{p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language})
       if(error || !run){const code=['ENGLISH_COVERAGE_REQUIRED','REPORT_OTHER_VERSION_RUNNING','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}

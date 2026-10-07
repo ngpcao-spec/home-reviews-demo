@@ -124,8 +124,8 @@ export function consultantMetrics(reviews: ReputationReview[], classifications: 
 }
 
 /** Final narrative sees anonymous, server-counted topics only, never names, addresses or review quotes. */
-export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string, version:3|4|5|6|7=3, source:DiagnosticSource={}) {
-  if(version===5 || version===6 || version===7) {
+export async function consultantNarrative(metrics: ReturnType<typeof consultantMetrics>, language: 'fr'|'vi', recordUsage?: (usage: Usage) => Promise<void>, model?: string, version:3|4|5|6|7|8=3, source:DiagnosticSource={}) {
+  if(version===5 || version===6 || version===7 || version===8) {
     const result=await consultantNarrativeV5(v5Input(metrics,language,source),language,recordUsage,model)
     return {...result,report:withManagerConclusion({...result.report,version})}
   }
@@ -164,8 +164,8 @@ export async function consultantNarrative(metrics: ReturnType<typeof consultantM
 function v5Input(metrics:ReturnType<typeof consultantMetrics>,language:'fr'|'vi',source:DiagnosticSource) {
   return {total:metrics.total,positive:metrics.positive,negative:metrics.negative,source,topics:metrics.themes.map(t=>({...t,key:`${t.theme_key}:${t.sentiment}`,label:CATALOG[t.theme_key][language==='fr'?1:2]}))}
 }
-export function assembleConsultantReport(metrics: ReturnType<typeof consultantMetrics>, raw: Record<string, unknown>, language: 'fr'|'vi', version:3|4|5|6|7=3, source:DiagnosticSource={}): ConsultantReportData {
-  if(version===5 || version===6 || version===7) return withManagerConclusion({...assembleV5(v5Input(metrics,language,source),language,raw),version})
+export function assembleConsultantReport(metrics: ReturnType<typeof consultantMetrics>, raw: Record<string, unknown>, language: 'fr'|'vi', version:3|4|5|6|7|8=3, source:DiagnosticSource={}): ConsultantReportData {
+  if(version===5 || version===6 || version===7 || version===8) return withManagerConclusion({...assembleV5(v5Input(metrics,language,source),language,raw),version})
   const priorities=narrativePriorities(metrics.total,metrics.themes.map(t=>({key:`${t.theme_key}:${t.sentiment}`,axis:t.axis,sentiment:t.sentiment,mentions:t.mentions,label:CATALOG[t.theme_key][language==='fr'?1:2]})))
   const prose = (value: unknown) => {
     if (typeof value !== 'string' || !value.trim() || value.length>3000 || /\p{N}|https?:\/\//u.test(value)) throw new Error('REPORT_INVALID_NARRATIVE')

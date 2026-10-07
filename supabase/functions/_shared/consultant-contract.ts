@@ -1,4 +1,5 @@
 import type { StructuredContextStats } from './structured-review-context.ts'
+import type { CrossRatingAnalysis } from './cross-rating-analysis.ts'
 export const CONSULTANT_VERSION = 7
 export const AXES = ['service', 'quality', 'price', 'atmosphere'] as const
 export type Axis = typeof AXES[number]
@@ -12,7 +13,7 @@ export interface ConsultantAspect {
   explanation: string
 }
 export interface ConsultantReportData {
-  version: 3 | 4 | 5 | 6 | 7
+  version: 3 | 4 | 5 | 6 | 7 | 8
   language: 'fr' | 'vi'
   total: number
   positive: number
@@ -25,6 +26,7 @@ export interface ConsultantReportData {
   axis_diagnostics?: Record<Axis, AxisDiagnostic>
   decision_summary?: DecisionSummary
   structured_context_stats?: StructuredContextStats
+  cross_rating_analysis?: CrossRatingAnalysis
   analysis_input_stats?:{total_reviews:number;reviews_with_text:number;textless_reviews:number;original_english_count:number;google_english_translation_count:number;fallback_non_english_count:number;english_analysis_coverage_percent:number}
 }
 

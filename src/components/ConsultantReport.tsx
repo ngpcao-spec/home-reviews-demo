@@ -16,7 +16,7 @@ export function ConsultantReport({report}: {report: ConsultantReportData}) {
   const {messages, language} = useI18n()
   const m = messages.reputation
   if (report.language !== language) return <p role="status">{m.languageUnavailable}</p>
-  if (report.version === 5 || report.version === 6 || report.version === 7) return <ConsultantReportV5 report={report}/>
+  if (report.version === 5 || report.version === 6 || report.version === 7 || report.version === 8) return <ConsultantReportV5 report={report}/>
   const label = {service:m.service,quality:m.quality,price:m.price,atmosphere:m.atmosphere}
   const aspects = (items: ConsultantReportData['positive_aspects'] = [], compact = false, countOnly = false) => {
     const displayed = compact ? [...items].sort((a,b)=>b.mentions-a.mentions).slice(0,5) : items

@@ -37,9 +37,9 @@ function harness(){
   }
 }
 describe('durable worker without any frontend process',()=>{
-  it.each([3,4,5,6,7] as const)('keeps narrative version %i across worker restarts',async version=>{
+  it.each([3,4,5,6,7,8] as const)('keeps narrative version %i across worker restarts',async version=>{
     const h=harness()
-    h.patch({snapshot:{...h.run.snapshot,analysis_version:version,reviews:h.run.snapshot.reviews!.map(r=>({...r,...(version===7?{original_language:'en',analysis_text:r.original_text??'',analysis_language:'en',analysis_source:'original_en' as const}:{})})),base:{...h.run.snapshot.base,analysis_version:version}}})
+    h.patch({snapshot:{...h.run.snapshot,analysis_version:version,reviews:h.run.snapshot.reviews!.map(r=>({...r,...(version>=7?{original_language:'en',analysis_text:r.original_text??'',analysis_language:'en',analysis_source:'original_en' as const}:{})})),base:{...h.run.snapshot.base,analysis_version:version}}})
     await h.tick();await h.tick()
     expect(ai.narrative.mock.calls[0][4]).toBe(version)
     expect(ai.narrative.mock.calls[0][5]).toEqual(h.run.snapshot.base)
@@ -52,6 +52,15 @@ describe('durable worker without any frontend process',()=>{
     expect(historicalNarrativeVersion({...h.run,snapshot:{}})).toBe(3)
     expect(historicalNarrativeVersion(h.run)).toBe(3)
     expect(()=>historicalNarrativeVersion({...h.run,snapshot:{...h.run.snapshot,analysis_version:4}})).toThrow('REPORT_VERSION_CHANGED')
+  })
+  it('V8 publication appends cross rating only after the unchanged narrative and adds no model call or usage',async()=>{
+    const h=harness();h.patch({model:'gpt-6.1-sol',cursor:4,findings:[{review_id:'r0',theme_key:'food_quality',sentiment:'positive',evidence:'Good food'}],snapshot:{analysis_version:8,reviews:h.run.snapshot.reviews!.map(r=>({...r,analysis_text:'Good food',analysis_language:'en',analysis_source:'original_en',normalized_category_ratings:{food:5,service:2,atmosphere:null}})),base:{...h.run.snapshot.base,analysis_version:8}}})
+    await h.tick();expect(ai.extract).not.toHaveBeenCalled();expect(ai.narrative).toHaveBeenCalledTimes(1);expect(h.run.input_tokens).toBe(310);expect(h.run.output_tokens).toBe(620);expect(JSON.stringify(ai.narrative.mock.calls[0][5])).not.toContain('cross_rating_analysis');expect(h.publication).toMatchObject({analysis_version:8,consultant_report:{cross_rating_analysis:{total_reviews:80,axes:{service:{low_score_unexplained_count:80}}}}});expect(h.run.findings).toHaveLength(1)
+  })
+  it('prepares a fresh V8 English snapshot with normalized scores without invoking models; V7 fingerprint/fields remain separate',async()=>{
+    const source=[{id:'r0',rating:5,original_text:'Русский оригинал',original_language:'ru',review_translations:[{language:'en',translated_text:'Excellent food.'}],review_detailed_rating:{'Đồ ăn':5,'Dịch vụ':2},review_context:{'Giá mỗi người':'100'},review_reply_drafts:[],status:'new',historical_import:true,published_at:null}],snapshots:HistoricalJob['snapshot'][]=[]
+    for(const version of [7,8] as const){const h=harness(),run={...h.run,cursor:0,findings:[],classifications:[],snapshot:{analysis_version:version}} as HistoricalJob,query={select(){return this},eq(){return this},lte(){return this},gte(){return this},order(){return this},range:async()=>({data:source,error:null}),single:async()=>({data:{id:'place',organization_id:'org',total_reviews:1,rating:5,created_at:run.created_at},error:null})},database={from:()=>query,rpc:async(_name:string,args:{p_values:object})=>{Object.assign(run,args.p_values);return {data:true,error:null}}};await processHistoricalRun(database as never,run,'worker');snapshots.push(run.snapshot)}
+    expect(ai.extract).not.toHaveBeenCalled();expect(ai.narrative).not.toHaveBeenCalled();expect(snapshots[0].reviews![0]).not.toHaveProperty('normalized_category_ratings');expect(snapshots[1].reviews![0]).toMatchObject({original_text:'Русский оригинал',original_language:'ru',analysis_text:'Excellent food.',analysis_language:'en',analysis_source:'google_translation_en',normalized_category_ratings:{food:5,service:2,atmosphere:null}});expect(snapshots[1].base!.analysis_input_stats).toMatchObject({total_reviews:1,google_english_translation_count:1,english_analysis_coverage_percent:100});expect(snapshots[0].base!.source_fingerprint).not.toBe(snapshots[1].base!.source_fingerprint)
   })
   it.each(['gpt-5.6-terra','gpt-6.1-sol'])('pins %s through retry, recovered lease and publication despite environment changes',async(model)=>{
     vi.stubGlobal('Deno',{env:{get:()=>model==='gpt-6.1-sol'?'gpt-5.6-terra':'gpt-6.1-sol'}})

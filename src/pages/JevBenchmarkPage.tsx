@@ -84,7 +84,7 @@ export function JevBenchmarkPage() {
         {run?.status==='failed' && <JevTechnicalDetails run={run}/>}
         </>}
         {(directThemes||run?.status==='completed') && <JevThemesPhase key={sourceId} user={user} source={source} visible={visible}/>}
-        <details className="card jev-card jev-technical"><summary>{language==='fr'?'Préparation anglaise et rapport V7':'Chuẩn bị tiếng Anh và báo cáo V7'}</summary><EnglishReviewPreparation key={source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/></details>
+        <details className="card jev-card jev-technical"><summary>{language==='fr'?'Préparation anglaise et rapports V7 / V8':'Chuẩn bị tiếng Anh và báo cáo V7 / V8'}</summary><EnglishReviewPreparation key={source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/></details>
       </>}
     </>}
     <p className="jev-footnote">{t.production}</p>
