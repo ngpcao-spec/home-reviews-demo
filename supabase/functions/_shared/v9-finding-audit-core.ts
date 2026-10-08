@@ -12,6 +12,10 @@ export interface AuditItem extends SelectedAuditItem {id:string}
 export interface AuditLabel {item_id:string;choice:GoldChoice}
 export async function auditSha256(value:string){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join('')}
 export const findingKey=(f:Pick<AuditFinding,'review_id'|'theme_key'|'sentiment'>)=>f.review_id+':'+f.theme_key+':'+f.sentiment
+// PostgreSQL extra_float_digits=0 emits double precision values with 15 significant
+// digits, while JSONB preserves the source decimal. Allow only serialization noise;
+// this does not round stored probabilities or change any classification threshold.
+export function sameStoredProbability(stored:unknown,source:unknown){return typeof stored==='number'&&typeof source==='number'&&Number.isFinite(stored)&&Number.isFinite(source)&&stored>=0&&stored<=1&&source>=0&&source<=1&&Math.abs(stored-source)<=8*Number.EPSILON}
 export function validateAuditSources(b:AuditBundle){
   if(b.v8.generation_id!==AUDIT_V8||b.v9.generation_id!==AUDIT_V9||b.v8.status!=='completed'||b.v9.status!=='completed'||b.v8.snapshot.analysis_version!==8||b.v9.snapshot.analysis_version!==9||b.v8.organization_id!==b.v9.organization_id||b.v8.establishment_id!==b.v9.establishment_id)throw new Error('FINDING_AUDIT_SOURCE_REQUIRED')
   const original=new Map(b.v8.snapshot.reviews.map(r=>[r.id,r])),current=b.v9.snapshot.reviews
@@ -38,7 +42,7 @@ export async function selectFindingAuditItems(b:AuditBundle){
 export async function validateStoredAuditItems(items:AuditItem[],b:AuditBundle){
   if(items.length!==AUDIT_TARGET||new Set(items.map(findingKey)).size!==AUDIT_TARGET||new Set(items.map(i=>i.id)).size!==AUDIT_TARGET||new Set(items.map(i=>i.position)).size!==AUDIT_TARGET)throw new Error('FINDING_AUDIT_ITEMS_INVALID')
   const candidates=new Map(v9OnlyFindings(b).map(f=>[findingKey(f),f])),reviews=new Map(b.v9.snapshot.reviews.map(r=>[r.id,r]))
-  for(const item of items){const f=candidates.get(findingKey(item)),text=reviews.get(item.review_id)?.analysis_text;if(!f||!text?.trim()||item.position<1||item.position>AUDIT_TARGET||await auditSha256(text)!==item.analysis_text_sha256||item.probability_positive!==f.probability_positive||item.probability_negative!==f.probability_negative||item.repeat_stable!==f.repeat_stable)throw new Error('FINDING_AUDIT_SOURCE_CHANGED')}
+  for(const item of items){const f=candidates.get(findingKey(item)),text=reviews.get(item.review_id)?.analysis_text;if(!f||!text?.trim()||item.position<1||item.position>AUDIT_TARGET||await auditSha256(text)!==item.analysis_text_sha256||!sameStoredProbability(item.probability_positive,f.probability_positive)||!sameStoredProbability(item.probability_negative,f.probability_negative)||item.repeat_stable!==f.repeat_stable)throw new Error('FINDING_AUDIT_SOURCE_CHANGED')}
 }
 export function compareFindingAudit(items:AuditItem[],labels:AuditLabel[]){
   const choices=new Map(labels.map(l=>[l.item_id,l.choice]))
