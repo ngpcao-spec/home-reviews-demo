@@ -13,13 +13,15 @@ export interface ConsultantAspect {
   explanation: string
 }
 export interface ConsultantReportData {
-  version: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
-  analysis_engine?:'jev_hybrid'|'jev_hybrid_calibrated'
+  version: 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11
+  analysis_engine?:'jev_hybrid'|'jev_hybrid_calibrated'|'jev_hybrid_human_aligned'
   analysis_unavailable_count?:number
   analysis_pipeline?:import('./historical-v9-core.ts').V9Usage&{jev_cost_usd:number;sol_narrative_cost_usd:number;total_estimated_cost_usd:number;end_to_end_elapsed_ms:number|null;unavailable_theme_reviews:number;source_generation_id:string;source_snapshot_sha256:string}
   v8_v9_comparison?:ReturnType<typeof import('./historical-v9-core.ts').compareV8V9>
   calibrated_analysis_pipeline?:ReturnType<typeof import('./historical-v10-core.ts').v10Costs>&{source_generation_id:string;source_snapshot_sha256:string;unavailable_theme_reviews:number}
   v9_v10_comparison?:ReturnType<typeof import('./historical-v10-core.ts').compareV9V10>
+  human_aligned_analysis_pipeline?:ReturnType<typeof import('./historical-v11-core.ts').v11Costs>&{source_generation_id:string;source_snapshot_sha256:string;unavailable_theme_reviews:number}
+  v11_comparison?:ReturnType<typeof import('./historical-v11-core.ts').compareV11Sources>
   language: 'fr' | 'vi'
   total: number
   positive: number
