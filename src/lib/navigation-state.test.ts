@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { clearNavigationState, readUiState, restorableRoute, savedRoute, saveRoute, saveUiState } from './navigation-state'
 beforeEach(()=>localStorage.clear())
 describe('persisted navigation',()=>{
+  it('resumes a finding audit for the same account without permitting auth tokens',()=>{saveRoute('human','/plus/v9-finding-audit?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');expect(savedRoute('human')).toContain('/plus/v9-finding-audit');expect(savedRoute('other')).toBeNull();expect(restorableRoute('/plus/v9-finding-audit?access_token=secret')).toBe(false)})
   it('resumes final adjudication after a cold PWA restart while keeping account/token restrictions',()=>{saveRoute('human','/plus/gold-check?id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');expect(savedRoute('human')).toContain('/plus/gold-check');expect(savedRoute('other')).toBeNull();expect(restorableRoute('/plus/gold-check?access_token=secret')).toBe(false)})
   it('restores the human annotation route per account after a cold PWA restart, without permitting auth URLs',()=>{
     saveRoute('human','/plus/gold-set?id=99999999-9999-4999-8999-999999999999')

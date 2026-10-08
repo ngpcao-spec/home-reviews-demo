@@ -470,3 +470,6 @@ verify_jwt = true
 
 [functions.representative-human-test]
 verify_jwt = true
+
+[functions.v9-finding-human-audit]
+verify_jwt = true

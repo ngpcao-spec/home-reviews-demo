@@ -6,6 +6,7 @@ import { useAnalyticsScroll } from '../lib/use-analytics-scroll'
 import { useHistoricalGeneration } from '../lib/use-historical-generation'
 import { useApp } from '../app/AppContext'
 import { ReputationReport } from '../components/ReputationReport'
+import { FindingAuditEntry } from './V9FindingAuditPage'
 import { ConsultantReport } from '../components/ConsultantReport'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
@@ -197,7 +198,7 @@ export function AnalyticsPage() {
         {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
       </div>
 
-      {visibleHistoricalReport && (visibleHistoricalReport.consultant ? <ConsultantReport report={visibleHistoricalReport.consultant}/> : <ReputationReport report={visibleHistoricalReport} />)}
+      {visibleHistoricalReport && (visibleHistoricalReport.consultant ? <><ConsultantReport report={visibleHistoricalReport.consultant}/>{visibleHistoricalReport.consultant.version===9&&visibleHistoricalReport.consultant.analysis_pipeline?.source_generation_id==='307025ef-05b1-401e-8f6d-e48ca5677553'&&<FindingAuditEntry/>}</> : <ReputationReport report={visibleHistoricalReport} />)}
 
     </div>}
 
