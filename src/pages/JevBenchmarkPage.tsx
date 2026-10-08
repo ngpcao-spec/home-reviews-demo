@@ -13,6 +13,7 @@ import { JevThemesPhase } from './JevThemesPhase'
 import { EnglishReviewPreparation } from './EnglishReviewPreparation'
 import {HistoricalV8Entry} from './HistoricalV8Entry'
 import {HistoricalV9Test} from './HistoricalV9Test'
+import {HistoricalV10Test} from './HistoricalV10Test'
 import {FIRST_V8_ESTABLISHMENT} from '../../supabase/functions/_shared/historical-v8'
 
 export function JevBenchmarkPage() {
@@ -74,7 +75,7 @@ export function JevBenchmarkPage() {
         <section className="card jev-card jev-source"><label htmlFor="jev-source">{t.establishment}</label><select id="jev-source" value={primary!.source_generation_id} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{sources.data!.map(s=><option key={s.source_generation_id} value={s.source_generation_id}>{s.name} · {s.reviews_total} {t.reviews}</option>)}</select>
           {(primary?.snapshots?.length??0)>1&&<><label className="jev-snapshot-label" htmlFor="jev-snapshot">{t.dataset} · V6 / V7</label><select id="jev-snapshot" value={sourceId} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{primary!.snapshots!.map(s=><option key={s.source_generation_id} value={s.source_generation_id}>V{s.source_analysis_version} · {s.reviews_total} {t.reviews} · {s.source_analysis_version===7?'Analyse EN':language==='fr'?'Langues originales':'Ngôn ngữ gốc'} · {new Date(s.completed_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</option>)}</select></>}
           <p>{sourceId===primary?.source_generation_id?t.reportDate:language==='fr'?'Rapport sélectionné':'Báo cáo đã chọn'} · {new Date(source.completed_at).toLocaleDateString(language==='fr'?'fr-FR':'vi-VN')}</p>{source.source_analysis_version===7&&<span className="jev-tag">Analyse EN · V7</span>}<div className="jev-meta"><span>{t.model}<strong>Jev latest</strong></span><span>{t.repeats}<strong>3</strong></span><span>{t.dataset}<strong>{source.reviews_total} {t.reviews}</strong></span></div></section>
-        {source.establishment_id===FIRST_V8_ESTABLISHMENT&&<HistoricalV9Test key={"v9:"+source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/>}
+        {source.establishment_id===FIRST_V8_ESTABLISHMENT&&<HistoricalV10Test key={"v10:"+source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/>}{source.establishment_id===FIRST_V8_ESTABLISHMENT&&<HistoricalV9Test key={"v9:"+source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/>}
         {source.establishment_id===FIRST_V8_ESTABLISHMENT&&<HistoricalV8Entry key={source.establishment_id} user={user} establishment={source.establishment_id} name={source.name} visible={visible}/>}
         {!directThemes&&englishSnapshot&&<section className="card jev-card"><h3>{language==='fr'?'Phase 2 sur les avis anglais':'Giai đoạn 2 với đánh giá tiếng Anh'}</h3><p>{language==='fr'?'Un rapport V7 est disponible. Sélectionnez-le pour accéder au lancement du test.':'Đã có báo cáo V7. Chọn báo cáo để mở nút chạy thử nghiệm.'}</p><button className="primary-button full-width" disabled={starting} onClick={()=>chooseSource(englishSnapshot.source_generation_id)}>{language==='fr'?'Sélectionner V7 · Analyse EN':'Chọn V7 · Phân tích tiếng Anh'}</button></section>}
         {!directThemes&&<>

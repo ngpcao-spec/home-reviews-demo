@@ -5,6 +5,7 @@ import './ReputationReport.css'
 import './ConsultantReportV5.css'
 import { GoogleContextInfo } from './GoogleContextInfo'
 import {V9ReportInfo} from './V9ReportInfo'
+import {V10ReportInfo} from './V10ReportInfo'
 import {CrossRatingSection} from './CrossRatingSection'
 import {crossRatingMessages} from '../i18n/cross-rating'
 
@@ -15,7 +16,7 @@ function Section({index,title,children}:{index:number;title:string;children:Reac
 }
 export function ConsultantReportV5({report}:{report:ConsultantReportData}) {
   const {language}=useI18n(),m=copy[language]
-  const diagnostics=report.axis_diagnostics,decision=report.decision_summary,cross=(report.version===8||report.version===9)?report.cross_rating_analysis:undefined,crossWords=crossRatingMessages[language]
+  const diagnostics=report.axis_diagnostics,decision=report.decision_summary,cross=(report.version===8||report.version===9||report.version===10)?report.cross_rating_analysis:undefined,crossWords=crossRatingMessages[language]
   if(!diagnostics || !decision) return <p role="status">{m.empty}</p>
   const number=(n:number)=>n.toLocaleString(language==='fr'?'fr-FR':'vi-VN',{minimumFractionDigits:2,maximumFractionDigits:2})
   const topics=(items:DiagnosticTopic[],empty:string)=>items.length?<ul className="v5-topics">{items.map(t=><li key={t.key}><span>{t.label}</span><small>{t.mentions} {m.mentions}</small></li>)}</ul>:<p className="v5-muted">{empty}</p>
@@ -27,6 +28,7 @@ export function ConsultantReportV5({report}:{report:ConsultantReportData}) {
   }
   return <div className="consultant-report consultant-v5" lang={language}>
     {report.version===9&&<V9ReportInfo report={report}/>}
+    {report.version===10&&<V10ReportInfo report={report}/>}
     {report.version>=7&&<p className="v5-muted">{language==='fr'?'Analyse EN':'Phân tích EN'} · {report.analysis_input_stats?.english_analysis_coverage_percent.toLocaleString(language==='fr'?'fr-FR':'vi-VN',{maximumFractionDigits:1})??'—'} %{(report.analysis_input_stats?.fallback_non_english_count??0)>0&&<> · {report.analysis_input_stats!.fallback_non_english_count} {language==='fr'?'avis analysés dans leur langue originale':'đánh giá phân tích bằng ngôn ngữ gốc'}</>}</p>}
     <Section index={1} title={m.overview}><dl className="reputation-replies"><div><dt>{m.analyzed}</dt><dd>{report.total}</dd></div>{report.sample_average_rating!=null&&<div><dt>{m.average}</dt><dd>{number(report.sample_average_rating)} / 5</dd></div>}</dl></Section>
     <Section index={2} title={m.quick}><div className="v5-grid">{AXES.map(key=><div className="v5-quick-axis" key={key} data-axis={key}><h3>{m.axes[key]}</h3>{metric(key,true)}<p className="v5-signal">{diagnostics[key].recurring_negative[0]?.label??diagnostics[key].top_positive[0]?.label??m.empty}</p></div>)}</div><small>{m.coverageNote}</small></Section>
@@ -35,5 +37,6 @@ export function ConsultantReportV5({report}:{report:ConsultantReportData}) {
     <Section index={cross?8:7} title={m.takeaway}><div className="v5-decisions"><div><h3>{m.strengths}</h3>{topics(decision.strengths,m.empty)}</div><div><h3>{m.statuses.watch}</h3>{topics(decision.watch,m.none)}</div><div><h3>{m.limited}</h3>{decision.limited_axes.length?<ul>{decision.limited_axes.map(key=><li key={key}>{m.axes[key]}</li>)}</ul>:<p>{m.empty}</p>}</div><div><h3>{m.manager}</h3><p>{decision.manager_summary}</p></div></div><small>{m.note}</small></Section>
     <Section index={cross?9:8} title={m.conclusion}><p className="consultant-prose">{report.conclusion}</p></Section>
     {report.version===9&&<V9ReportInfo report={report} comparisonOnly/>}
+    {report.version===10&&<V10ReportInfo report={report} comparisonOnly/>}
   </div>
 }
