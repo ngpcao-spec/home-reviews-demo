@@ -473,3 +473,9 @@ verify_jwt = true
 
 [functions.v9-finding-human-audit]
 verify_jwt = true
+
+[functions.negative-review-validation]
+verify_jwt = true
+
+[functions.process-negative-validation-jobs]
+verify_jwt = false

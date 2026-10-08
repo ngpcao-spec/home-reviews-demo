@@ -7,6 +7,7 @@ import { JevBenchmarkPage } from './JevBenchmarkPage'
 import { jevApi } from '../lib/jev-benchmark'
 import { jevSource,jevResult } from '../../tests/fixtures/jev-benchmark'
 import {FIRST_V8_ESTABLISHMENT} from '../../supabase/functions/_shared/historical-v8'
+vi.mock('./NegativeValidationPage',()=>({NegativeValidationEntry:()=>null}))
 const access=vi.hoisted(()=>({data:true,isPending:false}))
 vi.mock('../app/AppContext',()=>({useApp:()=>({currentUser:{id:'user'},demoMode:false,notifications:[]})}))
 vi.mock('../lib/use-jev-access',()=>({useJevAccess:()=>access}))
