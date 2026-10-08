@@ -13,6 +13,7 @@ vi.mock('../lib/use-jev-access',()=>({useJevAccess:()=>access}))
 vi.mock('../lib/supabase',()=>({supabase:null}))
 vi.mock('./EnglishReviewPreparation',()=>({EnglishReviewPreparation:()=>null}))
 vi.mock('./HistoricalV8Entry',()=>({HistoricalV8Entry:()=> <section data-testid="v8-entry">Rapport V8 — Notes + texte</section>}))
+vi.mock('./HistoricalV9Test',()=>({HistoricalV9Test:()=> <section data-testid="v9-entry">Rapport V9 — Jev + notes</section>}))
 function mount(language:'fr'|'vi'='fr'){return render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}})}><MemoryRouter><I18nProvider language={language}><JevBenchmarkPage/></I18nProvider></MemoryRouter></QueryClientProvider>)}
 beforeEach(()=>{access.data=true;Object.defineProperty(document,'hidden',{configurable:true,value:false});vi.spyOn(jevApi,'sources').mockResolvedValue([jevSource]);vi.spyOn(jevApi,'latest').mockResolvedValue(null);vi.spyOn(jevApi,'read').mockResolvedValue({...jevResult,status:'running'});vi.spyOn(jevApi,'post').mockResolvedValue({benchmark_id:jevResult.id})})
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();vi.useRealTimers()})

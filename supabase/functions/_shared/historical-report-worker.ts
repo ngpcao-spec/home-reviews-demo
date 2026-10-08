@@ -6,6 +6,7 @@ import { assembleConsultantReport, consultantBatches, consultantMetrics, consult
 import { historicalRetry, HISTORICAL_REPORT_LEASE_SECONDS } from './historical-report-policy.ts'
 import { analysisTextForReview,analysisInputStats,groundingText } from './analysis-text.ts'
 import { normalizeCategoryRatings,crossRatingAnalysis } from './cross-rating-analysis.ts'
+import {processHistoricalV9Run,type V9Job} from './historical-v9-worker.ts'
 
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
 type InputReview = ReputationReview & { review_translations?:{language:string;translated_text:string}[];review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
@@ -13,7 +14,7 @@ export interface HistoricalJob {
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
-  snapshot:{analysis_version?:3|4|5|6|7|8;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
+  snapshot:{analysis_version?:3|4|5|6|7|8|9;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
   token_usage_complete:boolean; created_at:string; last_error:string|null; error_code?:string|null;
 }
 const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
@@ -62,6 +63,7 @@ async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
 
 /** One durable unit per invocation: snapshot OR extraction batch OR final narrative. */
 export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJob, worker:string) {
+  if(Number(run.snapshot.analysis_version)===9)return processHistoricalV9Run(admin,run as unknown as V9Job,worker)
   const started=Date.now()
   let usageRecorded=true
   const log=(event:string,extra:Record<string,unknown>={})=>console.info(event,{

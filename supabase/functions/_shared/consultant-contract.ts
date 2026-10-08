@@ -13,7 +13,11 @@ export interface ConsultantAspect {
   explanation: string
 }
 export interface ConsultantReportData {
-  version: 3 | 4 | 5 | 6 | 7 | 8
+  version: 3 | 4 | 5 | 6 | 7 | 8 | 9
+  analysis_engine?:'jev_hybrid'
+  analysis_unavailable_count?:number
+  analysis_pipeline?:import('./historical-v9-core.ts').V9Usage&{jev_cost_usd:number;sol_narrative_cost_usd:number;total_estimated_cost_usd:number;end_to_end_elapsed_ms:number|null;unavailable_theme_reviews:number;source_generation_id:string;source_snapshot_sha256:string}
+  v8_v9_comparison?:ReturnType<typeof import('./historical-v9-core.ts').compareV8V9>
   language: 'fr' | 'vi'
   total: number
   positive: number
