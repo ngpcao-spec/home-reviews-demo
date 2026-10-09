@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -42,6 +43,29 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          name: github-pages-${{ github.run_attempt }}
+      - name: Wait for Pages artifact metadata
+        env:
+          PAGES_ARTIFACT_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
+        run: |
+          for attempt in {1..12}; do
+            count="$(curl --fail --silent --show-error \
+              --header "Authorization: Bearer $PAGES_ARTIFACT_TOKEN" \
+              --header 'Accept: application/vnd.github+json' \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+              | jq --arg name "$PAGES_ARTIFACT_NAME" '[.artifacts[] | select(.name == $name and .expired == false)] | length')"
+            if [ "$count" = "1" ]; then exit 0; fi
+            if [ "$count" -gt 1 ]; then
+              echo 'More than one artifact matches this deployment attempt.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          echo 'Pages artifact metadata is not available yet.' >&2
+          exit 1
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
