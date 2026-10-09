@@ -1,0 +1,13 @@
+import {describe,it,expect,vi,afterEach} from 'vitest'
+import {syntheticV12} from '../../../tests/fixtures/jev-v12'
+import {V12_CONFIG} from '../_shared/jev-v12-config'
+const context=vi.hoisted(()=>({value:null as unknown}))
+vi.mock('../_shared/auth.ts',()=>({requireUser:async()=>context.value,assertMembership:vi.fn().mockResolvedValue('owner')}))
+vi.mock('../_shared/rate-limit.ts',()=>({enforceRateLimit:vi.fn()}))
+afterEach(()=>{vi.unstubAllGlobals();vi.resetModules()})
+describe('deployed V12 reader projection',()=>{
+ it('GET with actual database row shape reports ready/30 without starting any paid job',async()=>{const f=await syntheticV12(),reads:{table:string;fields:string}[]=[],rpc=vi.fn(),tables:Record<string,unknown[]>={analysis_negative_ai_exploratory_runs:[f.source],analysis_negative_ai_exploratory_tasks:f.tasks,analysis_negative_validation_ai_preannotations:f.initial.map(r=>({...r,experiment_id:f.source.source_experiment_id,notes_fr:'Legacy metadata',needs_human_review:true})),analysis_negative_ai_theme_rechecks:f.rechecks,analysis_jev_experimental_configurations:[{id:V12_CONFIG.question_set,config:V12_CONFIG,config_sha256:f.prepared.config_sha256,frozen_at:'2026-10-09'}],analysis_jev_v12_runs:[],analysis_v11_independent_holdout_items:[]};
+ class Query {fields='*';constructor(private table:string){}select(fields:string){this.fields=fields;reads.push({table:this.table,fields});return this}eq(){return this}in(){return this}order(){return this}values(){return (tables[this.table]??[]).map(row=>this.fields==='*'?structuredClone(row):Object.fromEntries(this.fields.split(',').map(k=>[k,(row as Record<string,unknown>)[k]])))}async single(){return {data:this.values()[0]??null,error:null}}async maybeSingle(){return this.single()}async range(){return {data:this.values(),error:null}}then(resolve:(v:unknown)=>unknown){return Promise.resolve({data:this.values(),error:null}).then(resolve)}}
+ context.value={user:{id:'owner'},client:{},admin:{from:(table:string)=>new Query(table),rpc}};let handler:(r:Request)=>Promise<Response>=async()=>new Response('missing');vi.stubGlobal('Deno',{env:{get:()=> 'fake'},serve:(fn:typeof handler)=>{handler=fn}});await import('./index.ts');const response=await handler(new Request('https://fixture/functions/v1/experimental-jev-v12')),data=await response.json();expect(response.status).toBe(200);expect(data.error_code).toBeNull();expect(data.ready).toBe(true);expect(data.preview.eligible_reviews).toBe(30);expect(data.preview.expected_requests).toBe(90);expect(reads.find(r=>r.table==='analysis_negative_validation_ai_preannotations')?.fields).toBe('review_id,analysis_text_sha256,rubric_version,model_source,theme_choices,created_at');expect(rpc).not.toHaveBeenCalled()
+ })
+})
