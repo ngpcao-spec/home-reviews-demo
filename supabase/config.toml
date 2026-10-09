@@ -485,3 +485,9 @@ verify_jwt = true
 
 [functions.process-jev-exploratory-jobs]
 verify_jwt = false
+
+[functions.ai-exploratory-benchmark]
+verify_jwt = true
+
+[functions.process-ai-exploratory-benchmarks]
+verify_jwt = false

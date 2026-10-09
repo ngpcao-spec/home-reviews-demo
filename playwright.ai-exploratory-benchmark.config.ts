@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test'
+export default defineConfig({testDir:'./tests/e2e',testMatch:'ai-exploratory-benchmark.spec.ts',workers:1,use:{baseURL:'http://127.0.0.1:4174'},webServer:{command:'node node_modules/vite/bin/vite.js --config tests/e2e/vite.english.config.ts',url:'http://127.0.0.1:4174',reuseExistingServer:true},projects:[360,390,430,768].map(width=>({name:width===768?'ipad':`mobile-${width}`,use:{browserName:'chromium',viewport:{width,height:844}}}))})
