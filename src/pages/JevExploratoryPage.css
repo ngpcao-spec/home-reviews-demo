@@ -1,0 +1,6 @@
+.exploratory-page select,.exploratory-page textarea,.exploratory-page input[type=number]{display:block;width:100%;max-width:100%;box-sizing:border-box;margin:12px 0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:inherit}
+.exploratory-page textarea{min-height:160px;resize:vertical;font-size:16px}
+.exploratory-page label{display:block;overflow-wrap:anywhere}
+.exploratory-page input[type=checkbox]{min-width:22px;min-height:22px;margin:10px 12px 10px 0;vertical-align:middle}
+.exploratory-page .jev-id,.exploratory-page li,.exploratory-page strong{overflow-wrap:anywhere}
+.exploratory-link{display:block;text-align:center;text-decoration:none;box-sizing:border-box}

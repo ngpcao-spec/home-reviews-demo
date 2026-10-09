@@ -1,0 +1,4 @@
+import {supabase} from './supabase'
+import type {exploratoryProjection} from '../../supabase/functions/_shared/jev-exploratory-api'
+export type ExploratoryData=ReturnType<typeof exploratoryProjection>&{export_bundle?:Record<string,unknown>}
+export async function exploratoryApi(id?:string,action?:string,payload:Record<string,unknown>={}):Promise<ExploratoryData>{if(!supabase)throw new Error('UNAUTHORIZED');const {data,error}=await supabase.functions.invoke('jev-exploratory-review'+(action?'':id?'?id='+encodeURIComponent(id):''),action?{body:{...payload,run_id:id,action}}:{method:'GET'});if(error){let code='EXPLORATORY_CONNECTION_ERROR';if(error.context instanceof Response)try{code=(await error.context.clone().json()).error??code}catch{/* Do not show raw transport data. */}throw new Error(code)}return data as ExploratoryData}

@@ -68,6 +68,7 @@ export function parseJev(raw: unknown): { decision: JevDecision; usage: JevUsage
 }
 export interface JevClientOptions {
   fetcher?: typeof fetch; sleep?: (ms: number)=>Promise<void>; timeoutMs?: number
+  maxAttempts?: number
   onAttempt?: (event: { duration_ms: number; model: string | null; status: number | null })=>void
   onRetry?: (event: { retry: number; delay_ms: number })=>void
   onUsage?: (usage: JevUsage, model: string)=>void
@@ -78,7 +79,8 @@ export function createJevClient(apiKey: string | undefined, options: JevClientOp
   const fetcher = options.fetcher ?? fetch
   const sleep = options.sleep ?? (ms=>new Promise(resolve=>setTimeout(resolve,ms)))
   async function request(url: string, payload?: SystemOnePayload) {
-    for (let attempt=0; attempt<3; attempt++) {
+    const attempts=Math.min(3,Math.max(1,options.maxAttempts??3))
+    for (let attempt=0; attempt<attempts; attempt++) {
       const start = Date.now(), controller = new AbortController()
       const timer = setTimeout(()=>controller.abort(), options.timeoutMs ?? 15_000)
       let status: number | null = null, model: string | null = null, retryable = false
@@ -101,7 +103,7 @@ export function createJevClient(apiKey: string | undefined, options: JevClientOp
       } catch (error) {
         const network = error instanceof TypeError || (error instanceof Error && error.name === 'AbortError')
         retryable ||= network
-        if (!retryable || attempt===2) throw new Error(error instanceof Error && /^JEV_[A-Z0-9_]+$/.test(error.message) ? error.message : network ? 'JEV_NETWORK_ERROR' : 'JEV_INVALID_RESPONSE')
+        if (!retryable || attempt===attempts-1) throw new Error(error instanceof Error && /^JEV_[A-Z0-9_]+$/.test(error.message) ? error.message : network ? 'JEV_NETWORK_ERROR' : 'JEV_INVALID_RESPONSE')
       } finally {
         clearTimeout(timer)
         if (payload) options.onAttempt?.({ duration_ms: Date.now()-start, model, status })
