@@ -35,7 +35,7 @@ export interface ConsultantReportData {
   decision_summary?: DecisionSummary
   structured_context_stats?: StructuredContextStats
   cross_rating_analysis?: CrossRatingAnalysis
-  analysis_input_stats?:{total_reviews:number;reviews_with_text:number;textless_reviews:number;original_english_count:number;google_english_translation_count:number;fallback_non_english_count:number;english_analysis_coverage_percent:number}
+  analysis_input_stats?:ReturnType<typeof import('./analysis-text.ts').analysisInputStats>
 }
 
 export type CoverageLevel = 'strong' | 'medium' | 'limited'

@@ -10,7 +10,8 @@ export interface ReputationReview {
   analysis_text?:string
   normalized_category_ratings?:import('./cross-rating-analysis.ts').CategoryRatings
   analysis_language?:string|null
-  analysis_source?:'original_en'|'google_translation_en'|'fallback_original'|'textless'
+  analysis_source?:import('./analysis-text.ts').AnalysisSource
+  analysis_translation_override?:import('./analysis-text.ts').EnglishOverrideProvenance
   text: string | null
   published_at: string | null
   historical_import: boolean
