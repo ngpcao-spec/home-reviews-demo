@@ -1,0 +1,13 @@
+import {describe,it,expect,vi,afterEach} from 'vitest'
+import {syntheticIndependent} from '../../../tests/fixtures/independent-jev'
+import {INDEPENDENT_CONFIG} from '../_shared/independent-jev-core'
+const state=vi.hoisted(()=>({context:null as unknown,role:'owner'}))
+vi.mock('../_shared/auth.ts',()=>({requireUser:async()=>state.context,assertMembership:async()=>{if(state.role!=='owner')throw new Error('FORBIDDEN')}}))
+vi.mock('../_shared/rate-limit.ts',()=>({enforceRateLimit:vi.fn()}))
+afterEach(()=>{vi.unstubAllGlobals();vi.resetModules();state.role='owner'})
+describe('real independent endpoint (all database/provider calls mocked)',()=>{
+ it('previews the sealed holdout with extra row bookkeeping and no start RPC',async()=>{const f=await syntheticIndependent(),tables:Record<string,unknown[]>={analysis_v11_independent_holdout_sets:[{...f.h,label_source:'human_independent_required'}],analysis_v11_independent_holdout_items:f.items,analysis_v11_independent_holdout_ai_references:f.refs,analysis_v11_independent_holdout_ai_seals:[f.seal],analysis_jev_independent_configurations:[{id:INDEPENDENT_CONFIG.id,config:INDEPENDENT_CONFIG,config_sha256:f.prepared.config_sha256,frozen_at:'2026-10-09'}],analysis_negative_ai_exploratory_runs:[{input_rate_usd_per_million:.042}],analysis_jev_independent_runs:[],analysis_negative_validation_reviews:f.trainingIds.map(review_id=>({review_id})),analysis_review_english_translation_overrides:[]},rpc=vi.fn(async(name:string)=>({data:name==='validate_independent_jev_source'?{}:null,error:null}));
+ class Query {constructor(private table:string){}select(){return this}eq(){return this}in(){return this}order(){return this}limit(){return this}single(){return Promise.resolve({data:tables[this.table]?.[0]??null,error:null})}maybeSingle(){return this.single()}then(resolve:(r:unknown)=>unknown){return Promise.resolve({data:tables[this.table]??[],error:null}).then(resolve)}}
+ state.context={user:{id:'owner'},client:{},admin:{from:(table:string)=>new Query(table),rpc}};let handler:(r:Request)=>Promise<Response>=async()=>new Response();vi.stubGlobal('Deno',{env:{get:(key:string)=>key==='TYPESAFE_API_KEY'?'fake':undefined},serve:(fn:typeof handler)=>{handler=fn}});await import('./index.ts');const d=await(await handler(new Request('https://fixture/independent'))).json();expect(d.error_code).toBeNull();expect(d.ready).toBe(true);expect(d.preview).toMatchObject({reviews:32,reference_labels:800,uncertain_labels:11,expected_requests:192});expect(rpc.mock.calls.every(([name])=>name==='validate_independent_jev_source')).toBe(true);state.role='other-tenant';const denied=await handler(new Request('https://fixture/independent'));expect(denied.status).toBe(403)
+ })
+})
