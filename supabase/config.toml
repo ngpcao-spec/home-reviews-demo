@@ -510,3 +510,9 @@ verify_jwt = false
 
 [functions.get-jev-economy]
 verify_jwt = false
+
+[functions.jev-compact-comparison]
+verify_jwt = false
+
+[functions.process-jev-compact]
+verify_jwt = false

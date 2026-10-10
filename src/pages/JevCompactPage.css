@@ -1,0 +1,3 @@
+.compact-upload { display:flex; flex-direction:column; gap:12px; white-space:normal; }
+.compact-upload input[type="file"] { display:block; width:100%; max-width:100%; min-width:0; font-size:14px; }
+.compact-format { overflow-wrap:anywhere; word-break:break-word; }

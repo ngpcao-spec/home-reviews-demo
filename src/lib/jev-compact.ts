@@ -1,0 +1,5 @@
+import {supabase} from './supabase'
+import type {CompactView} from '../../supabase/functions/_shared/jev-compact-api'
+export type {CompactView}
+export async function compactApi(org:string,action?:{action:string;rows?:unknown;confirm?:boolean;confirm_cost?:boolean;reference_sha256?:string}):Promise<CompactView>{if(!supabase)throw new Error('UNAUTHORIZED');const {data,error}=await supabase.functions.invoke('jev-compact-comparison?'+new URLSearchParams({organization_id:org}).toString(),action?{body:action}:{method:'GET'});if(error){let code='COMPACT_CONNECTION_ERROR';if(error.context instanceof Response)try{code=(await error.context.clone().json()).error??code}catch{/* Codes only. */}throw new Error(code)}return data as CompactView}
+export function downloadCompactJson(name:string,data:unknown){const link=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));link.href=url;link.download=name;link.click();URL.revokeObjectURL(url)}

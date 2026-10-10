@@ -1,0 +1,10 @@
+import {createRoot} from 'react-dom/client'
+import {MemoryRouter} from 'react-router-dom'
+import {I18nProvider} from '../../../src/i18n'
+import {CompactWorkspace} from '../../../src/pages/JevCompactPage'
+import {syntheticCompact} from '../../fixtures/jev-compact'
+import '../../../src/styles/global.css'
+import '../../../src/styles/pages.css'
+import '../../../src/styles/reference.css'
+import '../../../src/styles/warm-theme.css'
+const p=new URLSearchParams(location.search),data=await syntheticCompact(p.get('stage')==='done'?'done':'draft'),language=p.get('language')==='vi'?'vi':'fr';createRoot(document.getElementById('root')!).render(<MemoryRouter><I18nProvider language={language}><main className="page-frame"><div className="jev-page gold-page exploratory-page"><CompactWorkspace data={data} act={async()=>{throw new Error('No real mutation in mobile fixture')}}/></div></main></I18nProvider></MemoryRouter>)
