@@ -507,3 +507,6 @@ verify_jwt = true
 
 [functions.process-experimental-jev-v13]
 verify_jwt = false
+
+[functions.get-jev-economy]
+verify_jwt = false
