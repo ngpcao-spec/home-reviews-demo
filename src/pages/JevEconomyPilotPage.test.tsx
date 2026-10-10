@@ -1,0 +1,21 @@
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query'
+import {MemoryRouter} from 'react-router-dom'
+import {afterEach,it,expect,vi} from 'vitest'
+import {I18nProvider} from '../i18n'
+import {JevEconomyPilotPage,JevEconomyPilotEntry,PilotWorkspace} from './JevEconomyPilotPage'
+import {syntheticPilotView} from '../../tests/fixtures/jev-pilot'
+import {restorableRoute} from '../lib/navigation-state'
+const api=vi.hoisted(()=>vi.fn());
+const gate=vi.hoisted(()=>({data:true,isPending:false}))
+vi.mock('../lib/jev-pilot',()=>({pilotApi:api}))
+vi.mock('../lib/use-jev-access',()=>({useJevAccess:()=>gate}))
+vi.mock('../app/AppContext',()=>({useApp:()=>({currentUser:{id:'fixture-owner'},demoMode:false,notifications:[]})}))
+const mount=(ui:React.ReactNode,language:'fr'|'vi'='fr')=>render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}})}><MemoryRouter><I18nProvider language={language}>{ui}</I18nProvider></MemoryRouter></QueryClientProvider>)
+afterEach(()=>{cleanup();vi.clearAllMocks();gate.data=true})
+it('experimental entry and route available on iPad restoration',()=>{mount(<JevEconomyPilotEntry/>);expect(screen.getByRole('link')).toHaveAttribute('href','/plus/jev-economy-pilot');expect(restorableRoute('/plus/jev-economy-pilot')).toBe(true)})
+it.each(['fr','vi'] as const)('renders %s free partial preview, explicit biases and both paid actions disabled',async lang=>{const data=await syntheticPilotView(),act=vi.fn();mount(<PilotWorkspace data={data} act={act}/>,lang);expect(screen.getByRole('button',{name:lang==='fr'?'Compléter les analyses JEV':'Hoàn tất phân tích JEV'})).toBeDisabled();expect(screen.getByRole('button',{name:lang==='fr'?'Générer le rapport Sol':'Tạo báo cáo Sol'})).toBeDisabled();expect(screen.getByText(lang==='fr'?'Pas de sous-note Google Prix dédiée.':'Không có điểm Google riêng cho Giá.')).toBeInTheDocument();expect(act).not.toHaveBeenCalled();expect(screen.getAllByText(/USD/)[0]).toBeInTheDocument()})
+it('GET server restores frozen counts after remount; load/refresh do not prepare or pay',async()=>{api.mockResolvedValue(await syntheticPilotView());const first=mount(<JevEconomyPilotPage/>);await screen.findByText('Artisan Cafe & Eatery');expect(api).toHaveBeenCalledExactlyOnceWith('fr');fireEvent.click(screen.getByRole('button',{name:'Actualiser les états sans appel IA'}));await waitFor(()=>expect(api).toHaveBeenCalledTimes(2));first.unmount();mount(<JevEconomyPilotPage/>);await screen.findByText('Artisan Cafe & Eatery');expect(api.mock.calls.every(c=>c.length===1)).toBe(true)})
+it('free snapshot manual only and double click locked',async()=>{const data=await syntheticPilotView();api.mockResolvedValueOnce({...data,snapshot:null});let resolve:(v:unknown)=>void=()=>{};api.mockImplementationOnce(()=>new Promise(r=>{resolve=r}));mount(<JevEconomyPilotPage/>);const b=await screen.findByRole('button',{name:'Préparer une prévisualisation gratuite'});fireEvent.click(b);fireEvent.click(b);expect(api).toHaveBeenCalledTimes(2);resolve(data);await screen.findByText('Artisan Cafe & Eatery');expect(api.mock.calls[1][1]).toEqual({action:'prepare_snapshot'})})
+it('future authorization still requires separate cost-confirmed stage and snapshot/hash',async()=>{const data=await syntheticPilotView();data.can_complete_jev=true;const act=vi.fn(async(body:unknown)=>{void body});mount(<PilotWorkspace data={data} act={act}/>);fireEvent.click(screen.getByRole('button',{name:'Compléter les analyses JEV'}));expect(act).not.toHaveBeenCalled();expect(screen.getByRole('alertdialog')).toContainHTML('USD');fireEvent.click(screen.getByRole('button',{name:'Confirmer le coût et lancer cette étape'}));await waitFor(()=>expect(act).toHaveBeenCalledOnce());expect(act.mock.calls[0][0]).toEqual({action:'complete_jev',confirm_cost:true,source_sha256:data.snapshot!.source_sha256,input_sha256:data.plans.jev_input_sha256})})
+it('unauthorized users cannot read customer data',()=>{gate.data=false;mount(<JevEconomyPilotPage/>);expect(api).not.toHaveBeenCalled();expect(screen.getByText(/Réservé aux propriétaires/)).toBeInTheDocument()})

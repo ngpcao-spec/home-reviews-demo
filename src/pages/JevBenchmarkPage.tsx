@@ -15,6 +15,7 @@ import {HistoricalV8Entry} from './HistoricalV8Entry'
 import {HistoricalV9Test} from './HistoricalV9Test'
 import {HistoricalV10Test} from './HistoricalV10Test'
 import {HistoricalV11Test} from './HistoricalV11Test'
+import {JevEconomyPilotEntry} from './JevEconomyPilotPage'
 import {JevCompactEntry} from './JevCompactPage'
 import {JevEconomyEntry} from './JevEconomyPage'
 import {JevV13Entry} from './JevV13Page'
@@ -80,7 +81,7 @@ export function JevBenchmarkPage() {
   const loading=access.isPending || (access.data===true && (sources.isPending || (!!sourceId && !directThemes && runQuery.isPending)))
   return <><PageHeader title={t.title} back/><div className="jev-page">
     <header className="jev-intro"><span className="jev-tag"><FlaskConical size={14}/>{t.experimental}</span><h2>{t.title}</h2><p>{t.subtitle}</p></header>
-    {access.data===true&&<><JevCompactEntry/><JevEconomyEntry/><JevV13Entry/><IndependentJevEntry/><JevV12Entry/><AiExploratoryBenchmarkEntry/><JevExploratoryEntry/><details className="card jev-card"><summary>{exploratoryMessages[language].legacy}</summary><NegativeValidationEntry/></details></>}{loading?<p role="status" className="jev-notice"><LoaderCircle className="jev-spinner" size={18}/>{t.loading}</p>:access.data!==true?<section className="card jev-card"><p>{t.denied}</p><Link to="/plus">{language==='fr'?'Retour à Plus':'Quay lại Thêm'}</Link></section>:<>
+    {access.data===true&&<><JevEconomyPilotEntry/><JevCompactEntry/><JevEconomyEntry/><JevV13Entry/><IndependentJevEntry/><JevV12Entry/><AiExploratoryBenchmarkEntry/><JevExploratoryEntry/><details className="card jev-card"><summary>{exploratoryMessages[language].legacy}</summary><NegativeValidationEntry/></details></>}{loading?<p role="status" className="jev-notice"><LoaderCircle className="jev-spinner" size={18}/>{t.loading}</p>:access.data!==true?<section className="card jev-card"><p>{t.denied}</p><Link to="/plus">{language==='fr'?'Retour à Plus':'Quay lại Thêm'}</Link></section>:<>
       {sources.isError?<p role="alert">{t.readFailed}</p>:!source?<p className="card jev-card">{t.noSources}</p>:<>
         <section className="card jev-card jev-source"><label htmlFor="jev-source">{t.establishment}</label><select id="jev-source" value={primary!.source_generation_id} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{sources.data!.map(s=><option key={s.source_generation_id} value={s.source_generation_id}>{s.name} · {s.reviews_total} {t.reviews}</option>)}</select>
           {(primary?.snapshots?.length??0)>1&&<><label className="jev-snapshot-label" htmlFor="jev-snapshot">{t.dataset} · V6 / V7</label><select id="jev-snapshot" value={sourceId} disabled={starting} onChange={e=>chooseSource(e.target.value)}>{primary!.snapshots!.map(s=><option key={s.source_generation_id} value={s.source_generation_id}>V{s.source_analysis_version} · {s.reviews_total} {t.reviews} · {s.source_analysis_version===7?'Analyse EN':language==='fr'?'Langues originales':'Ngôn ngữ gốc'} · {new Date(s.completed_at).toLocaleString(language==='fr'?'fr-FR':'vi-VN')}</option>)}</select></>}

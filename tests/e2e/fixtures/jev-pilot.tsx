@@ -1,0 +1,10 @@
+import {createRoot} from 'react-dom/client'
+import {MemoryRouter} from 'react-router-dom'
+import {I18nProvider} from '../../../src/i18n'
+import {PilotWorkspace} from '../../../src/pages/JevEconomyPilotPage'
+import {syntheticPilotView} from '../../fixtures/jev-pilot'
+import '../../../src/styles/global.css'
+import '../../../src/styles/pages.css'
+import '../../../src/styles/reference.css'
+import '../../../src/styles/warm-theme.css'
+const language=new URLSearchParams(location.search).get('language')==='vi'?'vi':'fr',data=await syntheticPilotView();createRoot(document.getElementById('root')!).render(<MemoryRouter><I18nProvider language={language}><main className="page-frame"><div className="jev-page gold-page exploratory-page"><PilotWorkspace data={data} act={async()=>{throw new Error('Fixture mutation disabled')}}/></div></main></I18nProvider></MemoryRouter>)

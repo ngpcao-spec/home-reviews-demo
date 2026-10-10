@@ -1,0 +1,8 @@
+import {syntheticPilot,pilotRates} from '../../tests/fixtures/jev-pilot.ts'
+import {auditPilotCache,pilotStatistics,verifyPilotSnapshot,pilotCosts} from '../functions/_shared/jev-pilot-core.ts'
+import {pilotNarrativeContext} from '../functions/_shared/jev-pilot-narrative.ts'
+const assert=(x:unknown)=>{if(!x)throw new Error('ASSERTION_FAILED')}
+Deno.test('full economy exact frozen snapshot, one-pass reusable identity',async()=>{const f=await syntheticPilot();await verifyPilotSnapshot(f.snapshot);assert(f.audit.used.length===2);f.cache[0].analysis_text_sha256='wrong';assert((await auditPilotCache(f.snapshot.source.reviews,f.cache,f.snapshot.organization_id,f.snapshot.establishment_id)).used.length===1)})
+Deno.test('partial coverage and bias, original text preserved, no English fallback',async()=>{const f=await syntheticPilot(),s=pilotStatistics(f.snapshot.source.reviews,f.audit,20);assert(s.coverage.missing_english===1&&s.coverage.textless_reviews===1);assert(s.warnings.includes('STAR_DISTRIBUTION_BIASED'));assert(s.theme_frequencies_for_restaurant===null)})
+Deno.test('known costs, no fabricated translation or Apify rates',()=>{assert(Math.abs(pilotCosts(pilotRates,361).estimated_jev_cost_usd!-.121296)<1e-12);assert(pilotCosts({...pilotRates,sol_output:null},361).total_known_usd===null)})
+Deno.test('Sol aggregate context bounded evidence, source preserved',async()=>{const f=await syntheticPilot(),c=pilotNarrativeContext(f.snapshot,pilotStatistics(f.snapshot.source.reviews,f.audit,20),'fr');assert(c.representative_evidence.length<=8);assert(!JSON.stringify(c).includes('original_text'));assert(!JSON.stringify(c).includes(f.snapshot.source.reviews[4].analysis_text!))})
