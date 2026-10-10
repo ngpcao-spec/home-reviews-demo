@@ -502,3 +502,8 @@ verify_jwt = true
 
 [functions.process-independent-jev-benchmark]
 verify_jwt = false
+[functions.experimental-jev-v13]
+verify_jwt = true
+
+[functions.process-experimental-jev-v13]
+verify_jwt = false

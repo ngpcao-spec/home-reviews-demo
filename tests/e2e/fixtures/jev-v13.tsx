@@ -1,0 +1,15 @@
+import {useState} from 'react'
+import {createRoot} from 'react-dom/client'
+import {MemoryRouter} from 'react-router-dom'
+import {I18nProvider} from '../../../src/i18n'
+import {V13Workspace} from '../../../src/pages/JevV13Page'
+import {syntheticV13View} from '../../fixtures/jev-v13-view'
+import {syntheticV13} from '../../fixtures/jev-v13'
+import {compareV13} from '../../../supabase/functions/_shared/jev-v13-core'
+import '../../../src/styles/global.css'
+import '../../../src/styles/pages.css'
+import '../../../src/styles/reference.css'
+import '../../../src/styles/warm-theme.css'
+const f=await syntheticV13('second'),ready=await syntheticV13View('second'),done={...ready,run:{id:f.run.id,status:'completed' as const,created_at:'now',error_code:null},comparison:await compareV13(f.run,f.tasks)},language=new URLSearchParams(location.search).get('language')==='vi'?'vi':'fr'
+export function Demo(){const [data,setData]=useState(localStorage.getItem('v13-fixture-completed')?done:ready);return <main className="page-frame"><div className="jev-page gold-page exploratory-page"><V13Workspace data={data} busy={false} start={async()=>{localStorage.setItem('v13-fixture-completed','1');setData(done)}}/></div></main>}
+createRoot(document.getElementById('root')!).render(<MemoryRouter><I18nProvider language={language}><Demo/></I18nProvider></MemoryRouter>)
