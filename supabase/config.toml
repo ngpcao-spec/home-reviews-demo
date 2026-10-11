@@ -534,3 +534,9 @@ verify_jwt = false
 
 [functions.jev-pilot-reserved-evaluation]
 verify_jwt = false
+
+[functions.jev-hybrid-evidence-report]
+verify_jwt = false
+
+[functions.process-jev-hybrid-evidence-report]
+verify_jwt = false
