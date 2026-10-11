@@ -531,3 +531,6 @@ verify_jwt = false
 
 [functions.jev-pilot-evidence-v3]
 verify_jwt = false
+
+[functions.jev-pilot-reserved-evaluation]
+verify_jwt = false

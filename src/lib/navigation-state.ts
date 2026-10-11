@@ -3,7 +3,7 @@ const UI_PREFIX = 'home-reviews:ui:'
 export function restorableRoute(route: string) {
   if (!route.startsWith('/') || route.startsWith('//')) return false
   const [pathname, query = ''] = route.split('?')
-  if (!/^(\/|\/etablissements(?:\/[\w-]+)?|\/avis(?:\/[\w-]+)?|\/analyses|\/notifications|\/plus(?:\/(?:jev-benchmark|gold-set|gold-check|representative-test|v9-finding-audit|negative-validation|jev-exploratory|ai-exploratory-benchmark|jev-v12-test|jev-independent-test|jev-v13-test|jev-economy|jev-compact|jev-economy-pilot|jev-pilot-evidence|jev-pilot-evidence-v21|jev-pilot-evidence-v3))?)$/.test(pathname)
+  if (!/^(\/|\/etablissements(?:\/[\w-]+)?|\/avis(?:\/[\w-]+)?|\/analyses|\/notifications|\/plus(?:\/(?:jev-benchmark|gold-set|gold-check|representative-test|v9-finding-audit|negative-validation|jev-exploratory|ai-exploratory-benchmark|jev-v12-test|jev-independent-test|jev-v13-test|jev-economy|jev-compact|jev-economy-pilot|jev-pilot-evidence|jev-pilot-evidence-v21|jev-pilot-evidence-v3|jev-pilot-reserved-evaluation))?)$/.test(pathname)
     || pathname === '/etablissements/ajouter') return false
   return !/(?:access_token|refresh_token|token|code|type)=/i.test(query)
 }

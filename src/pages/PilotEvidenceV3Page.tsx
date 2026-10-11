@@ -1,3 +1,4 @@
+import { reservedMessages } from '../i18n/pilot-reserved-evaluation'
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -166,7 +167,7 @@ export function EvidenceV3Workspace(
   return (
     <>
       <section className="card jev-card">
-        <h2>{t.title}</h2>
+        <h2>{t.title}</h2><Link className="secondary-button full-width" to="/plus/jev-pilot-reserved-evaluation">{reservedMessages[language].open}</Link>
         <p>{t.disclaimer}</p>
         <p>{t.immutable}</p>
         <button

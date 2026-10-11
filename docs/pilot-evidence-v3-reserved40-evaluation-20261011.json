@@ -1,0 +1,3074 @@
+{
+  "result": {
+    "version": "pilot-evidence-v3-reserved40-evaluation-v1",
+    "control_id": "3988aa10-0c5c-4a52-b1ff-1b576b488c52",
+    "control_sha256": "418c0f1a2dccea8bd5f29ce046dcc57a35d645710231ed540cd38dcb1ccb4391",
+    "snapshot_id": "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+    "snapshot_sha256": "19ea6e88f81a6243792b0a49ec1aa2a7b3d1915272c50790940a6c5c8259bf7e",
+    "organization_id": "93228bbb-6397-41e3-b8be-21ee7060eda7",
+    "v21_audit_id": "854ae975-7a7e-4a73-ae9e-d2f4807d046a",
+    "v21_result_sha256": "04df1ee8ea25040797439cf496958bdbd591957788a5cd69e79608a36bb71ce1",
+    "manifest": {
+      "engine_commit": "91e76d8a4c130ce3b3565cbbc74771e286b0df48",
+      "reference_commit": "b64f571d36ca389cdf459b1311c35938848ce1f7",
+      "engine_files": [
+        {
+          "path": "supabase/functions/_shared/ai-exploratory-benchmark.ts",
+          "git_blob_sha256": "06fd932fe9d243a5bea7f96f8e3a0b53d675628c7afd61a3c14bc7df58db2394"
+        },
+        {
+          "path": "supabase/functions/_shared/analysis-text.ts",
+          "git_blob_sha256": "6b190255d3398cd5574d472a61f3e90ce187f086f29b0b0725eabd9ae2ba41e4"
+        },
+        {
+          "path": "supabase/functions/_shared/consultant-contract.ts",
+          "git_blob_sha256": "516ca9beedf5650c93a1e64276258a88033943bce96008cde8ee30b3942b0d75"
+        },
+        {
+          "path": "supabase/functions/_shared/cors.ts",
+          "git_blob_sha256": "1c9b3396de9ed431c794af2069ea72d3cd1caa827eaf685b59206a7e0f5787cc"
+        },
+        {
+          "path": "supabase/functions/_shared/cross-rating-analysis.ts",
+          "git_blob_sha256": "cdf5b6586d165262b126fd54376722d2270127d2095c2b285b0e536d2c5ac147"
+        },
+        {
+          "path": "supabase/functions/_shared/gold-taxonomy.ts",
+          "git_blob_sha256": "0390341a91af618b35a2c50de08c1029a5c51522acb6efeada9c5613df6f58c3"
+        },
+        {
+          "path": "supabase/functions/_shared/historical-v9-core.ts",
+          "git_blob_sha256": "63a16fbb409f547cdb4cdb9e1d8db429169703c540f5b3defd64963065df0775"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-benchmark.ts",
+          "git_blob_sha256": "3321987e81ab173c97df63a62e744e52b88c72aeaf1eac4a02ecd8225b7177a0"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-economy-cache.ts",
+          "git_blob_sha256": "28a98da9d8031b1e5fadd3043bd1518409115092d05077cd5f2b13fe75fc860d"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-economy-config.ts",
+          "git_blob_sha256": "d3eb62abefff51fe319821f6e466d4597cc8c1474543c81d79f90c4d27913aaa"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-exploratory-core.ts",
+          "git_blob_sha256": "4a14f2af13059f9c09140b27ce9a39029471b84b6975569060e74518c6884294"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-pilot-core.ts",
+          "git_blob_sha256": "cbf9667c4481924e8f42bc3f188f57c54704c7bc949dae8c0f56514105004ebc"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-pilot-narrative.ts",
+          "git_blob_sha256": "f884c16f35a1a450294d2a47cca66ae680f7ea5e573e0e63e221022deb597ba1"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-pilot-types.ts",
+          "git_blob_sha256": "b56d50f5f2a3e67c043ad103ef67a5e3c1cb4b64566c029be0c93cb9ad48818c"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-themes.ts",
+          "git_blob_sha256": "0cd51ce38b0e95613d98a489ed019b47f67377b2c0044c91ccba42f4499bc75b"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-v11-calibration.ts",
+          "git_blob_sha256": "ca18c54026576c8262eb9cdadf47c7e078d4ea2c221dbc395071239a963b156d"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-v12-config.ts",
+          "git_blob_sha256": "aacf2365a40e46e1b8091b5c8ce21948c36ab0ca781623aecf25c1e3547831c4"
+        },
+        {
+          "path": "supabase/functions/_shared/jev-v12-core.ts",
+          "git_blob_sha256": "ef7b39d99a27ecc5a2b7c00eb56f853727c080a9b6cec929e06b17029b3f9d49"
+        },
+        {
+          "path": "supabase/functions/_shared/jev.ts",
+          "git_blob_sha256": "b00ebcf750eedb26c5563e9f5af9c6dad1097243bafdb8b0a4f0a3302101b661"
+        },
+        {
+          "path": "supabase/functions/_shared/negative-validation-core.ts",
+          "git_blob_sha256": "91e11e10945036b2b09e133f641e3075754a0adcc77c1bb7982ff67dc4084ccb"
+        },
+        {
+          "path": "supabase/functions/_shared/negative-validation-score.ts",
+          "git_blob_sha256": "ac77c7ebb64f4e31021a66cba1c9b80775a7b159c6703931a4c5fd65ba4d2c83"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-api.ts",
+          "git_blob_sha256": "85e1a21dc81fc9be0d8c8280c3221a2546c131f8e5d3b26767c1247bebd917ed"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-audit.ts",
+          "git_blob_sha256": "a6495a4ebcb808fb932925cbb8f2f5a0c301079020c15cb408be1c263ce34657"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-rules.ts",
+          "git_blob_sha256": "b1f26d2614aff8d2da47534be41364ac3ec4865d78c94b369f1bc357f075a972"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-v21-audit.ts",
+          "git_blob_sha256": "cc08028381d6acd338dac3b5342f8305481c4a834f6f81eaace8d8b1b5a78272"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-v21-rules.ts",
+          "git_blob_sha256": "b6973b8a31b998cd98240665a9b6b9d93f30052d65e65a7bb97eb341dbb85ca5"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-v3-audit.ts",
+          "git_blob_sha256": "e540aa7a7452ddfe2ca5f0955081cd67467e50910f1bcef45de2fb3cd787aa3c"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-v3-control.ts",
+          "git_blob_sha256": "cfd1aa133d05167dbbe03086a00033688b62c551a3dd225a7845465c825e2388"
+        },
+        {
+          "path": "supabase/functions/_shared/pilot-evidence-v3.ts",
+          "git_blob_sha256": "4a9bef64d70fc4107e194e288f46be325fe1bcec6a2f7a6fe6aacbe28ff0a8ac"
+        },
+        {
+          "path": "supabase/functions/_shared/reputation-metrics.ts",
+          "git_blob_sha256": "ddd5936bccf564142828060459f092f622445ec2f09b69700492c228069d5fb6"
+        },
+        {
+          "path": "supabase/functions/_shared/review-language.ts",
+          "git_blob_sha256": "c66528b0ed3d3cabce1d73783d8cdee8d2e04a26f27ecc65f9bd7c4634a45476"
+        },
+        {
+          "path": "supabase/functions/_shared/structured-review-context.ts",
+          "git_blob_sha256": "89505cb1f6ebf42380c0c0be467266f10710f7ae7a1c14aa1611fef0acba4e1e"
+        }
+      ],
+      "engine_files_sha256": "491188bdd67680010740b8d411721f0c82bc48d5fbb8c34e2966565bb1f1c8fa",
+      "reference_file_sha256": "9ce8013b5857dfb168887304f1bab056a11fb23a75c6763b28ff99330edf4e05",
+      "reference_canonical_sha256": "5022abfc493723dcd838004cbe51088ee04286da0eb16caddba0c94d249eaf22",
+      "posthoc_file_sha256": "487b8a538fe39d9baf6cf85f7b1311494fd78a7ce20e29206b0a37cd9f64e4de",
+      "runtime": "Deno 2.9.6; offline --deny-net"
+    },
+    "rule_sha256": "4fd4dc9eb81e386c9e1c805a74e6494297ce5c640fdf61199e36a556f50d582a",
+    "frozen_verifier_outputs_sha256": "24497f8ed3f0649b8096479e2d6a6ca477b229d733e3fe066aa06139776860ab",
+    "reference_type": "chatgpt_ai_reference_not_human_gold",
+    "independent_human_validation": false,
+    "sampling_limitations": [
+      "40 selected review/theme pairs from one establishment, non-representative of all stored reviews or independent restaurants.",
+      "References are GPT-6 model judgments, not human annotations.",
+      "The theme was visible; two candidate polarities (positions 1 and 2) were exposed during administrative source inspection before this adjudication. Remaining proposed polarities and model decisions were not retrieved while annotating.",
+      "Resolved English texts were used; no independent source-language translation validation.",
+      "V3 must be evaluated in a separate later step after this file is frozen; no V3 reference labels or historical predictions were modified.",
+      "Uncertain decisions must be excluded from binary precision/recall calculations or reported separately."
+    ],
+    "definitions": {
+      "decisive_coverage": "supported_by_rule or unsupported_by_rule, divided by all or comparable cases as labelled",
+      "selective_agreement": "correct accepts plus correct rejections / decisive comparable cases; abstentions excluded",
+      "strict_agreement": "correct accepts plus correct rejections / all comparable cases; abstentions not counted as agreement",
+      "unjustified_acceptance_rate": "incorrect accepts / accepted comparable associations; not global JEV precision",
+      "justified_acceptance_coverage": "justified accepted / reference-supported associations",
+      "jev_baseline": "selected JEV associations, not all 25-theme predictions; no absent-theme accuracy inferred"
+    },
+    "cases": [
+      {
+        "position": 1,
+        "review_id": "6a95d0d8-1b5a-4ed5-a398-4f751d87b414",
+        "theme_key": "location",
+        "polarity": "negative",
+        "analysis_text_sha256": "4f714117e9c56efaa211c039601d311ba9d34a1a1af0bb656f104b67575fc49e",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "atmosphere",
+        "analysis_text": "Do not miss this!! Highly recommend this place for drinks or food! Go inside and see for yourself! From the outside doesn’t look like much but do yourself a favour!",
+        "reference_choice": "absent",
+        "reference_justification": "Appearance from outside is unassuming, but there is no evaluation of the restaurant's location, distance or access.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "ad2ab94b4775f8b4e2166e735acd03cb9140e944ec3debabb3e7cb28f659066d",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "793c3526e3d8b15ac3b527435af3d23d505268f8d3c9ab0db1a923d5feaabd6a"
+        },
+        "jev": {
+          "cache_id": "08621a9d-7a31-49a7-8ffd-d4cf44c613c4",
+          "cache_response_sha256": "5c5ccc874e42372a25b1a11ad0b1cf698d6a9d5da6804ac94867a1a04028e0a3",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 0.63,
+            "positive": 0.19,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 2,
+        "review_id": "7e8d6c9d-0261-44be-ab2a-8628189a57ec",
+        "theme_key": "decor",
+        "polarity": "negative",
+        "analysis_text_sha256": "4d65b955a7f7c9969dc875196234876a2dd32f54d3fd3c533a77971e60b739dd",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "atmosphere",
+        "analysis_text": "Delicious. The cozy dining room doesn't look particularly impressive at first glance, but once inside, you feel cozy and comfortable. Greenery, beautiful interior details.",
+        "reference_choice": "both",
+        "reference_justification": "Interior/decor is initially described as unimpressive, then greenery and beautiful interior details are praised.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "4928a4b2b8388b0103961fadbd3957bd0efb195958ac31769b31e64c5f85f218",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "c207ec811d12fcbcbab5f9cd78ccc2f912df731d56fafa216afaa4a4f347da36"
+        },
+        "jev": {
+          "cache_id": "4e51f09f-eb55-4788-948a-107fd27047d3",
+          "cache_response_sha256": "4304a9566f47d78e86ddb063499477e7d6809896f8e4215bc809e5d47aac8b6a",
+          "choice": "both",
+          "probabilities": {
+            "choice": "both",
+            "negative": 0.87,
+            "positive": 0.99,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 3,
+        "review_id": "6080e94b-1025-4672-91ed-b4494a4861e9",
+        "theme_key": "wait_time",
+        "polarity": "negative",
+        "analysis_text_sha256": "a9a7fd00399d8cb78ca88f5dd4d71002321f4e9c0b09bfe6849a302ffdfd8867",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "The place is quite spacious. However, the service was disappointing. A staff member handed me the menu and said he would return in five minutes, but after 15 minutes, I had to go downstairs myself to place my order. The drinks were also underwhelming for the price and definitely not worth it.",
+        "reference_choice": "negative",
+        "reference_justification": "Employee promised five minutes but did not return after fifteen; the guest had to go downstairs to order.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "dd0b062c89cd6f2e7192c1d76439a9ce601480a7bd0f1e38b82717ac74cffb6a",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "00c2d628d190d51fd09adce88d78adb330b2a2628fb9f3729f0cf8fab4d96db8"
+        },
+        "jev": {
+          "cache_id": "b363bb79-5868-45b7-ab41-799cb78bb98e",
+          "cache_response_sha256": "56ab130d6ce68ccb9a5920f76b73de798b7a47a80c15a338a55d4dcfa21e68a8",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 1,
+            "positive": 0.01,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 4,
+        "review_id": "fb52f17a-d994-4a49-a1e2-8d8695201c1b",
+        "theme_key": "professionalism",
+        "polarity": "negative",
+        "analysis_text_sha256": "427343bcb8246247609147307993b36b3952be426bd7b722c7f78f68ae8f617b",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "The female employee at this shop had a bad attitude towards foreign customers. I'm Vietnamese, and I brought my friends here to buy something, and my friends are foreigners.",
+        "reference_choice": "negative",
+        "reference_justification": "The employee's discriminatory or poor attitude toward foreign customers is explicit unprofessional conduct.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "5e99f596be79662aab3d87c04b13efb9cb96a2c85c05fa933c8bf7569662e20c",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "3ab14e0088a2e6e7eb18a4e2bbeaa9492264b066afd11aeccfa36b871cf50689"
+        },
+        "jev": {
+          "cache_id": "92a6f36e-a08c-4c74-90e7-0e60978fc102",
+          "cache_response_sha256": "ce643da2a25d309fa7f80c2ea74532ab955c98c06eceb6dabc20599573546022",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 1,
+            "positive": 0,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 5,
+        "review_id": "9f65e579-ee31-4adf-b318-e7f256d5a385",
+        "theme_key": "wait_time",
+        "polarity": "negative",
+        "analysis_text_sha256": "5b98ae9769414a89b95200eba86778568d6da0ede2cdbf13e52619a7ffee9411",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "The portions are already incredibly small.\nBut I can't remember how many times I've failed to enjoy my meal here. The drinks are excellent. The food is completely tasteless. The coffee and drinks arrived early, and we waited for the food. The coffee got cold while it was still being served. Very disappointed.",
+        "reference_choice": "negative",
+        "reference_justification": "Food arrived sufficiently late after drinks that the coffee grew cold while waiting.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "6a7e62dc62d28089232f452709070fd3ec73cc4fbc1a24386a6cc1be054a2785",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "f4ca1af011a14b799948438e8c54229fa16d083b12695abc033b964bf4e08703"
+        },
+        "jev": {
+          "cache_id": "6d11a0fc-b2d0-4587-af8d-a3a05aeda0b8",
+          "cache_response_sha256": "33f57875e21b6f7786ca6960aba40e0f444a63774258c049b438413d25f3d770",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 0.8999999999999999,
+            "positive": 0.44,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 6,
+        "review_id": "7c11a7f5-0211-4f5f-ae87-55f1c1283ed0",
+        "theme_key": "wait_time",
+        "polarity": "negative",
+        "analysis_text_sha256": "b62b39b36e43da8e8a7bd82e28f611e7f5ac85bc6d32317d0fbed384e7499e0a",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "supported_by_rule",
+          "reason": "EXPLICIT_BOUND_ENTITY_POLARITY",
+          "statement": {
+            "id": "c3:wait_time:negative:service_delays:3",
+            "theme": "wait_time",
+            "polarity": "negative",
+            "claim": "service_delays",
+            "entity": "service",
+            "entity_name": "service",
+            "start": 213,
+            "end": 242,
+            "quote": "the service is a little slow.",
+            "clause": 3,
+            "time": "unspecified",
+            "negation": false,
+            "relation": "predicate_argument_event",
+            "actionable": true
+          }
+        },
+        "axis": "service",
+        "analysis_text": "Artisan Cafe & Eatery is a great place to visit if you want a change of pace with brunch in Nha Trang. The cozy atmosphere and rustic decor are quite relaxing. The food is delicious and beautifully presented, but the service is a little slow. The cafe also has many photogenic spots. Prices are reasonable, but the menu could probably be more diverse. Overall, it's good!",
+        "reference_choice": "negative",
+        "reference_justification": "The review explicitly says service is a little slow.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "1acbd337afb0fd5ddfca56d0d5d6990eb4ef0812e4291b9ea443d6c3947b88ef",
+        "category": "justified_accepted",
+        "status": "supported_by_rule",
+        "quote_sha256": "42661a37b32c998a3c92cac929166492e84a3e8070776dd3ad75f5b36d438fca",
+        "v21": {
+          "status": "supported_by_rule",
+          "reason": "EXPLICIT_THEME_AND_POLARITY",
+          "excerpt": {
+            "end": 242,
+            "claim": "wait_time",
+            "quote": "the service is a little slow.",
+            "start": 213,
+            "rule_id": "wait_time.negative.wait_time"
+          },
+          "binding_id": "141a5ddcef00636f9b7eea30fdf71993ce7c236fb479f50a8b55a3f00b9f787f"
+        },
+        "jev": {
+          "cache_id": "6a4d40ad-21b6-4c28-8279-e565b8e6b866",
+          "cache_response_sha256": "23bab323867f191d3bca170fedea018677a2c137f11f5a7ccb3f841d6d287a11",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 1,
+            "positive": 0,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 7,
+        "review_id": "e2b157e1-8921-41c8-9b01-929a01726cc7",
+        "theme_key": "billing",
+        "polarity": "negative",
+        "analysis_text_sha256": "96a9bd332f110bbdf675d37bc0338090593e6b46d825fb1d738b8567b94a3c38",
+        "decision": {
+          "flags": [
+            "NEGATED_EVENT:value"
+          ],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "The presentation is 5 stars. It looks beautiful, but the taste is strange. Everything is mixed together. It's a typical salmon scramble with toast, but in your mouth you taste cinnamon, sugar, something spicy, flowers, and pumpkin jam. There's nothing to spread on the toast, so it's very dry... not for everyone. The pasta Bolognese is just ordinary. The bill was 450,000, although it should have been 400,000 (they probably add a service charge). Not worth the money.",
+        "reference_choice": "negative",
+        "reference_justification": "The bill exceeded the expected amount and a possibly unannounced service charge was suspected.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "cb4619f62dba5479bf7dc603a8714a10ecd1bdd05ed3853fb9f67378e7faaa6a",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "3ab1c5f4f6e94f126d2b4a8d02affd9b13fb40faa4a263c842d5fc18eb94b27b"
+        },
+        "jev": {
+          "cache_id": "c1db82f0-acb7-4629-942a-ec25782878d1",
+          "cache_response_sha256": "1998e58aa705f58c4c290062c48d75592d15c685e155b19d4e51b9c62b5da271",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 1,
+            "positive": 0.04,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 8,
+        "review_id": "e68bb7df-d73b-4842-a0ca-9e26575a97c4",
+        "theme_key": "price_level",
+        "polarity": "negative",
+        "analysis_text_sha256": "43119dc5a3d4c8d5f1cf50a493156e987ef34093a3a7262f7d0b23ef9953dfa4",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "Delicious food and friendly service. Prices are a little higher than the local average, but it's worth it.",
+        "reference_choice": "uncertain",
+        "reference_justification": "Higher-than-local-average prices are explicitly stated, but immediately judged worthwhile; a negative price-level attitude is not clear.",
+        "reference_supports": null,
+        "reference_annotation_sha256": "2e82940ce4510ebdc60e33d13aa59ec8f13e47a0c8619a9ef91e5c5b650ec52f",
+        "category": "reference_uncertain",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "de59be9aaa2296e48f2b611f762a401f083d56b3026a5f69b97cf44674292bcc"
+        },
+        "jev": {
+          "cache_id": "b38568ea-3a8a-4ab8-851f-5b273fc257de",
+          "cache_response_sha256": "c16a936546bf3ec86e19dc2412e5bec8f7e8e232f98bad746a44535d5358c31f",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 0.97,
+            "positive": 0.5800000000000001,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 9,
+        "review_id": "d6518e2d-576c-4d2f-bcb0-2b26c184c250",
+        "theme_key": "value",
+        "polarity": "negative",
+        "analysis_text_sha256": "08502637f9b55facc2b069062a41c5f25cbd56838f460a566d1a60dbccaf9d4f",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "A fantastic place, a 7-minute taxi ride from Nha Trang city center for 100 rubles. The food is beyond reproach; we tried all the pastas, salads, and lasagna. The flavors and combinations are superb. Free seating is available in the evening, so no waiting. There's definitely no other place like this in Nha Trang with cuisine like this, and we highly recommend everyone try it at least once. The prices are above average, but it's worth it. The portions are generous and large.",
+        "reference_choice": "positive",
+        "reference_justification": "Above-average prices are explicitly described as worth the experience, establishing positive value for money.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "6085a1f5bbc561d10cb1ced4c526ae89a4d2f9334d067a215d88192646399ac1",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "c005183b74b0c9a0e1cfb8dbafe8b8e3bd8daca42f0d9a8f55b39faf9cbab0be"
+        },
+        "jev": {
+          "cache_id": "35dc2374-87ef-4dc1-af2f-44b0f52f2559",
+          "cache_response_sha256": "26cf6f27f842651bde3da37eeb78ec9172b8138ad173602adf18a667ea89846c",
+          "choice": "both",
+          "probabilities": {
+            "choice": "both",
+            "negative": 0.61,
+            "positive": 0.98,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 10,
+        "review_id": "5de421ee-3b24-4fb9-ae3f-89fabf8a76a0",
+        "theme_key": "price_level",
+        "polarity": "negative",
+        "analysis_text_sha256": "569fd4d645013cf582ff70ed8d0977150b961034dfca803c01de8826a2b22ad0",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "A very tasty establishment! The prices are closer to Moscow's, of course, but the dishes are very high-quality and delicious.",
+        "reference_choice": "uncertain",
+        "reference_justification": "A price comparison with Moscow alone does not state whether the price level is positively or negatively judged.",
+        "reference_supports": null,
+        "reference_annotation_sha256": "d8d9183eeac095913bd5f4ec18c954417d789e3431f39fdb4e0abcc62a895142",
+        "category": "reference_uncertain",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "f89b93731a6487260fcec240607a07753074feb2acbd3b8c89e07dc2ee39a722"
+        },
+        "jev": {
+          "cache_id": "b160a420-111b-4bc0-9a34-636126fee1c9",
+          "cache_response_sha256": "0289160abc9d7619f0ba3c5915936a6243d4ff93ec8dca767ed98c3c8bcc02de",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 0.61,
+            "positive": 0.07,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 11,
+        "review_id": "2245000f-8600-43b0-8969-e40727954b37",
+        "theme_key": "billing",
+        "polarity": "negative",
+        "analysis_text_sha256": "9c8d502f050c65937385e03e9afaa2c73d4d38f11afb8e4f1a07e5db110d4077",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "Tax (     It’s simply a matter of including it in the base price )",
+        "reference_choice": "negative",
+        "reference_justification": "Criticizes tax being separated rather than included in the base price, an explicit billing-transparency issue.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "8b11465088eef88f923d27492d885e51b55412fd648ff21941609cdcb3b5b1a0",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "b6071c0ddda2db2ef6db8ee838ca1fb28bf49e2456bbe088c82d7a6a32e800d3"
+        },
+        "jev": {
+          "cache_id": "cb85443a-82b1-44a7-8d1c-359e3e5c4158",
+          "cache_response_sha256": "822b16bd8806c52943b1ec8e76315f05e31cbf6871b21604cfa1c1134d7a6a8d",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 0.79,
+            "positive": 0.04,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 12,
+        "review_id": "50e0a434-b71b-410f-9149-122cec9a23d0",
+        "theme_key": "value",
+        "polarity": "positive",
+        "analysis_text_sha256": "bf5ba62ba4a499f4364009ea9841f904e021bc4c4681d2a72d39e86a552cecd2",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "unsupported_by_rule",
+          "reason": "PRICE_LEVEL_NOT_VALUE",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "Perfect place. One of the most beautiful restaurants I visited in Vietnam. Perfect breakfast for the whole family that includes everything. And not expensive. Many thanks to Artisan!",
+        "reference_choice": "positive",
+        "reference_justification": "A complete family breakfast is praised as perfect and not expensive, indicating a favorable price-to-offering judgment.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "a6af831b5897f070e2b18c1af89cb10116dfd2f79b4ab3f0aa32fc2ca6d70863",
+        "category": "justified_rejected",
+        "status": "unsupported_by_rule",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "afa3e2417f0a152cef52c40635db20df71116c73a247131919cf5e665f6c602d"
+        },
+        "jev": {
+          "cache_id": "bb6eda82-b6d5-4d2e-adf2-4f3e71fcde58",
+          "cache_response_sha256": "02f319ee9c71f68f1be0595a559c62c0fbbf658c583d91359e1681ac4c96c476",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0.01,
+            "positive": 0.9400000000000001,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 13,
+        "review_id": "732293c3-1d21-42a1-b7a9-0cc8ea4b7ca8",
+        "theme_key": "price_level",
+        "polarity": "positive",
+        "analysis_text_sha256": "22e01ef6498942b76813cd73d50ec1fae3cfa5cafb4f7e10f11f7f7820299432",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "supported_by_rule",
+          "reason": "EXPLICIT_BOUND_ENTITY_POLARITY",
+          "statement": {
+            "id": "c5:price_level:positive:low_price:3",
+            "theme": "price_level",
+            "polarity": "positive",
+            "claim": "low_price",
+            "entity": "price",
+            "entity_name": "prices",
+            "start": 192,
+            "end": 242,
+            "quote": "The prices were quite reasonable for the portions,",
+            "clause": 5,
+            "time": "unspecified",
+            "negation": false,
+            "relation": "price_descriptor_not_value",
+            "actionable": true
+          }
+        },
+        "axis": "price",
+        "analysis_text": "I ordered an egg royal and an artisan salmon, but they weren't as good as I expected. The poached eggs were overcooked; the yolks of both were dry when cut open. The salmon wasn't very fresh. The prices were quite reasonable for the portions, but the quality was only acceptable. However, the restaurant's atmosphere was nice, cool, and quiet.",
+        "reference_choice": "positive",
+        "reference_justification": "Prices are explicitly called reasonable for the portions.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "c59602161323faea93715e77f46df7aff94efbb79b0a7e181613bed89ce6ddb0",
+        "category": "justified_accepted",
+        "status": "supported_by_rule",
+        "quote_sha256": "89cf4e8ab055bddd55679daa4249ca0fe324b1e8ca3fdb8905d79b363d2fd8f5",
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "7d0efd6056a4937b7b868ba9307096657956a24c9a619b4e9522b92fc09ad389"
+        },
+        "jev": {
+          "cache_id": "bd00de5a-7e07-4dc9-9f55-acfe3463969f",
+          "cache_response_sha256": "f5d7a8b4e9769bae880397b55ead50d84a6d7aa7c5afda23df44bbc2d31b374d",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0.04,
+            "positive": 0.99,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 14,
+        "review_id": "5c3ecaea-851c-430c-ab15-180ed66a1db8",
+        "theme_key": "value",
+        "polarity": "positive",
+        "analysis_text_sha256": "62f99f119db3dca0d0787a25660c93408040c88b50aa12fe0c33d9c745a31737",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "It was very surprising to find this place in the middle of a residential street area, the prices are pleasant, the atmosphere is very attractive and the carp pool at the entrance is very beautiful. I recommend everyone to visit this place.",
+        "reference_choice": "absent",
+        "reference_justification": "Pleasant prices are praised without an explicit comparison between price and the service or product obtained.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "3fbeaa4c273c7f359b72b8e4cfa3ab390ebc276cecdf16206c8c588ee582f3b9",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "3a3e91a4c349e5373d252775e584d4a4c985d7ea63bfe18f77583fed88af0e32"
+        },
+        "jev": {
+          "cache_id": "4344e8e8-9eee-4010-9097-e43b6ff4dc1d",
+          "cache_response_sha256": "915c18f3b1077b38ad53f2c7484070643a0ebecb335ddaf08ccda72cf46d4478",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.71,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 15,
+        "review_id": "da8e36d2-328f-4efc-8fc0-4e3d06b94aa8",
+        "theme_key": "value",
+        "polarity": "positive",
+        "analysis_text_sha256": "c99cebd0199e09a1d5af77c3fece58b88b3f7ba4c74c1f15c66c2b7edaeea88a",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "unsupported_by_rule",
+          "reason": "PRICE_LEVEL_NOT_VALUE",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "A very atmospheric place with delicious coffee and breakfasts! The prices are affordable, I recommend it!",
+        "reference_choice": "absent",
+        "reference_justification": "Affordable prices and delicious food are both mentioned, but no definite value-for-money comparison is made.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "940b30601a6f744010351dd13bae688098f950a8e433d6dd48069cd975df2889",
+        "category": "unjustified_rejected",
+        "status": "unsupported_by_rule",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "0443093aa6d1365f5839b568db1b8d3995ac4c36d5dbc9d65fdc14f880c89418"
+        },
+        "jev": {
+          "cache_id": "7171a1b6-c6c1-49f4-ab74-ca44ca5a177c",
+          "cache_response_sha256": "de11809ed14cfb006ac73ffe0314dc6c388f363119ec168a6eb4a1228d98dfb6",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.9,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 16,
+        "review_id": "c3663fe2-8ef9-4986-b3ef-d28b08d5575d",
+        "theme_key": "value",
+        "polarity": "positive",
+        "analysis_text_sha256": "15c84b33fbd4836a70fca66178e4aae56d38568c3397fb14a19c94b87a385562",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "price",
+        "analysis_text": "A very atmospheric place! We're from Russia, visiting Nha Trang for the first time. We found out about this restaurant on Instagram. It's very beautiful, delicious, and inexpensive! Definitely worth a visit!",
+        "reference_choice": "positive",
+        "reference_justification": "Explicitly describes the experience as beautiful, delicious and inexpensive together, suggesting favorable value.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "16a9ca1b54eb9b243890616d4d66c1e20a6e629f56aadbb0f347ae58d1233293",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "cc9cd77dce4aa4387def34294c8de6d8018f15435df1e3c6f46f6ddae1e76b69"
+        },
+        "jev": {
+          "cache_id": "d178bac7-3d8b-4867-88fe-b5aca96ec086",
+          "cache_response_sha256": "a36ca3db4bca39fc1b15b61d8bccbbfee749280cc6a8ffb636f176abb86a84f6",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.93,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 17,
+        "review_id": "e45be953-4b32-4cf4-8f59-a3ac1860dde6",
+        "theme_key": "food_quality",
+        "polarity": "negative",
+        "analysis_text_sha256": "d501ded0add474ce441665a987b48f739e8bca0ed681903cade53f69f53b9bfc",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "There's unslaked baking soda in the pancake.\nBad.",
+        "reference_choice": "negative",
+        "reference_justification": "Unslaked baking soda is criticized as a defect in the pancake.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "dfdce1f7c5731a2dd94099b3ed535fd144923a202bd8dc0fac8e6863f33a59d0",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "03dc28a19e16eebf5e851370c42c2ed15f76a9bf48f6eb873d10357b40235b12"
+        },
+        "jev": {
+          "cache_id": "718d216e-aa23-48f5-b531-4e63ee6444d7",
+          "cache_response_sha256": "5d8c1c0eaf1e7dd44fd1a86e35c1a029b12d0426fd71faa9ad78071f59816809",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 0.94,
+            "positive": 0,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 18,
+        "review_id": "54dcae7a-dd43-429c-be84-44d0d3e4f8b2",
+        "theme_key": "food_quality",
+        "polarity": "negative",
+        "analysis_text_sha256": "75202206aabad7fc45d9f61e6a1c13f1cf0246e16b11e1a3084be8e1c62ee606",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "supported_by_rule",
+          "reason": "EXPLICIT_BOUND_ENTITY_POLARITY",
+          "statement": {
+            "id": "c1:food_quality:negative:food_quality:0",
+            "theme": "food_quality",
+            "polarity": "negative",
+            "claim": "food_quality",
+            "entity": "food",
+            "entity_name": "food",
+            "start": 28,
+            "end": 81,
+            "quote": "since it's a cafe, the food overall isn't that great.",
+            "clause": 1,
+            "time": "unspecified",
+            "negation": true,
+            "relation": "attribute_attached_to_entity",
+            "actionable": true
+          }
+        },
+        "axis": "quality",
+        "analysis_text": "The atmosphere is okay, but since it's a cafe, the food overall isn't that great. If you want to eat, go to a restaurant.",
+        "reference_choice": "negative",
+        "reference_justification": "The review says the food overall is not great.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "f446608c5ce4913b4b27694fbb008048ebb348b413dbcdb40cd8dbdacf4a88d7",
+        "category": "justified_accepted",
+        "status": "supported_by_rule",
+        "quote_sha256": "51266a3801b9a086f0f63449e4dd3b4d6b1007c9686017fe1faa399c92c5d6cf",
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "466e2120a2cdcc889a3f43ca05ddcb8fbd25a9a49c9bee7dbb577117ebe5b719"
+        },
+        "jev": {
+          "cache_id": "9d596d61-c406-4d0b-abcb-4c5a3dde06fb",
+          "cache_response_sha256": "60d1fe39ed83cd51b8a345318eb9a41e53039e673f365fb8229ce98f72831c65",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 1,
+            "positive": 0,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 19,
+        "review_id": "cfe0affb-af32-4528-b15d-bbb88bb9ca68",
+        "theme_key": "portions",
+        "polarity": "negative",
+        "analysis_text_sha256": "1bef602fd48b183e956bf6a3a55629e35764873fd367ac77bc46a22ea9d54b03",
+        "decision": {
+          "flags": [
+            "AMBIGUOUS_ANTECEDENT"
+          ],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "An excellent restaurant in every way. We spent around 610,000 dong here.\n\nWe ordered three full dishes (the portions were huge, we even regretted ordering two). They give you water when you sit down, but I'm not sure where it comes from.\n\nThe waiters were super nice, everything was brought quickly, and they were very attentive even though we arrived just before closing time.\n\nThe signature smoothies are beyond praise. If we were staying here instead of visiting on a tourist trip, we would come here regularly.",
+        "reference_choice": "positive",
+        "reference_justification": "Large, generous portions are highlighted favorably; having ordered too many dishes is not a criticism of the portion itself.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "502f61be77c7f7b1e34222126d13466485b8f9ae29fddc32c021c49949d48336",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "a2c2dc805ee49212e6dc22c054ee7f7edcd6bf09371cce4305e5acee87c1055c"
+        },
+        "jev": {
+          "cache_id": "504fb317-726c-486e-8859-9c282e97490c",
+          "cache_response_sha256": "35fe37bfeb515a31d9a929744a0608d20a6e2481beb13a22e9639023377c751c",
+          "choice": "both",
+          "probabilities": {
+            "choice": "both",
+            "negative": 0.73,
+            "positive": 0.89,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 20,
+        "review_id": "51bce1a1-2845-49a2-8632-5b6793e67ffa",
+        "theme_key": "portions",
+        "polarity": "negative",
+        "analysis_text_sha256": "d0f4db6f3d10560c247c4fcef509b12eb7e6c4f1d27fdb8bcf66b891b8aff58a",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "We went to this place last night. The prices are steep, and the burgers aren't big.\nThe menu says the dishes are exempt from 8 percent VAT, plus a 2 percent service charge.\nThe menu description is unclear.",
+        "reference_choice": "negative",
+        "reference_justification": "The burgers are described as not big, explicitly criticizing serving quantity.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "d1fc791b6817b3a88bcb56417ce622a5df855305668195c26d26bee140b2c22b",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "c60c1eaf89c3d5152a28306e7eaab563acb64d91cb38206929de1d2faa79ddf1"
+        },
+        "jev": {
+          "cache_id": "f6013954-6262-405f-8bbd-7bb608ea6585",
+          "cache_response_sha256": "2fdb7501827fe2729c410b37303205d5ffd24f9f5690e5345e7e3f7b389184a3",
+          "choice": "negative",
+          "probabilities": {
+            "choice": "negative",
+            "negative": 1,
+            "positive": 0,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 21,
+        "review_id": "3a70d566-ac04-49ee-b21a-e5263ad7fb05",
+        "theme_key": "portions",
+        "polarity": "negative",
+        "analysis_text_sha256": "0adc794069017e187e25aec8cd4b72fa3a433b0b5b661e8d98091ef6007cabc3",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "Delicious and beautiful.\nThe only thing is, there's very little feta in the protein bowl. But the portion is good and it's delicious.",
+        "reference_choice": "both",
+        "reference_justification": "The protein bowl's portion is described as good, but its feta quantity as too little.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "45dc660526cfb51653ff4755f3218324f5ebde4e1ea161af47bb4b07cc4dfce3",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "f7e211ebae405e3d2b48f9386d81b9483638e4f21881bcdb47b223c0b27e07e3"
+        },
+        "jev": {
+          "cache_id": "1d10e409-3afa-4956-9fc9-9544ee2ea94b",
+          "cache_response_sha256": "8fea983ee6007a6e58904df0cd37ed7467bc32c91ab628dfff20c61e8ab4fca5",
+          "choice": "both",
+          "probabilities": {
+            "choice": "both",
+            "negative": 0.9299999999999999,
+            "positive": 0.9099999999999999,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 22,
+        "review_id": "dfe2e090-3721-4986-a8b0-d0efdf0879f7",
+        "theme_key": "coordination",
+        "polarity": "positive",
+        "analysis_text_sha256": "b3d6aae0eb5c8b05ef174f3042a73f9b15efc33d0465edcce6b97b7c7b9f6388",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "Nice place and service.",
+        "reference_choice": "absent",
+        "reference_justification": "Generic praise for service does not describe service organization or coordination.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "8882b7a08385ca74f50189ef987c366b867a00fb8821ba0c84f9c24c6e69d81b",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "8f950c7a9379c7a2541fd1a5557f947ff632124f14d3b109db637e2305df56f6"
+        },
+        "jev": {
+          "cache_id": "c055cdca-c2fc-4d0b-b473-67abe656ccf4",
+          "cache_response_sha256": "3ae7630fc686f74a929a0775d56ac3b0d84963b55516d633faf0c406f0093cd4",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.68,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 23,
+        "review_id": "6943f64e-b661-4faa-b1d1-784f10604d78",
+        "theme_key": "friendly_staff",
+        "polarity": "positive",
+        "analysis_text_sha256": "d76ed14072c4378670b9b5300e9a487b33cb1ef69b86018e5dc05228d8b7e4e4",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "Absolutely fantastic place, if you are looking for a bit more \"western\" food, English breakfasts and so on. Simple menu, very good coffee also.\nThe atmosphere is really pleasant, original and the guys working there are so polite and cool. Top spot!",
+        "reference_choice": "positive",
+        "reference_justification": "Employees are explicitly described as polite, which is a positive friendliness/politeness judgment.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "217412d8a29282556d1f5546f4118fcc3d1a8999c8f893585fc96cb3f1906b1c",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "1763633545e8217bb9551d29c061e1cc0fd2aadb41677e18cd30b22f5db2eb27"
+        },
+        "jev": {
+          "cache_id": "479e6a1a-8353-492b-a50d-f4b2c6d3644b",
+          "cache_response_sha256": "94f1b165fcb76dcafea6103d90035d2a43310da513149761f8af37063a295eff",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.98,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 24,
+        "review_id": "e8d5c50e-0bad-42e7-907a-9895f1e86bc7",
+        "theme_key": "coordination",
+        "polarity": "positive",
+        "analysis_text_sha256": "9bdb49bd9a5da3dced8fd307eb217a9c5bb7d1953da6beb29aa5e4d896685945",
+        "decision": {
+          "flags": [
+            "AMBIGUOUS_ANTECEDENT"
+          ],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "The place has a great atmosphere. We had shrimp pasta, and the shrimp were soft and tender, not rubbery. The burgers were also very tasty and juicy. I liked the chicken one best, but that's a matter of taste. The burgers come with fries.\nThe service is good; the waiters are attentive and don't overwhelm you.\nI recommend ordering one of the dishes, as the portions are large and filling, but they can also pack takeaway if you need something.",
+        "reference_choice": "absent",
+        "reference_justification": "Attentive servers and generally good service do not by themselves establish organization or synchronization.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "a2be09c106f5474ae20202ceb8326861397381e8fb3bb3b95e2dc24ab8734d21",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "f9e34f17961e8bfe7f1fcb8987f998868bd482ffccac0d397ebc673ac74ef653"
+        },
+        "jev": {
+          "cache_id": "8314aa61-ea0b-44e2-aca5-559824b5fbae",
+          "cache_response_sha256": "e6ccb10008de8c92a853e50ebc2d762e030aa6b0b1eb5e27fc130ad778cf44da",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.69,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 25,
+        "review_id": "da617b3d-29e5-4be3-8b58-e6ff27b94bc0",
+        "theme_key": "attentiveness",
+        "polarity": "positive",
+        "analysis_text_sha256": "f3700e7af9efb33c71b47e6edb15c4c871f7e68744517b0fa76905efd7378100",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "unsupported_by_rule",
+          "reason": "OTHER_SERVICE_DIMENSION_NOT_CUSTOMER_CARE",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "The Artisan Cafe a must to experience if you are in Nha Trang. The staff there is friendly courteous and their customer service is impeccable. The atmosphere is vibrant and calming and stunning. Food is just as perfect with a diverse variety of menu options to choose from. Will be visiting again very soon! (The photo depicts their protein bowl paired with their blueberry galaxy smoothie).",
+        "reference_choice": "absent",
+        "reference_justification": "Impeccable customer service is generic praise without any specific attention-to-needs action.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "759503649470fdbd005a445f76f219bc59a583d8b49ec87779c7132f9ed2d7f6",
+        "category": "unjustified_rejected",
+        "status": "unsupported_by_rule",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "d2320dd8eb74bf806e14b0436eb6245759bc4302dc2ca9c5e4e55f895e14a227"
+        },
+        "jev": {
+          "cache_id": "978dcc74-2947-4832-b981-f3cad700a6e6",
+          "cache_response_sha256": "3d55e6838c4a4de7419f3b3192fdfd4bcba7cdf95c429739aa5ab811cbccac43",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.87,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 26,
+        "review_id": "557c2354-0b03-4bbc-a869-e2f74e9eb584",
+        "theme_key": "professionalism",
+        "polarity": "positive",
+        "analysis_text_sha256": "9c8337cc4a20cbb564d587177e0460a1954fdb4bf6c381f50da06071d2a14554",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "service",
+        "analysis_text": "Delicious food! Pleasant atmosphere and attentive staff. We'll definitely be back again 💜",
+        "reference_choice": "absent",
+        "reference_justification": "Attentive staff are mentioned but not explicit knowledge, competence or professional handling.",
+        "reference_supports": false,
+        "reference_annotation_sha256": "13bc85e978371dd45fb0f8874848a82f7b84bc7c61a8f0607a9dff05c225fbcb",
+        "category": "unjustified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "427f1b461beae5da4820a6de17d41204b289f3f332e6acf50aac3a6011f301af"
+        },
+        "jev": {
+          "cache_id": "56c1e487-0409-4860-8616-aa156a4a0da4",
+          "cache_response_sha256": "a783848232e4b0d555256d95c441790cac4ff40924850c82e3c3af34ced67d8a",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.6,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 27,
+        "review_id": "d65a06b6-d4c4-46ff-9993-9c23aeec8ff7",
+        "theme_key": "atmosphere",
+        "polarity": "positive",
+        "analysis_text_sha256": "b3268757cb03d2d5d2b679c517a330cf4e5adfff99af64408cfb44271c2dfaf3",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "atmosphere",
+        "analysis_text": "Nice placeee😍😍 Interior is amazing, cozy chill vibe, food is delicious. I really recommend the protein bowl. Thank you✨✨",
+        "reference_choice": "positive",
+        "reference_justification": "A cozy, chill vibe is a direct positive evaluation of atmosphere.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "9a5cfc0b520e3cbae268083dea10a968d97dc790268fced5b34528bd648f53ba",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "aa2a2309d82f84814eaed94335cc8ede7eaa475df37ed8825bf317ef90db0ed3"
+        },
+        "jev": {
+          "cache_id": "4f2b479b-1802-42bd-ba84-fa18cb28fd5d",
+          "cache_response_sha256": "dd38b59fc65cf82a17882dd1eb761a8bbc5b35c0aabcca6ebfdc10b87dba0491",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.93,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 28,
+        "review_id": "8ff12d97-da5a-44d2-a951-9c2c36b351fa",
+        "theme_key": "decor",
+        "polarity": "positive",
+        "analysis_text_sha256": "d055d9aaaea1d78c8cb94e0bde428425f0f055f45654a51bfd89178033e9494a",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "atmosphere",
+        "analysis_text": "This was the first place we went to eat after arriving in Nha Trang. We went there several times during our vacation. And we're finishing our Vietnam trip with dinner here. It's such a beautiful place, from the entrance to the food to the faucet in the restroom. The coffee is delicious, as were all the dishes we tried. The staff is wonderful and always smiling. Thank you ❤️",
+        "reference_choice": "positive",
+        "reference_justification": "The cafe is described as visually beautiful throughout, including entrance and interior details.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "08f2a7dd1fcac29ff15ba86bf81ee1926cc2708b6704b2668b26470c56d64a71",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "380d89e84a345a72be44751d58907677e6e7a7977281fd674e1644e36bda2883"
+        },
+        "jev": {
+          "cache_id": "14e02d05-71da-4ccd-bbf6-c9bd990bdb8b",
+          "cache_response_sha256": "1607f1303a27655723f752ce37a01f859766497403a44c18ef09197b7119ce2a",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.96,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 29,
+        "review_id": "d38e1c43-e97e-457b-8e18-2b7f0eb1e0b7",
+        "theme_key": "atmosphere",
+        "polarity": "positive",
+        "analysis_text_sha256": "0f4e58f616cdc97b67611e3a36764b58fac0404dc06b7d8b996d012f5df7cd21",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "atmosphere",
+        "analysis_text": "Beautiful and quiet place, polite staff and delicious food",
+        "reference_choice": "positive",
+        "reference_justification": "A beautiful, quiet setting conveys a positive atmosphere.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "3f0a62d429ef5d27d275bbf29b244009efc1d2bb0db1fee2ecf052005cfb65ae",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "b6fbe3a2d6900585158b28af9723a70ecb00765be7c950d7d9d0c859761f7c52"
+        },
+        "jev": {
+          "cache_id": "2a8ed1b1-5aca-4e38-baac-aafb2b647d64",
+          "cache_response_sha256": "6a929067a5ed7c312322b5d341daa6f093b9eda57a874f11bd347cf01b7af001",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.93,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 30,
+        "review_id": "e325cc85-ad55-4301-95d8-ea4ced912eee",
+        "theme_key": "atmosphere",
+        "polarity": "positive",
+        "analysis_text_sha256": "0e189dbcecdfaccd6dba3bf7da1794cd717d6e080dad47201d40563057975ae9",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "supported_by_rule",
+          "reason": "EXPLICIT_BOUND_ENTITY_POLARITY",
+          "statement": {
+            "id": "c0:atmosphere:positive:atmosphere:3",
+            "theme": "atmosphere",
+            "polarity": "positive",
+            "claim": "atmosphere",
+            "entity": "atmosphere",
+            "entity_name": "atmosphere",
+            "start": 0,
+            "end": 74,
+            "quote": "Amazing place, excellent, delicious food, comfortable and cozy atmosphere.",
+            "clause": 0,
+            "time": "unspecified",
+            "negation": false,
+            "relation": "attribute_attached_to_entity",
+            "actionable": true
+          }
+        },
+        "axis": "atmosphere",
+        "analysis_text": "Amazing place, excellent, delicious food, comfortable and cozy atmosphere.\nThe waiters are very attentive and polite. I recommend it to everyone.",
+        "reference_choice": "positive",
+        "reference_justification": "The atmosphere is explicitly described as comfortable and cozy.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "070830f0ce9e6750533c646aa1e13513452ae7c9d7fc227d2fccb6ddfd8ca9fe",
+        "category": "justified_accepted",
+        "status": "supported_by_rule",
+        "quote_sha256": "b300888645f051755c275fb7de8e2ba8353a724e60331cdec8ac9e5e906b3d2a",
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "9e45b39516547513d73facf4187f8539e2d04c3d1b3b478883bec123e9be079c"
+        },
+        "jev": {
+          "cache_id": "1be90982-191c-45f5-8309-f9907a112102",
+          "cache_response_sha256": "4af716080be8de46eb6a6782cd7d29cbdc0d1c9934ea07f6c130833c47f8870d",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.97,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 31,
+        "review_id": "f2870a8d-40cc-423b-b3de-4b2016830d8b",
+        "theme_key": "atmosphere",
+        "polarity": "positive",
+        "analysis_text_sha256": "4c8f999480e10ad4ee5bc4a9208db58a4ab57d88dc83620702a5f0941353ef9c",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "supported_by_rule",
+          "reason": "EXPLICIT_BOUND_ENTITY_POLARITY",
+          "statement": {
+            "id": "c0:atmosphere:positive:atmosphere:1",
+            "theme": "atmosphere",
+            "polarity": "positive",
+            "claim": "atmosphere",
+            "entity": "atmosphere",
+            "entity_name": "atmosphere",
+            "start": 0,
+            "end": 59,
+            "quote": "Beautiful, peaceful place with amazing atmosphere and food.",
+            "clause": 0,
+            "time": "unspecified",
+            "negation": false,
+            "relation": "attribute_attached_to_entity",
+            "actionable": true
+          }
+        },
+        "axis": "atmosphere",
+        "analysis_text": "Beautiful, peaceful place with amazing atmosphere and food. Service was very good. We will definitely be back",
+        "reference_choice": "positive",
+        "reference_justification": "The atmosphere is explicitly called amazing and the place peaceful.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "a79a94b813e3ee8cd441e2f503daa6bbe23808d99c7d9bec31b1ae21901c0a2e",
+        "category": "justified_accepted",
+        "status": "supported_by_rule",
+        "quote_sha256": "ce6179ba428d9afed21e62b8938814bbb42af9b0093f4ab4f42091ceadc4907f",
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "e78d4ef68a61b73d0c0dbe1fda11c4cbf3c6f7738702a6b87d5be23b35278f32"
+        },
+        "jev": {
+          "cache_id": "96eb643b-deda-433e-b2fa-59acf7280304",
+          "cache_response_sha256": "c30991a5d88ee7c8b20f560a6676b253bb509269b5d88e5a0ec82f9ac3ba4660",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.98,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 32,
+        "review_id": "8fba760b-d209-4359-87ee-5aa68fa0b3e3",
+        "theme_key": "food_quality",
+        "polarity": "positive",
+        "analysis_text_sha256": "c561704598cb94a9718e42b003de908fff7dc9864991b79006e5f5cb8667056c",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "very delicious and kindly",
+        "reference_choice": "positive",
+        "reference_justification": "Delicious is a direct positive taste evaluation in a restaurant review, albeit without naming a dish.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "5cd8a991a0c30c92f33e4b2bcf8a1f1c1959844c962e858d11937076e04c8c46",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "1332d31d10ea479f29380e8f4d1f26cbf0b8225326884e029e04306b6f799f95"
+        },
+        "jev": {
+          "cache_id": "7791df65-a5b3-4025-a462-42ee7233ca08",
+          "cache_response_sha256": "dc4b5d3ebbcf5fb1fffba0abf5dbba25c4f167a1aec2c0a2bb1c8cebfd89a350",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.96,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 33,
+        "review_id": "5e3ec6fd-eb53-4a5d-ab6c-10082b0db78d",
+        "theme_key": "food_quality",
+        "polarity": "positive",
+        "analysis_text_sha256": "006cac37d17b7d70c4eb641c6b1606d75551380ba420809b6b416425e1ad93ed",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "Amazing atmosphere, food and service!!!!",
+        "reference_choice": "positive",
+        "reference_justification": "The adjective amazing explicitly applies to food alongside service and atmosphere.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "e72278248ff62de064cf8e077a4af2cdb9343add03d3d2094cdd55de3dce940c",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "f5bcd1251bb25cdc8caea0bbf7eb23678ab14f17f4c5092f74a738599cb85fa1"
+        },
+        "jev": {
+          "cache_id": "08209c67-238f-4787-9c59-513939bd4049",
+          "cache_response_sha256": "1f528efd4af2ef78f72507d847d5edd5057fe4ac2d5ae95dd5aab995701d3df7",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.62,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 34,
+        "review_id": "dc732a2a-ce95-4f2e-a77f-906fdfdf2a94",
+        "theme_key": "presentation",
+        "polarity": "positive",
+        "analysis_text_sha256": "cb20525001db19046e3a5949dced555b4130c4c7cac2ff531891eb516713fd74",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "This is an absolutely standout, incredible place for brunch (or any other meal for that matter). Flavours are delicious, fresh and wholesome and the dishes are vibrant and creative. We discovered the cafe in our last week in Vietnam, returned the next day and if we weren’t leaving tomorrow, we’d be back again! Everything we tried was excellent but perhaps the real highlights were the hummus eggs, protein bowl, beef shakshuka and pancakes.",
+        "reference_choice": "uncertain",
+        "reference_justification": "Vibrant, creative dishes may reflect appearance, but no clear evaluation of their visual plating/presentation is given.",
+        "reference_supports": null,
+        "reference_annotation_sha256": "d680c23a2746fdcdaa39182d653792b92d67abdbc0e101166121d74ca62e1894",
+        "category": "reference_uncertain",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "e6808143e2a0b4a32c1e07be27952a13bf06ca077b46bd0838f8b1238bee8ce3"
+        },
+        "jev": {
+          "cache_id": "f28ec0ed-74de-4243-9776-408213f4ffae",
+          "cache_response_sha256": "4f268da72eecaf51c44c08216b39d37ab9660441932164e261cd985e109ef837",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.66,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 35,
+        "review_id": "b1cb77e8-8d74-43ee-a6bb-1401d27c0314",
+        "theme_key": "food_quality",
+        "polarity": "positive",
+        "analysis_text_sha256": "a240afcf6503d96f165038f4f34a9e5ea54676c33483e96be12558947049b013",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "The entrance is very beautiful, it sets the atmosphere even before you enter the cafe. And the food is incredibly delicious ❤️\nThe staff is welcoming and friendly, which is also wonderful.",
+        "reference_choice": "positive",
+        "reference_justification": "The food is explicitly described as incredibly delicious.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "79bb50f0927f99d16b2b23d582197919cb28a36bbfa5341698999e28bc7e678c",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "4f2cf9b4a4bc2d4bc6775211a5b77f1410368a969649cf0f94b972c09a6abd7e"
+        },
+        "jev": {
+          "cache_id": "5825dd3b-6710-4dd0-901e-df19b8293c49",
+          "cache_response_sha256": "625f4c379570146fa40f7506d6e5d1e60f5414b4214b44da5a1d3840da595a95",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.99,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 36,
+        "review_id": "49fa68eb-534d-4527-afaa-d5d6849fa43b",
+        "theme_key": "food_quality",
+        "polarity": "positive",
+        "analysis_text_sha256": "056f8e97d1b379a9fbbd26a8e57f4c2e9db348b4bcd4aac90ab8dc80d0eda0b1",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "Everything was delicious, the staff was polite, they could explain everything and translate if something was not clear, special 5 stars for the croissant with chocolate😍😍",
+        "reference_choice": "positive",
+        "reference_justification": "Everything is described as delicious and a chocolate croissant is praised in particular.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "8c46549aaa927ad084f2cc43dd687bb9b8cfa7c5831e758ee054f117c16bfd9c",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "0ceccd81fd8fa89fb62a6df287c14456dbb3c243d8309fd64655a25f1300209f"
+        },
+        "jev": {
+          "cache_id": "10a7ea2b-f6aa-4ac0-af2a-4c1ccfc38e9a",
+          "cache_response_sha256": "192ff457068f0cf54e80616ded2c5bd31bcc3a4c3c0fbcff2e0b8f9027daea6a",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.99,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 37,
+        "review_id": "7e51a09a-e4e5-47b9-b1f4-b9f12fa20bff",
+        "theme_key": "food_quality",
+        "polarity": "positive",
+        "analysis_text_sha256": "4a6d019792794152442947db000590b6f12af9607657e893010d56b2a72134d4",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "Very tasty and a relaxed atmosphere. It feels like a Balinese place, the same vibe. I recommend it 👍",
+        "reference_choice": "positive",
+        "reference_justification": "The review says very tasty in a restaurant context, conveying positive food taste.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "951f57965eface320171b49d7eab441e1f32cc780c1f3a919223516b4f8f6b47",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "dbe40abad390f05af8a5ab532f461bfcd2973f5cbffc2e020fc6138830effa79"
+        },
+        "jev": {
+          "cache_id": "c4ffd820-d3f9-46a4-95ae-ee0434188963",
+          "cache_response_sha256": "e85343312ad8bcdfcd280b3a239867e5bc39ad0636a23b4d0f5bb7e6f56b8f27",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.98,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 38,
+        "review_id": "7fbc7fa9-c0d1-4655-8346-97b0d1c0a0b8",
+        "theme_key": "food_quality",
+        "polarity": "positive",
+        "analysis_text_sha256": "03251cf357139fc1e162b9c7d5ea7227af4e28a079c06788d525f3df888b36d2",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "We visited this restaurant on September 9, 2026. We experienced aesthetic pleasure! Gustatory ecstasy! The cuisine was mind-blowing. Special respect to the chef! We recommend visiting! The atmosphere is European.",
+        "reference_choice": "positive",
+        "reference_justification": "Gustatory ecstasy and mind-blowing cuisine directly praise food taste and quality.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "ee7bf6668c10bdeca69e812803dc42003e220fce07aa5a900480d9e2be316c71",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "3a971a28743d5e84f0fa292cd4cca1415be59231838799e9edb7e6cea6a748e5"
+        },
+        "jev": {
+          "cache_id": "5aae7073-168a-4247-bcfb-649c5e1a80e2",
+          "cache_response_sha256": "21826f09debb1acce6d207da0669f347cec263fd5d8106680a771b37be9d9aa7",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.97,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 39,
+        "review_id": "f5b4fac6-f320-412f-98b6-55b23959bdff",
+        "theme_key": "drinks",
+        "polarity": "positive",
+        "analysis_text_sha256": "0c86d0398d474fc6bf7f2067408a0f1e55c9a9c25b86ee81d676d18d87f4742a",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "quality",
+        "analysis_text": "Lasagna and smoothies are magical❤️",
+        "reference_choice": "positive",
+        "reference_justification": "Smoothies are explicitly described as magical, conveying a positive judgment of drinks.",
+        "reference_supports": true,
+        "reference_annotation_sha256": "6cbb5ec44668e6dd1e25756ee74ec0d6955fb40910302efea664a8b84b10f252",
+        "category": "justified_pending",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "692f68cdb487bdb1fed1c7e0e1117fda7bb1429794c10d7c75d270b3740fb10e"
+        },
+        "jev": {
+          "cache_id": "36ef56fc-b218-4502-a350-3fa508407974",
+          "cache_response_sha256": "5a73d1db604fa0e35ee47790d0f16097e0ef1474d9609557ac404f54387ff37a",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.82,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      },
+      {
+        "position": 40,
+        "review_id": "d904b348-a9fd-4aa6-a208-b07744aca7b7",
+        "theme_key": "noise",
+        "polarity": "positive",
+        "analysis_text_sha256": "f00e62e9a19e4ae086c8f9c2814bdc6a49eccca830324c8ea28a9b83cacb8ba0",
+        "decision": {
+          "flags": [],
+          "verification_type": "structured_deterministic_check",
+          "human_validated": false,
+          "ai_verified": false,
+          "status": "review_needed",
+          "reason": "MEANING_NOT_ESTABLISHED",
+          "statement": null
+        },
+        "axis": "atmosphere",
+        "analysis_text": "My favorite coffee shop in Nha Trang ❤️ The atmosphere is just amazing, it's so calm and pleasant to be here 🥰",
+        "reference_choice": "uncertain",
+        "reference_justification": "Calm and pleasant atmosphere may refer to relaxation rather than an explicit judgment about sound or quietness.",
+        "reference_supports": null,
+        "reference_annotation_sha256": "0c3e22dafb6ae358f0db4b7034c0e0470a6f489e3c4fa46379273d5c78a0240a",
+        "category": "reference_uncertain",
+        "status": "review_needed",
+        "quote_sha256": null,
+        "v21": {
+          "status": "review_needed",
+          "reason": "EXPLICIT_SUPPORT_NOT_ESTABLISHED",
+          "excerpt": null,
+          "binding_id": "55315003a7af61d2f03e043b40fed283386ed7270d3c5ed053175f0b6615afa1"
+        },
+        "jev": {
+          "cache_id": "19c4aea3-eb99-492f-a43b-7d5dec015633",
+          "cache_response_sha256": "60609dd80e0f75f7646247993e2da14d58f415749829da6d5c58f377eec98959",
+          "choice": "positive",
+          "probabilities": {
+            "choice": "positive",
+            "negative": 0,
+            "positive": 0.65,
+            "evaluations": 1,
+            "repeat_stable": null
+          },
+          "served_model": "jev-1.13.0",
+          "configuration_id": "v12_economy_1pass_v1"
+        }
+      }
+    ],
+    "metrics": {
+      "v3": {
+        "total": 40,
+        "comparable": 36,
+        "reference_uncertain": 4,
+        "reference_supported": 27,
+        "reference_unsupported": 9,
+        "counts": {
+          "justified_accepted": 5,
+          "unjustified_accepted": 0,
+          "justified_pending": 21,
+          "unjustified_rejected": 2,
+          "justified_rejected": 1,
+          "unjustified_pending": 7,
+          "reference_uncertain": 4
+        },
+        "decisive_coverage_all": {
+          "numerator": 8,
+          "denominator": 40,
+          "value": 0.2
+        },
+        "decisive_coverage_comparable": {
+          "numerator": 8,
+          "denominator": 36,
+          "value": 0.2222222222222222
+        },
+        "abstention_all": {
+          "numerator": 32,
+          "denominator": 40,
+          "value": 0.8
+        },
+        "abstention_comparable": {
+          "numerator": 28,
+          "denominator": 36,
+          "value": 0.7777777777777778
+        },
+        "acceptance_precision": {
+          "numerator": 5,
+          "denominator": 5,
+          "value": 1
+        },
+        "unjustified_acceptance_rate": {
+          "numerator": 0,
+          "denominator": 5,
+          "value": 0
+        },
+        "unjustified_acceptance_per_comparable": {
+          "numerator": 0,
+          "denominator": 36,
+          "value": 0
+        },
+        "selective_agreement": {
+          "numerator": 7,
+          "denominator": 8,
+          "value": 0.875
+        },
+        "strict_agreement_all_comparable": {
+          "numerator": 7,
+          "denominator": 36,
+          "value": 0.19444444444444445
+        },
+        "justified_acceptance_coverage": {
+          "numerator": 5,
+          "denominator": 27,
+          "value": 0.18518518518518517
+        }
+      },
+      "v21": {
+        "total": 40,
+        "comparable": 36,
+        "reference_uncertain": 4,
+        "reference_supported": 27,
+        "reference_unsupported": 9,
+        "counts": {
+          "justified_accepted": 1,
+          "unjustified_accepted": 0,
+          "justified_pending": 26,
+          "unjustified_rejected": 0,
+          "justified_rejected": 0,
+          "unjustified_pending": 9,
+          "reference_uncertain": 4
+        },
+        "decisive_coverage_all": {
+          "numerator": 1,
+          "denominator": 40,
+          "value": 0.025
+        },
+        "decisive_coverage_comparable": {
+          "numerator": 1,
+          "denominator": 36,
+          "value": 0.027777777777777776
+        },
+        "abstention_all": {
+          "numerator": 39,
+          "denominator": 40,
+          "value": 0.975
+        },
+        "abstention_comparable": {
+          "numerator": 35,
+          "denominator": 36,
+          "value": 0.9722222222222222
+        },
+        "acceptance_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "unjustified_acceptance_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0
+        },
+        "unjustified_acceptance_per_comparable": {
+          "numerator": 0,
+          "denominator": 36,
+          "value": 0
+        },
+        "selective_agreement": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "strict_agreement_all_comparable": {
+          "numerator": 1,
+          "denominator": 36,
+          "value": 0.027777777777777776
+        },
+        "justified_acceptance_coverage": {
+          "numerator": 1,
+          "denominator": 27,
+          "value": 0.037037037037037035
+        }
+      },
+      "jev": {
+        "total": 40,
+        "comparable": 36,
+        "reference_uncertain": 4,
+        "reference_supported": 27,
+        "reference_unsupported": 9,
+        "counts": {
+          "justified_accepted": 27,
+          "unjustified_accepted": 9,
+          "justified_pending": 0,
+          "unjustified_rejected": 0,
+          "justified_rejected": 0,
+          "unjustified_pending": 0,
+          "reference_uncertain": 4
+        },
+        "decisive_coverage_all": {
+          "numerator": 40,
+          "denominator": 40,
+          "value": 1
+        },
+        "decisive_coverage_comparable": {
+          "numerator": 36,
+          "denominator": 36,
+          "value": 1
+        },
+        "abstention_all": {
+          "numerator": 0,
+          "denominator": 40,
+          "value": 0
+        },
+        "abstention_comparable": {
+          "numerator": 0,
+          "denominator": 36,
+          "value": 0
+        },
+        "acceptance_precision": {
+          "numerator": 27,
+          "denominator": 36,
+          "value": 0.75
+        },
+        "unjustified_acceptance_rate": {
+          "numerator": 9,
+          "denominator": 36,
+          "value": 0.25
+        },
+        "unjustified_acceptance_per_comparable": {
+          "numerator": 9,
+          "denominator": 36,
+          "value": 0.25
+        },
+        "selective_agreement": {
+          "numerator": 27,
+          "denominator": 36,
+          "value": 0.75
+        },
+        "strict_agreement_all_comparable": {
+          "numerator": 27,
+          "denominator": 36,
+          "value": 0.75
+        },
+        "justified_acceptance_coverage": {
+          "numerator": 27,
+          "denominator": 27,
+          "value": 1
+        }
+      }
+    },
+    "by_axis": {
+      "service": {
+        "v3": {
+          "total": 9,
+          "comparable": 9,
+          "reference_uncertain": 0,
+          "reference_supported": 5,
+          "reference_unsupported": 4,
+          "counts": {
+            "justified_accepted": 1,
+            "unjustified_accepted": 0,
+            "justified_pending": 4,
+            "unjustified_rejected": 1,
+            "justified_rejected": 0,
+            "unjustified_pending": 3,
+            "reference_uncertain": 0
+          },
+          "decisive_coverage_all": {
+            "numerator": 2,
+            "denominator": 9,
+            "value": 0.2222222222222222
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 2,
+            "denominator": 9,
+            "value": 0.2222222222222222
+          },
+          "abstention_all": {
+            "numerator": 7,
+            "denominator": 9,
+            "value": 0.7777777777777778
+          },
+          "abstention_comparable": {
+            "numerator": 7,
+            "denominator": 9,
+            "value": 0.7777777777777778
+          },
+          "acceptance_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 1,
+            "value": 0
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 9,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 2,
+            "denominator": 9,
+            "value": 0.2222222222222222
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 1,
+            "denominator": 5,
+            "value": 0.2
+          }
+        },
+        "v21": {
+          "total": 9,
+          "comparable": 9,
+          "reference_uncertain": 0,
+          "reference_supported": 5,
+          "reference_unsupported": 4,
+          "counts": {
+            "justified_accepted": 1,
+            "unjustified_accepted": 0,
+            "justified_pending": 4,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 4,
+            "reference_uncertain": 0
+          },
+          "decisive_coverage_all": {
+            "numerator": 1,
+            "denominator": 9,
+            "value": 0.1111111111111111
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 1,
+            "denominator": 9,
+            "value": 0.1111111111111111
+          },
+          "abstention_all": {
+            "numerator": 8,
+            "denominator": 9,
+            "value": 0.8888888888888888
+          },
+          "abstention_comparable": {
+            "numerator": 8,
+            "denominator": 9,
+            "value": 0.8888888888888888
+          },
+          "acceptance_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 1,
+            "value": 0
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 9,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 1,
+            "denominator": 9,
+            "value": 0.1111111111111111
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 1,
+            "denominator": 5,
+            "value": 0.2
+          }
+        },
+        "jev": {
+          "total": 9,
+          "comparable": 9,
+          "reference_uncertain": 0,
+          "reference_supported": 5,
+          "reference_unsupported": 4,
+          "counts": {
+            "justified_accepted": 5,
+            "unjustified_accepted": 4,
+            "justified_pending": 0,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 0,
+            "reference_uncertain": 0
+          },
+          "decisive_coverage_all": {
+            "numerator": 9,
+            "denominator": 9,
+            "value": 1
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 9,
+            "denominator": 9,
+            "value": 1
+          },
+          "abstention_all": {
+            "numerator": 0,
+            "denominator": 9,
+            "value": 0
+          },
+          "abstention_comparable": {
+            "numerator": 0,
+            "denominator": 9,
+            "value": 0
+          },
+          "acceptance_precision": {
+            "numerator": 5,
+            "denominator": 9,
+            "value": 0.5555555555555556
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 4,
+            "denominator": 9,
+            "value": 0.4444444444444444
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 4,
+            "denominator": 9,
+            "value": 0.4444444444444444
+          },
+          "selective_agreement": {
+            "numerator": 5,
+            "denominator": 9,
+            "value": 0.5555555555555556
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 5,
+            "denominator": 9,
+            "value": 0.5555555555555556
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 5,
+            "denominator": 5,
+            "value": 1
+          }
+        }
+      },
+      "quality": {
+        "v3": {
+          "total": 13,
+          "comparable": 12,
+          "reference_uncertain": 1,
+          "reference_supported": 11,
+          "reference_unsupported": 1,
+          "counts": {
+            "justified_accepted": 1,
+            "unjustified_accepted": 0,
+            "justified_pending": 10,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 1,
+            "reference_uncertain": 1
+          },
+          "decisive_coverage_all": {
+            "numerator": 1,
+            "denominator": 13,
+            "value": 0.07692307692307693
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 1,
+            "denominator": 12,
+            "value": 0.08333333333333333
+          },
+          "abstention_all": {
+            "numerator": 12,
+            "denominator": 13,
+            "value": 0.9230769230769231
+          },
+          "abstention_comparable": {
+            "numerator": 11,
+            "denominator": 12,
+            "value": 0.9166666666666666
+          },
+          "acceptance_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 1,
+            "value": 0
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 12,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 1,
+            "denominator": 12,
+            "value": 0.08333333333333333
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 1,
+            "denominator": 11,
+            "value": 0.09090909090909091
+          }
+        },
+        "v21": {
+          "total": 13,
+          "comparable": 12,
+          "reference_uncertain": 1,
+          "reference_supported": 11,
+          "reference_unsupported": 1,
+          "counts": {
+            "justified_accepted": 0,
+            "unjustified_accepted": 0,
+            "justified_pending": 11,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 1,
+            "reference_uncertain": 1
+          },
+          "decisive_coverage_all": {
+            "numerator": 0,
+            "denominator": 13,
+            "value": 0
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 0,
+            "denominator": 12,
+            "value": 0
+          },
+          "abstention_all": {
+            "numerator": 13,
+            "denominator": 13,
+            "value": 1
+          },
+          "abstention_comparable": {
+            "numerator": 12,
+            "denominator": 12,
+            "value": 1
+          },
+          "acceptance_precision": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 12,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 0,
+            "denominator": 12,
+            "value": 0
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 0,
+            "denominator": 11,
+            "value": 0
+          }
+        },
+        "jev": {
+          "total": 13,
+          "comparable": 12,
+          "reference_uncertain": 1,
+          "reference_supported": 11,
+          "reference_unsupported": 1,
+          "counts": {
+            "justified_accepted": 11,
+            "unjustified_accepted": 1,
+            "justified_pending": 0,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 0,
+            "reference_uncertain": 1
+          },
+          "decisive_coverage_all": {
+            "numerator": 13,
+            "denominator": 13,
+            "value": 1
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 12,
+            "denominator": 12,
+            "value": 1
+          },
+          "abstention_all": {
+            "numerator": 0,
+            "denominator": 13,
+            "value": 0
+          },
+          "abstention_comparable": {
+            "numerator": 0,
+            "denominator": 12,
+            "value": 0
+          },
+          "acceptance_precision": {
+            "numerator": 11,
+            "denominator": 12,
+            "value": 0.9166666666666666
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 1,
+            "denominator": 12,
+            "value": 0.08333333333333333
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 1,
+            "denominator": 12,
+            "value": 0.08333333333333333
+          },
+          "selective_agreement": {
+            "numerator": 11,
+            "denominator": 12,
+            "value": 0.9166666666666666
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 11,
+            "denominator": 12,
+            "value": 0.9166666666666666
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 11,
+            "denominator": 11,
+            "value": 1
+          }
+        }
+      },
+      "price": {
+        "v3": {
+          "total": 10,
+          "comparable": 8,
+          "reference_uncertain": 2,
+          "reference_supported": 5,
+          "reference_unsupported": 3,
+          "counts": {
+            "justified_accepted": 1,
+            "unjustified_accepted": 0,
+            "justified_pending": 3,
+            "unjustified_rejected": 1,
+            "justified_rejected": 1,
+            "unjustified_pending": 2,
+            "reference_uncertain": 2
+          },
+          "decisive_coverage_all": {
+            "numerator": 3,
+            "denominator": 10,
+            "value": 0.3
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 3,
+            "denominator": 8,
+            "value": 0.375
+          },
+          "abstention_all": {
+            "numerator": 7,
+            "denominator": 10,
+            "value": 0.7
+          },
+          "abstention_comparable": {
+            "numerator": 5,
+            "denominator": 8,
+            "value": 0.625
+          },
+          "acceptance_precision": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 1,
+            "value": 0
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 2,
+            "denominator": 3,
+            "value": 0.6666666666666666
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 1,
+            "denominator": 5,
+            "value": 0.2
+          }
+        },
+        "v21": {
+          "total": 10,
+          "comparable": 8,
+          "reference_uncertain": 2,
+          "reference_supported": 5,
+          "reference_unsupported": 3,
+          "counts": {
+            "justified_accepted": 0,
+            "unjustified_accepted": 0,
+            "justified_pending": 5,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 3,
+            "reference_uncertain": 2
+          },
+          "decisive_coverage_all": {
+            "numerator": 0,
+            "denominator": 10,
+            "value": 0
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "abstention_all": {
+            "numerator": 10,
+            "denominator": 10,
+            "value": 1
+          },
+          "abstention_comparable": {
+            "numerator": 8,
+            "denominator": 8,
+            "value": 1
+          },
+          "acceptance_precision": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 0,
+            "denominator": 5,
+            "value": 0
+          }
+        },
+        "jev": {
+          "total": 10,
+          "comparable": 8,
+          "reference_uncertain": 2,
+          "reference_supported": 5,
+          "reference_unsupported": 3,
+          "counts": {
+            "justified_accepted": 5,
+            "unjustified_accepted": 3,
+            "justified_pending": 0,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 0,
+            "reference_uncertain": 2
+          },
+          "decisive_coverage_all": {
+            "numerator": 10,
+            "denominator": 10,
+            "value": 1
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 8,
+            "denominator": 8,
+            "value": 1
+          },
+          "abstention_all": {
+            "numerator": 0,
+            "denominator": 10,
+            "value": 0
+          },
+          "abstention_comparable": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "acceptance_precision": {
+            "numerator": 5,
+            "denominator": 8,
+            "value": 0.625
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 3,
+            "denominator": 8,
+            "value": 0.375
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 3,
+            "denominator": 8,
+            "value": 0.375
+          },
+          "selective_agreement": {
+            "numerator": 5,
+            "denominator": 8,
+            "value": 0.625
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 5,
+            "denominator": 8,
+            "value": 0.625
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 5,
+            "denominator": 5,
+            "value": 1
+          }
+        }
+      },
+      "atmosphere": {
+        "v3": {
+          "total": 8,
+          "comparable": 7,
+          "reference_uncertain": 1,
+          "reference_supported": 6,
+          "reference_unsupported": 1,
+          "counts": {
+            "justified_accepted": 2,
+            "unjustified_accepted": 0,
+            "justified_pending": 4,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 1,
+            "reference_uncertain": 1
+          },
+          "decisive_coverage_all": {
+            "numerator": 2,
+            "denominator": 8,
+            "value": 0.25
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 2,
+            "denominator": 7,
+            "value": 0.2857142857142857
+          },
+          "abstention_all": {
+            "numerator": 6,
+            "denominator": 8,
+            "value": 0.75
+          },
+          "abstention_comparable": {
+            "numerator": 5,
+            "denominator": 7,
+            "value": 0.7142857142857143
+          },
+          "acceptance_precision": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 2,
+            "value": 0
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 7,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 2,
+            "denominator": 7,
+            "value": 0.2857142857142857
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 2,
+            "denominator": 6,
+            "value": 0.3333333333333333
+          }
+        },
+        "v21": {
+          "total": 8,
+          "comparable": 7,
+          "reference_uncertain": 1,
+          "reference_supported": 6,
+          "reference_unsupported": 1,
+          "counts": {
+            "justified_accepted": 0,
+            "unjustified_accepted": 0,
+            "justified_pending": 6,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 1,
+            "reference_uncertain": 1
+          },
+          "decisive_coverage_all": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 0,
+            "denominator": 7,
+            "value": 0
+          },
+          "abstention_all": {
+            "numerator": 8,
+            "denominator": 8,
+            "value": 1
+          },
+          "abstention_comparable": {
+            "numerator": 7,
+            "denominator": 7,
+            "value": 1
+          },
+          "acceptance_precision": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 0,
+            "denominator": 7,
+            "value": 0
+          },
+          "selective_agreement": {
+            "numerator": 0,
+            "denominator": 0,
+            "value": null
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 0,
+            "denominator": 7,
+            "value": 0
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 0,
+            "denominator": 6,
+            "value": 0
+          }
+        },
+        "jev": {
+          "total": 8,
+          "comparable": 7,
+          "reference_uncertain": 1,
+          "reference_supported": 6,
+          "reference_unsupported": 1,
+          "counts": {
+            "justified_accepted": 6,
+            "unjustified_accepted": 1,
+            "justified_pending": 0,
+            "unjustified_rejected": 0,
+            "justified_rejected": 0,
+            "unjustified_pending": 0,
+            "reference_uncertain": 1
+          },
+          "decisive_coverage_all": {
+            "numerator": 8,
+            "denominator": 8,
+            "value": 1
+          },
+          "decisive_coverage_comparable": {
+            "numerator": 7,
+            "denominator": 7,
+            "value": 1
+          },
+          "abstention_all": {
+            "numerator": 0,
+            "denominator": 8,
+            "value": 0
+          },
+          "abstention_comparable": {
+            "numerator": 0,
+            "denominator": 7,
+            "value": 0
+          },
+          "acceptance_precision": {
+            "numerator": 6,
+            "denominator": 7,
+            "value": 0.8571428571428571
+          },
+          "unjustified_acceptance_rate": {
+            "numerator": 1,
+            "denominator": 7,
+            "value": 0.14285714285714285
+          },
+          "unjustified_acceptance_per_comparable": {
+            "numerator": 1,
+            "denominator": 7,
+            "value": 0.14285714285714285
+          },
+          "selective_agreement": {
+            "numerator": 6,
+            "denominator": 7,
+            "value": 0.8571428571428571
+          },
+          "strict_agreement_all_comparable": {
+            "numerator": 6,
+            "denominator": 7,
+            "value": 0.8571428571428571
+          },
+          "justified_acceptance_coverage": {
+            "numerator": 6,
+            "denominator": 6,
+            "value": 1
+          }
+        }
+      }
+    },
+    "jev_exact_choice_agreement": {
+      "numerator": 27,
+      "denominator": 36,
+      "value": 0.75
+    },
+    "overlap_with_199": 0,
+    "reference_labels_changed": false,
+    "engine_changed": false,
+    "production_enabled": false,
+    "new_paid_calls": 0,
+    "immutable": true
+  },
+  "result_sha256": "cb560e3c23087ba87993c3c71c6dd10fa90caf6041f9e199dca6223f2790049a"
+}
