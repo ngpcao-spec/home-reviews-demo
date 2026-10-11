@@ -1,0 +1,23 @@
+begin;
+do $$declare a public.analysis_jev_pilot_evidence_v3;c public.analysis_jev_pilot_evidence_v3_controls;b public.analysis_jev_pilot_evidence_v21;bad boolean;id2 uuid;x jsonb;begin
+ select * into a from public.analysis_jev_pilot_evidence_v3 order by created_at desc limit 1;if not found then raise exception 'TEST_V3_REQUIRED';end if;
+ select * into c from public.analysis_jev_pilot_evidence_v3_controls where id=a.control_id;
+ select * into b from public.analysis_jev_pilot_evidence_v21 where id=a.base_audit_id;
+ if a.base_result_sha256<>b.result_sha256 or a.human_validated or a.ai_verified or a.new_paid_calls<>0 or a.production_enabled then raise exception 'TEST_V3_PROVENANCE';end if;
+ if jsonb_array_length(a.result->'checks')<>1580 or jsonb_array_length(a.result->'diagnostic')<>199 or jsonb_array_length(c.body->'items')<>40 or (select count(distinct i->>'review_id') from jsonb_array_elements(c.body->'items') i)<>40 or exists(select 1 from jsonb_array_elements(c.body->'items') i join jsonb_array_elements(a.result->'diagnostic') d on i->>'review_id'=d->>'review_id') then raise exception 'TEST_V3_COVERAGE';end if;
+ if has_table_privilege('anon','public.analysis_jev_pilot_evidence_v3','select') or has_table_privilege('authenticated','public.analysis_jev_pilot_evidence_v3','insert') or has_table_privilege('authenticated','public.analysis_jev_pilot_evidence_v3_controls','update') or has_function_privilege('authenticated','public.save_pilot_evidence_v3(uuid,uuid,jsonb,text,jsonb,text)','execute') then raise exception 'TEST_PRIVILEGES';end if;
+ id2=public.save_pilot_evidence_v3(a.created_by,a.base_audit_id,c.body,c.result_sha256,a.result,a.result_sha256);if id2<>a.id then raise exception 'TEST_IDEMPOTENCE';end if;
+ bad=false;begin update public.analysis_jev_pilot_evidence_v3 set result='{}' where id=a.id;exception when others then if sqlerrm='EVIDENCE_AUDIT_IMMUTABLE' then bad=true;else raise;end if;end;if not bad then raise exception 'TEST_IMMUTABLE';end if;
+ bad=false;begin delete from public.analysis_jev_pilot_evidence_v3_controls where id=c.id;exception when others then if sqlerrm='EVIDENCE_AUDIT_IMMUTABLE' then bad=true;else raise;end if;end;if not bad then raise exception 'TEST_CONTROL_IMMUTABLE';end if;
+ bad=false;begin perform public.save_pilot_evidence_v3(gen_random_uuid(),a.base_audit_id,c.body,c.result_sha256,a.result,a.result_sha256);exception when others then if sqlerrm='FORBIDDEN' then bad=true;else raise;end if;end;if not bad then raise exception 'TEST_ROLE';end if;
+ bad=false;begin perform public.save_pilot_evidence_v3(a.created_by,a.base_audit_id,c.body,c.result_sha256,a.result,repeat('a',64));exception when others then if sqlerrm='V3_HASH_CHANGED' then bad=true;else raise;end if;end;if not bad then raise exception 'TEST_HASH';end if;
+ x=jsonb_set(a.result,'{new_paid_calls}','1');bad=false;begin perform public.save_pilot_evidence_v3(a.created_by,a.base_audit_id,c.body,c.result_sha256,x,encode(extensions.digest(public.jev_economy_canonical(x),'sha256'),'hex'));exception when others then if sqlerrm='V3_VERSION_INVALID' then bad=true;else raise;end if;end;if not bad then raise exception 'TEST_NO_PAID';end if;
+ if jsonb_array_length(a.result->'recommendations')<>4 or exists(select 1 from jsonb_array_elements(a.result->'recommendations') r where r->>'status'<>'grounded_by_rules' or jsonb_array_length(r->'proof_ids')<>2) then raise exception 'TEST_EXACT_RECOMMENDATION_PROOFS';end if;
+ if exists(select 1 from jsonb_array_elements(c.body->'items') i where i->'reference_annotation' is distinct from 'null'::jsonb) then raise exception 'TEST_NO_FAKE_REFERENCE';end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d6e79d9c-72cd-40d2-a945-0452b268a783',true);
+do $$begin if not exists(select 1 from public.analysis_jev_pilot_evidence_v3) or not exists(select 1 from public.analysis_jev_pilot_evidence_v3_controls) then raise exception 'TEST_OWNER_RLS';end if;end $$;
+select set_config('request.jwt.claim.sub','ffffffff-ffff-4fff-8fff-ffffffffffff',true);
+do $$begin if exists(select 1 from public.analysis_jev_pilot_evidence_v3) or exists(select 1 from public.analysis_jev_pilot_evidence_v3_controls) then raise exception 'TEST_CROSS_TENANT';end if;end $$;
+rollback;
