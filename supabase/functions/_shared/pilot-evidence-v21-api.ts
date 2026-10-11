@@ -1,0 +1,11 @@
+import {json,preflight} from './cors.ts'
+import {buildEvidenceV21,evidenceV21AuditHash,previewEvidenceV21,type EvidenceV21Audit} from './pilot-evidence-v21-audit.ts'
+import {EVIDENCE_V21_VERSION} from './pilot-evidence-v21-rules.ts'
+import type {EvidenceRecord} from './pilot-evidence-api.ts'
+import type {PilotSnapshot} from './jev-pilot-core.ts'
+import type {PilotJob} from './jev-pilot-types.ts'
+import type {EconomyCache} from './jev-economy-cache.ts'
+export interface EvidenceV21Record {id:string;result:EvidenceV21Audit;result_sha256:string;created_at:string;created_by:string}
+export interface EvidenceV21View {version:string;record:EvidenceV21Record|null;ready:boolean;preview:Awaited<ReturnType<typeof previewEvidenceV21>>|null;new_paid_calls:0;can_generate_report:false;production_enabled:false}
+export interface EvidenceV21Repository {language:'fr'|'vi';source:()=>Promise<{base:EvidenceRecord;snapshot:PilotSnapshot;report:PilotJob}>;cache:()=>Promise<(EconomyCache&{theme_results?:unknown})[]>;read:(base_id:string)=>Promise<EvidenceV21Record|null>;save:(base_id:string,result:EvidenceV21Audit,sha:string)=>Promise<void>}
+export function evidenceV21Handler(repository:(r:Request)=>Promise<EvidenceV21Repository>){return async(request:Request)=>{const p=preflight(request);if(p)return p;try{if(!['GET','POST'].includes(request.method))return json({error:'METHOD_NOT_ALLOWED'},405);const repo=await repository(request),source=await repo.source();if(request.method==='POST'){const body=await request.json();if(body.action!=='audit_free')return json({error:'EVIDENCE_PAID_ACTION_DISABLED'},405);const a=await buildEvidenceV21(source.snapshot,source.report,await repo.cache(),source.base);await repo.save(source.base.id,a,await evidenceV21AuditHash(a))}const record=await repo.read(source.base.id);return json({version:EVIDENCE_V21_VERSION,record,ready:true,preview:record?await previewEvidenceV21(source.snapshot,source.base,record.result,record.result_sha256,repo.language):null,new_paid_calls:0,can_generate_report:false,production_enabled:false} satisfies EvidenceV21View)}catch(e){const error=e instanceof Error&&/^[A-Z0-9_]+$/.test(e.message)?e.message:'EVIDENCE_V21_REQUEST_FAILED';return json({error},error==='UNAUTHORIZED'?401:error==='FORBIDDEN'?403:409)}}}

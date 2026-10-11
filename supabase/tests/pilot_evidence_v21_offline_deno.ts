@@ -1,0 +1,8 @@
+import {syntheticEvidenceV21,V21_REAL_PROFESSIONALISM_CASE} from '../../tests/fixtures/pilot-evidence-v21.ts'
+import {verifyEvidenceV21} from '../functions/_shared/pilot-evidence-v21-rules.ts'
+import {previewEvidenceV21,recommendationFromEvidenceV21} from '../functions/_shared/pilot-evidence-v21-audit.ts'
+import {evidenceRuleHash} from '../functions/_shared/pilot-evidence-rules.ts'
+const assert=(x:unknown)=>{if(!x)throw new Error('ASSERTION_FAILED')}
+Deno.test('professionalism explicit, generic service not evidence, V2 untouched',async()=>{assert(verifyEvidenceV21(V21_REAL_PROFESSIONALISM_CASE.text,'professionalism','positive').status==='unsupported_by_rule');assert(verifyEvidenceV21('They knew the menu.','professionalism','positive').status==='supported_by_rule');assert(await evidenceRuleHash()==='8334b14f39be05b8cbaa4a403de198739469b8f1b4fe516168641b37ca95bd99')})
+Deno.test('exact eight V2 quotes kept, rule metrics sum, no paid report',async()=>{const f=await syntheticEvidenceV21(),p=await previewEvidenceV21(f.snapshot,f.base,f.audit,f.sha,'vi');assert(f.audit.selected.length===8);assert(f.audit.summary.supported+f.audit.summary.unsupported+f.audit.summary.review_needed===f.audit.summary.jev_findings);assert(!p.can_generate_report&&p.new_paid_calls===0);assert(p.interpretation_and_recommendations.recommendations.every(r=>r.required_evidence_ids.length===2&&r.status==='grounded_by_rules'))})
+Deno.test('missing any required proof never certifies a recommendation',async()=>{const f=await syntheticEvidenceV21();f.audit.selected.splice(0,1);const r=recommendationFromEvidenceV21(f.audit,'service','fr');assert(r.status==='review_needed'&&r.actions.length===0)})

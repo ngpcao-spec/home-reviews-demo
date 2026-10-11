@@ -525,3 +525,6 @@ verify_jwt = false
 
 [functions.jev-pilot-evidence]
 verify_jwt = false
+
+[functions.jev-pilot-evidence-v21]
+verify_jwt = false
