@@ -1,0 +1,9 @@
+import {it,expect,vi,afterEach} from 'vitest'
+import {syntheticEvidence} from '../../../tests/fixtures/pilot-evidence'
+import {prepareEvidenceV2Packet,evidenceAuditHash} from './pilot-evidence-audit'
+import {validateEvidenceProseV2,writeEvidenceProseV2} from './pilot-evidence-sol'
+const mock=vi.hoisted(()=>vi.fn())
+vi.mock('./reputation-themes.ts',()=>({structuredCall:mock}))
+afterEach(()=>vi.clearAllMocks())
+it('future V2 writer runs independent preflight before provider; corrupted quote makes zero calls',async()=>{const f=await syntheticEvidence();f.evidence.selected[0].quote_sha256='bad';await expect(writeEvidenceProseV2(f.snapshot,f.evidence,await evidenceAuditHash(f.evidence),'vi',async()=>{})).rejects.toThrow('PREFLIGHT_REJECTED');expect(mock).not.toHaveBeenCalled()})
+it('future writer accepts only supplied statement/recommendation IDs; no invented access recommendation',async()=>{const f=await syntheticEvidence(),p=await prepareEvidenceV2Packet(f.snapshot,f.evidence,f.sha,'fr'),good={axes:['service','quality','price','atmosphere'].map(key=>({key,statement_ids:p.statements.filter(s=>s.axis===key).map(s=>s.id)})),positive_statement_ids:p.statements.filter(s=>s.key.endsWith(':positive')).map(s=>s.id),negative_statement_ids:p.statements.filter(s=>s.key.endsWith(':negative')).map(s=>s.id),recommendation_ids:p.recommendation_catalog.map(s=>s.id)};expect(validateEvidenceProseV2(good,p)).toEqual(good);expect(()=>validateEvidenceProseV2({...good,recommendation_ids:['invented_access']},p)).toThrow('RECOMMENDATION_UNGROUNDED');expect(()=>validateEvidenceProseV2({...good,positive_statement_ids:['unknown']},p)).toThrow('PROSE_UNGROUNDED');mock.mockResolvedValue({data:good});await writeEvidenceProseV2(f.snapshot,f.evidence,f.sha,'fr',async()=>{});expect(mock).toHaveBeenCalledOnce();expect(mock.mock.calls[0][1]).toEqual(p);expect(mock.mock.calls[0][5]).toBe('gpt-6.1-sol')})

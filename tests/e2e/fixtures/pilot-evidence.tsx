@@ -1,0 +1,10 @@
+import {createRoot} from 'react-dom/client'
+import {MemoryRouter} from 'react-router-dom'
+import {I18nProvider} from '../../../src/i18n'
+import {EvidenceWorkspace} from '../../../src/pages/PilotEvidencePage'
+import {syntheticEvidenceView} from '../../fixtures/pilot-evidence'
+import '../../../src/styles/global.css'
+import '../../../src/styles/pages.css'
+import '../../../src/styles/reference.css'
+import '../../../src/styles/warm-theme.css'
+const lang=new URLSearchParams(location.search).get('language')==='vi'?'vi':'fr',data=await syntheticEvidenceView();createRoot(document.getElementById('root')!).render(<MemoryRouter><I18nProvider language={lang}><main className="page-frame"><div className="jev-page gold-page exploratory-page evidence-page"><EvidenceWorkspace data={data} audit={async()=>{}}/></div></main></I18nProvider></MemoryRouter>)

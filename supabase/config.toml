@@ -522,3 +522,6 @@ verify_jwt = false
 
 [functions.process-jev-economy-pilot]
 verify_jwt = false
+
+[functions.jev-pilot-evidence]
+verify_jwt = false
