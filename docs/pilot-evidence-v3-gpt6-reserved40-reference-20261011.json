@@ -1,0 +1,359 @@
+{
+  "schema_version": "pilot-evidence-v3-chatgpt-ai-reference-v1",
+  "source": "GPT-6 qualitative adjudication of blind-text/theme-only export, not an independent human Gold standard",
+  "model": "GPT-6",
+  "annotation_type": "chatgpt_ai_reference",
+  "created_on": "2026-10-11",
+  "source_control_id": "3988aa10-0c5c-4a52-b1ff-1b576b488c52",
+  "source_control_sha256": "418c0f1a2dccea8bd5f29ce046dcc57a35d645710231ed540cd38dcb1ccb4391",
+  "snapshot_id": "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+  "snapshot_sha256": "19ea6e88f81a6243792b0a49ec1aa2a7b3d1915272c50790940a6c5c8259bf7e",
+  "selection_frozen_before_annotation": true,
+  "reference_choices": [
+    "absent",
+    "positive",
+    "negative",
+    "both",
+    "uncertain"
+  ],
+  "annotated_without_v3_on_control": true,
+  "sampling_limitations": [
+    "40 selected review/theme pairs from one establishment, non-representative of all stored reviews or independent restaurants.",
+    "References are GPT-6 model judgments, not human annotations.",
+    "The theme was visible; two candidate polarities (positions 1 and 2) were exposed during administrative source inspection before this adjudication. Remaining proposed polarities and model decisions were not retrieved while annotating.",
+    "Resolved English texts were used; no independent source-language translation validation.",
+    "V3 must be evaluated in a separate later step after this file is frozen; no V3 reference labels or historical predictions were modified.",
+    "Uncertain decisions must be excluded from binary precision/recall calculations or reported separately."
+  ],
+  "rules": "Apply the 25 original V12 theme boundaries. Explicit customer expressions only; price-level versus value, friendliness versus attentiveness/professionalism, atmosphere versus noise, service coordination versus generic service must be distinguished.",
+  "counts": {
+    "absent": 7,
+    "positive": 18,
+    "negative": 9,
+    "both": 2,
+    "uncertain": 4
+  },
+  "count": 40,
+  "items": [
+    {
+      "position": 1,
+      "review_id": "6a95d0d8-1b5a-4ed5-a398-4f751d87b414",
+      "theme_key": "location",
+      "analysis_text_sha256": "4f714117e9c56efaa211c039601d311ba9d34a1a1af0bb656f104b67575fc49e",
+      "choice": "absent",
+      "justification": "Appearance from outside is unassuming, but there is no evaluation of the restaurant's location, distance or access."
+    },
+    {
+      "position": 2,
+      "review_id": "7e8d6c9d-0261-44be-ab2a-8628189a57ec",
+      "theme_key": "decor",
+      "analysis_text_sha256": "4d65b955a7f7c9969dc875196234876a2dd32f54d3fd3c533a77971e60b739dd",
+      "choice": "both",
+      "justification": "Interior/decor is initially described as unimpressive, then greenery and beautiful interior details are praised."
+    },
+    {
+      "position": 3,
+      "review_id": "6080e94b-1025-4672-91ed-b4494a4861e9",
+      "theme_key": "wait_time",
+      "analysis_text_sha256": "a9a7fd00399d8cb78ca88f5dd4d71002321f4e9c0b09bfe6849a302ffdfd8867",
+      "choice": "negative",
+      "justification": "Employee promised five minutes but did not return after fifteen; the guest had to go downstairs to order."
+    },
+    {
+      "position": 4,
+      "review_id": "fb52f17a-d994-4a49-a1e2-8d8695201c1b",
+      "theme_key": "professionalism",
+      "analysis_text_sha256": "427343bcb8246247609147307993b36b3952be426bd7b722c7f78f68ae8f617b",
+      "choice": "negative",
+      "justification": "The employee's discriminatory or poor attitude toward foreign customers is explicit unprofessional conduct."
+    },
+    {
+      "position": 5,
+      "review_id": "9f65e579-ee31-4adf-b318-e7f256d5a385",
+      "theme_key": "wait_time",
+      "analysis_text_sha256": "5b98ae9769414a89b95200eba86778568d6da0ede2cdbf13e52619a7ffee9411",
+      "choice": "negative",
+      "justification": "Food arrived sufficiently late after drinks that the coffee grew cold while waiting."
+    },
+    {
+      "position": 6,
+      "review_id": "7c11a7f5-0211-4f5f-ae87-55f1c1283ed0",
+      "theme_key": "wait_time",
+      "analysis_text_sha256": "b62b39b36e43da8e8a7bd82e28f611e7f5ac85bc6d32317d0fbed384e7499e0a",
+      "choice": "negative",
+      "justification": "The review explicitly says service is a little slow."
+    },
+    {
+      "position": 7,
+      "review_id": "e2b157e1-8921-41c8-9b01-929a01726cc7",
+      "theme_key": "billing",
+      "analysis_text_sha256": "96a9bd332f110bbdf675d37bc0338090593e6b46d825fb1d738b8567b94a3c38",
+      "choice": "negative",
+      "justification": "The bill exceeded the expected amount and a possibly unannounced service charge was suspected."
+    },
+    {
+      "position": 8,
+      "review_id": "e68bb7df-d73b-4842-a0ca-9e26575a97c4",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "43119dc5a3d4c8d5f1cf50a493156e987ef34093a3a7262f7d0b23ef9953dfa4",
+      "choice": "uncertain",
+      "justification": "Higher-than-local-average prices are explicitly stated, but immediately judged worthwhile; a negative price-level attitude is not clear."
+    },
+    {
+      "position": 9,
+      "review_id": "d6518e2d-576c-4d2f-bcb0-2b26c184c250",
+      "theme_key": "value",
+      "analysis_text_sha256": "08502637f9b55facc2b069062a41c5f25cbd56838f460a566d1a60dbccaf9d4f",
+      "choice": "positive",
+      "justification": "Above-average prices are explicitly described as worth the experience, establishing positive value for money."
+    },
+    {
+      "position": 10,
+      "review_id": "5de421ee-3b24-4fb9-ae3f-89fabf8a76a0",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "569fd4d645013cf582ff70ed8d0977150b961034dfca803c01de8826a2b22ad0",
+      "choice": "uncertain",
+      "justification": "A price comparison with Moscow alone does not state whether the price level is positively or negatively judged."
+    },
+    {
+      "position": 11,
+      "review_id": "2245000f-8600-43b0-8969-e40727954b37",
+      "theme_key": "billing",
+      "analysis_text_sha256": "9c8d502f050c65937385e03e9afaa2c73d4d38f11afb8e4f1a07e5db110d4077",
+      "choice": "negative",
+      "justification": "Criticizes tax being separated rather than included in the base price, an explicit billing-transparency issue."
+    },
+    {
+      "position": 12,
+      "review_id": "50e0a434-b71b-410f-9149-122cec9a23d0",
+      "theme_key": "value",
+      "analysis_text_sha256": "bf5ba62ba4a499f4364009ea9841f904e021bc4c4681d2a72d39e86a552cecd2",
+      "choice": "positive",
+      "justification": "A complete family breakfast is praised as perfect and not expensive, indicating a favorable price-to-offering judgment."
+    },
+    {
+      "position": 13,
+      "review_id": "732293c3-1d21-42a1-b7a9-0cc8ea4b7ca8",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "22e01ef6498942b76813cd73d50ec1fae3cfa5cafb4f7e10f11f7f7820299432",
+      "choice": "positive",
+      "justification": "Prices are explicitly called reasonable for the portions."
+    },
+    {
+      "position": 14,
+      "review_id": "5c3ecaea-851c-430c-ab15-180ed66a1db8",
+      "theme_key": "value",
+      "analysis_text_sha256": "62f99f119db3dca0d0787a25660c93408040c88b50aa12fe0c33d9c745a31737",
+      "choice": "absent",
+      "justification": "Pleasant prices are praised without an explicit comparison between price and the service or product obtained."
+    },
+    {
+      "position": 15,
+      "review_id": "da8e36d2-328f-4efc-8fc0-4e3d06b94aa8",
+      "theme_key": "value",
+      "analysis_text_sha256": "c99cebd0199e09a1d5af77c3fece58b88b3f7ba4c74c1f15c66c2b7edaeea88a",
+      "choice": "absent",
+      "justification": "Affordable prices and delicious food are both mentioned, but no definite value-for-money comparison is made."
+    },
+    {
+      "position": 16,
+      "review_id": "c3663fe2-8ef9-4986-b3ef-d28b08d5575d",
+      "theme_key": "value",
+      "analysis_text_sha256": "15c84b33fbd4836a70fca66178e4aae56d38568c3397fb14a19c94b87a385562",
+      "choice": "positive",
+      "justification": "Explicitly describes the experience as beautiful, delicious and inexpensive together, suggesting favorable value."
+    },
+    {
+      "position": 17,
+      "review_id": "e45be953-4b32-4cf4-8f59-a3ac1860dde6",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "d501ded0add474ce441665a987b48f739e8bca0ed681903cade53f69f53b9bfc",
+      "choice": "negative",
+      "justification": "Unslaked baking soda is criticized as a defect in the pancake."
+    },
+    {
+      "position": 18,
+      "review_id": "54dcae7a-dd43-429c-be84-44d0d3e4f8b2",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "75202206aabad7fc45d9f61e6a1c13f1cf0246e16b11e1a3084be8e1c62ee606",
+      "choice": "negative",
+      "justification": "The review says the food overall is not great."
+    },
+    {
+      "position": 19,
+      "review_id": "cfe0affb-af32-4528-b15d-bbb88bb9ca68",
+      "theme_key": "portions",
+      "analysis_text_sha256": "1bef602fd48b183e956bf6a3a55629e35764873fd367ac77bc46a22ea9d54b03",
+      "choice": "positive",
+      "justification": "Large, generous portions are highlighted favorably; having ordered too many dishes is not a criticism of the portion itself."
+    },
+    {
+      "position": 20,
+      "review_id": "51bce1a1-2845-49a2-8632-5b6793e67ffa",
+      "theme_key": "portions",
+      "analysis_text_sha256": "d0f4db6f3d10560c247c4fcef509b12eb7e6c4f1d27fdb8bcf66b891b8aff58a",
+      "choice": "negative",
+      "justification": "The burgers are described as not big, explicitly criticizing serving quantity."
+    },
+    {
+      "position": 21,
+      "review_id": "3a70d566-ac04-49ee-b21a-e5263ad7fb05",
+      "theme_key": "portions",
+      "analysis_text_sha256": "0adc794069017e187e25aec8cd4b72fa3a433b0b5b661e8d98091ef6007cabc3",
+      "choice": "both",
+      "justification": "The protein bowl's portion is described as good, but its feta quantity as too little."
+    },
+    {
+      "position": 22,
+      "review_id": "dfe2e090-3721-4986-a8b0-d0efdf0879f7",
+      "theme_key": "coordination",
+      "analysis_text_sha256": "b3d6aae0eb5c8b05ef174f3042a73f9b15efc33d0465edcce6b97b7c7b9f6388",
+      "choice": "absent",
+      "justification": "Generic praise for service does not describe service organization or coordination."
+    },
+    {
+      "position": 23,
+      "review_id": "6943f64e-b661-4faa-b1d1-784f10604d78",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "d76ed14072c4378670b9b5300e9a487b33cb1ef69b86018e5dc05228d8b7e4e4",
+      "choice": "positive",
+      "justification": "Employees are explicitly described as polite, which is a positive friendliness/politeness judgment."
+    },
+    {
+      "position": 24,
+      "review_id": "e8d5c50e-0bad-42e7-907a-9895f1e86bc7",
+      "theme_key": "coordination",
+      "analysis_text_sha256": "9bdb49bd9a5da3dced8fd307eb217a9c5bb7d1953da6beb29aa5e4d896685945",
+      "choice": "absent",
+      "justification": "Attentive servers and generally good service do not by themselves establish organization or synchronization."
+    },
+    {
+      "position": 25,
+      "review_id": "da617b3d-29e5-4be3-8b58-e6ff27b94bc0",
+      "theme_key": "attentiveness",
+      "analysis_text_sha256": "f3700e7af9efb33c71b47e6edb15c4c871f7e68744517b0fa76905efd7378100",
+      "choice": "absent",
+      "justification": "Impeccable customer service is generic praise without any specific attention-to-needs action."
+    },
+    {
+      "position": 26,
+      "review_id": "557c2354-0b03-4bbc-a869-e2f74e9eb584",
+      "theme_key": "professionalism",
+      "analysis_text_sha256": "9c8337cc4a20cbb564d587177e0460a1954fdb4bf6c381f50da06071d2a14554",
+      "choice": "absent",
+      "justification": "Attentive staff are mentioned but not explicit knowledge, competence or professional handling."
+    },
+    {
+      "position": 27,
+      "review_id": "d65a06b6-d4c4-46ff-9993-9c23aeec8ff7",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "b3268757cb03d2d5d2b679c517a330cf4e5adfff99af64408cfb44271c2dfaf3",
+      "choice": "positive",
+      "justification": "A cozy, chill vibe is a direct positive evaluation of atmosphere."
+    },
+    {
+      "position": 28,
+      "review_id": "8ff12d97-da5a-44d2-a951-9c2c36b351fa",
+      "theme_key": "decor",
+      "analysis_text_sha256": "d055d9aaaea1d78c8cb94e0bde428425f0f055f45654a51bfd89178033e9494a",
+      "choice": "positive",
+      "justification": "The cafe is described as visually beautiful throughout, including entrance and interior details."
+    },
+    {
+      "position": 29,
+      "review_id": "d38e1c43-e97e-457b-8e18-2b7f0eb1e0b7",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "0f4e58f616cdc97b67611e3a36764b58fac0404dc06b7d8b996d012f5df7cd21",
+      "choice": "positive",
+      "justification": "A beautiful, quiet setting conveys a positive atmosphere."
+    },
+    {
+      "position": 30,
+      "review_id": "e325cc85-ad55-4301-95d8-ea4ced912eee",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "0e189dbcecdfaccd6dba3bf7da1794cd717d6e080dad47201d40563057975ae9",
+      "choice": "positive",
+      "justification": "The atmosphere is explicitly described as comfortable and cozy."
+    },
+    {
+      "position": 31,
+      "review_id": "f2870a8d-40cc-423b-b3de-4b2016830d8b",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "4c8f999480e10ad4ee5bc4a9208db58a4ab57d88dc83620702a5f0941353ef9c",
+      "choice": "positive",
+      "justification": "The atmosphere is explicitly called amazing and the place peaceful."
+    },
+    {
+      "position": 32,
+      "review_id": "8fba760b-d209-4359-87ee-5aa68fa0b3e3",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "c561704598cb94a9718e42b003de908fff7dc9864991b79006e5f5cb8667056c",
+      "choice": "positive",
+      "justification": "Delicious is a direct positive taste evaluation in a restaurant review, albeit without naming a dish."
+    },
+    {
+      "position": 33,
+      "review_id": "5e3ec6fd-eb53-4a5d-ab6c-10082b0db78d",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "006cac37d17b7d70c4eb641c6b1606d75551380ba420809b6b416425e1ad93ed",
+      "choice": "positive",
+      "justification": "The adjective amazing explicitly applies to food alongside service and atmosphere."
+    },
+    {
+      "position": 34,
+      "review_id": "dc732a2a-ce95-4f2e-a77f-906fdfdf2a94",
+      "theme_key": "presentation",
+      "analysis_text_sha256": "cb20525001db19046e3a5949dced555b4130c4c7cac2ff531891eb516713fd74",
+      "choice": "uncertain",
+      "justification": "Vibrant, creative dishes may reflect appearance, but no clear evaluation of their visual plating/presentation is given."
+    },
+    {
+      "position": 35,
+      "review_id": "b1cb77e8-8d74-43ee-a6bb-1401d27c0314",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "a240afcf6503d96f165038f4f34a9e5ea54676c33483e96be12558947049b013",
+      "choice": "positive",
+      "justification": "The food is explicitly described as incredibly delicious."
+    },
+    {
+      "position": 36,
+      "review_id": "49fa68eb-534d-4527-afaa-d5d6849fa43b",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "056f8e97d1b379a9fbbd26a8e57f4c2e9db348b4bcd4aac90ab8dc80d0eda0b1",
+      "choice": "positive",
+      "justification": "Everything is described as delicious and a chocolate croissant is praised in particular."
+    },
+    {
+      "position": 37,
+      "review_id": "7e51a09a-e4e5-47b9-b1f4-b9f12fa20bff",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "4a6d019792794152442947db000590b6f12af9607657e893010d56b2a72134d4",
+      "choice": "positive",
+      "justification": "The review says very tasty in a restaurant context, conveying positive food taste."
+    },
+    {
+      "position": 38,
+      "review_id": "7fbc7fa9-c0d1-4655-8346-97b0d1c0a0b8",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "03251cf357139fc1e162b9c7d5ea7227af4e28a079c06788d525f3df888b36d2",
+      "choice": "positive",
+      "justification": "Gustatory ecstasy and mind-blowing cuisine directly praise food taste and quality."
+    },
+    {
+      "position": 39,
+      "review_id": "f5b4fac6-f320-412f-98b6-55b23959bdff",
+      "theme_key": "drinks",
+      "analysis_text_sha256": "0c86d0398d474fc6bf7f2067408a0f1e55c9a9c25b86ee81d676d18d87f4742a",
+      "choice": "positive",
+      "justification": "Smoothies are explicitly described as magical, conveying a positive judgment of drinks."
+    },
+    {
+      "position": 40,
+      "review_id": "d904b348-a9fd-4aa6-a208-b07744aca7b7",
+      "theme_key": "noise",
+      "analysis_text_sha256": "f00e62e9a19e4ae086c8f9c2814bdc6a49eccca830324c8ea28a9b83cacb8ba0",
+      "choice": "uncertain",
+      "justification": "Calm and pleasant atmosphere may refer to relaxation rather than an explicit judgment about sound or quietness."
+    }
+  ]
+}
