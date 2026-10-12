@@ -1,0 +1,6 @@
+import {createRoot} from 'react-dom/client';import {useState} from 'react';
+import {I18nProvider} from '../../../src/i18n';import {Native48Workspace} from '../../../src/pages/LunaNative48Page';import {nativeViewFixture} from '../../fixtures/luna-native48';
+import '../../../src/styles/global.css';import '../../../src/styles/pages.css';import '../../../src/styles/reference.css';import '../../../src/styles/warm-theme.css';
+const query=new URLSearchParams(location.search),language=query.get('language')==='vi'?'vi':'fr',mode=query.get('mode'),initial=await nativeViewFixture(mode==='completed'),storage='mock-native48-'+mode;
+export function Fixture(){const [data,setData]=useState(()=>localStorage.getItem(storage)?JSON.parse(localStorage.getItem(storage)!):initial);return <Native48Workspace data={data} onPrepare={()=>{const next={...data,plan_id:'mock-plan'};localStorage.setItem(storage,JSON.stringify(next));setData(next);return Promise.resolve();}} onRefresh={()=>Promise.resolve()}/>;}
+createRoot(document.getElementById('root')!).render(<I18nProvider language={language}><main className='page-frame'><div className='jev-page gold-page decisions-page'><Fixture/></div></main></I18nProvider>);

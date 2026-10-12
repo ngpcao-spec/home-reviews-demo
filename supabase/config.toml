@@ -555,3 +555,9 @@ verify_jwt = false
 
 [functions.process-luna-multirest]
 verify_jwt = false
+
+[functions.luna-native48]
+verify_jwt = false
+
+[functions.process-luna-native48]
+verify_jwt = false
