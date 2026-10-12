@@ -1,0 +1,31 @@
+# HOME Reviews — Activation contrôlée du test Luna sur 40 preuves (préparation uniquement)
+
+## Décision utilisateur / portée
+
+L'utilisateur a répondu « Go » pour **préparer** un premier test OpenAI Decisions de vérification des preuves. Ce n'est **pas** une instruction d'envoyer immédiatement des requêtes payantes. Le lancement et la dépense requièrent ensuite une confirmation manuelle, explicite, du coût dans l'application iPhone. Le modèle est `gpt-6-luna`, sur `POST /v1/decisions`, question de type `choice`.
+
+- Expérience préparée, **immuable** : `analysis_decisions_experiments.id=73a7bfe9-c618-4e2f-aa82-3b0fae8eb989`, version `openai-decisions-exploratory-v1`.
+- Configuration existante : `luna-decisions-evidence-choice-v1`, SHA à vérifier sur le serveur.
+- Contrôle figé : `analysis_jev_pilot_evidence_v3_controls.id=3988aa10-0c5c-4a52-b1ff-1b576b488c52`, 40 avis distincts, SHA `418c0f1a2dccea8bd5f29ce046dcc57a35d645710231ed540cd38dcb1ccb4391`.
+- Référence GPT-6 déjà utilisée : `docs/pilot-evidence-v3-gpt6-reserved40-reference-20261011.json`, commit `b64f571d36ca389cdf459b1311c35938848ce1f7`; 4 références uncertain. Il s'agit d'une **évaluation IA rétrospective**, pas d'un Gold humain ni d'une nouvelle validation indépendante.
+- Comparateur V3 figé : `analysis_jev_pilot_evidence_v3_reserved_evaluations.id=dae5d565-6a72-4955-aa01-a4e79c218d12`.
+- Coût indicatif en tarif Decisions standard 0,10 USD/million de tokens d'entrée : **0,0023527 USD pour 40 appels** d'après l'estimation locale actuelle ; valeur non facturée, majorations régionales/contexte possibles. Ni l'accès à la bêta, ni le coût facturé réel ne sont encore vérifiés.
+
+## Implémentation attendue
+
+1. **Ne pas déverrouiller** ni modifier les tables immuables `analysis_decisions_experiments`, `analysis_decisions_tasks` (contrainte `status='blocked'`), les trois configurations de référence, les benchmarks ou les rapports. Créer un sous-pipeline dédié `openai-decisions-evidence40-run-v1` avec nouvelles migrations/tables, RLS organization owner/admin/manager, états durables et immuabilité finale.
+2. Vérification serveur avant préparation et avant lancement : utilisateur actif et membre de l'organisation ; 40 `review_id` distincts, mêmes `theme_key`, `polarity`, textes anglais et SHA256, mêmes configurations, contrôle/références figés ; exactement **40 payloads** de vérification et hashes déterministes. Uniquement le texte, le thème et la polarité proposés + frontières de V12 sont envoyés à Luna. **Jamais** les notes Google, les classifications historiques JEV/V3, les références GPT-6 ni l'identité utilisateur.
+3. Une première action gratuite prévisualise dans l'interface le nombre de requêtes **40 max**, tokens estimés, coût **indicatif ~0,00235 USD**, taux officiel et risques, et détail des questions. L'utilisateur doit appuyer personnellement sur une confirmation distincte « Confirmer le coût et lancer Luna » / vietnamien ; activer seulement **ce** bouton, pas Choice ni Predicate.
+4. **Aucun appel OpenAI** par l'assistant, par les migrations, par les tests, ni lors de l'activation/déploiement. La confirmation dans l'application crée atomiquement un run autorisé, figé par hashes, idempotent. Le GO dans ChatGPT n'est **pas** cette confirmation et ne crée pas de tâche payante automatiquement.
+5. Un job serveur durable indépendant de l'iPhone appelle au maximum 40 fois `POST /v1/decisions` avec `model='gpt-6-luna'`, 1 question `choice` par avis, choix `supported/unsupported/uncertain`, confiance et distribution. Ne jamais envoyer les secrets au client. Valider le modèle servi et le schéma de chaque réponse, enregistrer les refus/erreurs.
+6. **Aucun retry payant automatique**, y compris timeout, 429 ou 5xx après dispatch. État `billing_uncertain` ou `failed` non requeue. Réserver la tentative de manière transactionnelle **avant** l'envoi, compteur immuable `request_count<=1` par cas. Verrouiller le total à **40**, bloquer double clic, deuxième worker, nouveaux appels et nouvelles facturations sans autorisation spécifique. Si accès bêta/API key indisponible, afficher l'erreur : ne jamais basculer sur Responses, JEV ou Sol.
+7. Enregistrer pour chaque réponse `gpt-6-luna` réel, `answer.type`, `choice`, probabilités, `confidence`, refus, `usage.input_tokens`, détails cache, `output_tokens`, coût calculé au tarif applicable, latence, hash de requête/réponse et identifiant de réponse si fourni. Ne pas revendiquer de « montant facturé » sans télémétrie d'usage ; garder les majorations inconnues comme estimation.
+8. Comparaison à l'arrêt du run : référence GPT-6 `absent/positive/negative/both/uncertain` convertie en appui `supported` selon thème + polarité ; 4 cas incertains hors dénominateur binaire. Comparer Luna à JEV et V3 (V3 sur 40 : cinq appuis corrects, aucun faux appui, un faux rejet, 32 abstentions). Tableau de confusion, couverture, abstentions, précision sélective, rappel des preuves justifiées, désaccords et coûts. Échantillon difficile, utilisé antérieurement : **ni nouvelle mesure aveugle ni vérité humaine**.
+9. Rapports/payloads séparés des historiques ; RLS, provenance des traductions, conservation des SHA256, aucune mise en production, aucune modification de V11/V12/V13 ni de JEV/Sol.
+10. UI iPhone/iPad FR/VI : `Plus / Thêm → Test Jev → OpenAI Decisions — Test expérimental → Vérifier 40 preuves` avec état `prêt/en cours/terminé/échec/incertain`, progression et possibilité de fermer l'iPhone sans interrompre la tâche serveur.
+
+## Exigences de tests et livraison
+
+Unitaires, mocks HTTP Decisions, Deno sans réseau pour tests, SQL/RLS/idempotence/anti-retry, calcul du coût, attribution des résultats, vérification JSON/hashes, Playwright FR/VI iPhone/iPad, lint/build, puis déploiement technique. Vérifier 0 tâche 0 appel payé **avant** confirmation sur iPhone. Aucune condition `GO` dans le code : seule la confirmation explicite en application initie l'exécution. Le bouton peut être préparé à fonctionner, mais ne doit jamais auto-déclencher.
+
+Livrable Codex en français : tables/fonctions/files, prévalidation des 40, estimation actualisée, contrôles de sécurité, tests CI, statut du déploiement, procédure iPhone et preuve d'absence d'appels payants.
