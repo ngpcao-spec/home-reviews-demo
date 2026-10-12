@@ -1,5 +1,22 @@
 # HOME Reviews — Contrôle Luna sur 48 avis multilingues stratifiés (préparation manuelle, aucun appel payant)
 
+## MISE À JOUR PRIORITAIRE : AUTORISATION DE LANCEMENT DÉLÉGUÉ À CODEX
+
+**Nouvelle demande explicite de l'utilisateur : « Tu peux aussi dire à codex de lancer Luna, je n'ai pas besoin de le faire. »**
+
+Cette nouvelle autorisation **remplace les consignes antérieures exigeant une confirmation manuelle sur iPhone ou interdisant tout appel payant à Codex**. L'utilisateur autorise Codex à exécuter **une seule fois** le test Luna précis ci-dessous, **après** avoir développé, testé et déployé les composants. Les appels payants restent interdits pendant les tests, migrations, simulation et déploiement.
+
+**Périmètre strict** : jeu `a125ba0e-e4b0-49ca-83c8-1e52a27bd2be`, sceau `24883941-e3bc-4759-9af6-d21bd62413f9`, modèle `gpt-6-luna`, endpoint `POST /v1/decisions`, **48 appels maximum**, une tentative par avis, **aucune relance payante automatique**, aucun autre modèle ou test. Maintenir JEV, Sol, Apify, les expériences et rapports historiques inchangés ; aucune activation en production.
+
+**Consentement véridique** : consigner l'autorisation déléguée de l'utilisateur avec `consent_source='user_directive_codex_delegation'` et un audit horodaté. **Ne pas falsifier** un clic iPhone ni `confirmed_by`, ni contourner RLS. Adapter le workflow pour accepter un lancement administrateur autorisé et traçable par Codex. En cas d'impossibilité d'autorisation sécurisée, stopper et en expliquer la raison plutôt que simuler le consentement.
+
+**Ordre d'exécution** : (1) vérifier les 48 sources originales, références GPT-6 et empreintes scellées ; (2) tester anti-doublon, plafond 48, blocage de retry, RLS et mode hors-réseau ; (3) estimer et journaliser les tokens et le coût au tarif standard, sans les présenter comme facturés ; (4) déployer ; (5) **déclencher une seule exécution Luna par Codex sans attendre l'iPhone**, en évitant tout déclenchement par CI, GET, migration ou cron d'installation ; (6) suivre les 48 appels jusqu'au statut terminal sans aucune réémission payante ; (7) rendre compte : réussite/erreurs/indécisions, tokens et coût calculé, modèle servi, qualité versus 47 références évaluables et limites du jeu multilingue.
+
+**Contrôle anti-double lancement** : si un run existe déjà (running/completed/failed/billing_uncertain) pour ce jeu, ne déclencher **aucun** nouvel appel. Si un problème technique survient, ne pas payer de nouveau sans nouvelle autorisation.
+
+Les paragraphes historiques ci-dessous concernant « préparation seulement », « lancement interdit à Codex » et « confirmation iPhone obligatoire » ne s'appliquent plus à **cette exécution unique explicitement déléguée**. Les autres protections restent en vigueur.
+
+
 ## Travail déjà terminé et vérifié
 
 Un **nouveau** jeu source, non comparé directement aux benchmarks JEV/Decisions anglais précédents, est scellé en base avec ses annotations GPT-6 AI-only.
