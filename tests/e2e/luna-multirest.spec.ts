@@ -1,0 +1,10 @@
+import {expect,test} from "@playwright/test";
+for(const language of ["fr","vi"])test(`Luna multirest ${language} free blind export and blocked spending`,async({page})=>{
+ test.setTimeout(90000);if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});const providers:string[]=[];page.on("request",r=>{if(/api\.openai|typesafe|apify|functions\/v1|rest\/v1/.test(r.url()))providers.push(r.url());});
+ await page.goto(`/tests/e2e/fixtures/luna-multirest.html?language=${language}`);
+ await expect(page.getByRole("button",{name:language==="fr"?"Lancer le contrôle Luna":"Chạy kiểm tra Luna",exact:true})).toBeDisabled();
+ await expect(page.getByRole("button",{name:language==="fr"?"Sceller les références IA":"Niêm phong tham chiếu AI",exact:true})).toBeDisabled();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+ const download=page.waitForEvent("download");await page.getByRole("button",{name:language==="fr"?"Exporter les 40 cas pour GPT-6":"Xuất 40 trường hợp cho GPT-6",exact:true}).click();const file=await download;expect(file.suggestedFilename()).toBe("luna-multirest-gpt6-blind-40.json");const stream=await file.createReadStream();let text="";for await(const chunk of stream!)text+=chunk.toString();const exp=JSON.parse(text);expect(exp.items).toHaveLength(40);for(const item of exp.items)expect(Object.keys(item).sort()).toEqual(["analysis_text","analysis_text_sha256","review_id","theme_key"]);
+ await page.reload();await expect(page.getByRole("button",{name:language==="fr"?"Lancer le contrôle Luna":"Chạy kiểm tra Luna",exact:true})).toBeDisabled();await page.getByText(language==="fr"?"Restaurants (11)":"Nhà hàng (11)",{exact:true}).click();await expect(page.getByText("Mock restaurant 11 · 3",{exact:true})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);await page.screenshot({path:`test-results/multirest-${language}-${test.info().project.name}.png`});expect(providers).toEqual([]);
+});

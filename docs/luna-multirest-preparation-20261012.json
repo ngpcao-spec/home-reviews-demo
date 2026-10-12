@@ -1,0 +1,200 @@
+{
+  "protocol": "luna-multirest-evidence-v1",
+  "set_id": "929bef2d-e841-43e0-a055-3d924d5f88b2",
+  "set_sha": "6ece86a66208a86ba7c32a5825277ee28fbb0abafc2b828b6c255b4006c7dcb8",
+  "source_control": "4942bc5e-5790-4087-b382-ca4644d71f47",
+  "source_sha": "d1d47e0c178d7ee0189cecabeda98249a951a63b271feccea6c04f55ccec895a",
+  "sealed_at": "2026-10-12T11:22:41.852398+00:00",
+  "config_sha": "9f26dc31bc17218e8903f5ece895928dca277b748b4fede16c7805513482743e",
+  "selector_sha": "e5821f70348632829836e1a39d308522d99939329a8c27ca9cdc913bf04665a0",
+  "cases_sha": "e6eedc985b451dcc09edab45c68d5b31a0ca0759e8f6ca643a9faa131d0a1d01",
+  "cases": 40,
+  "restaurants": [
+    {
+      "id": "1323a892-ce26-4111-9b48-aace079e8154",
+      "name": "Green Home Restaurant",
+      "review_count": 3
+    },
+    {
+      "id": "69b6e810-97c0-4a6d-95e5-0647a321c6aa",
+      "name": "Làng Ngon Corner - Vietnamese Cuisine",
+      "review_count": 3
+    },
+    {
+      "id": "71011991-5962-466c-8eff-1eac9b6bd6a6",
+      "name": "Cilantro Restaurant 2",
+      "review_count": 4
+    },
+    {
+      "id": "7d06473f-a079-464d-b392-f258efb65a34",
+      "name": "The Home Pizza Nha Trang",
+      "review_count": 4
+    },
+    {
+      "id": "a13ecf32-030b-4eb2-a577-3ac9e9f2073d",
+      "name": "Mai Hương Restaurant - Nha Trang",
+      "review_count": 3
+    },
+    {
+      "id": "ad179c3a-a115-40e0-ac60-0df0c1f3c8b0",
+      "name": "Green Home Dining",
+      "review_count": 4
+    },
+    {
+      "id": "b2dd8af9-3990-41ac-af62-7c4ffbc2543b",
+      "name": "The Home Pizza Phu Quoc",
+      "review_count": 4
+    },
+    {
+      "id": "bfc486b8-4cc7-4cd5-ab59-1a118c61aced",
+      "name": "K.HOUSE Restaurant",
+      "review_count": 3
+    },
+    {
+      "id": "c815b57b-ec87-43c8-8e69-47c7c746facd",
+      "name": "Luong Son Cang Restaurant",
+      "review_count": 3
+    },
+    {
+      "id": "c9b6e047-691a-43ed-95d5-482f9cb2e594",
+      "name": "Nhà hàng Nha Trang xưa",
+      "review_count": 4
+    },
+    {
+      "id": "d40d3438-79d8-4c28-8b09-eba640598201",
+      "name": "Xóm Mới Garden",
+      "review_count": 5
+    }
+  ],
+  "stars": {
+    "1": 3,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 37
+  },
+  "method_counts": {
+    "explicit_textual_signal": 23,
+    "textual_anchor_unconfirmed": 8,
+    "no_specific_theme_anchor": 9
+  },
+  "theme_counts": {
+    "food_quality": {
+      "positive": 16,
+      "negative": 1
+    },
+    "freshness": {
+      "positive": 0,
+      "negative": 0
+    },
+    "cooking": {
+      "positive": 0,
+      "negative": 0
+    },
+    "temperature": {
+      "positive": 0,
+      "negative": 1
+    },
+    "portions": {
+      "positive": 2,
+      "negative": 0
+    },
+    "presentation": {
+      "positive": 2,
+      "negative": 0
+    },
+    "drinks": {
+      "positive": 0,
+      "negative": 0
+    },
+    "variety": {
+      "positive": 0,
+      "negative": 0
+    },
+    "consistency": {
+      "positive": 0,
+      "negative": 0
+    },
+    "friendly_staff": {
+      "positive": 5,
+      "negative": 1
+    },
+    "attentiveness": {
+      "positive": 1,
+      "negative": 0
+    },
+    "wait_time": {
+      "positive": 0,
+      "negative": 0
+    },
+    "coordination": {
+      "positive": 0,
+      "negative": 0
+    },
+    "communication": {
+      "positive": 0,
+      "negative": 0
+    },
+    "order_accuracy": {
+      "positive": 0,
+      "negative": 0
+    },
+    "professionalism": {
+      "positive": 1,
+      "negative": 0
+    },
+    "atmosphere": {
+      "positive": 3,
+      "negative": 0
+    },
+    "decor": {
+      "positive": 1,
+      "negative": 0
+    },
+    "noise": {
+      "positive": 0,
+      "negative": 0
+    },
+    "comfort": {
+      "positive": 0,
+      "negative": 0
+    },
+    "cleanliness": {
+      "positive": 0,
+      "negative": 0
+    },
+    "location": {
+      "positive": 0,
+      "negative": 0
+    },
+    "value": {
+      "positive": 5,
+      "negative": 0
+    },
+    "billing": {
+      "positive": 0,
+      "negative": 0
+    },
+    "price_level": {
+      "positive": 1,
+      "negative": 0
+    }
+  },
+  "eligible": 39,
+  "tokens": 22295,
+  "cost": 0.0022295,
+  "full40_cost": 0.0023109999999999997,
+  "reference_count": 0,
+  "result_count": 0,
+  "new_paid_calls": 0,
+  "limit_flags": [
+    {
+      "position": 32,
+      "review_id": "86621ac9-27a9-456b-9f34-9db6946bc623",
+      "flags": [
+        "FROZEN_EN_FIELD_CONTAINS_VIETNAMESE_SENTENCES"
+      ]
+    }
+  ],
+  "validation_type": "free_preparation_no_reference_judgments"
+}

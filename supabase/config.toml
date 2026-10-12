@@ -549,3 +549,6 @@ verify_jwt = false
 
 [functions.process-decisions-evidence40]
 verify_jwt = false
+
+[functions.luna-multirest]
+verify_jwt = false
