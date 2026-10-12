@@ -1,0 +1,288 @@
+{
+  "protocol": "luna-multirest-evidence-v1",
+  "dataset_sha256": "6ece86a66208a86ba7c32a5825277ee28fbb0abafc2b828b6c255b4006c7dcb8",
+  "annotation_model": "GPT-6",
+  "reference_type": "GPT6_AI_reference_not_independent_human_Gold",
+  "items": [
+    {
+      "review_id": "23d1aaf6-a548-4eab-bc9f-ffe05c2c22dc",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "7995ea5da29854e72dd0de5bf4d3293c1745749c1a559f6a521d2b133740ee17",
+      "choice": "negative",
+      "justification": "Seafood is described as dry/rubbery and food as bland and tasteless."
+    },
+    {
+      "review_id": "5fad0c79-ce79-4d65-b1b5-c8203c480b0c",
+      "theme_key": "temperature",
+      "analysis_text_sha256": "9defba44a0c7320109e193a3a552da4dcd353d0dd4b156cf5d787d7369ab7234",
+      "choice": "negative",
+      "justification": "Several dishes are explicitly described as cold when they should be warm."
+    },
+    {
+      "review_id": "128f29a3-5f70-4253-ac6c-862f763ead94",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "bfab3fee407a16701781886c315809f979fe01a66a3cbf1c6daf41ba00fb1bb7",
+      "choice": "absent",
+      "justification": "A buffet running out of food concerns availability, not the food's taste or quality."
+    },
+    {
+      "review_id": "b18304ae-7c76-471f-9d03-2276cadf60ab",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "06c0f8e7815dfa77a16ac3ff9377dcbc5ef2d193343353f1aec276f94b474b01",
+      "choice": "absent",
+      "justification": "Describing a waiter as beautiful does not establish staff friendliness."
+    },
+    {
+      "review_id": "a4261608-ca63-44d9-8c70-3c48c3c104cc",
+      "theme_key": "presentation",
+      "analysis_text_sha256": "db882c3da878e1f67ef89ab99b0d56caf75f93031dd538525e9bdfc2a58e666f",
+      "choice": "positive",
+      "justification": "Food is explicitly praised as beautifully presented."
+    },
+    {
+      "review_id": "1ed2d103-7152-40cf-8b9d-deef62cdf87a",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "9aaefae0ab4109955fd5242c278dbc61ddcb2e1c95eb0fdeb65de8ee617fa2ff",
+      "choice": "positive",
+      "justification": "The customer clearly praises the atmosphere as great."
+    },
+    {
+      "review_id": "c30e9422-0f98-4b4d-b652-fa42735e0177",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "180e31234329f3e18911f971950ddae25df110554892e4449743955a650cf1e1",
+      "choice": "positive",
+      "justification": "Pizza is enthusiastically praised as amazing and the best."
+    },
+    {
+      "review_id": "7294e5f2-b20c-470d-b1ce-a448c96bf2d2",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "3ebd7029a497bf9cb232d44f1e3beafd36146d5e1e9f9d48a92b92d27cf27984",
+      "choice": "absent",
+      "justification": "The statement addresses the street/location, not staff friendliness."
+    },
+    {
+      "review_id": "b3b3fb0c-e8f1-4bf8-a1ff-67750c4fc964",
+      "theme_key": "presentation",
+      "analysis_text_sha256": "51562454efac4fb6fcb98ea048da0f46745e7579479f0f516ba1a662a0be2ff1",
+      "choice": "positive",
+      "justification": "The review explicitly praises beautiful presentation."
+    },
+    {
+      "review_id": "f7a73b37-041a-408e-a6c0-e05f324d87f8",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "bd444b4b31c2b239516c5b25296e8bf38fd1f7214835409d3b5aa767268c57d9",
+      "choice": "positive",
+      "justification": "Clams are explicitly described as super delicious."
+    },
+    {
+      "review_id": "97a7ea13-48b7-492c-8c4f-bc86a3b2bc33",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "51e9c99413cedfd6f520bb46c28a7f0e17da82d755c2f5740d98776f953b8226",
+      "choice": "positive",
+      "justification": "The staff are specifically described as very nice."
+    },
+    {
+      "review_id": "beb5ecf6-24b1-457c-aace-9ba272040779",
+      "theme_key": "value",
+      "analysis_text_sha256": "ebd9063910f8faea15ac56bfc48c56f6df461fb4faa6ee29c04c1ad490162e47",
+      "choice": "absent",
+      "justification": "Generic praise without a statement about price relative to quality/service."
+    },
+    {
+      "review_id": "81cdac6b-8ef2-400a-b82b-517eb9a13c15",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "b33d2518f57597eb5db9c2164ddc3a1726bf4f3d27bda7db44f10493bb13ef12",
+      "choice": "positive",
+      "justification": "The owner is explicitly described as incredibly friendly."
+    },
+    {
+      "review_id": "80b52bdb-5d4c-4782-ba3a-541f6f466772",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "4029575bc9d2bf4f7d5603f68110315bdfb2a12d2e1206d6e33878b0fc4c5a7c",
+      "choice": "absent",
+      "justification": "The generic phrase 'Very fun' offers no staff behavior evidence."
+    },
+    {
+      "review_id": "ab118b7a-a826-41e1-8b63-7e7d4fa999c5",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "0afa43b0664e4f67f5771d1019b966a3d5fb5101e9eaad9b8cb55193d28f5fd7",
+      "choice": "positive",
+      "justification": "Food is explicitly described as wonderful."
+    },
+    {
+      "review_id": "e4452e5a-2143-48bc-bf9c-661a9684dfb7",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "ba0ae9c88cf9ec896df038f9473f53add38c84559399b7b68c8cd0a4f43e15ed",
+      "choice": "positive",
+      "justification": "The customer calls all food delicious; the coconut drink is not the only food-related evidence."
+    },
+    {
+      "review_id": "3c2c8726-d932-4d80-9093-354aedf4b5bd",
+      "theme_key": "value",
+      "analysis_text_sha256": "2b5949b2929d72c044efc8e579283cefba228fdc314741bc3051f5cf2584d7f9",
+      "choice": "absent",
+      "justification": "General praise of the place lacks value-for-money evidence."
+    },
+    {
+      "review_id": "a502a0f0-e3d1-489c-9ab8-9a5a5b5f625f",
+      "theme_key": "value",
+      "analysis_text_sha256": "90ff26ff04ad6217bf97ff268448f8fd7c7a9ead43e013cfaa7ddeb4a8041819",
+      "choice": "absent",
+      "justification": "Relaxation is praised; no relationship between price and what was received is stated."
+    },
+    {
+      "review_id": "412ec0b3-cb6f-48d6-895f-ff1325f46259",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "3a57b928319d7c81522cb5f1ba79461f17656b9eaf151065e21ab87a6bac4575",
+      "choice": "positive",
+      "justification": "The restaurant review directly calls the food tasty."
+    },
+    {
+      "review_id": "b4a70e86-6909-48f2-84c2-024c3e5be41d",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "885500a08fbc439ccb091233c4712a0d04dd0b247cb58c55176b1875bf6189d1",
+      "choice": "positive",
+      "justification": "Food is explicitly praised as amazing."
+    },
+    {
+      "review_id": "011b619f-7dad-45be-b216-169f2a020fde",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "c6885d9c5aafbd407e436d0c74df707d9c1d830446d75137eb6e559081dd1a3e",
+      "choice": "positive",
+      "justification": "The ambiance is explicitly called great."
+    },
+    {
+      "review_id": "ce7cd621-9bad-4926-893e-e11fa170b0a2",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "98c0e99355b3d0570b61a9a5fa55ef88cd9745eaa4178a2b8c9ac8240f1c3ec4",
+      "choice": "positive",
+      "justification": "Food is explicitly described as great."
+    },
+    {
+      "review_id": "3a3103be-16a0-437d-934a-47d39d2fd681",
+      "theme_key": "value",
+      "analysis_text_sha256": "a0d7ce8c360ce42ca16394929f14c0fcb116bae1a05f6f9c23ae7815f6ae7de7",
+      "choice": "absent",
+      "justification": "Generic 'Good!' does not assess price relative to food or service."
+    },
+    {
+      "review_id": "2590c904-444d-4a56-9094-50521f195ef9",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "8fe530dc7cf4bedcc5a4e499808038d210d4dd012e1ac60608237cfe08db8bc2",
+      "choice": "positive",
+      "justification": "Named food dishes are directly evaluated as 'the best'."
+    },
+    {
+      "review_id": "c120616f-b7e4-4524-961b-5cbe76ad88b9",
+      "theme_key": "value",
+      "analysis_text_sha256": "843ac01149cced785dfebd0028d3b03ba78e286e1c6f9517ebfcdb609d97af4c",
+      "choice": "absent",
+      "justification": "'Ok' alone is too generic to assess value."
+    },
+    {
+      "review_id": "6c0a3024-88cd-40b7-a922-1b0d56cb9047",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "5ebb520a8302472f6405bdfacb54cd68eba8e292e7e1b894276a8205899b160a",
+      "choice": "positive",
+      "justification": "The food is explicitly described as delicious."
+    },
+    {
+      "review_id": "aea46873-3ad5-43b7-b643-955dfdf9a1e6",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "966efff7834c60b2deda4aae2e967601a6a9aadb373e2394f70f9c0ad4bad9cf",
+      "choice": "positive",
+      "justification": "The enthusiastic emoji immediately accompanying 'Pizza' conveys praise of the dish."
+    },
+    {
+      "review_id": "92e55e4f-3f37-492a-8068-e9c1bdaba70a",
+      "theme_key": "decor",
+      "analysis_text_sha256": "da20acf5b6751f24388beb7892c366bee3add92bb8acff222f16e3f7c811d520",
+      "choice": "positive",
+      "justification": "Decorations and interior are explicitly described as beautiful."
+    },
+    {
+      "review_id": "8dec24b1-7947-4316-a37e-e18e58c87c94",
+      "theme_key": "portions",
+      "analysis_text_sha256": "ff1db07d7ee7c2cd33991225584ea9a5915b0c8c2c757fd1988969a1929974d8",
+      "choice": "positive",
+      "justification": "A generous portion of spaghetti is directly praised."
+    },
+    {
+      "review_id": "36adf63c-8229-407b-9481-111883d2a77a",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "5b2cb80463a9df022b9ed081f1e28afdd5bf007bf850ab8a23dedd90c3d6610f",
+      "choice": "positive",
+      "justification": "The customer explicitly states that prices are not expensive."
+    },
+    {
+      "review_id": "d4b0b63f-0de8-42e5-88e4-eefd0a793555",
+      "theme_key": "attentiveness",
+      "analysis_text_sha256": "6ebe007440c97bd96a93730914918dd3d1cd97bd0eb9b3c9952b7f09fd5bbd3c",
+      "choice": "positive",
+      "justification": "The staff are explicitly described as attentive, along with friendly and enthusiastic."
+    },
+    {
+      "review_id": "86621ac9-27a9-456b-9f34-9db6946bc623",
+      "theme_key": "friendly_staff",
+      "analysis_text_sha256": "b75983957e704c395f298e3eaa0350a9fbcb560207dc0eb0d876e9f1db2bd122",
+      "choice": "positive",
+      "justification": "The English text directly calls staff pleasant/friendly and thanks them for the warm welcome; this mixed-language item is excluded from future Luna dispatch."
+    },
+    {
+      "review_id": "3f340081-dc74-4f80-bb63-14424c3f7fbf",
+      "theme_key": "professionalism",
+      "analysis_text_sha256": "f5bfb2972dc590387ec24882a4e9927080cc4fe13e254e108cdd9739ed9c9f03",
+      "choice": "positive",
+      "justification": "Service is directly praised as amazing, a favorable evaluation of service execution under the stored V11/V12 definition."
+    },
+    {
+      "review_id": "490851e2-9340-425d-a299-ef8e0cefd82c",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "ce7988e6c9956cbc6f10f04652a6dce8069f12964e86f649bc325a9439c13728",
+      "choice": "absent",
+      "justification": "Generic 'Good!!!' does not specifically evaluate atmosphere."
+    },
+    {
+      "review_id": "976b776d-7e8b-4a7a-95bb-8ee742d21b34",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "10f902fa9a78b5a8edc529fa2f3a67d4445d0820d1814b81337a559f0655c142",
+      "choice": "positive",
+      "justification": "'Yummy' is a direct positive taste signal in this restaurant-review context."
+    },
+    {
+      "review_id": "3ad4b9ca-ffeb-47f0-98b9-479afe226c9b",
+      "theme_key": "portions",
+      "analysis_text_sha256": "2257fcd8f4340222944b3ea338ef0dd1f7cc20e73430bcc0d7ffc4e1fce44595",
+      "choice": "positive",
+      "justification": "The customer explicitly praises the portion sizes as great."
+    },
+    {
+      "review_id": "fedfbd99-78d5-4faa-9eee-4dca05bbe9a7",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "33bc9b1f23edcc4123a72a056e6d541cc78d571a81955323a570156fd03ac243",
+      "choice": "positive",
+      "justification": "Food is explicitly described as delicious."
+    },
+    {
+      "review_id": "ab617b40-6cbb-44b8-8fb0-ab4b7ccf7388",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "0082a88aad141670e56b929af490f12207bcad2257de8db3377f0f812f0ca4c8",
+      "choice": "positive",
+      "justification": "Pasta and pizza are specifically evaluated as good."
+    },
+    {
+      "review_id": "931c9068-45ab-4759-b150-669dd2b9310f",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "4fee3f2e6a142d439a79e0db9e0c7685de36589ccb245f1b9dd9fbf066bedaa9",
+      "choice": "positive",
+      "justification": "Vietnamese food is explicitly described as delicious."
+    },
+    {
+      "review_id": "5bf0017d-888d-460b-83e0-7bce782d3434",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "c539f71f49994127166d340377e726bb1d1b6d98b4547e9b285559955f1b14ad",
+      "choice": "absent",
+      "justification": "'Very good' and 'best restaurant' are generic venue praise; no food quality is specifically described."
+    }
+  ]
+}
