@@ -19,6 +19,14 @@ import {
   verifyMultiReferences,
 } from "../_shared/luna-multirest.ts";
 import { decisionsHash } from "../_shared/decisions-config.ts";
+import {
+  loadMultiLaunch,
+  multiLaunchView,
+  multiPort,
+  multiRpc,
+} from "../_shared/luna-multirest-store.ts";
+import { processMultirestBatch } from "../_shared/luna-multirest-worker.ts";
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 Deno.serve(multirestHandler(async (r) => {
   const ctx = await requireUser(r);
   await assertMembership(ctx.client, ctx.user.id, MULTI_ORG, [
@@ -92,23 +100,64 @@ Deno.serve(multirestHandler(async (r) => {
         c.review_id === o.review_id
       )!.candidate.theme_key,
     })) as MultiObservation[];
+    const launch = record && seal
+      ? await multiLaunchView(
+        ctx.admin,
+        !!Deno.env.get("OPENAI_API_KEY")?.trim(),
+      )
+      : undefined;
     return {
       record,
       reference_seal: seal,
       blind_export: record
         ? blindMultiExport(record.body, record.body_sha256)
         : null,
-      result: seal && observations.length
+      result: launch?.run?.result ?? (seal && observations.length
         ? scoreMultirest(record!.body, seal.body.items, observations)
-        : null,
-      paid_enabled: false,
-      can_launch: false,
+        : null),
+      paid_enabled: !!launch,
+      can_launch: !!launch?.can_confirm,
+      launch,
       new_paid_calls: 0,
       production_enabled: false,
     };
   }
   return {
     read,
+    prepareLaunch: async (v) => {
+      if (!v.launch || !v.reference_seal) {
+        throw new Error("MULTIREST_REFERENCE_REQUIRED");
+      }
+      await multiRpc(ctx.admin, "luna_multi_save_plan", {
+        p_user: ctx.user.id,
+        p_manifest: v.launch.manifest,
+        p_sha: v.launch.manifest_sha256,
+      });
+      return read();
+    },
+    confirmLaunch: async (v, b) =>
+      await multiRpc(ctx.admin, "luna_multi_confirm", {
+        p_user: ctx.user.id,
+        p_plan: v.launch!.plan_id,
+        p_sha: v.launch!.manifest_sha256,
+        p_cost: v.launch!.manifest.estimated_cost_usd,
+        p_consent: b.consent_version,
+      }) as string,
+    wake: (run) => {
+      EdgeRuntime.waitUntil(
+        loadMultiLaunch(ctx.admin).then((source) =>
+          processMultirestBatch(
+            multiPort(ctx.admin),
+            source,
+            run,
+            Deno.env.get("OPENAI_API_KEY") ?? "",
+            fetch,
+          )
+        ).catch(() =>
+          console.error("MULTIREST_WORKER_STOPPED_NO_RETRY")
+        ),
+      );
+    },
     freeze: async () => {
       const source = await rpc("luna_multirest_source_check") as {
         control: MultiControl;
