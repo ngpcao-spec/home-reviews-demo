@@ -1,0 +1,355 @@
+{
+  "protocol": "luna-native-balanced48-v1",
+  "dataset_sha256": "5f0aeb92cf1d27890d447cd4ed9c6ab2f297773ad9b736912db44593c998caca",
+  "annotation_model": "GPT-6",
+  "reference_type": "GPT6_AI_reference_not_independent_human_Gold",
+  "annotation_source": "ChatGPT in-conversation qualitative labeling of frozen original-language text with review ID and theme only",
+  "evaluation_language": "original_multilingual",
+  "annotated_without_proposed_polarity_per_review": true,
+  "independent_human_validation": false,
+  "caveats": [
+    "GPT-6 AI interpretations, not human Gold; some translated meanings and nuance in Russian/Korean/Japanese may be uncertain.",
+    "The model knew the overall stratified star distribution and theme coverage from earlier conversation, though per-item candidate polarity/rating were excluded from the annotation tool output.",
+    "Original multilingual reviews rather than the English translations used by earlier JEV/Luna experiments; scores must not be compared as equivalent.",
+    "Do not tune the next Luna configuration using these labels before freezing the model configuration.",
+    "Source texts are stored privately in Supabase; this GitHub reference artifact does not publish their bodies."
+  ],
+  "items": [
+    {
+      "review_id": "b69bcebf-5e8b-4cec-98f2-48f7c47cfca7",
+      "theme_key": "attentiveness",
+      "original_text_sha256": "4df08e60c0655a739b8b0e62f94e87fefd867ad1d4342cce1f17170fab27bca3",
+      "choice": "negative",
+      "justification": "Servers are explicitly inattentive, forget orders and leave a promised dish unserved."
+    },
+    {
+      "review_id": "f293cbe0-a6f2-40bf-8303-69d41ac12eca",
+      "theme_key": "food_quality",
+      "original_text_sha256": "3533bec8971f3cf2b0057bb2fc71116e5fae2ac2a196d8cc8d9a6a5610a1e7be",
+      "choice": "negative",
+      "justification": "The tom yum is criticized as scant and watery, undermining the meal's food quality."
+    },
+    {
+      "review_id": "3e2b32a9-21c8-4b0b-ac6a-b2543f30fba7",
+      "theme_key": "professionalism",
+      "original_text_sha256": "220fd867f4dc03ba77884cf8b8065aa1c2ca294f8e13412f188dbd49a8ff8d07",
+      "choice": "negative",
+      "justification": "The review explicitly calls staff attitude and operations very poor."
+    },
+    {
+      "review_id": "5ce1e29e-b444-4208-939b-a6429e78f5a6",
+      "theme_key": "atmosphere",
+      "original_text_sha256": "7d7fc82eba90452e790de2294164d15f7e6f242c70171c254a5c616548ff5642",
+      "choice": "absent",
+      "justification": "The complaint concerns undercooked lamb and a discount dispute, not ambience."
+    },
+    {
+      "review_id": "f16d9da2-e677-400a-a532-d9b614850937",
+      "theme_key": "food_quality",
+      "original_text_sha256": "07b09b744c8f7e937fe173e48b0daf3d97b336552b5ca4a1b7bcf52ca75e2938",
+      "choice": "negative",
+      "justification": "A fish dish is directly criticized for a strongly unpleasant smell."
+    },
+    {
+      "review_id": "829f1931-7bf6-4d5b-9b9c-398652ecdb1f",
+      "theme_key": "price_level",
+      "original_text_sha256": "f2e990252498496d72f9cc9d1d261eec6ea3d61506e47867de6befd542840fda",
+      "choice": "absent",
+      "justification": "Menu prices are stated numerically; no explicit sentiment about the price level is expressed."
+    },
+    {
+      "review_id": "e8ee74ff-396e-473a-96a7-82b1c407f8ec",
+      "theme_key": "food_quality",
+      "original_text_sha256": "9cc830a538cf218e5b62d9648460ad7772a7e4d0deb85847e34908e2660f80c8",
+      "choice": "negative",
+      "justification": "The customer criticizes undercooked steak and off-smelling fried rice."
+    },
+    {
+      "review_id": "8158457b-a4c2-4592-804f-9aedb5928855",
+      "theme_key": "food_quality",
+      "original_text_sha256": "a160502841caa254b336d8c4246d158ac94ad34c44538a148e87229dba71bd91",
+      "choice": "negative",
+      "justification": "Seafood and rice are directly described as completely not tasty."
+    },
+    {
+      "review_id": "242dc3a0-03e0-4611-b27e-c8a1a738e7b0",
+      "theme_key": "price_level",
+      "original_text_sha256": "273c3ee103cc37d055ee5b14193e4fa7c07468944957b7cc4d126932d6f8f544",
+      "choice": "absent",
+      "justification": "The issue is contradictory promotion eligibility and staff conduct, not a direct judgment of price level."
+    },
+    {
+      "review_id": "6db902e5-5c61-4326-9ffb-48facf199b9b",
+      "theme_key": "cleanliness",
+      "original_text_sha256": "5c283a0e7109e4e5865b7bed05c21166fc468e14f610ab14f2f75370422af0ca",
+      "choice": "absent",
+      "justification": "Food is described as hard/odd smelling, but there is no specific cleanliness or hygiene assessment."
+    },
+    {
+      "review_id": "a32da101-c78c-46aa-ae4d-490b16c19bbe",
+      "theme_key": "billing",
+      "original_text_sha256": "21da06fc8205a8996e7ab27fcbe5e90f03ff83d4324419270d2e2966e50f3a93",
+      "choice": "negative",
+      "justification": "The customer challenges payment for ramen with a hair in it after being offered only a small discount."
+    },
+    {
+      "review_id": "a250c126-4cb0-445e-be7e-daacc793cf36",
+      "theme_key": "wait_time",
+      "original_text_sha256": "169c0e188a0b425b841da89213943a5097b9947c0c11192eda17afa6c2d9ad2a",
+      "choice": "negative",
+      "justification": "More than 60 minutes of waiting for service is explicitly reported."
+    },
+    {
+      "review_id": "e24f8375-c840-4857-ba57-52da9529fa19",
+      "theme_key": "friendly_staff",
+      "original_text_sha256": "981e03a7784ceb972abf21329e5227a1deaebbfa23bd9d518a04490ec537404d",
+      "choice": "positive",
+      "justification": "Staff are explicitly praised as friendly and attentive despite criticism of the food."
+    },
+    {
+      "review_id": "dbd64a8f-ee65-4392-9e6a-36d5edc02d74",
+      "theme_key": "freshness",
+      "original_text_sha256": "e5a2fc8ec0b6af69820c8e5bfacbb3b528396936d6965c806dd8e747397c34a9",
+      "choice": "negative",
+      "justification": "Sashimi is criticized as frozen rather than fresh."
+    },
+    {
+      "review_id": "38354629-3969-482d-b608-bb85db6e2642",
+      "theme_key": "comfort",
+      "original_text_sha256": "90a7312aba5b6fdc451d6aa302d08a83c4b79a8fa53e1a3495d8ad2b8c3e9e58",
+      "choice": "negative",
+      "justification": "The menu is explicitly described as too large for the table and physically uncomfortable."
+    },
+    {
+      "review_id": "674894d7-fbbf-464c-83cd-ebd341dc4f1e",
+      "theme_key": "friendly_staff",
+      "original_text_sha256": "8e270ec0dae14062501b5443fa51232bcafa09797004434c1301b8d9834221be",
+      "choice": "positive",
+      "justification": "The reviewer explicitly calls personnel polite despite criticizing the soup."
+    },
+    {
+      "review_id": "b4a9f697-5e1d-46ea-98f4-b5e3e464fbaa",
+      "theme_key": "drinks",
+      "original_text_sha256": "6a82d2770484331bd7a1a5b7d36f0dc715ffd653302461281fa1fc83f31aa91d",
+      "choice": "absent",
+      "justification": "The review discusses salad, rice and symptoms; no drink-quality opinion is expressed, and causation of illness is unverified."
+    },
+    {
+      "review_id": "22a58a21-1851-4bff-a215-dc35bfe6dba0",
+      "theme_key": "value",
+      "original_text_sha256": "8331b2b2a8842883e2bcccf656a3e1ecd9c9c7cd01781d45e4efbdbe2c77ef9e",
+      "choice": "absent",
+      "justification": "The reviewer did not dine and gives no evaluation of value for money."
+    },
+    {
+      "review_id": "46894f52-20c0-40a0-8082-33d64f8de0d9",
+      "theme_key": "food_quality",
+      "original_text_sha256": "1b21b6464f0ad27302b419ba977efd66dc658a00baffbd9cc97cefecc13c584c",
+      "choice": "uncertain",
+      "justification": "Freshness is praised but taste called ordinary; it is unclear whether this should count as explicit negative food quality."
+    },
+    {
+      "review_id": "fc2b4bcb-3493-486b-903b-2b468f205308",
+      "theme_key": "communication",
+      "original_text_sha256": "0c27e250591bd4b7287aa1939e6b5abd2dbef7e9a2f249e71c71b77d19913f1c",
+      "choice": "positive",
+      "justification": "The reviewer explicitly states that communication with the Korean-speaking order taker was trouble-free."
+    },
+    {
+      "review_id": "5817d707-b33d-4d80-bdb5-3c8506cbae4e",
+      "theme_key": "freshness",
+      "original_text_sha256": "ad3bdb895be33cac4be79337d67e043e4ef442454133a7c5634f0be78cbda473",
+      "choice": "absent",
+      "justification": "Food taste and low oil are discussed, but its freshness is not explicitly evaluated."
+    },
+    {
+      "review_id": "9cfcca1e-9a2d-4bf2-ba36-9175418b4ed2",
+      "theme_key": "atmosphere",
+      "original_text_sha256": "c38b4a769794338cbda873587b61f86864c96f8b179876e68b6b09686ddc15dd",
+      "choice": "positive",
+      "justification": "The restaurant interior is explicitly praised for its pleasant atmosphere."
+    },
+    {
+      "review_id": "1ca6c5ff-86e6-4cc4-ab84-8a99056a98ee",
+      "theme_key": "price_level",
+      "original_text_sha256": "152700348167c1700304cd9cca2f2717fcfbf10dacea2fd4e4442c88cb44fcf9",
+      "choice": "absent",
+      "justification": "The entry charge and its deduction from dining cost are described factually without calling prices high or low."
+    },
+    {
+      "review_id": "b688f01c-2708-4e87-b576-d896674721d0",
+      "theme_key": "presentation",
+      "original_text_sha256": "cb08515c717fdb1dcd2a0cafd9ebf2b8138e4bfa510d04cf74fa4e60b5cd180c",
+      "choice": "positive",
+      "justification": "Presentation of the mango smoothie is explicitly praised even while its flavor is criticized."
+    },
+    {
+      "review_id": "394fbfc2-28d3-489a-a42b-565905e96663",
+      "theme_key": "food_quality",
+      "original_text_sha256": "611640e34da467d2107cd01dac3268757b25a6148389000073eec2a0bfdca93f",
+      "choice": "both",
+      "justification": "One dish is rated three out of five while fried rice is rated five out of five, expressing contrasting food-quality evaluations."
+    },
+    {
+      "review_id": "f4757550-7ba3-4f03-b2c5-3138f604061a",
+      "theme_key": "attentiveness",
+      "original_text_sha256": "9413c09eae8a61d124f05cfccd67a604a9dd0c179d780bd861c95f7bd48995d5",
+      "choice": "positive",
+      "justification": "Staff are explicitly described as checking on and caring for guests promptly and thoughtfully."
+    },
+    {
+      "review_id": "f5b85b13-a1b5-40c4-b552-db6448ab80ae",
+      "theme_key": "order_accuracy",
+      "original_text_sha256": "169704fad43c4fb819a752801f71850e25226433920fec3f71c8a46b991abd0d",
+      "choice": "absent",
+      "justification": "Several dishes and a dog leaving are mentioned, with no incorrect-order allegation."
+    },
+    {
+      "review_id": "f90604b0-62bc-48b8-a2fe-edc062ef101d",
+      "theme_key": "price_level",
+      "original_text_sha256": "73064b88cf92f339793379bba368d830d003f2bd00a77e565e6f863b15f56031",
+      "choice": "negative",
+      "justification": "The review explicitly calls the prices rather expensive for Vietnam."
+    },
+    {
+      "review_id": "14d0dbc7-04cc-449a-829f-f06a6c1ab894",
+      "theme_key": "professionalism",
+      "original_text_sha256": "0fcf5e9ec3582f57642e1da1c3a1541a21a43d4698b91a3ce6dc1307dfb0e4f2",
+      "choice": "positive",
+      "justification": "The reviewer praises the staff's enthusiastic and cheerful service execution."
+    },
+    {
+      "review_id": "315958fe-ed28-4e7f-8cf3-f6247d3ff8cb",
+      "theme_key": "food_quality",
+      "original_text_sha256": "9dc65995490e49c2b2a51b27706262bcc8d6464bfef87aae1e555051f32c17e3",
+      "choice": "positive",
+      "justification": "The reviewer explicitly says the meal was delicious and satisfying."
+    },
+    {
+      "review_id": "cbff8c17-1e3b-4163-81a0-8984503c5bcb",
+      "theme_key": "friendly_staff",
+      "original_text_sha256": "59749a65394c48430c1764ce2f2be98612a62120345390f4995ae5deb712654f",
+      "choice": "positive",
+      "justification": "The waiter is specifically described as welcoming and kind."
+    },
+    {
+      "review_id": "615d1013-82ab-4d57-a2c4-14bca3be23fa",
+      "theme_key": "decor",
+      "original_text_sha256": "5a3eece085ebaee15378a9b997dd7ae58b03c26c79136273f34ae97e178a1cf4",
+      "choice": "absent",
+      "justification": "Indoor smoking is criticized, but no decorative or interior aesthetic assessment is stated."
+    },
+    {
+      "review_id": "0e004725-889d-47d6-b0aa-27f8993b0fb3",
+      "theme_key": "price_level",
+      "original_text_sha256": "81c333187c0d05822b12e06992aab4e768b707d08e6c8e5b0e2c5486faf27015",
+      "choice": "negative",
+      "justification": "Prices are explicitly said to be relatively high compared with nearby establishments."
+    },
+    {
+      "review_id": "f6ecd914-2903-453d-9b4e-21a8eeca0da1",
+      "theme_key": "portions",
+      "original_text_sha256": "b5a2a1644b680532fc37d75ddb63f46f8203c3d97653d34176b83e60cb4da4b9",
+      "choice": "positive",
+      "justification": "Portions are explicitly described as generous and large."
+    },
+    {
+      "review_id": "26f02c74-ab95-4c70-afa2-c67a1ded8edc",
+      "theme_key": "food_quality",
+      "original_text_sha256": "d2475bb5e4d09728d4730b25730c243658bff096e17e6c4de0945b916942433f",
+      "choice": "positive",
+      "justification": "Pizza and crab pasta are directly praised as delicious."
+    },
+    {
+      "review_id": "c88eb2a8-edd9-4e35-a2c7-86be2c4e24db",
+      "theme_key": "location",
+      "original_text_sha256": "4b5d7f43a4dad69a34849c5883886d68003ad6b91bf7ca5aac4b7dc981640270",
+      "choice": "absent",
+      "justification": "Visiting on arrival and commenting on music/menu does not evaluate location or access."
+    },
+    {
+      "review_id": "c7ff8718-c564-4f97-92d5-4161f572abd4",
+      "theme_key": "temperature",
+      "original_text_sha256": "5b92dc591758c90cbc88ccf48585fe16872102eb9d54cea2d2c4b4b9977f0729",
+      "choice": "absent",
+      "justification": "Hotpot is a dish name and a cool air-conditioned room is about comfort, not explicit serving-temperature quality."
+    },
+    {
+      "review_id": "3fa5d6d5-d44b-446f-9a26-fc097ce38c4c",
+      "theme_key": "food_quality",
+      "original_text_sha256": "e40501f35b38da7635bb4c72dd02ba8c78c09e669e72a5072a44ae1a1f90e3d4",
+      "choice": "positive",
+      "justification": "The reviewer says the food was very tasty."
+    },
+    {
+      "review_id": "df2eb671-57b7-4e62-b7e5-c5b3ced88ead",
+      "theme_key": "food_quality",
+      "original_text_sha256": "b9d00197ccb614155c874306c0b643ff15282a86bd60f4e481bac78c41bdae53",
+      "choice": "positive",
+      "justification": "The reviewer directly states that the food was very tasty and filling."
+    },
+    {
+      "review_id": "c84761cb-06a7-49aa-a04a-b8636b996522",
+      "theme_key": "location",
+      "original_text_sha256": "dbe6ac10c9a94c6d7042d422984cc5666b9b286504dc99ac76f84d79e79c5fe5",
+      "choice": "positive",
+      "justification": "The restaurant's seaside location is explicitly praised as beautiful for enjoying the view."
+    },
+    {
+      "review_id": "5ab6be5d-77f4-4741-8378-696f6e450adf",
+      "theme_key": "communication",
+      "original_text_sha256": "6342184c1cf94018bb7132a20cb3831f512170b5046dc19fb2ed49e6d4f1ba2c",
+      "choice": "absent",
+      "justification": "Cleanliness and seafood freshness are mentioned, but no exchange of information is evaluated."
+    },
+    {
+      "review_id": "529ed130-139f-4b50-beeb-f2ec8b7aee57",
+      "theme_key": "friendly_staff",
+      "original_text_sha256": "2c03dda9c7de9d90c4f31219f53b721b4708a0af43c5a8781336ef9887217f02",
+      "choice": "positive",
+      "justification": "Personnel are expressly described as welcoming."
+    },
+    {
+      "review_id": "e31cb00d-1689-4466-be85-016e319f603b",
+      "theme_key": "wait_time",
+      "original_text_sha256": "16ea0d2319cce46baa65e53d63bfb5e3f80f590a1525c843fc7f3c8f3078236f",
+      "choice": "positive",
+      "justification": "Even when busy, guests are explicitly said not to wait long."
+    },
+    {
+      "review_id": "82de1ed0-2f11-4233-8a1f-d4449267f262",
+      "theme_key": "friendly_staff",
+      "original_text_sha256": "2dc8fd39050bf213ed2693ae34590cdf92af515fa31fac1894cc24ebc9dcc0ab",
+      "choice": "positive",
+      "justification": "Staff and owner are directly described as very friendly."
+    },
+    {
+      "review_id": "c1fd7444-f82d-48e5-b92f-6cd7d542cafb",
+      "theme_key": "billing",
+      "original_text_sha256": "f92183d763a8fe5cc2dae2b23a3771c0aa4775f454487f9140272204ea6ed587",
+      "choice": "absent",
+      "justification": "Only freshness and taste are praised; billing is not mentioned."
+    },
+    {
+      "review_id": "2e6d61c2-4edc-4b14-9cb0-4e5f99c91425",
+      "theme_key": "noise",
+      "original_text_sha256": "f39c9f6a08b9a71129034a32a43c2a970a95a3bfc1c3c1120a6856b8fde45865",
+      "choice": "absent",
+      "justification": "Festive joy and children's activities concern mood, not an explicit assessment of noise level."
+    },
+    {
+      "review_id": "fd6ff2f9-d2d8-4fc0-b491-4ca32966004a",
+      "theme_key": "value",
+      "original_text_sha256": "254fc364784261f2e08012bbd206bd3b95e99b67b7d73ab7556fe90a88351c18",
+      "choice": "positive",
+      "justification": "Good prices are praised alongside tasty food, explicitly supporting favorable value for money."
+    },
+    {
+      "review_id": "6ab517f4-95ef-4f0a-9cd8-75fd8ac483dc",
+      "theme_key": "cleanliness",
+      "original_text_sha256": "4fb72ba18746b616f5c8b924bd56d45713047956b49fee83dfa3c270681a4089",
+      "choice": "absent",
+      "justification": "Service, food and affordable prices are praised, but hygiene or cleanliness is not discussed."
+    }
+  ]
+}
