@@ -543,3 +543,9 @@ verify_jwt = false
 
 [functions.decisions-experiment]
 verify_jwt = false
+
+[functions.decisions-evidence40]
+verify_jwt = false
+
+[functions.process-decisions-evidence40]
+verify_jwt = false
