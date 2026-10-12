@@ -1,0 +1,771 @@
+{
+  "schema_version": "luna-original-multilingual-balanced-v1",
+  "organization_id": "93228bbb-6397-41e3-b8be-21ee7060eda7",
+  "selection_seed": "LUNA_BALANCED_48_20261012",
+  "source": "original_review_text_frozen_from_supabase",
+  "candidate_lexicon": {
+    "quality": [
+      [
+        "temperature",
+        "cold|hot|холодн|остыв|горяч|nguội|lạnh|nóng|차갑|뜨겁|冷た"
+      ],
+      [
+        "portions",
+        "portion|serving size|порц|suất|khẩu phần|phần ăn|양이|分量"
+      ],
+      [
+        "freshness",
+        "fresh|stale|свеж|несвеж|tươi|ươn|신선|新鮮"
+      ],
+      [
+        "presentation",
+        "presentat|plating|подач|красиво оформ|trình bày|플레이팅|盛り付け"
+      ],
+      [
+        "drinks",
+        "coffee|drink|juice|tea|кофе|напит|чай|cà phê|đồ uống|nước|커피|음료|飲み物"
+      ],
+      [
+        "cooking",
+        "overcook|undercook|burnt|raw meat|пережар|подгор|cháy|sống|chín|덜 익|生焼"
+      ],
+      [
+        "food_quality",
+        "food|dish|meal|pizza|taste|tasty|delicious|еды|еда|блюд|вкус|пицц|кухн|ngon|món|thức ăn|đồ ăn|음식|맛|요리|料理|美味|好吃|菜品"
+      ]
+    ],
+    "service": [
+      [
+        "wait_time",
+        "wait|slow|late|ждал|ждать|долго|медлен|chờ|đợi|lâu|chậm|기다리|늦게|느리|待た|遅い"
+      ],
+      [
+        "attentiveness",
+        "attent|ignored|не замеч|невнимател|chu đáo|tận tình|lơ|배려|무시|気遣"
+      ],
+      [
+        "communication",
+        "language|understand|english|russian language|язык|непонят|говорить|ngoại ngữ|tiếng anh|언어|英語"
+      ],
+      [
+        "order_accuracy",
+        "wrong order|ordered.*got|not what|не то блюд|перепутал|sai món|nhầm món|잘못 나온|注文間違"
+      ],
+      [
+        "professionalism",
+        "unprofession|rude|impolite|terrible service|обслуживан|непроф|хам|thái độ|phục vụ|불친절|서비스|態度"
+      ],
+      [
+        "friendly_staff",
+        "friendly|polite|nice staff|приветлив|вежлив|дружелюбн|thân thiện|dễ thương|친절|상냥|礼儀"
+      ]
+    ],
+    "price": [
+      [
+        "billing",
+        "bill|charged|invoice|receipt|tax|service charge|счет|счёт|платеж|hóa đơn|phụ thu|계산서|영수증|청구"
+      ],
+      [
+        "value",
+        "worth it|worth the|value for money|overpriced for|не стоит|стоит своих|đáng tiền|không đáng|가성비|お得"
+      ],
+      [
+        "price_level",
+        "price|prices|expensive|cheap|cost|дорого|цена|стоимос|дешев|giá|đắt|rẻ|비싸|가격|저렴|値段|高い|安い|价格|贵"
+      ]
+    ],
+    "atmosphere": [
+      [
+        "cleanliness",
+        "dirty|filthy|clean|mold|hygien|гряз|чист|плесен|bẩn|sạch|vệ sinh|더럽|깨끗|不洁|汚|卫生"
+      ],
+      [
+        "decor",
+        "decor|interior|design|интерьер|декор|trang trí|nội thất|인테리어|装飾"
+      ],
+      [
+        "location",
+        "location|distance|far from|далеко|местополож|cách xa|vị trí|멀리|위치|場所"
+      ],
+      [
+        "noise",
+        "noise|loud|music|шум|громк|ồn|nhạc to|시끄럽|音量"
+      ],
+      [
+        "comfort",
+        "uncomfortable|hot inside|cold inside|неудобн|комфорт|thoải mái|nóng bức|편안|불편"
+      ],
+      [
+        "atmosphere",
+        "atmosphere|ambien|vibe|атмосфер|уют|không gian|분위기|雰囲気|环境"
+      ]
+    ]
+  },
+  "candidate_negative_regex": "bad|awful|terrible|poor|disappoint|not good|horrible|overpriced|dry|bland|never again|не вкус|невкус|ужас|плохо|отврат|недовольн|разочар|плох|поздно|дорого|không ngon|tệ|dở|kém|thất vọng|chậm|đắt|맛없|별로|최악|실망|비싸|不味|ひど|不好",
+  "candidate_positive_regex": "good|great|excellent|wonderful|amazing|love|delicious|tasty|beautiful|friendly|kind|nice|хорош|отлич|прекрас|вкусн|нрав|вежлив|ngon|tốt|tuyệt|đẹp|thân thiện|맛있|좋|친절|최고|素晴|美味|很好",
+  "star_quota": {
+    "1": 9,
+    "2": 6,
+    "3": 5,
+    "4": 12,
+    "5": 16
+  },
+  "axis_quota_by_star_bucket": {
+    "low": {
+      "quality": 7,
+      "service": 6,
+      "price": 4,
+      "atmosphere": 3
+    },
+    "four": {
+      "quality": 4,
+      "service": 4,
+      "price": 2,
+      "atmosphere": 2
+    },
+    "five": {
+      "quality": 5,
+      "service": 4,
+      "price": 3,
+      "atmosphere": 4
+    }
+  },
+  "per_establishment_max": 6,
+  "selection_policy": "Within rating and establishment, sort by salted md5 review id; round-robin establishments with fewest selected; exclude Artisan and reviews overlapping prior JEV cache, benchmarks, labels and Luna sets; choose candidate axis/theme using regex anchor and quota, fallback to seeded boundary probe; polarity uses only text lexicon and hash, never star rating.",
+  "paid_enabled": false,
+  "production_enabled": false,
+  "reference_status": "unannotated",
+  "translation": "no_translation_created_native_source_text",
+  "warnings": [
+    "Multilingual original-language test, NOT directly comparable with previous English-only Luna studies.",
+    "Sample deliberately enriched for low-star opinions, not a representative estimate of all Google reviews.",
+    "Candidate themes and polarities are deterministic proposals, not JEV classifications.",
+    "All provider calls remain disabled until a future explicit manual confirmation."
+  ],
+  "items": [
+    {
+      "position": 1,
+      "review_id": "b69bcebf-5e8b-4cec-98f2-48f7c47cfca7",
+      "establishment_id": "69b6e810-97c0-4a6d-95e5-0647a321c6aa",
+      "rating": 1,
+      "original_language": "fr",
+      "original_text_sha256": "4df08e60c0655a739b8b0e62f94e87fefd867ad1d4342cce1f17170fab27bca3",
+      "theme_key": "attentiveness",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "0155b1c63bdb55922c9e0ca87a9bfd59"
+    },
+    {
+      "position": 2,
+      "review_id": "f293cbe0-a6f2-40bf-8303-69d41ac12eca",
+      "establishment_id": "71011991-5962-466c-8eff-1eac9b6bd6a6",
+      "rating": 1,
+      "original_language": "ru",
+      "original_text_sha256": "3533bec8971f3cf2b0057bb2fc71116e5fae2ac2a196d8cc8d9a6a5610a1e7be",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "7b0ffc51d78d025cf23a22f966877f97"
+    },
+    {
+      "position": 3,
+      "review_id": "3e2b32a9-21c8-4b0b-ac6a-b2543f30fba7",
+      "establishment_id": "7d06473f-a079-464d-b392-f258efb65a34",
+      "rating": 1,
+      "original_language": "vi",
+      "original_text_sha256": "220fd867f4dc03ba77884cf8b8065aa1c2ca294f8e13412f188dbd49a8ff8d07",
+      "theme_key": "professionalism",
+      "proposed_polarity": "negative",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "189eca905f6941c7347286181686070f"
+    },
+    {
+      "position": 4,
+      "review_id": "5ce1e29e-b444-4208-939b-a6429e78f5a6",
+      "establishment_id": "a13ecf32-030b-4eb2-a577-3ac9e9f2073d",
+      "rating": 1,
+      "original_language": "ru",
+      "original_text_sha256": "7d7fc82eba90452e790de2294164d15f7e6f242c70171c254a5c616548ff5642",
+      "theme_key": "atmosphere",
+      "proposed_polarity": "negative",
+      "axis": "atmosphere",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "7df1e12ae1eade8c84c808d66b5d8086"
+    },
+    {
+      "position": 5,
+      "review_id": "f16d9da2-e677-400a-a532-d9b614850937",
+      "establishment_id": "ad179c3a-a115-40e0-ac60-0df0c1f3c8b0",
+      "rating": 1,
+      "original_language": "ru",
+      "original_text_sha256": "07b09b744c8f7e937fe173e48b0daf3d97b336552b5ca4a1b7bcf52ca75e2938",
+      "theme_key": "food_quality",
+      "proposed_polarity": "negative",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "7e5a232969be5959a7fc7ffa0aa1ab34"
+    },
+    {
+      "position": 6,
+      "review_id": "829f1931-7bf6-4d5b-9b9c-398652ecdb1f",
+      "establishment_id": "b2dd8af9-3990-41ac-af62-7c4ffbc2543b",
+      "rating": 1,
+      "original_language": "ja",
+      "original_text_sha256": "f2e990252498496d72f9cc9d1d261eec6ea3d61506e47867de6befd542840fda",
+      "theme_key": "price_level",
+      "proposed_polarity": "positive",
+      "axis": "price",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "c0cbd5d1ced1e1f79f30d354252431be"
+    },
+    {
+      "position": 7,
+      "review_id": "e8ee74ff-396e-473a-96a7-82b1c407f8ec",
+      "establishment_id": "bfc486b8-4cc7-4cd5-ab59-1a118c61aced",
+      "rating": 1,
+      "original_language": "ko",
+      "original_text_sha256": "9cc830a538cf218e5b62d9648460ad7772a7e4d0deb85847e34908e2660f80c8",
+      "theme_key": "food_quality",
+      "proposed_polarity": "negative",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "09e9709ad8f58aaef7b07cba301aac53"
+    },
+    {
+      "position": 8,
+      "review_id": "8158457b-a4c2-4592-804f-9aedb5928855",
+      "establishment_id": "c815b57b-ec87-43c8-8e69-47c7c746facd",
+      "rating": 1,
+      "original_language": "ru",
+      "original_text_sha256": "a160502841caa254b336d8c4246d158ac94ad34c44538a148e87229dba71bd91",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "92d31029312dfd50683da4039bfeb5aa"
+    },
+    {
+      "position": 9,
+      "review_id": "242dc3a0-03e0-4611-b27e-c8a1a738e7b0",
+      "establishment_id": "c9b6e047-691a-43ed-95d5-482f9cb2e594",
+      "rating": 1,
+      "original_language": "vi",
+      "original_text_sha256": "273c3ee103cc37d055ee5b14193e4fa7c07468944957b7cc4d126932d6f8f544",
+      "theme_key": "price_level",
+      "proposed_polarity": "negative",
+      "axis": "price",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "b12acc5b9b6960fa5c1b73f069b6a9c2"
+    },
+    {
+      "position": 10,
+      "review_id": "6db902e5-5c61-4326-9ffb-48facf199b9b",
+      "establishment_id": "d40d3438-79d8-4c28-8b09-eba640598201",
+      "rating": 2,
+      "original_language": "ko",
+      "original_text_sha256": "5c283a0e7109e4e5865b7bed05c21166fc468e14f610ab14f2f75370422af0ca",
+      "theme_key": "cleanliness",
+      "proposed_polarity": "negative",
+      "axis": "atmosphere",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "2880cc52d03c8f70c946bd7cf7eadef4"
+    },
+    {
+      "position": 11,
+      "review_id": "a32da101-c78c-46aa-ae4d-490b16c19bbe",
+      "establishment_id": "d57ed022-5924-41f2-a53f-685eb4de4d50",
+      "rating": 2,
+      "original_language": "ru",
+      "original_text_sha256": "21da06fc8205a8996e7ab27fcbe5e90f03ff83d4324419270d2e2966e50f3a93",
+      "theme_key": "billing",
+      "proposed_polarity": "positive",
+      "axis": "price",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "acbd9cb747cb4c981ae11195338f12dd"
+    },
+    {
+      "position": 12,
+      "review_id": "a250c126-4cb0-445e-be7e-daacc793cf36",
+      "establishment_id": "69b6e810-97c0-4a6d-95e5-0647a321c6aa",
+      "rating": 2,
+      "original_language": "vi",
+      "original_text_sha256": "169c0e188a0b425b841da89213943a5097b9947c0c11192eda17afa6c2d9ad2a",
+      "theme_key": "wait_time",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "b466dd4d03d1f62228948874715917b0"
+    },
+    {
+      "position": 13,
+      "review_id": "e24f8375-c840-4857-ba57-52da9529fa19",
+      "establishment_id": "7d06473f-a079-464d-b392-f258efb65a34",
+      "rating": 2,
+      "original_language": "vi",
+      "original_text_sha256": "981e03a7784ceb972abf21329e5227a1deaebbfa23bd9d518a04490ec537404d",
+      "theme_key": "friendly_staff",
+      "proposed_polarity": "negative",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "01793ad5b490673a1883054b7bd7e864"
+    },
+    {
+      "position": 14,
+      "review_id": "dbd64a8f-ee65-4392-9e6a-36d5edc02d74",
+      "establishment_id": "a13ecf32-030b-4eb2-a577-3ac9e9f2073d",
+      "rating": 2,
+      "original_language": "ru",
+      "original_text_sha256": "e5a2fc8ec0b6af69820c8e5bfacbb3b528396936d6965c806dd8e747397c34a9",
+      "theme_key": "freshness",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "b14aefb69c73c746e21604b4f872f1d3"
+    },
+    {
+      "position": 15,
+      "review_id": "38354629-3969-482d-b608-bb85db6e2642",
+      "establishment_id": "b2dd8af9-3990-41ac-af62-7c4ffbc2543b",
+      "rating": 2,
+      "original_language": "en",
+      "original_text_sha256": "90a7312aba5b6fdc451d6aa302d08a83c4b79a8fa53e1a3495d8ad2b8c3e9e58",
+      "theme_key": "comfort",
+      "proposed_polarity": "positive",
+      "axis": "atmosphere",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "c006b1d9741da948f0ba4bcd7909d075"
+    },
+    {
+      "position": 16,
+      "review_id": "674894d7-fbbf-464c-83cd-ebd341dc4f1e",
+      "establishment_id": "71011991-5962-466c-8eff-1eac9b6bd6a6",
+      "rating": 3,
+      "original_language": "ru",
+      "original_text_sha256": "8e270ec0dae14062501b5443fa51232bcafa09797004434c1301b8d9834221be",
+      "theme_key": "friendly_staff",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "458b08cbc4945dcbab86cd3c2ed16cfb"
+    },
+    {
+      "position": 17,
+      "review_id": "b4a9f697-5e1d-46ea-98f4-b5e3e464fbaa",
+      "establishment_id": "ad179c3a-a115-40e0-ac60-0df0c1f3c8b0",
+      "rating": 3,
+      "original_language": "ru",
+      "original_text_sha256": "6a82d2770484331bd7a1a5b7d36f0dc715ffd653302461281fa1fc83f31aa91d",
+      "theme_key": "drinks",
+      "proposed_polarity": "negative",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "04c92cb343a464849f623f9182337536"
+    },
+    {
+      "position": 18,
+      "review_id": "22a58a21-1851-4bff-a215-dc35bfe6dba0",
+      "establishment_id": "bfc486b8-4cc7-4cd5-ab59-1a118c61aced",
+      "rating": 3,
+      "original_language": "ru",
+      "original_text_sha256": "8331b2b2a8842883e2bcccf656a3e1ecd9c9c7cd01781d45e4efbdbe2c77ef9e",
+      "theme_key": "value",
+      "proposed_polarity": "positive",
+      "axis": "price",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "3461d16c6d8e34f7e6ab64af3ff24102"
+    },
+    {
+      "position": 19,
+      "review_id": "46894f52-20c0-40a0-8082-33d64f8de0d9",
+      "establishment_id": "c815b57b-ec87-43c8-8e69-47c7c746facd",
+      "rating": 3,
+      "original_language": "ko",
+      "original_text_sha256": "1b21b6464f0ad27302b419ba977efd66dc658a00baffbd9cc97cefecc13c584c",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "067cc10c7f193a1a5025b40434e802c0"
+    },
+    {
+      "position": 20,
+      "review_id": "fc2b4bcb-3493-486b-903b-2b468f205308",
+      "establishment_id": "d40d3438-79d8-4c28-8b09-eba640598201",
+      "rating": 3,
+      "original_language": "ko",
+      "original_text_sha256": "0c27e250591bd4b7287aa1939e6b5abd2dbef7e9a2f249e71c71b77d19913f1c",
+      "theme_key": "communication",
+      "proposed_polarity": "negative",
+      "axis": "service",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "5f26a8e21ccc1c9c81956ff745730641"
+    },
+    {
+      "position": 21,
+      "review_id": "5817d707-b33d-4d80-bdb5-3c8506cbae4e",
+      "establishment_id": "1323a892-ce26-4111-9b48-aace079e8154",
+      "rating": 4,
+      "original_language": "vi",
+      "original_text_sha256": "ad3bdb895be33cac4be79337d67e043e4ef442454133a7c5634f0be78cbda473",
+      "theme_key": "freshness",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "2f2c04d2d441659294ef0a964ba5d5b6"
+    },
+    {
+      "position": 22,
+      "review_id": "9cfcca1e-9a2d-4bf2-ba36-9175418b4ed2",
+      "establishment_id": "1323a892-ce26-4111-9b48-aace079e8154",
+      "rating": 4,
+      "original_language": "ru",
+      "original_text_sha256": "c38b4a769794338cbda873587b61f86864c96f8b179876e68b6b09686ddc15dd",
+      "theme_key": "atmosphere",
+      "proposed_polarity": "negative",
+      "axis": "atmosphere",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "30106df8cc60f4828817992f4dc1ba0e"
+    },
+    {
+      "position": 23,
+      "review_id": "1ca6c5ff-86e6-4cc4-ab84-8a99056a98ee",
+      "establishment_id": "c9b6e047-691a-43ed-95d5-482f9cb2e594",
+      "rating": 4,
+      "original_language": "ko",
+      "original_text_sha256": "152700348167c1700304cd9cca2f2717fcfbf10dacea2fd4e4442c88cb44fcf9",
+      "theme_key": "price_level",
+      "proposed_polarity": "positive",
+      "axis": "price",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "f832ef038c1b018b0e18fe056683cf7d"
+    },
+    {
+      "position": 24,
+      "review_id": "b688f01c-2708-4e87-b576-d896674721d0",
+      "establishment_id": "1323a892-ce26-4111-9b48-aace079e8154",
+      "rating": 4,
+      "original_language": "ru",
+      "original_text_sha256": "cb08515c717fdb1dcd2a0cafd9ebf2b8138e4bfa510d04cf74fa4e60b5cd180c",
+      "theme_key": "presentation",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "35b59f793a604949e119920f2aed93ee"
+    },
+    {
+      "position": 25,
+      "review_id": "394fbfc2-28d3-489a-a42b-565905e96663",
+      "establishment_id": "69b6e810-97c0-4a6d-95e5-0647a321c6aa",
+      "rating": 4,
+      "original_language": "ko",
+      "original_text_sha256": "611640e34da467d2107cd01dac3268757b25a6148389000073eec2a0bfdca93f",
+      "theme_key": "food_quality",
+      "proposed_polarity": "negative",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "328985ce1356ff69d7d6198b08b15d7b"
+    },
+    {
+      "position": 26,
+      "review_id": "f4757550-7ba3-4f03-b2c5-3138f604061a",
+      "establishment_id": "7d06473f-a079-464d-b392-f258efb65a34",
+      "rating": 4,
+      "original_language": "vi",
+      "original_text_sha256": "9413c09eae8a61d124f05cfccd67a604a9dd0c179d780bd861c95f7bd48995d5",
+      "theme_key": "attentiveness",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "32a86eedcff6fbf6d17d3df43a71dd75"
+    },
+    {
+      "position": 27,
+      "review_id": "f5b85b13-a1b5-40c4-b552-db6448ab80ae",
+      "establishment_id": "a13ecf32-030b-4eb2-a577-3ac9e9f2073d",
+      "rating": 4,
+      "original_language": "ko",
+      "original_text_sha256": "169704fad43c4fb819a752801f71850e25226433920fec3f71c8a46b991abd0d",
+      "theme_key": "order_accuracy",
+      "proposed_polarity": "negative",
+      "axis": "service",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "0f25baa7b79659bdf859e1b0837b4611"
+    },
+    {
+      "position": 28,
+      "review_id": "f90604b0-62bc-48b8-a2fe-edc062ef101d",
+      "establishment_id": "ad179c3a-a115-40e0-ac60-0df0c1f3c8b0",
+      "rating": 4,
+      "original_language": "ru",
+      "original_text_sha256": "73064b88cf92f339793379bba368d830d003f2bd00a77e565e6f863b15f56031",
+      "theme_key": "price_level",
+      "proposed_polarity": "negative",
+      "axis": "price",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "118a20563d3837c62a8835e1d38e20f8"
+    },
+    {
+      "position": 29,
+      "review_id": "14d0dbc7-04cc-449a-829f-f06a6c1ab894",
+      "establishment_id": "c9b6e047-691a-43ed-95d5-482f9cb2e594",
+      "rating": 4,
+      "original_language": "vi",
+      "original_text_sha256": "0fcf5e9ec3582f57642e1da1c3a1541a21a43d4698b91a3ce6dc1307dfb0e4f2",
+      "theme_key": "professionalism",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "fc256f77f56f30098657b1cc689c3289"
+    },
+    {
+      "position": 30,
+      "review_id": "315958fe-ed28-4e7f-8cf3-f6247d3ff8cb",
+      "establishment_id": "d40d3438-79d8-4c28-8b09-eba640598201",
+      "rating": 4,
+      "original_language": "ko",
+      "original_text_sha256": "9dc65995490e49c2b2a51b27706262bcc8d6464bfef87aae1e555051f32c17e3",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "124a5683af0f2776ec8f7fbf35fb8fa2"
+    },
+    {
+      "position": 31,
+      "review_id": "cbff8c17-1e3b-4163-81a0-8984503c5bcb",
+      "establishment_id": "1323a892-ce26-4111-9b48-aace079e8154",
+      "rating": 4,
+      "original_language": "ru",
+      "original_text_sha256": "59749a65394c48430c1764ce2f2be98612a62120345390f4995ae5deb712654f",
+      "theme_key": "friendly_staff",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "48e8b95199972f7991a55d152582a38c"
+    },
+    {
+      "position": 32,
+      "review_id": "615d1013-82ab-4d57-a2c4-14bca3be23fa",
+      "establishment_id": "69b6e810-97c0-4a6d-95e5-0647a321c6aa",
+      "rating": 4,
+      "original_language": "vi",
+      "original_text_sha256": "5a3eece085ebaee15378a9b997dd7ae58b03c26c79136273f34ae97e178a1cf4",
+      "theme_key": "decor",
+      "proposed_polarity": "negative",
+      "axis": "atmosphere",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "3c7e7742248ce2ba546aae0bd7a51adf"
+    },
+    {
+      "position": 33,
+      "review_id": "0e004725-889d-47d6-b0aa-27f8993b0fb3",
+      "establishment_id": "d57ed022-5924-41f2-a53f-685eb4de4d50",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "81c333187c0d05822b12e06992aab4e768b707d08e6c8e5b0e2c5486faf27015",
+      "theme_key": "price_level",
+      "proposed_polarity": "negative",
+      "axis": "price",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "0428dc1275e8a790e7c3b7b132f3ae48"
+    },
+    {
+      "position": 34,
+      "review_id": "f6ecd914-2903-453d-9b4e-21a8eeca0da1",
+      "establishment_id": "71011991-5962-466c-8eff-1eac9b6bd6a6",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "b5a2a1644b680532fc37d75ddb63f46f8203c3d97653d34176b83e60cb4da4b9",
+      "theme_key": "portions",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "060f2c76ccb8a446bde60dc9f1ca5b5f"
+    },
+    {
+      "position": 35,
+      "review_id": "26f02c74-ab95-4c70-afa2-c67a1ded8edc",
+      "establishment_id": "b2dd8af9-3990-41ac-af62-7c4ffbc2543b",
+      "rating": 5,
+      "original_language": "vi",
+      "original_text_sha256": "d2475bb5e4d09728d4730b25730c243658bff096e17e6c4de0945b916942433f",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "0027ceefe848dab916e567b1d842b83f"
+    },
+    {
+      "position": 36,
+      "review_id": "c88eb2a8-edd9-4e35-a2c7-86be2c4e24db",
+      "establishment_id": "bfc486b8-4cc7-4cd5-ab59-1a118c61aced",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "4b5d7f43a4dad69a34849c5883886d68003ad6b91bf7ca5aac4b7dc981640270",
+      "theme_key": "location",
+      "proposed_polarity": "negative",
+      "axis": "atmosphere",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "0a8afc1d73fc1ae48f8646ce327c29ca"
+    },
+    {
+      "position": 37,
+      "review_id": "c7ff8718-c564-4f97-92d5-4161f572abd4",
+      "establishment_id": "c815b57b-ec87-43c8-8e69-47c7c746facd",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "5b92dc591758c90cbc88ccf48585fe16872102eb9d54cea2d2c4b4b9977f0729",
+      "theme_key": "temperature",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "04c463d5a241b2586713f35cbb9162b7"
+    },
+    {
+      "position": 38,
+      "review_id": "3fa5d6d5-d44b-446f-9a26-fc097ce38c4c",
+      "establishment_id": "d57ed022-5924-41f2-a53f-685eb4de4d50",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "e40501f35b38da7635bb4c72dd02ba8c78c09e669e72a5072a44ae1a1f90e3d4",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "1349c9c720d3c09b35f13b81fb260615"
+    },
+    {
+      "position": 39,
+      "review_id": "df2eb671-57b7-4e62-b7e5-c5b3ced88ead",
+      "establishment_id": "71011991-5962-466c-8eff-1eac9b6bd6a6",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "b9d00197ccb614155c874306c0b643ff15282a86bd60f4e481bac78c41bdae53",
+      "theme_key": "food_quality",
+      "proposed_polarity": "positive",
+      "axis": "quality",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "06167b0c48e99f351863f723a1b65de2"
+    },
+    {
+      "position": 40,
+      "review_id": "c84761cb-06a7-49aa-a04a-b8636b996522",
+      "establishment_id": "7d06473f-a079-464d-b392-f258efb65a34",
+      "rating": 5,
+      "original_language": "vi",
+      "original_text_sha256": "dbe6ac10c9a94c6d7042d422984cc5666b9b286504dc99ac76f84d79e79c5fe5",
+      "theme_key": "location",
+      "proposed_polarity": "positive",
+      "axis": "atmosphere",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "00b840062913ebf3b291b72a42e0b730"
+    },
+    {
+      "position": 41,
+      "review_id": "5ab6be5d-77f4-4741-8378-696f6e450adf",
+      "establishment_id": "a13ecf32-030b-4eb2-a577-3ac9e9f2073d",
+      "rating": 5,
+      "original_language": "vi",
+      "original_text_sha256": "6342184c1cf94018bb7132a20cb3831f512170b5046dc19fb2ed49e6d4f1ba2c",
+      "theme_key": "communication",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "04c3d5a06aeb53c40298376fc20bf7ad"
+    },
+    {
+      "position": 42,
+      "review_id": "529ed130-139f-4b50-beeb-f2ec8b7aee57",
+      "establishment_id": "ad179c3a-a115-40e0-ac60-0df0c1f3c8b0",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "2c03dda9c7de9d90c4f31219f53b721b4708a0af43c5a8781336ef9887217f02",
+      "theme_key": "friendly_staff",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "00009b53d1017cc5cb18d60b7354dbb1"
+    },
+    {
+      "position": 43,
+      "review_id": "e31cb00d-1689-4466-be85-016e319f603b",
+      "establishment_id": "b2dd8af9-3990-41ac-af62-7c4ffbc2543b",
+      "rating": 5,
+      "original_language": "vi",
+      "original_text_sha256": "16ea0d2319cce46baa65e53d63bfb5e3f80f590a1525c843fc7f3c8f3078236f",
+      "theme_key": "wait_time",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "004c8b4f196afaa49e7a70b11b1067d7"
+    },
+    {
+      "position": 44,
+      "review_id": "82de1ed0-2f11-4233-8a1f-d4449267f262",
+      "establishment_id": "bfc486b8-4cc7-4cd5-ab59-1a118c61aced",
+      "rating": 5,
+      "original_language": "ko",
+      "original_text_sha256": "2dc8fd39050bf213ed2693ae34590cdf92af515fa31fac1894cc24ebc9dcc0ab",
+      "theme_key": "friendly_staff",
+      "proposed_polarity": "positive",
+      "axis": "service",
+      "candidate_basis": "multilingual_lexical_anchor",
+      "seed_md5": "0c81d45883c83f883b657e36ecdbebf7"
+    },
+    {
+      "position": 45,
+      "review_id": "c1fd7444-f82d-48e5-b92f-6cd7d542cafb",
+      "establishment_id": "c815b57b-ec87-43c8-8e69-47c7c746facd",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "f92183d763a8fe5cc2dae2b23a3771c0aa4775f454487f9140272204ea6ed587",
+      "theme_key": "billing",
+      "proposed_polarity": "positive",
+      "axis": "price",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "089b0aac640edc1eac3adabadfbb68c3"
+    },
+    {
+      "position": 46,
+      "review_id": "2e6d61c2-4edc-4b14-9cb0-4e5f99c91425",
+      "establishment_id": "c9b6e047-691a-43ed-95d5-482f9cb2e594",
+      "rating": 5,
+      "original_language": "vi",
+      "original_text_sha256": "f39c9f6a08b9a71129034a32a43c2a970a95a3bfc1c3c1120a6856b8fde45865",
+      "theme_key": "noise",
+      "proposed_polarity": "positive",
+      "axis": "atmosphere",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "053f4b31546be0a8954791418df79c97"
+    },
+    {
+      "position": 47,
+      "review_id": "fd6ff2f9-d2d8-4fc0-b491-4ca32966004a",
+      "establishment_id": "d40d3438-79d8-4c28-8b09-eba640598201",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "254fc364784261f2e08012bbd206bd3b95e99b67b7d73ab7556fe90a88351c18",
+      "theme_key": "value",
+      "proposed_polarity": "positive",
+      "axis": "price",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "001e60efa56103c93b1d10b6b17fe60d"
+    },
+    {
+      "position": 48,
+      "review_id": "6ab517f4-95ef-4f0a-9cd8-75fd8ac483dc",
+      "establishment_id": "d57ed022-5924-41f2-a53f-685eb4de4d50",
+      "rating": 5,
+      "original_language": "ru",
+      "original_text_sha256": "4fb72ba18746b616f5c8b924bd56d45713047956b49fee83dfa3c270681a4089",
+      "theme_key": "cleanliness",
+      "proposed_polarity": "positive",
+      "axis": "atmosphere",
+      "candidate_basis": "seeded_boundary_probe",
+      "seed_md5": "14ca6f2adb326cc503fda2c4d0ae34d1"
+    }
+  ]
+}
