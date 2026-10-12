@@ -540,3 +540,6 @@ verify_jwt = false
 
 [functions.process-jev-hybrid-evidence-report]
 verify_jwt = false
+
+[functions.decisions-experiment]
+verify_jwt = false

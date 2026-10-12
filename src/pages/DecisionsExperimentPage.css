@@ -1,0 +1,4 @@
+.decisions-page { min-width: 0; }
+.decisions-page button { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.decisions-page h2, .decisions-page p, .decisions-page summary { overflow-wrap: anywhere; }
+.decisions-page pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }

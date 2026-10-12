@@ -1,0 +1,3 @@
+import {lunaPayload,parseLuna,dispatchDecisions} from "../functions/_shared/decisions-config.ts";
+Deno.test("Decisions preparation remains disconnected",async()=>{if(lunaPayload("predicate","alias","English").questions.length!==50)throw new Error("QUESTIONS");let blocked=false;try{await dispatchDecisions();}catch(e){blocked=(e as Error).message==="DECISIONS_PAID_EXECUTION_DISABLED";}if(!blocked)throw new Error("NOT_DISABLED");});
+Deno.test("invalid paid-looking usage is rejected offline",()=>{let bad=false;try{parseLuna({model:"gpt-6-luna",answers:[],usage:{input_tokens:-1,output_tokens:0,total_tokens:-1}},"choice");}catch{bad=true;}if(!bad)throw new Error("INVALID_ACCEPTED");});
