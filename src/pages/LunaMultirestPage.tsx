@@ -5,6 +5,7 @@ import {useApp} from "../app/AppContext";
 import {useI18n} from "../i18n";
 import {useJevAccess} from "../lib/use-jev-access";
 import {supabase} from "../lib/supabase";
+import {LunaMultirestResults} from './LunaMultirestResults';
 import {LunaMultirestLaunchPanel} from './LunaMultirestLaunchPanel';
 import {MULTI_CONSENT} from '../../supabase/functions/_shared/luna-multirest-launch';
 import {PageHeader} from "../components/ui/PageHeader";
@@ -32,7 +33,7 @@ export function MultiWorkspace({data,onFreeze,onSeal,onRefresh,onPrepare,onConfi
  <details className="card jev-card"><summary>{t.themes}</summary>{Object.entries(s.theme_distribution).filter(([,n])=>n.positive+n.negative>0).map(([k,n])=><p key={k}>{k} · positive {n.positive} · negative {n.negative}</p>)}</details>
  <details className="card jev-card"><summary>{t.reviews} ({s.cases.length})</summary>{s.cases.map(c=><article key={c.review_id}><h3>{c.position} · {c.candidate.theme_key} · {c.candidate.polarity}</h3><p>{c.establishment_name} · {c.overall_rating}★</p><p>{t.method} : {c.candidate.method}</p><p className="gold-text" lang="en">{c.analysis_text}</p><p className="jev-id">{c.review_id}<br/>{c.analysis_text_sha256}<br/>{c.case_sha256}</p></article>)}</details>
  <section className="card jev-card"><h3>{t.metrics}</h3><p>{t.complement}</p></section>
- {data.result&&<section className="card jev-card"><h3>{t.results}</h3><p>{t.notHuman}</p><pre className="gold-text">{JSON.stringify(data.result.overall,null,2)}</pre><h4>{t.low}</h4><pre className="gold-text">{JSON.stringify(data.result.low_star,null,2)}</pre><details><summary>{t.themes}</summary><pre className="gold-text">{JSON.stringify(data.result.by_theme,null,2)}</pre></details><details><summary>{t.restaurants}</summary><pre className="gold-text">{JSON.stringify(data.result.by_restaurant,null,2)}</pre></details><p>{data.result.served_models.join(", ")}</p><p>{data.result.input_tokens} input · {data.result.output_tokens} output · {data.result.duration_ms} ms</p><p>{money(data.result.known_estimated_cost_usd)}</p></section>}
+<LunaMultirestResults data={data}/>
  <details className="card jev-card"><summary>{t.source}</summary><p className="jev-id">{s.source_control_id}<br/>{s.source_sha256}<br/>{s.config_sha256}<br/>{s.selector_sha256}</p></details></>}
  <button className="secondary-button full-width" disabled={busy} onClick={()=>void action(onRefresh)}>{t.refresh}</button></>;
 }
