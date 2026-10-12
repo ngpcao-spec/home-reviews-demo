@@ -8,7 +8,10 @@ Deno.serve(hybridHandler(async (request) => {
   }
   const { data: s, error } = await ctx.admin.from(
     "analysis_jev_pilot_snapshots",
-  ).select("organization_id").eq("id", "f9c8876b-1b5a-4d10-9538-758881b61b6b")
+  ).select("organization_id,source").eq(
+    "id",
+    "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+  )
     .single();
   if (error || !s) throw new Error("FORBIDDEN");
   await assertMembership(ctx.client, ctx.user.id, s.organization_id, [
@@ -33,6 +36,30 @@ Deno.serve(hybridHandler(async (request) => {
           s.organization_id,
         ).eq("version", "jev-hybrid-independent-control-v1").maybeSingle();
       if (pe || ce) throw new Error("HYBRID_READ_FAILED");
+      const { data: balanced, error: be } = await ctx.admin.from(
+        "analysis_jev_hybrid_plans",
+      ).select("*").eq("organization_id", s.organization_id).eq(
+        "language",
+        language,
+      ).eq("version", "jev-hybrid-evidence-report-v1.1-balanced").order(
+        "created_at",
+        { ascending: false },
+      ).limit(1).maybeSingle();
+      if (be) throw new Error("HYBRID_READ_FAILED");
+      const wanted = new Set(
+        [...p?.body.selected ?? [], ...balanced?.body.selected ?? []].map((
+          e: { review_id: string },
+        ) => e.review_id),
+      );
+      const review_texts = (s.source.reviews as {
+        id: string;
+        analysis_text: string;
+        analysis_text_sha256: string;
+      }[]).filter((r) => wanted.has(r.id)).map((r) => ({
+        review_id: r.id,
+        analysis_text: r.analysis_text,
+        analysis_text_sha256: r.analysis_text_sha256,
+      }));
       let jobs: unknown[] = [];
       if (p) {
         const { data: j, error: je } = await ctx.admin.from(
@@ -48,6 +75,8 @@ Deno.serve(hybridHandler(async (request) => {
       }
       return {
         plan: p,
+        balanced,
+        review_texts,
         control: c,
         jobs,
         paid_enabled: false,

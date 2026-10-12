@@ -1,0 +1,340 @@
+[
+  {
+    "language": "fr",
+    "result_sha256": "2cd0b0097a07a7fa5f91e6bbf52c1d69480783be7d0a00eeb14fd6f44dd141ae",
+    "selector_sha256": "1f20303921c5c379e27370044d5ee8788302257a559b7828372b7b7c3e17ad8c",
+    "selector_source_sha256": "9a7bf46772a3902e55039d60aaf0d101b747d6e66b8ab9fd2516ed81bcac29b3",
+    "source_snapshot_id": "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+    "source_sha256": "19ea6e88f81a6243792b0a49ec1aa2a7b3d1915272c50790940a6c5c8259bf7e",
+    "statistics_sha256": "c30d8d8b90d78a4032b0b175f50317b45f03826614961127d598870f8a2145a4",
+    "summary": {
+      "total": 25,
+      "distinct_reviews": 24,
+      "rule_confirmed": 25,
+      "sol_candidate": 0,
+      "by_axis_polarity": {
+        "service:positive": 2,
+        "service:negative": 4,
+        "quality:positive": 6,
+        "quality:negative": 6,
+        "price:positive": 1,
+        "price:negative": 4,
+        "atmosphere:positive": 1,
+        "atmosphere:negative": 1
+      },
+      "star_distribution": {
+        "1": 3,
+        "2": 3,
+        "3": 5,
+        "4": 3,
+        "5": 11
+      },
+      "mixed": 22,
+      "negative_despite_high_rating": 6,
+      "covered_theme_polarities": 19,
+      "covered_themes": 14,
+      "low_star_citations": 11,
+      "low_star_negative": 9,
+      "high_star_negative": 6
+    },
+    "main_problems": [
+      {
+        "axis": "quality",
+        "negative_mentions": 78,
+        "negative_review_count": 51,
+        "selected_negative_citations": 6,
+        "distinct_evidence_reviews": 6
+      },
+      {
+        "axis": "price",
+        "negative_mentions": 77,
+        "negative_review_count": 44,
+        "selected_negative_citations": 4,
+        "distinct_evidence_reviews": 4
+      },
+      {
+        "axis": "service",
+        "negative_mentions": 55,
+        "negative_review_count": 19,
+        "selected_negative_citations": 4,
+        "distinct_evidence_reviews": 4
+      }
+    ],
+    "evidence_pool": {
+      "total": 1580,
+      "rule_confirmed": 487,
+      "sol_candidate": 975,
+      "explicitly_contested": 118
+    },
+    "shortages": [],
+    "estimates": {
+      "estimated_input_tokens": 19636,
+      "estimated_output_tokens": 4828,
+      "max_output_tokens": 9500,
+      "estimated_sol_cost_usd": 0.087552,
+      "max_sol_cost_usd": 0.134272,
+      "jev_new_cost_usd": 0,
+      "jev_reused_cost_usd": 0,
+      "jev_new_requests": 0,
+      "total_estimated_cost_usd": 0.087552,
+      "actual_cost_usd": null,
+      "tokenizer": "js-tiktoken 1.0.21 o200k_base; approximate for model alias, 12% margin + 256 framing tokens",
+      "input_budget_tokens": 20000,
+      "rates": {
+        "jev_input": 0.042,
+        "sol_input": 2,
+        "jev_output": 0,
+        "provenance": [
+          "Recorded Artisan completed full-configuration cache usage",
+          "Recorded Jev and aggregate Sol narrative rates/usage",
+          "Apify and translation tariff unavailable"
+        ],
+        "sol_output": 10,
+        "apify_import": null,
+        "observed_sol_input": 4162,
+        "english_translation": null,
+        "observed_sol_output": 1420,
+        "observed_jev_input_per_review": 8476.109375,
+        "observed_jev_output_per_review": 1125.203125
+      },
+      "old_sol_cost_is_not_reused": true,
+      "dossier_bytes": 54524
+    },
+    "comparison": {
+      "v1_summary": {
+        "total": 23,
+        "distinct_reviews": 19,
+        "rule_confirmed": 12,
+        "sol_candidate": 11,
+        "by_axis_polarity": {
+          "service:positive": 1,
+          "service:negative": 5,
+          "quality:positive": 2,
+          "quality:negative": 7,
+          "price:positive": 1,
+          "price:negative": 2,
+          "atmosphere:positive": 2,
+          "atmosphere:negative": 3
+        },
+        "star_distribution": {
+          "1": 0,
+          "2": 2,
+          "3": 2,
+          "4": 6,
+          "5": 13
+        },
+        "mixed": 23,
+        "negative_despite_high_rating": 17,
+        "covered_theme_polarities": 23,
+        "covered_themes": 19,
+        "low_star_negative": 0,
+        "high_star_negative": 17
+      },
+      "v1_estimates": {
+        "estimated_input_tokens": 19862,
+        "estimated_output_tokens": 4779,
+        "max_output_tokens": 9500,
+        "estimated_sol_cost_usd": 0.087514,
+        "max_sol_cost_usd": 0.134724,
+        "jev_new_cost_usd": 0,
+        "jev_reused_cost_usd": 0,
+        "jev_new_requests": 0,
+        "total_estimated_cost_usd": 0.087514,
+        "actual_cost_usd": null,
+        "tokenizer": "js-tiktoken 1.0.21 o200k_base; approximate for model alias, 12% margin + 256 framing tokens",
+        "input_budget_tokens": 20000,
+        "rates": {
+          "jev_input": 0.042,
+          "sol_input": 2,
+          "jev_output": 0,
+          "provenance": [
+            "Recorded Artisan completed full-configuration cache usage",
+            "Recorded Jev and aggregate Sol narrative rates/usage",
+            "Apify and translation tariff unavailable"
+          ],
+          "sol_output": 10,
+          "apify_import": null,
+          "observed_sol_input": 4162,
+          "english_translation": null,
+          "observed_sol_output": 1420,
+          "observed_jev_input_per_review": 8476.109375,
+          "observed_jev_output_per_review": 1125.203125
+        },
+        "old_sol_cost_is_not_reused": true
+      },
+      "changed_count": 22,
+      "added_count": 22
+    },
+    "new_paid_calls": 0,
+    "paid_enabled": false
+  },
+  {
+    "language": "vi",
+    "result_sha256": "ca64475707f68f730b4b7476936127ac66d899fe1cacbcfd3dce8669dbaf1d96",
+    "selector_sha256": "1f20303921c5c379e27370044d5ee8788302257a559b7828372b7b7c3e17ad8c",
+    "selector_source_sha256": "9a7bf46772a3902e55039d60aaf0d101b747d6e66b8ab9fd2516ed81bcac29b3",
+    "source_snapshot_id": "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+    "source_sha256": "19ea6e88f81a6243792b0a49ec1aa2a7b3d1915272c50790940a6c5c8259bf7e",
+    "statistics_sha256": "c30d8d8b90d78a4032b0b175f50317b45f03826614961127d598870f8a2145a4",
+    "summary": {
+      "total": 25,
+      "distinct_reviews": 24,
+      "rule_confirmed": 25,
+      "sol_candidate": 0,
+      "by_axis_polarity": {
+        "service:positive": 2,
+        "service:negative": 4,
+        "quality:positive": 6,
+        "quality:negative": 6,
+        "price:positive": 1,
+        "price:negative": 4,
+        "atmosphere:positive": 1,
+        "atmosphere:negative": 1
+      },
+      "star_distribution": {
+        "1": 3,
+        "2": 3,
+        "3": 5,
+        "4": 3,
+        "5": 11
+      },
+      "mixed": 22,
+      "negative_despite_high_rating": 6,
+      "covered_theme_polarities": 19,
+      "covered_themes": 14,
+      "low_star_citations": 11,
+      "low_star_negative": 9,
+      "high_star_negative": 6
+    },
+    "main_problems": [
+      {
+        "axis": "quality",
+        "negative_mentions": 78,
+        "negative_review_count": 51,
+        "selected_negative_citations": 6,
+        "distinct_evidence_reviews": 6
+      },
+      {
+        "axis": "price",
+        "negative_mentions": 77,
+        "negative_review_count": 44,
+        "selected_negative_citations": 4,
+        "distinct_evidence_reviews": 4
+      },
+      {
+        "axis": "service",
+        "negative_mentions": 55,
+        "negative_review_count": 19,
+        "selected_negative_citations": 4,
+        "distinct_evidence_reviews": 4
+      }
+    ],
+    "evidence_pool": {
+      "total": 1580,
+      "rule_confirmed": 487,
+      "sol_candidate": 975,
+      "explicitly_contested": 118
+    },
+    "shortages": [],
+    "estimates": {
+      "estimated_input_tokens": 19768,
+      "estimated_output_tokens": 4828,
+      "max_output_tokens": 9500,
+      "estimated_sol_cost_usd": 0.087816,
+      "max_sol_cost_usd": 0.134536,
+      "jev_new_cost_usd": 0,
+      "jev_reused_cost_usd": 0,
+      "jev_new_requests": 0,
+      "total_estimated_cost_usd": 0.087816,
+      "actual_cost_usd": null,
+      "tokenizer": "js-tiktoken 1.0.21 o200k_base; approximate for model alias, 12% margin + 256 framing tokens",
+      "input_budget_tokens": 20000,
+      "rates": {
+        "jev_input": 0.042,
+        "sol_input": 2,
+        "jev_output": 0,
+        "provenance": [
+          "Recorded Artisan completed full-configuration cache usage",
+          "Recorded Jev and aggregate Sol narrative rates/usage",
+          "Apify and translation tariff unavailable"
+        ],
+        "sol_output": 10,
+        "apify_import": null,
+        "observed_sol_input": 4162,
+        "english_translation": null,
+        "observed_sol_output": 1420,
+        "observed_jev_input_per_review": 8476.109375,
+        "observed_jev_output_per_review": 1125.203125
+      },
+      "old_sol_cost_is_not_reused": true,
+      "dossier_bytes": 54817
+    },
+    "comparison": {
+      "v1_summary": {
+        "total": 23,
+        "distinct_reviews": 19,
+        "rule_confirmed": 12,
+        "sol_candidate": 11,
+        "by_axis_polarity": {
+          "service:positive": 1,
+          "service:negative": 5,
+          "quality:positive": 2,
+          "quality:negative": 7,
+          "price:positive": 1,
+          "price:negative": 2,
+          "atmosphere:positive": 2,
+          "atmosphere:negative": 3
+        },
+        "star_distribution": {
+          "1": 0,
+          "2": 2,
+          "3": 2,
+          "4": 6,
+          "5": 13
+        },
+        "mixed": 23,
+        "negative_despite_high_rating": 17,
+        "covered_theme_polarities": 23,
+        "covered_themes": 19,
+        "low_star_negative": 0,
+        "high_star_negative": 17
+      },
+      "v1_estimates": {
+        "estimated_input_tokens": 19994,
+        "estimated_output_tokens": 4779,
+        "max_output_tokens": 9500,
+        "estimated_sol_cost_usd": 0.087778,
+        "max_sol_cost_usd": 0.134988,
+        "jev_new_cost_usd": 0,
+        "jev_reused_cost_usd": 0,
+        "jev_new_requests": 0,
+        "total_estimated_cost_usd": 0.087778,
+        "actual_cost_usd": null,
+        "tokenizer": "js-tiktoken 1.0.21 o200k_base; approximate for model alias, 12% margin + 256 framing tokens",
+        "input_budget_tokens": 20000,
+        "rates": {
+          "jev_input": 0.042,
+          "sol_input": 2,
+          "jev_output": 0,
+          "provenance": [
+            "Recorded Artisan completed full-configuration cache usage",
+            "Recorded Jev and aggregate Sol narrative rates/usage",
+            "Apify and translation tariff unavailable"
+          ],
+          "sol_output": 10,
+          "apify_import": null,
+          "observed_sol_input": 4162,
+          "english_translation": null,
+          "observed_sol_output": 1420,
+          "observed_jev_input_per_review": 8476.109375,
+          "observed_jev_output_per_review": 1125.203125
+        },
+        "old_sol_cost_is_not_reused": true
+      },
+      "changed_count": 22,
+      "added_count": 22
+    },
+    "new_paid_calls": 0,
+    "paid_enabled": false
+  }
+]

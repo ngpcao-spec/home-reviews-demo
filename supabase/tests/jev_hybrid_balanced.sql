@@ -1,0 +1,21 @@
+begin;
+do $$declare p public.analysis_jev_hybrid_plans;b public.analysis_jev_hybrid_plans;pid uuid;bad boolean;fake jsonb;begin
+ select * into p from public.analysis_jev_hybrid_plans where version='jev-hybrid-evidence-report-v1.1-balanced' and language='vi';
+ select * into b from public.analysis_jev_hybrid_plans where result_sha256=p.body->'comparison'->>'v1_sha256';
+ if p.id is null or b.id is null or p.paid_enabled or p.production_enabled or p.body->'analytics' is distinct from b.body->'analytics' or jsonb_array_length(p.body->'selected') not between 23 and 32 or (p.body->'selected_summary'->'star_distribution'->>'1')::int<3 or (p.body->'selected_summary'->>'low_star_citations')::numeric/jsonb_array_length(p.body->'selected') not between .35 and .45 then raise exception 'BALANCED_TEST_SCOPE';end if;
+ if has_function_privilege('authenticated','public.save_hybrid_balanced_preparation(uuid,uuid,jsonb,text)','execute') or has_table_privilege('authenticated','public.analysis_jev_hybrid_plans','insert') then raise exception 'BALANCED_TEST_ROLE';end if;
+ if public.hybrid_utf16_slice('A😀BC',1,3)<>'😀' or public.hybrid_utf16_slice('A😀BC',3,5)<>'BC' then raise exception 'BALANCED_TEST_UTF16';end if;
+ pid:=public.save_hybrid_balanced_preparation(p.created_by,b.id,p.body,p.result_sha256);if pid<>p.id then raise exception 'BALANCED_TEST_IDEMPOTENCE';end if;
+ bad:=false;begin update public.analysis_jev_hybrid_plans set body='{}' where id=p.id;exception when others then if sqlerrm='EVIDENCE_AUDIT_IMMUTABLE' then bad:=true;else raise;end if;end;if not bad then raise exception 'BALANCED_TEST_IMMUTABLE';end if;
+ fake:=jsonb_set(p.body,'{selected,0,quote}','"invented quote"');
+ bad:=false;begin perform public.save_hybrid_balanced_preparation(p.created_by,b.id,fake,p.result_sha256);exception when others then if sqlerrm='BALANCED_HASH_CHANGED' then bad:=true;else raise;end if;end;if not bad then raise exception 'BALANCED_TEST_SHA';end if;
+ bad:=false;begin perform public.save_hybrid_balanced_preparation('ffffffff-ffff-4fff-8fff-ffffffffffff',b.id,p.body,p.result_sha256);exception when others then if sqlerrm='FORBIDDEN' then bad:=true;else raise;end if;end;if not bad then raise exception 'BALANCED_TEST_TENANT';end if;
+ bad:=false;begin perform public.start_hybrid_report(p.id,true);exception when others then if sqlerrm='HYBRID_PAID_EXECUTION_DISABLED' then bad:=true;else raise;end if;end;if not bad then raise exception 'BALANCED_TEST_SPENDING';end if;
+ if exists(select 1 from public.analysis_jev_hybrid_authorizations) or exists(select 1 from public.analysis_jev_hybrid_jobs) or exists(select 1 from public.analysis_jev_hybrid_verdicts) then raise exception 'BALANCED_TEST_NO_JOB';end if;
+end $$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','d6e79d9c-72cd-40d2-a945-0452b268a783',true);
+do $$begin if (select count(*) from public.analysis_jev_hybrid_plans where version='jev-hybrid-evidence-report-v1.1-balanced')<>2 or (select count(*) from public.analysis_jev_hybrid_plans where version='jev-hybrid-evidence-report-v1')<>2 then raise exception 'BALANCED_TEST_OWNER_RLS';end if;end $$;
+select set_config('request.jwt.claim.sub','ffffffff-ffff-4fff-8fff-ffffffffffff',true);
+do $$begin if exists(select 1 from public.analysis_jev_hybrid_plans) then raise exception 'BALANCED_TEST_CROSS_TENANT';end if;end $$;
+rollback;

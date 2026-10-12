@@ -1,5 +1,8 @@
 export const hybridMessages = {
   fr: {
+    v1: "Sélection V1", balanced: "Sélection V1.1 équilibrée",
+    diversityWarning: "Diversité du dossier, pas représentativité statistique. Les statistiques restent calculées sur l’ensemble des avis analysés. Les règles ne constituent pas une validation humaine.",
+    fullText: "Texte anglais complet de l’avis",
     title: "Rapport hybride JEV + Sol",
     intro: "Pipeline expérimental. Génération payante non autorisée.",
     generate: "Générer le rapport hybride",
@@ -61,6 +64,9 @@ export const hybridMessages = {
     },
   },
   vi: {
+    v1: "Lựa chọn V1", balanced: "Lựa chọn V1.1 cân bằng",
+    diversityWarning: "Sự đa dạng của hồ sơ không phải tính đại diện thống kê. Số liệu vẫn tính trên tất cả đánh giá đã phân tích. Quy tắc không phải xác nhận của con người.",
+    fullText: "Toàn bộ nội dung tiếng Anh của đánh giá",
     title: "Báo cáo kết hợp JEV + Sol",
     intro: "Pipeline thử nghiệm. Chưa cho phép tạo báo cáo tính phí.",
     generate: "Tạo báo cáo kết hợp",

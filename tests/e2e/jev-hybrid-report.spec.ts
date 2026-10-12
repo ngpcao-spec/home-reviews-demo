@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-test("hybrid free preview FR/VI, generation disabled, no calls, iPhone/iPad reload", async ({ page }) => {
+for (const language of ["fr", "vi"]) test(`hybrid balanced ${language}, generation disabled, no calls, iPhone/iPad reload`, async ({ page }) => {
+  test.setTimeout(90000);
   if (test.info().project.name === "desktop") {
     await page.setViewportSize({ width: 768, height: 1024 });
   }
@@ -9,7 +10,6 @@ test("hybrid free preview FR/VI, generation disabled, no calls, iPhone/iPad relo
       paid.push(r.url());
     }
   });
-  for (const language of ["fr", "vi"]) {
     await page.goto(
       "/tests/e2e/fixtures/jev-hybrid-report.html?language=" + language,
     );
@@ -20,6 +20,11 @@ test("hybrid free preview FR/VI, generation disabled, no calls, iPhone/iPad relo
       exact: true,
     });
     await expect(button).toBeDisabled();
+    await page.getByRole("button",{name:language==="fr"?"Sélection V1":"Lựa chọn V1",exact:true}).click();
+    await expect(page.getByRole("button",{name:language==="fr"?"Sélection V1":"Lựa chọn V1",exact:true})).toHaveAttribute("aria-pressed","true");
+    await page.getByRole("button",{name:language==="fr"?"Sélection V1.1 équilibrée":"Lựa chọn V1.1 cân bằng",exact:true}).click();
+    await expect(page.getByRole("heading",{name:language==="fr"?"Comparaison gratuite V1 / V1.1":"So sánh miễn phí V1 / V1.1"})).toBeVisible();
+    await page.getByText(language==="fr"?"Texte anglais complet de l’avis":"Toàn bộ nội dung tiếng Anh của đánh giá",{exact:true}).first().click();
     await expect(
       page.getByRole("heading", {
         name: language === "fr"
@@ -34,10 +39,10 @@ test("hybrid free preview FR/VI, generation disabled, no calls, iPhone/iPad relo
     ).toBe(false);
     await page.reload();
     await expect(button).toBeDisabled();
+    await expect(page.getByRole("button",{name:language==="fr"?"Sélection V1.1 équilibrée":"Lựa chọn V1.1 cân bằng",exact:true})).toHaveAttribute("aria-pressed","true");
     await page.screenshot({
       path: `test-results/hybrid-${language}-${test.info().project.name}.png`,
-      fullPage: true,
+      fullPage: false,
     });
-  }
   expect(paid).toEqual([]);
 });

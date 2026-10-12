@@ -1,6 +1,6 @@
 begin;
 do $$declare p public.analysis_jev_hybrid_plans;c public.analysis_jev_hybrid_controls;a uuid;j uuid;bad boolean;pid uuid;begin
- select * into p from public.analysis_jev_hybrid_plans where language='fr' limit 1;select * into c from public.analysis_jev_hybrid_controls where organization_id=p.organization_id;
+ select * into p from public.analysis_jev_hybrid_plans where language='fr' and version='jev-hybrid-evidence-report-v1' limit 1;select * into c from public.analysis_jev_hybrid_controls where organization_id=p.organization_id;
  if p.id is null or jsonb_array_length(p.body->'selected')>32 or (p.body->'analytics'->'coverage'->>'analysed_reviews')::int<>422 or p.paid_enabled or p.production_enabled then raise exception 'TEST_PLAN';end if;
  if has_table_privilege('anon','public.analysis_jev_hybrid_plans','select') or has_table_privilege('authenticated','public.analysis_jev_hybrid_authorizations','insert') or has_function_privilege('authenticated','public.save_hybrid_preparation(uuid,uuid,jsonb,text,jsonb,text)','execute') then raise exception 'TEST_PRIVILEGES';end if;
  pid=public.save_hybrid_preparation(p.created_by,p.source_snapshot_id,p.body,p.result_sha256,c.body,c.result_sha256);if pid<>p.id then raise exception 'TEST_IDEMPOTENCE';end if;
@@ -19,7 +19,7 @@ do $$declare p public.analysis_jev_hybrid_plans;c public.analysis_jev_hybrid_con
 end $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','d6e79d9c-72cd-40d2-a945-0452b268a783',true);
-do $$begin if (select count(*) from public.analysis_jev_hybrid_plans)<>2 then raise exception 'TEST_OWNER_RLS';end if;end $$;
+do $$begin if (select count(*) from public.analysis_jev_hybrid_plans where version='jev-hybrid-evidence-report-v1')<>2 then raise exception 'TEST_OWNER_RLS';end if;end $$;
 select set_config('request.jwt.claim.sub','ffffffff-ffff-4fff-8fff-ffffffffffff',true);
 do $$begin if exists(select 1 from public.analysis_jev_hybrid_plans) or exists(select 1 from public.analysis_jev_hybrid_controls) then raise exception 'TEST_CROSS_TENANT';end if;end $$;
 rollback;

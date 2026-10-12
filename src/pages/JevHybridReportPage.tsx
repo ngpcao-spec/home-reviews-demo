@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApp } from "../app/AppContext";
@@ -8,6 +8,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { hybridReportApi, type HybridView } from "../lib/jev-hybrid-report";
 import { hybridMessages } from "../i18n/jev-hybrid-report";
 import { GOLD_TAXONOMY } from "../../supabase/functions/_shared/gold-taxonomy";
+import { HybridBalancedComparison } from "../components/HybridBalancedComparison";
 import "./JevBenchmarkPage.css";
 import "./GoldSetPage.css";
 import "./PilotEvidenceV3Page.css";
@@ -63,9 +64,10 @@ export function JevHybridReportPage() {
   );
 }
 export function HybridWorkspace({ data }: { data: HybridView }) {
+  const [balanced, setBalanced] = useState(() => localStorage.getItem("hybrid-selection") !== "v1");
   const { language } = useI18n(),
     t = hybridMessages[language],
-    p = data.plan?.body,
+    p = balanced && data.balanced ? data.balanced.body : data.plan?.body,
     money = (n: number | null) =>
       n === null
         ? "—"
@@ -96,6 +98,16 @@ export function HybridWorkspace({ data }: { data: HybridView }) {
       </section>
       {p && (
         <>
+          {data.balanced && <>
+            <section className="card jev-card">
+              <div className="hybrid-selection-tabs">
+                <button className="secondary-button" aria-pressed={!balanced} onClick={() => { setBalanced(false); localStorage.setItem("hybrid-selection","v1"); }}>{t.v1}</button>
+                <button className="secondary-button" aria-pressed={balanced} onClick={() => { setBalanced(true); localStorage.setItem("hybrid-selection","balanced"); }}>{t.balanced}</button>
+              </div>
+              <p>{t.diversityWarning}</p>
+            </section>
+            <HybridBalancedComparison plan={data.balanced.body} />
+          </>}
           <section className="card jev-card">
             <h2>{t.statistics}</h2>
             <p>{t.scope}</p>
@@ -204,6 +216,10 @@ export function HybridWorkspace({ data }: { data: HybridView }) {
                   <p className="gold-text" lang="en">{e.context}</p>
                 </details>
                 <details>
+                  <summary>{t.fullText}</summary>
+                  <p className="gold-text" lang="en">{data.review_texts?.find((r) => r.review_id === e.review_id)?.analysis_text ?? data.balanced?.body.selected_review_texts.find((r) => r.review_id === e.review_id)?.analysis_text ?? e.context}</p>
+                </details>
+                <details>
                   <summary>{t.provenance}</summary>
                   <p className="jev-id">
                     {e.review_id}
@@ -242,7 +258,7 @@ export function HybridWorkspace({ data }: { data: HybridView }) {
           <details className="card jev-card">
             <summary>{t.provenance}</summary>
             <p className="jev-id">
-              {data.plan!.id}
+              {(balanced && data.balanced ? data.balanced : data.plan)!.id}
               <br />
               {p.source_snapshot_id}
               <br />
@@ -252,7 +268,7 @@ export function HybridWorkspace({ data }: { data: HybridView }) {
               <br />
               {p.schema_sha256}
               <br />
-              {data.plan!.result_sha256}
+              {(balanced && data.balanced ? data.balanced : data.plan)!.result_sha256}
             </p>
           </details>
         </>

@@ -1,0 +1,9 @@
+.hybrid-selection-tabs { display: flex; flex-wrap: wrap; gap: .6rem; }
+.hybrid-selection-tabs button { flex: 1 1 130px; white-space: normal; }
+.hybrid-selection-tabs button[aria-pressed="true"] { border-color: var(--color-primary, #d8bd91); background: rgba(216,189,145,.12); }
+.hybrid-comparison-table table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.hybrid-comparison-table th:first-child { width: 44%; }
+.hybrid-comparison-table th, .hybrid-comparison-table td { padding: .45rem .2rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; font-size: .85rem; }
+.hybrid-comparison-table tr { border-bottom: 1px solid rgba(216,189,145,.15); }
+.hybrid-stars { display: grid; grid-template-columns: 2rem 1fr 1fr; gap: .4rem; margin: .6rem 0; font-size: .9rem; }
+.hybrid-stars meter { width: 100%; grid-column: 2 / 4; }
