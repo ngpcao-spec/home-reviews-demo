@@ -7,6 +7,7 @@ import {
   loadEvidence40,
 } from "../_shared/decisions-evidence40-store.ts";
 import { processEvidence40Batch } from "../_shared/decisions-evidence40-worker.ts";
+import { assertEvidence40ActiveUser } from "../_shared/decisions-evidence40-auth.ts";
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 Deno.serve(evidence40Handler(async (r) => {
   const ctx = await requireUser(r), key = Deno.env.get("OPENAI_API_KEY") ?? "";
@@ -18,6 +19,7 @@ Deno.serve(evidence40Handler(async (r) => {
         "93228bbb-6397-41e3-b8be-21ee7060eda7",
         ["owner", "admin", "manager"],
       );
+      await assertEvidence40ActiveUser(ctx.admin, ctx.user.id);
     },
     view: () => evidence40View(ctx.admin, !!key.trim()),
     prepare: async (v) =>

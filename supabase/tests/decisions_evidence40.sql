@@ -1,7 +1,10 @@
 -- Explicit rollback-only authorization/task mocks; never visible to the scheduler.
 -- Harness sets LOCAL home_reviews.test_manifest from the verified offline builder.
+-- Match PostgREST's actual invoker role; do not mask missing privileges as postgres.
+set local role service_role;
 do $$declare m jsonb:=current_setting('home_reviews.test_manifest')::jsonb;u uuid;pid uuid;rid uuid;t jsonb;t2 jsonb;w uuid:=gen_random_uuid();bad boolean;sha text;
 begin
+ if current_user<>'service_role' or has_table_privilege('service_role','auth.users','select') then raise exception 'E40_TEST_INCORRECT_SERVER_ROLE';end if;
  select created_by into u from public.analysis_decisions_experiments where id=(m->>'experiment_id')::uuid;
  sha:=encode(extensions.digest(public.jev_economy_canonical(m),'sha256'),'hex');
  if exists(select 1 from public.analysis_decisions_evidence40_runs) or exists(select 1 from public.analysis_decisions_evidence40_tasks) then raise exception 'E40_TEST_MUST_START_EMPTY';end if;

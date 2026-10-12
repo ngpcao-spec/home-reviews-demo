@@ -37,3 +37,11 @@ La clé OpenAI reste uniquement dans les secrets Edge. Aucun probe payant de la 
 1 440 tests unitaires ; 4 tests Deno sans réseau ; checks/lint Deno ; SQL/RLS/idempotence/anti-retry sur transaction annulée ; lint et build ; 16 tests Playwright FR/VI sur 360/390/430 et iPad 768 px. Fournisseurs exclusivement simulés. Le manifeste réel a été vérifié hors réseau, sans appel provider.
 
 À la livraison technique : 0 plan, 0 run, 0 tâche, 0 tentative et 0 événement réels. Aucun rapport généré, aucune configuration historique modifiée, aucune activation en production.
+
+## Correctif de prévisualisation du 12 octobre
+
+Le rôle `service_role` ne possède pas de lecture SQL de `auth.users`. Le premier test SQL, exécuté comme `postgres`, avait masqué ce défaut. La prévisualisation renvoyait alors `EVIDENCE40_DATABASE_FAILED` avant toute création de plan.
+
+Les RPC restent SECURITY INVOKER et réservées au service. Elles vérifient l'appartenance et le rôle via `organization_members`. L'état actif/non supprimé/non banni du compte est vérifié côté serveur avec `auth.admin.getUserById`, avant préparation/confirmation et avant chaque réservation de tâche. Aucun droit de lecture supplémentaire de `auth.users` n'a été accordé. Aucun SECURITY DEFINER n'a été ajouté.
+
+Le test SQL s'exécute maintenant avec `SET LOCAL ROLE service_role` et vérifie explicitement l'absence de lecture de `auth.users`. Les appels de confirmation, réservation et finalisation restent exclusivement des simulations annulées par ROLLBACK. Onze tests unitaires supplémentaires contrôlent la lecture Auth, les comptes invalides, la réservation et les diagnostics sans secrets. Les logs RPC ne contiennent que le nom de l'opération et le code d'erreur.

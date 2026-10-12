@@ -12,6 +12,7 @@ import {
   evidence40Manifest,
 } from "./decisions-evidence40.ts";
 import type { E40Port } from "./decisions-evidence40-worker.ts";
+import { assertEvidence40ActiveUser } from "./decisions-evidence40-auth.ts";
 export async function loadEvidence40(admin: SupabaseClient) {
   const results = await Promise.all([
     admin.from("analysis_decisions_experiments").select("*").eq(
@@ -51,9 +52,15 @@ export async function e40rpc(
 ) {
   const { data, error } = await admin.rpc(name, args);
   if (error) {
+    console.error("EVIDENCE40_RPC_FAILED", {
+      operation: name,
+      code: error.code,
+    });
     throw new Error(
       error.message.match(/(?:EVIDENCE40|FORBIDDEN)[A-Z_0-9]*/)?.[0] ??
-        "EVIDENCE40_DATABASE_FAILED",
+        (error.code === "42501"
+          ? "EVIDENCE40_DATABASE_PERMISSION_DENIED"
+          : "EVIDENCE40_DATABASE_FAILED"),
     );
   }
   return data;
@@ -98,11 +105,31 @@ export async function evidence40View(
 }
 export function evidence40Port(admin: SupabaseClient): E40Port {
   return {
-    claim: async (worker, run) =>
-      await e40rpc(admin, "evidence40_claim", {
+    claim: async (worker, run) => {
+      if (!run) throw new Error("EVIDENCE40_RUN_REQUIRED");
+      const { data: r, error } = await admin.from(
+        "analysis_decisions_evidence40_runs",
+      )
+        .select("confirmed_by,organization_id,status").eq("id", run).single();
+      if (
+        error || !r ||
+        r.organization_id !== "93228bbb-6397-41e3-b8be-21ee7060eda7"
+      ) throw new Error("FORBIDDEN");
+      if (!["queued", "running"].includes(r.status)) return null;
+      try {
+        await assertEvidence40ActiveUser(admin, r.confirmed_by);
+      } catch {
+        await e40rpc(admin, "evidence40_stop_unsent", {
+          p_run: run,
+          p_error: "EVIDENCE40_AUTHORIZATION_UNAVAILABLE",
+        });
+        return null;
+      }
+      return await e40rpc(admin, "evidence40_claim", {
         p_worker: worker,
         p_run: run,
-      }) as E40Task | null,
+      }) as E40Task | null;
+    },
     finish: async (task, worker, status, output) =>
       await e40rpc(admin, "evidence40_finish", {
         p_task: task,
