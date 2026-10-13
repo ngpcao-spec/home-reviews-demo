@@ -1,0 +1,231 @@
+{
+  "dataset_sha256": "6e464e2f0fa13ae1f83168b65a04e3de3e396fc0c1150d08ba71e8e30b008189",
+  "annotation_model": "GPT-6",
+  "reference_type": "GPT6_AI_reference_not_independent_human_Gold",
+  "items": [
+    {
+      "review_id": "65122f12-5100-4932-b567-32896eb5ea84",
+      "theme_key": "billing",
+      "analysis_text_sha256": "1ec3ea9160ac9ba25d83a914283f69ba563175397b18debfd112068796249d7b",
+      "choice": "negative",
+      "justification": "L'avis critique le montant facturé différent du prix affiché et la présentation des suppléments et taxes sur la facture."
+    },
+    {
+      "review_id": "65122f12-5100-4932-b567-32896eb5ea84",
+      "theme_key": "value",
+      "analysis_text_sha256": "1ec3ea9160ac9ba25d83a914283f69ba563175397b18debfd112068796249d7b",
+      "choice": "negative",
+      "justification": "Le client affirme explicitement que le prix payé ne vaut pas l'expérience obtenue."
+    },
+    {
+      "review_id": "215b39b1-3054-4722-b338-671496e5d2a2",
+      "theme_key": "atmosphere",
+      "analysis_text_sha256": "0b54a62dad486986cdbf9048104b62c28578e5f4c724663235d84607f5a923c9",
+      "choice": "positive",
+      "justification": "Le client qualifie explicitement l'atmosphère de très bonne."
+    },
+    {
+      "review_id": "215b39b1-3054-4722-b338-671496e5d2a2",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "0b54a62dad486986cdbf9048104b62c28578e5f4c724663235d84607f5a923c9",
+      "choice": "positive",
+      "justification": "Le commentaire exprime explicitement une appréciation positive de la nourriture."
+    },
+    {
+      "review_id": "f8c708d9-983f-475e-b316-d2aa68c87e96",
+      "theme_key": "billing",
+      "analysis_text_sha256": "e6b138db24f45c529c0609b1b383fce072bf5779c667093750507b195d0f5bc8",
+      "choice": "negative",
+      "justification": "La TVA ajoutée au total et non comprise dans le prix du plat est soulignée comme avertissement de facturation."
+    },
+    {
+      "review_id": "f8c708d9-983f-475e-b316-d2aa68c87e96",
+      "theme_key": "cooking",
+      "analysis_text_sha256": "e6b138db24f45c529c0609b1b383fce072bf5779c667093750507b195d0f5bc8",
+      "choice": "negative",
+      "justification": "Le poisson est décrit comme trop cuit et difficile à mâcher, avec un autre morceau acceptable."
+    },
+    {
+      "review_id": "c128ad9c-e146-4e71-9add-2b5646e60081",
+      "theme_key": "attentiveness",
+      "analysis_text_sha256": "028db30f6d3a468c08a557c3f2497e298c1b3e6a23b4b63ac9ffe19b908f11c3",
+      "choice": "negative",
+      "justification": "Le client dit qu'il est très difficile de faire venir le personnel à sa table."
+    },
+    {
+      "review_id": "c128ad9c-e146-4e71-9add-2b5646e60081",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "028db30f6d3a468c08a557c3f2497e298c1b3e6a23b4b63ac9ffe19b908f11c3",
+      "choice": "negative",
+      "justification": "Le client juge explicitement les prix plutôt élevés."
+    },
+    {
+      "review_id": "919f2020-7777-4c78-aae0-56e38694b710",
+      "theme_key": "portions",
+      "analysis_text_sha256": "7749180c781f51118b95c410b96aa6a8e768318256e0a48a3ea57d78d714c12e",
+      "choice": "negative",
+      "justification": "Le client juge les portions des formules trop petites et précise que son conjoint n'était pas rassasié."
+    },
+    {
+      "review_id": "8d8d82b3-7b35-44e7-ac3a-df8b5778c05d",
+      "theme_key": "cooking",
+      "analysis_text_sha256": "ba3ad9bc31a5ad9675504a699a694e8750e221d48779806c76e9f5b0758df386",
+      "choice": "absent",
+      "justification": "Les oursins et fruits de mer crus sont cités comme produits consommés, sans évaluation précise de cuisson."
+    },
+    {
+      "review_id": "c6cd6823-5ba3-4c8d-84ed-2c82d4c2eafb",
+      "theme_key": "comfort",
+      "analysis_text_sha256": "48dfb72bdab70075c6d94dd5be396d9d527ffcbf60423b53c7b8b4f4b80302d4",
+      "choice": "negative",
+      "justification": "La salle est décrite comme un peu chaude, ce qui constitue une gêne de confort physique."
+    },
+    {
+      "review_id": "7b0c6575-fbd5-4e70-903d-11fef23aa32e",
+      "theme_key": "attentiveness",
+      "analysis_text_sha256": "0ac93b798f0e6a972723b4c85e07bd1499eb02c1dae57d4abd7a94409114fc81",
+      "choice": "negative",
+      "justification": "Le commentaire demande explicitement un personnel plus attentionné."
+    },
+    {
+      "review_id": "a93d3186-65e8-48ec-a517-b0eea1dac623",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "68c6deecdef39f09c6627f446df7f0a0e6d7cd545c94fb614bc6865f42a218de",
+      "choice": "both",
+      "justification": "Des crevettes sont recommandées et commandées de nouveau, mais un poisson frit est explicitement jugé peu bon."
+    },
+    {
+      "review_id": "bbd79b6a-0c78-4d3c-8918-7982294cfc63",
+      "theme_key": "cleanliness",
+      "analysis_text_sha256": "cd6724fe7a70c661a6ab8f93a66db6eb07250ba00e4db9b51d3b8a0a691d345d",
+      "choice": "positive",
+      "justification": "Le personnel débarrasse rapidement les déchets de table et remplace les assiettes lorsqu'elles deviennent sales : appréciation de l'entretien local de la table, sans inférer une hygiène générale."
+    },
+    {
+      "review_id": "0331a8a3-5944-47ea-b7c9-29d9a20d9bd6",
+      "theme_key": "portions",
+      "analysis_text_sha256": "bcd2c9d8e5d71def4243d832bcfb103f89ac7dc41acf4ee98049d56c9fa6bfa0",
+      "choice": "negative",
+      "justification": "Un produit est décrit comme bon mais un peu petit, ce qui critique directement sa taille."
+    },
+    {
+      "review_id": "868eb1ec-3081-4ad3-a0b1-5225e51a8d32",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "373e4dd86e1cff541d2fb02991886947b1f92e28263f67ba7c1b0243f8055df8",
+      "choice": "positive",
+      "justification": "L'avis dit explicitement que les prix ne sont pas trop élevés."
+    },
+    {
+      "review_id": "88bf139a-ef37-4b32-be6d-211b42d653a0",
+      "theme_key": "comfort",
+      "analysis_text_sha256": "ec2337c930a84d35dc4427b0b3bb20bf12940d7500015e3d5818a3cb6e888cfb",
+      "choice": "uncertain",
+      "justification": "La climatisation rend le repas presque froid, sans indiquer clairement si cette température est appréciée ou gênante."
+    },
+    {
+      "review_id": "31c54335-0983-40dd-ae98-1585fb94aaa0",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "f3eb8ad34e8ce68aad5fa7f59569c88f03762a8f49fb35562b80a35bcbedfae9",
+      "choice": "both",
+      "justification": "Le bánh xèo est jugé fade et gras, tandis que le phở est explicitement décrit comme la seule bonne chose."
+    },
+    {
+      "review_id": "e870f578-8d41-45e9-954a-fa891b148376",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "13d5217652a507eef753a10a30957d96730c6628d97854c261ee15858f1bcea9",
+      "choice": "negative",
+      "justification": "Le client déclare le prix élevé pour le service reçu, en le présentant comme un reproche."
+    },
+    {
+      "review_id": "9735f459-eae9-4741-a44c-09a2bcae9c5a",
+      "theme_key": "price_level",
+      "analysis_text_sha256": "eeee5e072e8b4e8f0331156e3a3c23afa64900eaf7e64a627a72e20861c3a18b",
+      "choice": "negative",
+      "justification": "Le mot « expensive » est présenté comme un désavantage contrasté avec le très bon goût des plats."
+    },
+    {
+      "review_id": "fb39cb91-db04-4906-ba99-5b147ba2628b",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "aac137bb2e15a71ca091f6f883a978dc48913d173c1905ca7deafc144aedd989",
+      "choice": "positive",
+      "justification": "La nourriture est explicitement décrite comme délicieuse."
+    },
+    {
+      "review_id": "da22cad1-fc99-4cc1-a866-e39eaa615ca8",
+      "theme_key": "professionalism",
+      "analysis_text_sha256": "d7a8955e0d84a651351f2b1e9123dc9645cc5de2d26fd51ab2212d2f374ee5b3",
+      "choice": "positive",
+      "justification": "Les employés connaissent bien le menu et fournissent de bonnes recommandations adaptées, démontrant une compétence de service."
+    },
+    {
+      "review_id": "d1c21845-81b7-41f5-aa05-4c721ee97cf0",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "02d1af6a5ae67fdcb7915cdcb394e0dd3cc03379a02aa168e4616ae0c9a45d2b",
+      "choice": "absent",
+      "justification": "L'avis parle d'un excellent restaurant de steaks, sans évaluer spécifiquement le goût ou la qualité d'un plat consommé."
+    },
+    {
+      "review_id": "aba9dde8-2d95-49a3-a3f0-c72294177ac7",
+      "theme_key": "communication",
+      "analysis_text_sha256": "0a4a10c18aa7b89c2bbc3c0f2005c4328a01ea6b109d4a4ec50ebffeb4c19089",
+      "choice": "positive",
+      "justification": "Une employée explique concrètement comment rouler la viande et les accompagnements, signal positif de communication utile."
+    },
+    {
+      "review_id": "cd1ecb81-462b-4749-a3a4-4d175179efeb",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "a673a8e811a16e60e90690dbf33c33ab2734e0de788273cc3310d89fd6dd97d0",
+      "choice": "positive",
+      "justification": "Le commentaire qualifie explicitement la nourriture de délicieuse."
+    },
+    {
+      "review_id": "42887ed7-c43c-42cc-8098-3201716d08f8",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "6cb5f68eaf6a8e365dfcc6c6ef5cfed08531e3eaedeeb106fb8b97aaf877a634",
+      "choice": "positive",
+      "justification": "Tous les plats sont explicitement décrits comme délicieux."
+    },
+    {
+      "review_id": "7675f9f3-195b-4bc7-8bf0-d93313944659",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "726bcf48f18e16c94e85c172d277617ec0d88101b7574cf20c1ef32c82264fda",
+      "choice": "positive",
+      "justification": "Le commentaire dit clairement que la nourriture est excellente."
+    },
+    {
+      "review_id": "6e285caf-47bf-423d-9b0f-ba90a4813a48",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "36f8f4f6fcfe498cf5483a9e71b6f825f4b7b6c43d32ad60b9a9eb6521e95c15",
+      "choice": "positive",
+      "justification": "Le commentaire évalue explicitement la nourriture comme très bonne."
+    },
+    {
+      "review_id": "73629119-f617-4ce5-97ba-bfd12b74128b",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "7d9f54751ef32e6f81cd57fea2a0e59948beb4384bdbe4cc141ad2c8e2f160ae",
+      "choice": "positive",
+      "justification": "Le client décrit la nourriture comme délicieuse et conforme à ses goûts."
+    },
+    {
+      "review_id": "3fe60ed0-67ac-4cc3-bc36-1f33e310f2a3",
+      "theme_key": "portions",
+      "analysis_text_sha256": "1a2bb324b311dfdd736543c1f430157b93f56d534a8eebd80ffb1bc0ec968bfa",
+      "choice": "positive",
+      "justification": "La portion de burger est directement qualifiée de généreuse."
+    },
+    {
+      "review_id": "92170411-612f-4cee-8b4e-1b0b372013c0",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "cd2e98c67bbb4bda72115fe5dc3b375a0cbbeaed526b916f93c986a4a603535e",
+      "choice": "positive",
+      "justification": "La nourriture est explicitement qualifiée de délicieuse."
+    },
+    {
+      "review_id": "bf184965-d590-42a2-af68-21999e6d4fba",
+      "theme_key": "food_quality",
+      "analysis_text_sha256": "b4da80363ea23e34f13791b79eb814e935125885784ef19a7f2448e4759ce7b4",
+      "choice": "positive",
+      "justification": "Le commentaire qualifie la nourriture de délicieuse et recommande fortement le ramen aux fruits de mer."
+    }
+  ]
+}
