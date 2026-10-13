@@ -14,6 +14,14 @@ import {
   verifyNegativeSet,
 } from "../_shared/luna-negative-v2.ts";
 import { decisionsHash } from "../_shared/decisions-config.ts";
+import {
+  loadNegativeLaunch,
+  negativeLaunchRpc,
+  negativeLaunchView,
+  negativePort,
+} from "../_shared/luna-negative-v2-store.ts";
+import { processNegativeBatch } from "../_shared/luna-negative-v2-worker.ts";
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 Deno.serve(negativeHandler(async (request) => {
   const ctx = await requireUser(request);
   await assertMembership(ctx.client, ctx.user.id, NEG_ORG, [
@@ -67,10 +75,51 @@ Deno.serve(negativeHandler(async (request) => {
       blind_export: record ? blindNegativeExport(record.body) : null,
       paid_enabled: false,
       new_paid_calls: 0,
+      launch: record && seal
+        ? await negativeLaunchView(
+          ctx.admin,
+          !!Deno.env.get("OPENAI_API_KEY")?.trim(),
+        )
+        : undefined,
     };
   }
   return {
     read,
+    prepareLaunch: async (v) => {
+      if (!v.launch || !v.reference_seal) {
+        throw new Error("NEGATIVE_V2_REFERENCE_REQUIRED");
+      }
+      await negativeLaunchRpc(ctx.admin, "luna_nv2_save_plan", {
+        p_user: ctx.user.id,
+        p_manifest: v.launch.manifest,
+        p_sha: v.launch.manifest_sha256,
+      });
+      return read();
+    },
+    confirmLaunch: async (v, b) =>
+      await negativeLaunchRpc(ctx.admin, "luna_nv2_confirm", {
+        p_user: ctx.user.id,
+        p_plan: v.launch!.plan_id,
+        p_sha: b.manifest_sha256,
+        p_cost: b.estimated_cost_usd,
+        p_consent: b.consent_version,
+      }) as string,
+    wake: (run) => {
+      EdgeRuntime.waitUntil(
+        (async () => {
+          const source = await loadNegativeLaunch(ctx.admin);
+          await processNegativeBatch(
+            negativePort(ctx.admin),
+            source,
+            run,
+            Deno.env.get("OPENAI_API_KEY") ?? "",
+            fetch,
+          );
+        })().catch(() => {
+          console.error("NEGATIVE_V2_DISPATCH_STOPPED_NO_RETRY");
+        }),
+      );
+    },
     freeze: async () => {
       const old = await read();
       if (old.record) return old;

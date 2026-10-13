@@ -564,3 +564,6 @@ verify_jwt = false
 
 [functions.luna-negative-v2]
 verify_jwt = false
+
+[functions.process-luna-negative-v2]
+verify_jwt = false
