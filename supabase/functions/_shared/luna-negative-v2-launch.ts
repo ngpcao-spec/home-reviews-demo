@@ -193,6 +193,12 @@ export async function negativeRunScore(
     ).length;
   return {
     ...score,
+    // Missing telemetry must never turn into a fabricated zero total or fewer attempts.
+    cost_usd: unknown ? null : score.cost_usd,
+    known_cost_usd: score.cost_usd,
+    cost_per_decision: unknown ? null : score.cost_per_decision,
+    api_calls: tasks.filter((t) => t.request_count === 1).length,
+    input_tokens: tasks.reduce((n, t) => n + (t.input_tokens ?? 0), 0),
     cases,
     negative: negativeMetrics(
       {
