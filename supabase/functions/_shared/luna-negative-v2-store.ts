@@ -94,13 +94,19 @@ export function negativePort(admin: SupabaseClient): NegativePort {
     claim: async (worker, run) => {
       const { data: r, error } = await admin.from(
         "analysis_luna_negative_v2_runs",
-      ).select("confirmed_by,organization_id,status").eq("id", run).single();
+      ).select(
+        "confirmed_by,organization_id,status,consent_source,organization_authority_user_id",
+      ).eq("id", run).single();
       if (error || !r || r.organization_id !== NEG_ORG) {
         throw new Error("FORBIDDEN");
       }
       if (!["queued", "running"].includes(r.status)) return null;
       try {
-        await assertEvidence40ActiveUser(admin, r.confirmed_by);
+        const authority = r.consent_source === "user_directive_codex_delegation"
+          ? r.organization_authority_user_id
+          : r.confirmed_by;
+        if (!authority) throw new Error("FORBIDDEN");
+        await assertEvidence40ActiveUser(admin, authority);
       } catch {
         await negativeLaunchRpc(admin, "luna_nv2_stop_unsent", {
           p_run: run,
