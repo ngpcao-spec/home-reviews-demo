@@ -1,3 +1,4 @@
+import {NegativeV2Entry} from './LunaNegativeV2Page';
 import {Native48Entry} from './LunaNative48Page';
 import {LunaMultirestEntry} from "./LunaMultirestPage";
 import {useEffect} from "react";
@@ -18,7 +19,7 @@ const messages={
 } as const;
 export function DecisionsWorkspace({data}:{data:DecisionsView}){const {language}=useI18n(),t=messages[language],p=data.record?.body,money=(n:number|null)=>n===null?"—":n.toLocaleString(language,{maximumFractionDigits:6})+" USD",metric=(m:{precision:number|null;recall:number|null;f1:number|null})=>[m.precision,m.recall,m.f1].map(n=>n===null?"—":n.toFixed(3)).join(" / ");return <>
  <section className="card jev-card"><h2>{t.title}</h2><p>{t.intro}</p><p>{t.disabled}</p><button className="primary-button full-width" disabled>{t.choice}</button><button className="secondary-button full-width" disabled>{t.predicate}</button></section>
- <LunaMultirestEntry/><Native48Entry/>
+ <LunaMultirestEntry/><Native48Entry/><NegativeV2Entry/>
  {p&&<><section className="card jev-card"><h2>{t.ready}</h2><p>{t.refs}</p><p>{t.source} : {p.paired_reviews} · {p.reference_count} labels</p><p>{t.uncertain} : {p.uncertain_reference_count}</p><p>{t.native}</p><p>{t.questionsNative}</p><p>{t.thresholds}</p><p>{t.abstain}</p><p className="jev-id">{p.source_set_id}<br/>{p.source_seal.dataset_sha256}<br/>{p.source_seal.reference_sha256}</p></section>
  <section className="card jev-card"><h2>{t.baseline}</h2><p>{t.negative} : {metric(p.jev.score.negative)}</p><p>{t.positive} : {metric(p.jev.score.positive)}</p><p>{t.global} : {p.jev.score.overall.f1?.toFixed(3)}</p><p>{t.usage} : {money(p.jev.usage.cost_usd)} / {money(0)}</p><p>{p.jev.usage.input_tokens} input · {p.jev.usage.output_tokens} output · {p.jev.usage.duration_ms} ms</p><p>{p.jev.served_models.join(", ")}</p></section>
  {(["choice","predicate"] as const).map(v=><section className="card jev-card" key={v}><h2>Luna {v}</h2><p>gpt-6-luna · {t.questions} : {p.costs[v].questions_per_review}</p><p>{t.calls} : {p.costs[v].planned_calls}</p><p>{t.tokens} : {p.costs[v].estimated_input_tokens}</p><p>{t.cost} : {money(p.costs[v].input_only_estimate_usd)}</p><p>{t.breakeven} : {p.costs[v].break_even_tokens_per_review?.toFixed(0)}</p><p>{t.unmeasured}</p><p>{t.estimate}</p><details><summary>100 / 500 / 1 000</summary>{p.costs[v].scenarios.map((s:{reviews:number;input_only_estimate_usd:number})=><p key={s.reviews}>{s.reviews} : {money(s.input_only_estimate_usd)}</p>)}</details></section>)}
