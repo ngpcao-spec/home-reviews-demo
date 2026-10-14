@@ -1,3 +1,4 @@
+import type { JlsRevalidation } from "./jev-luna-sol-revalidation.ts";
 import { json, preflight } from "./cors.ts";
 import { hybridHash } from "./jev-hybrid-evidence.ts";
 import type { JlsPlan } from "./jev-luna-sol.ts";
@@ -15,6 +16,7 @@ export interface JlsView {
     tasks: JlsExecutionTask[];
     dossier: {body:Awaited<ReturnType<typeof acceptedSolDossier>>;sha256:string}|null;
     result: {body:{sol_result:Awaited<ReturnType<typeof validateJlsReport>>};result_sha256:string}|null;
+    revalidation?: JlsRevalidation | null;
     costs:ReturnType<typeof executionCosts>;
   };
 }

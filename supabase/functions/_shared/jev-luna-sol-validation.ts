@@ -24,6 +24,22 @@ const ACTION_CLAIMS: Partial<Record<keyof typeof HYBRID_ACTIONS, string[]>> = {
   value: ["value_mismatch"], price: ["high_price"], bill: ["bill_charge"],
   wayfinding: ["wayfinding_problem"], distance: ["distance_problem"],
 };
+type ActionEvidence = Pick<JlsPlan["selected"][number],
+  "context" | "quote" | "theme_key" | "polarity" | "quote_start" | "quote_end" | "context_start">;
+export function jlsActionEvidenceSupported(e: ActionEvidence, claims?: readonly string[]) {
+  const graph = parseReviewV3(e.context),
+    rule = verifyGraphV3(graph, e.theme_key, e.polarity),
+    start = e.quote_start - e.context_start, end = e.quote_end - e.context_start;
+  // Keep full-context negation, antecedents, contradictions and temporal reversals.
+  // The globally ranked statement may be outside the selected citation: inspect
+  // all matching statements, but bind them to this exact source span.
+  if (rule.status !== "supported_by_rule" || !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(end) || start < 0 || end <= start || end > e.context.length ||
+    e.context.slice(start, end) !== e.quote) return false;
+  return graph.statements.some(s => s.theme === e.theme_key && s.polarity === e.polarity &&
+    s.actionable && s.start >= start && s.end <= end && e.quote.includes(s.quote) &&
+    (!claims || claims.includes(s.claim)));
+}
 export async function validateJlsReport(raw: unknown, p: JlsPlan, snapshot: PilotSnapshot, decisions: JlsDecision[]) {
   const dossier = await acceptedSolDossier(p, decisions);
   if (snapshot.id !== p.source_snapshot_id || snapshot.organization_id !== p.organization_id ||
@@ -73,13 +89,9 @@ export async function validateJlsReport(raw: unknown, p: JlsPlan, snapshot: Pilo
     for (const id of a.evidence_ids) {
       const e = p.selected.find(e => e.evidence_id === id)!;
       if (action.theme && action.theme !== e.theme_key || action.polarity !== e.polarity) reasons.push("ACTION_THEME_OR_POLARITY_MISMATCH");
-      const rule = verifyGraphV3(parseReviewV3(e.context), e.theme_key, e.polarity),
-        claims = ACTION_CLAIMS[a.action_code];
       // Luna verifies theme/polarity, NOT this precise recommended action.
       // V3 uncertainty never invalidates the evidence, but action grounding must abstain.
-      if (rule.status !== "supported_by_rule" || !rule.statement?.actionable ||
-        !e.quote.includes(rule.statement.quote) ||
-        claims && !claims.includes(rule.statement.claim)) reasons.push("PRECISE_ACTION_REQUIRES_REVIEW");
+      if (!jlsActionEvidenceSupported(e, ACTION_CLAIMS[a.action_code])) reasons.push("PRECISE_ACTION_REQUIRES_REVIEW");
     }
     return { ...a, text: reasons.length ? null : action[p.language],
       status: reasons.length ? "review_needed" : "grounded_in_luna_accepted_evidence_and_rules",
