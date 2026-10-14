@@ -9,6 +9,8 @@ import { jlsMessages } from "../i18n/jev-luna-sol";
 import { GOLD_TAXONOMY } from "../../supabase/functions/_shared/gold-taxonomy";
 import { PrioritizedJlsReport } from "../components/analysis/PrioritizedJlsReport";
 import {JlsEditorialPreparation} from "../components/analysis/JlsEditorialPreparation";
+import {JlsRestaurantPreparation, type RestaurantView} from "../components/analysis/JlsRestaurantPreparation";
+import {supabase} from "../lib/supabase";
 import "./JevBenchmarkPage.css";
 import "./GoldSetPage.css";
 import "./PilotEvidenceV3Page.css";
@@ -18,10 +20,13 @@ export function JevLunaSolPage() {
   const [selected, setSelected] = useState("");
   const est = establishments.find(e => e.id === selected) ??
     establishments.find(e => e.id === "252a8dca-14c7-4f09-bd1f-7b2c40ae97aa") ?? establishments[0];
+  const garden=est?.id==="d40d3438-79d8-4c28-8b09-eba640598201";
   const q = useQuery({ queryKey: ["jls-free-preview", currentUser.id, est?.id, language],
-    enabled: !demoMode && !!currentUser.id && !!est, retry: false,
+    enabled: !garden && !demoMode && !!currentUser.id && !!est, retry: false,
     queryFn: () => jlsPreview(est!.id, language) });
-  const { refetch } = q;
+  const restaurant=useQuery({queryKey:["jls-restaurant",currentUser.id,est?.id],enabled:garden&&!demoMode,retry:false,
+    queryFn:async()=>{if(!supabase)throw Error("UNAUTHORIZED");const r=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:est!.id}),{method:"GET"});if(r.error)throw Error("JLS_READ_FAILED");return r.data as RestaurantView;}});
+  const refetch=garden?restaurant.refetch:q.refetch;
   useEffect(() => {
     const read = () => { if (!document.hidden && !demoMode && est) void refetch(); };
     window.addEventListener("pageshow", read); document.addEventListener("visibilitychange", read);
@@ -32,11 +37,11 @@ export function JevLunaSolPage() {
     <select id="jls-est" value={est?.id ?? ""} onChange={e => setSelected(e.target.value)}>
       {establishments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
     </select>
-    {q.isFetching && <p role="status">{t.loading}</p>}
-    {q.isError && <p role="alert">{t.error} : {q.error.message}</p>}
-    {q.data && <JlsWorkspace data={q.data} />}
+    {(garden?restaurant.isFetching:q.isFetching) && <p role="status">{t.loading}</p>}
+    {(garden?restaurant.isError:q.isError) && <p role="alert">{t.error} : {garden?restaurant.error?.message:q.error?.message}</p>}
+    {garden?restaurant.data&&<JlsRestaurantPreparation data={restaurant.data}/>:q.data&&<JlsWorkspace data={q.data}/>}
     {!est && <p>{t.empty}</p>}
-    <button className="secondary-button full-width" disabled={!est || q.isFetching || demoMode} onClick={() => void q.refetch()}>{t.refresh}</button>
+    <button className="secondary-button full-width" disabled={!est || (garden?restaurant.isFetching:q.isFetching) || demoMode} onClick={() => void (garden?restaurant.refetch():q.refetch())}>{t.refresh}</button>
     <Link to="/plus/jev-benchmark">{t.back}</Link>
   </div></>;
 }

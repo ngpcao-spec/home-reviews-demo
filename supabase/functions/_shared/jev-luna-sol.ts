@@ -64,7 +64,7 @@ export function jlsProvenanceMetadata(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !omitted.has(key))
     .map(([key, v]) => [key, jlsProvenanceMetadata(v)]));
 }
-export function jlsSolDraft(source: BalancedPlan, evidence: JlsEvidence[], language: "fr" | "vi", kind: "conditional_estimate" | "accepted_only") {
+export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sha256"> & {estimates:{rates:BalancedPlan["estimates"]["rates"]}}, evidence: JlsEvidence[], language: "fr" | "vi", kind: "conditional_estimate" | "accepted_only") {
   const packet = {
     version: JLS_VERSION, language, statistics: source.analytics,
     statistics_sha256: source.statistics_sha256,
@@ -157,7 +157,7 @@ export async function buildJlsPlan(s: JlsSource, snapshot: PilotSnapshot, langua
     conditional_sol_preview: sol, conditional_sol_sha256: await hybridHash(sol.packet),
     prompt_sha256: await negativeHash(sol.prompt), schema_sha256: await hybridHash(sol.schema),
     estimates: { jev_new_calls: 0, jev_new_cost_usd: 0, jev_reused_cost_usd: 0,
-      luna_input_tokens: luna_tokens, luna_cost_usd: luna_cost, luna_rate_per_million: DECISIONS_RATE,
+      luna_input_tokens: luna_tokens, luna_cost_usd: luna_cost as number|null, luna_rate_per_million: DECISIONS_RATE,
       sol: sol.estimates, total_estimated_cost_usd: sol.estimates.estimated_cost_usd === null
         ? null : luna_cost + sol.estimates.estimated_cost_usd,
       high_estimated_cost_usd: sol.estimates.high_estimated_cost_usd === null
