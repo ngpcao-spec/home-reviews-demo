@@ -7,6 +7,7 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { jlsPreview, type JlsView } from "../lib/jev-luna-sol";
 import { jlsMessages } from "../i18n/jev-luna-sol";
 import { GOLD_TAXONOMY } from "../../supabase/functions/_shared/gold-taxonomy";
+import { PrioritizedJlsReport } from "../components/analysis/PrioritizedJlsReport";
 import "./JevBenchmarkPage.css";
 import "./GoldSetPage.css";
 import "./PilotEvidenceV3Page.css";
@@ -54,6 +55,9 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
       <button className="primary-button full-width" disabled>{t.generate}</button>
     </section>
     {data.delegated&&<JlsDelegatedStatus data={data.delegated}/>}
+    {data.prioritized&&<JlsPrioritizedPreparation data={data.prioritized}/>}
+    {data.prioritized?.result&&<PrioritizedJlsReport result={data.prioritized.result}/>}
+    {data.prioritized_error&&<p role="alert">{language==="fr"?"Nouveau format indisponible ; rapport historique conservé":"Định dạng mới chưa khả dụng; báo cáo cũ được giữ nguyên"} : {data.prioritized_error}</p>}
     {!p ? <p>{t.empty}</p> : <>
       <section className="card jev-card"><h2>{p.establishment_name}</h2><p>{t.source}</p><p>{t.preparation}</p>
         <dl className="jev-pairs"><dt>{t.analysed}</dt><dd>{p.statistics.coverage.analysed_reviews}</dd><dt>{t.quotes}</dt><dd>{p.question_count}</dd><dt>{t.reviews}</dt><dd>{p.max_luna_calls}</dd></dl>
@@ -92,7 +96,7 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
         <details><summary>{t.full}</summary><p>{p.luna_groups.find(g => g.review_id === e.review_id)?.payload.input &&
           JSON.parse(p.luna_groups.find(g => g.review_id === e.review_id)!.payload.input).analysis_text}</p></details>
       </article>)}</section>
-      <details className="card jev-card"><summary>{t.dossier}</summary><p>{t.dossierLimit}</p>
+      <details className="card jev-card"><summary>{t.dossier}</summary><p>{decisions.length?(language==="fr"?"Dossier conditionnel du plan historique, préparé avant Luna. Le dossier des preuves acceptées est affiché séparément.":"Hồ sơ có điều kiện của kế hoạch cũ, chuẩn bị trước Luna. Hồ sơ bằng chứng đã được chấp nhận hiển thị riêng."):t.dossierLimit}</p>
         <pre>{JSON.stringify(p.conditional_sol_preview.request, null, 2)}</pre></details>
       <details className="card jev-card"><summary>{t.details}</summary><pre>{JSON.stringify(p.luna_groups, null, 2)}</pre></details>
       <button className="secondary-button full-width" onClick={download}>{t.download}</button>
@@ -133,4 +137,29 @@ export function JlsDelegatedStatus({data}:{data:NonNullable<JlsView["delegated"]
 export function JlsEntry() {
   const { language } = useI18n(), t = jlsMessages[language];
   return <section className="card jev-card"><h3>{t.title}</h3><p>{t.locked}</p><Link className="secondary-button full-width" to="/plus/jev-luna-sol">{t.dossier}</Link></section>;
+}
+export function JlsPrioritizedPreparation({data}:{data:NonNullable<JlsView["prioritized"]>}){
+  const {language}=useI18n(),fr=language==="fr",d=data.draft,
+    money=(n:number|null)=>n===null?(fr?"Inconnu":"Chưa biết"):n.toLocaleString(language,{maximumFractionDigits:7})+" USD";
+  return <section className="card jev-card jls-prioritized">
+    <h3>{fr?"Nouveau format — recommandations prioritaires":"Định dạng mới — khuyến nghị ưu tiên"}</h3>
+    <p className="evidence-id">{d.version}</p>
+    <p>{fr?"Format prêt. Le rapport historique reste conservé ; aucun nouveau rapport généré.":"Định dạng sẵn sàng. Giữ nguyên báo cáo cũ; chưa tạo báo cáo mới."}</p>
+    <p>{fr?"Trois à cinq priorités si les preuves le permettent ; moins si nécessaire. Chaque priorité sépare constat sourcé, action proposée et justification de l’ordre.":"Ba đến năm ưu tiên nếu có đủ bằng chứng; ít hơn nếu cần. Mỗi ưu tiên tách phản ánh có nguồn, hành động đề xuất và lý do xếp thứ tự."}</p>
+    <dl className="jev-pairs"><dt>{fr?"Preuves ACCEPTED réutilisables":"Bằng chứng ACCEPTED có thể dùng lại"}</dt><dd>{d.accepted_ids.length}</dd>
+      <dt>Sol · {fr?"entrée estimée":"đầu vào ước tính"}</dt><dd>{d.estimates.estimated_input_tokens}</dd>
+      <dt>Sol · {fr?"sortie prévue":"đầu ra dự kiến"}</dt><dd>{d.estimates.estimated_output_tokens}</dd>
+      <dt>Sol · {fr?"coût estimé":"chi phí ước tính"}</dt><dd>{money(d.estimates.estimated_cost_usd)}</dd>
+      <dt>{fr?"Estimation haute":"Ước tính cao"}</dt><dd>{money(d.estimates.high_estimated_cost_usd)}</dd>
+    </dl>
+    <p>{fr?"JEV et Luna supplémentaires : zéro dans cette prévisualisation. Estimations locales, pas une facture ; éventuels suppléments non vérifiés.":"Không gọi thêm JEV hay Luna trong phần xem trước này. Ước tính cục bộ, không phải hóa đơn; phụ phí chưa xác minh."}</p>
+    <button className="primary-button full-width" disabled>{fr?"Nouvel essai — GO explicite requis":"Thử nghiệm mới — cần cho phép rõ ràng"}</button>
+    <details><summary>{fr?"Preuves disponibles pour les constats":"Bằng chứng có sẵn cho phần phản ánh"}</summary>
+      {d.packet.evidence.map(e=><article className="evidence-proof" key={e.evidence_id}><h4>{GOLD_TAXONOMY[e.theme_key][language]} · {e.polarity} · {e.rating} ★</h4>
+        <blockquote lang="en">{e.quote}</blockquote><details><summary>{fr?"Contexte exact et empreintes":"Ngữ cảnh chính xác và mã băm"}</summary><p lang="en">{e.context}</p>
+          <p className="evidence-id">{e.review_id}<br />{e.evidence_id}<br />{e.quote_sha256}<br />{e.context_sha256}</p></details></article>)}
+    </details>
+    <details><summary>{fr?"Dossier et schéma du futur appel Sol":"Hồ sơ và cấu trúc lần gọi Sol tương lai"}</summary><pre>{JSON.stringify(d.request,null,2)}</pre></details>
+    <aside className="jls-methodology"><h4>{fr?"Note méthodologique":"Ghi chú phương pháp"}</h4><p>{d.methodology_note}</p></aside>
+  </section>;
 }

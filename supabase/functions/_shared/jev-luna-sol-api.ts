@@ -1,4 +1,6 @@
 import type { JlsRevalidation } from "./jev-luna-sol-revalidation.ts";
+import type { PrioritizedDraft } from "./jev-luna-sol-prioritized.ts";
+import type { validatePrioritizedReport } from "./jev-luna-sol-prioritized-validation.ts";
 import { json, preflight } from "./cors.ts";
 import { hybridHash } from "./jev-hybrid-evidence.ts";
 import type { JlsPlan } from "./jev-luna-sol.ts";
@@ -9,6 +11,9 @@ export interface JlsView {
   plan: { id: string; body: JlsPlan; result_sha256: string; created_at: string } | null;
   runs: { id: string; status: string }[];
   paid_enabled: false; production_enabled: false; new_paid_calls: 0;
+  prioritized?: { draft: PrioritizedDraft; artifact_id: number | null; source_run_id: string;
+    result?: Awaited<ReturnType<typeof validatePrioritizedReport>> | null } | null;
+  prioritized_error?: string | null;
   delegated?: {
     ready: boolean; plan_id: string;
     protocol: { body: Awaited<ReturnType<typeof delegatedProtocol>>; sha256: string } | null;

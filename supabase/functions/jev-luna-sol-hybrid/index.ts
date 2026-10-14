@@ -4,6 +4,7 @@ import { jlsHandler, type JlsView } from "../_shared/jev-luna-sol-api.ts";
 import { verifyJlsPlan, JLS_VERSION } from "../_shared/jev-luna-sol.ts";
 import {JLS_PILOT_PLAN,executionCosts, type JlsExecutionTask} from "../_shared/jev-luna-sol-delegation.ts";
 import {hybridHash} from "../_shared/jev-hybrid-evidence.ts";
+import { buildPrioritizedDraft, verifyPrioritizedDraft, JLS_PRIORITIZED_ACTION } from "../_shared/jev-luna-sol-prioritized.ts";
 Deno.serve(jlsHandler(async request => {
   const ctx = await requireUser(request), query = new URL(request.url).searchParams;
   const establishment = query.get("establishment_id"), language = query.get("language") ?? "vi";
@@ -27,9 +28,11 @@ Deno.serve(jlsHandler(async request => {
   await verifyJlsPlan(plan.body, a.data, b.data);
   const { data: runs, error: re } = await ctx.client.from("analysis_jev_luna_sol_runs").select("id,status").eq("organization_id", est.organization_id).eq("plan_id", plan.id);
   if (re) throw new Error("JLS_READ_FAILED");
-  const {data:target,error:te}=await ctx.client.from("analysis_jev_luna_sol_plans").select("id").eq("id",JLS_PILOT_PLAN).eq("organization_id",est.organization_id).eq("establishment_id",est.id).maybeSingle();
+  const {data:target,error:te}=await ctx.client.from("analysis_jev_luna_sol_plans").select("id,body,result_sha256").eq("id",JLS_PILOT_PLAN).eq("organization_id",est.organization_id).eq("establishment_id",est.id).maybeSingle();
   if(te)throw new Error("JLS_READ_FAILED");
   let delegated:JlsView["delegated"];
+  let prioritized:JlsView["prioritized"] = null;
+  let prioritized_error:string|null=null;
   if(target){
     const [pr,rr]=await Promise.all([
       ctx.client.from("analysis_jev_luna_sol_protocols").select("body,sha256").eq("plan_id",target.id).maybeSingle(),
@@ -47,7 +50,29 @@ Deno.serve(jlsHandler(async request => {
     if(revision.error)throw new Error("JLS_READ_FAILED");
     if(revision.data&&(!rr.data||!result.data))throw new Error("JLS_REVALIDATION_CHANGED");
     const revalidation=revision.data?await verifyJlsRevalidation(revision.data.payload,rr.data!.id,result.data!):null;
+    if(result.data&&rr.data){try{
+      // Read-only new-format preparation. Never a run, authorization or provider call.
+      const targetSource=target.body.source_plan_id===a.data.id?a:await ctx.client.from("analysis_jev_hybrid_plans")
+        .select("id,body,result_sha256").eq("id",target.body.source_plan_id).eq("organization_id",est.organization_id).single();
+      if(targetSource.error||!targetSource.data)throw new Error("JLS_SOURCE_CHANGED");
+      await verifyJlsPlan(target.body,targetSource.data,b.data);
+      const decisions=result.data.body.sol_result.luna_decisions;
+      const saved=await ctx.client.from("analysis_jev_luna_sol_events").select("id,payload")
+        .eq("organization_id",est.organization_id).eq("plan_id",target.id).eq("action",JLS_PRIORITIZED_ACTION)
+        .eq("payload->body->>language",language).maybeSingle();
+      if(saved.error)throw new Error("JLS_READ_FAILED");
+      const body=saved.data?.payload.body;
+      if(body&&(await hybridHash(body)!==saved.data!.payload.sha256||body.source_run_id!==rr.data.id||
+        body.source_result_sha256!==result.data.result_sha256||body.source_plan_sha256!==target.result_sha256||body.organization_id!==est.organization_id))throw new Error("JLS_PRIORITIZED_PREPARATION_CHANGED");
+      const draft=body?.draft??await buildPrioritizedDraft(target.body,decisions,language as "fr"|"vi");
+      await verifyPrioritizedDraft(draft,target.body,decisions);
+      prioritized={draft,artifact_id:saved.data?.id??null,source_run_id:rr.data.id};
+    }catch(e){
+      // A failed new preparation is never used, but must not hide the separately
+      // verified immutable historical report.
+      prioritized_error=e instanceof Error&&/^[A-Z0-9_]+$/.test(e.message)?e.message:"JLS_PRIORITIZED_PREPARATION_CHANGED";
+    }}
     delegated={revalidation,ready:!!pr.data,plan_id:target.id,protocol:pr.data,run:rr.data,tasks:tasks.data as JlsExecutionTask[],dossier:dossier.data,result:result.data,costs:executionCosts(tasks.data as JlsExecutionTask[])};
   }
-  return { plan, delegated, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
+  return { plan, delegated, prioritized, prioritized_error, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
 }));

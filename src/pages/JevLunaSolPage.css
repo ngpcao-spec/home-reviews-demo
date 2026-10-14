@@ -5,4 +5,7 @@
 .jls-star meter { width: 100%; }
 .jls-status-pair { display: contents; }
 .jls-page select { width: 100%; }
+.jls-prioritized .evidence-proof { padding: .8rem 0; border-top: 1px solid var(--color-border, #8b7c69); }
+.jls-prioritized strong { display: block; margin-top: .7rem; }
+.jls-methodology { border-top: 1px solid var(--color-border, #8b7c69); margin-top: 1rem; padding-top: .6rem; font-size: .9rem; }
 .jls-page .jev-pairs dd { overflow-wrap: anywhere; min-width: 0; }
