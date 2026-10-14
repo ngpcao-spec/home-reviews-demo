@@ -40,6 +40,7 @@ export function JevLunaSolPage() {
 }
 export function JlsWorkspace({ data }: { data: JlsView }) {
   const { language } = useI18n(), t = jlsMessages[language], p = data.plan?.body;
+  const decisions=data.delegated?.tasks.filter(x=>x.phase==="luna").flatMap(x=>x.parsed?.decisions??[])??[];
   const axisNames: Record<string,string> = language === "fr" ? { service:"Service",quality:"Qualité",price:"Prix",atmosphere:"Ambiance" } : { service:"Dịch vụ",quality:"Chất lượng",price:"Giá",atmosphere:"Không gian" };
   const money = (x: number | null) => x === null ? t.unknown : x.toLocaleString(language, { maximumFractionDigits: 7 }) + " USD";
   const download = () => {
@@ -49,9 +50,10 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
     const a = document.createElement("a"); a.href = u; a.download = `jev-luna-sol-preparation-${language}.json`; a.click(); URL.revokeObjectURL(u);
   };
   return <>
-    <section className="card jev-card"><h2>{t.title}</h2><p>{t.intro}</p><p>{t.locked}</p><p>{t.limit}</p>
+    <section className="card jev-card"><h2>{t.title}</h2><p>{t.intro}</p><p>{data.delegated?.run?data.delegated.run.status:t.locked}</p><p>{t.limit}</p>
       <button className="primary-button full-width" disabled>{t.generate}</button>
     </section>
+    {data.delegated&&<JlsDelegatedStatus data={data.delegated}/>}
     {!p ? <p>{t.empty}</p> : <>
       <section className="card jev-card"><h2>{p.establishment_name}</h2><p>{t.source}</p><p>{t.preparation}</p>
         <dl className="jev-pairs"><dt>{t.analysed}</dt><dd>{p.statistics.coverage.analysed_reviews}</dd><dt>{t.quotes}</dt><dd>{p.question_count}</dd><dt>{t.reviews}</dt><dd>{p.max_luna_calls}</dd></dl>
@@ -61,8 +63,8 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
         <div className="jls-star" key={star}><span>{star} ★</span><meter min={0} max={p.question_count} value={count} /><strong>{count}</strong></div>)}
         <p>{language === "fr" ? "Diversité des citations ; les fréquences du restaurant restent calculées sur tous les avis analysés." : "Độ đa dạng trích dẫn; tần suất của nhà hàng vẫn tính trên mọi đánh giá đã phân tích."}</p>
       </section>
-      <section className="card jev-card"><h3>{t.pending} · {p.question_count}</h3><p>{t.rules} · {p.selected_summary.rule_confirmed}</p>
-        <dl className="jev-pairs">{[t.accepted, t.rejected, t.uncertain].map(x => <div className="jls-status-pair" key={x}><dt>{x}</dt><dd>{t.unrun}</dd></div>)}</dl>
+      <section className="card jev-card"><h3>{t.pending} · {p.question_count-decisions.length}</h3><p>{t.rules} · {p.selected_summary.rule_confirmed}</p>
+        <dl className="jev-pairs">{[[t.accepted,"ACCEPTED"],[t.rejected,"REJECTED"],[t.uncertain,"UNCERTAIN"]].map(([x,s]) => <div className="jls-status-pair" key={x}><dt>{x}</dt><dd>{decisions.length?decisions.filter(d=>d.status===s).length:t.unrun}</dd></div>)}</dl>
       </section>
       <section className="card jev-card"><h3>{t.costs}</h3><p>{t.zero}</p><dl className="jev-pairs">
         <dt>{t.requests}</dt><dd>{p.max_luna_calls}</dd><dt>{t.questions}</dt><dd>{p.question_count}</dd>
@@ -82,6 +84,7 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
       <section className="card jev-card"><h3>{t.quotes}</h3>{p.selected.map(e => <article className="evidence-proof" key={e.evidence_id}>
         <h4>{GOLD_TAXONOMY[e.theme_key][language]} · {e.polarity === "positive" ? "+" : "−"} · {e.rating} ★</h4>
         <blockquote>{e.quote}</blockquote><p>{t.rules}</p>
+        {decisions.find(d=>d.evidence_id===e.evidence_id)&&<p>Luna : {decisions.find(d=>d.evidence_id===e.evidence_id)!.status} · {decisions.find(d=>d.evidence_id===e.evidence_id)!.confidence}</p>}
         <details><summary>{language === "fr" ? "Contexte et provenance" : "Ngữ cảnh và nguồn"}</summary><p>{e.context}</p>
           <p className="evidence-id">{e.review_id}<br />{e.evidence_id}<br />{e.analysis_text_sha256}<br />{e.quote_sha256}<br />{e.translation_source}</p>
           <p>{e.v3_status} · {e.configuration_jev} · {e.served_model}</p>
@@ -95,6 +98,36 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
       <button className="secondary-button full-width" onClick={download}>{t.download}</button>
     </>}
   </>;
+}
+export function JlsDelegatedStatus({data}:{data:NonNullable<JlsView["delegated"]>}){
+  const {language}=useI18n(),fr=language==="fr",r=data.run,report=data.result?.body.sol_result.report;
+  const axes:Record<string,string>=fr?{service:"Service",quality:"Qualité",price:"Prix",atmosphere:"Ambiance"}:{service:"Dịch vụ",quality:"Chất lượng",price:"Giá",atmosphere:"Không gian"};
+  return <section className="card jev-card">
+    <h3>{fr?"Pilote vietnamien — exécution déléguée":"Thử nghiệm tiếng Việt — chạy được ủy quyền"}</h3>
+    <p>{r?r.status:data.ready?(fr?"Lancement délégué prêt — aucune dépense autorisée":"Sẵn sàng chạy được ủy quyền — chưa cho phép chi phí"):(fr?"Préparation du lancement délégué":"Đang chuẩn bị chạy được ủy quyền")}</p>
+    <p>{fr?"Une nouvelle autorisation explicite dans ChatGPT est nécessaire. Aucun clic iPhone n’est requis. Aucun lancement automatique depuis cet écran.":"Cần cho phép rõ ràng mới trong ChatGPT. Không cần bấm trên iPhone. Màn hình này không tự chạy."}</p>
+    <p>{fr?"Maximum : 24 requêtes Luna, 25 questions, un appel Sol ; aucun retry payant.":"Tối đa: 24 yêu cầu Luna, 25 câu hỏi, một lần gọi Sol; không gọi lại trả phí."}</p>
+    <p>{fr?"Avant Sol : 12 preuves acceptées, dont Qualité ≥ 2, Service ≥ 2, Prix ≥ 2, Ambiance ≥ 1 ; 6 critiques et 4 citations issues d’avis 1–3 étoiles. Toute réponse manquante ou tentative incertaine bloque Sol.":"Trước Sol: 12 bằng chứng được chấp nhận, Chất lượng ≥ 2, Dịch vụ ≥ 2, Giá ≥ 2, Không gian ≥ 1; 6 phê bình và 4 trích dẫn từ đánh giá 1–3 sao. Thiếu phản hồi hoặc lần gọi không rõ trạng thái sẽ chặn Sol."}</p>
+    {r&&<><p>{fr?"Consentement délégué":"Chấp thuận ủy quyền"} : {r.consent_source} · {new Date(r.expires_at).toLocaleString(language)}</p>
+      <p>Luna : {data.costs.luna.attempts} / 24 · Sol : {data.costs.sol.attempts} / 1</p>
+      <p>{fr?"Coût total calculé":"Tổng chi phí tính toán"} : {data.costs.total_cost_usd===null?(fr?"Inconnu — télémétrie manquante":"Chưa biết — thiếu dữ liệu sử dụng"):data.costs.total_cost_usd.toFixed(7)+" USD"}</p>
+      <p>{fr?"Coût calculé depuis l’usage, pas une facture vérifiée.":"Chi phí tính từ dữ liệu sử dụng, không phải hóa đơn đã xác minh."}</p>
+      {r.error_code&&<p role="alert">{r.error_code}</p>}
+      <details><summary>{fr?"Progression, probabilités et erreurs":"Tiến độ, xác suất và lỗi"}</summary><pre>{JSON.stringify(data.tasks,null,2)}</pre></details>
+    </>}
+    {data.dossier&&<details><summary>{fr?"Dossier Sol après Luna — preuves acceptées uniquement":"Hồ sơ Sol sau Luna — chỉ bằng chứng được chấp nhận"}</summary><pre>{JSON.stringify(data.dossier.body,null,2)}</pre></details>}
+    {report&&<><h3>{fr?"Rapport expérimental vietnamien":"Báo cáo thử nghiệm tiếng Việt"}</h3>
+      {report.axes.map(a=><div key={a.axis}><h4>{axes[a.axis??""]}</h4><p>{a.text??(fr?"À réexaminer":"Cần xem lại")}</p><p className="evidence-id">{a.evidence_ids.join(" · ")}</p></div>)}
+      {[
+        {title:fr?"Aspects positifs":"Điểm tích cực",items:report.positive_aspects},
+        {title:fr?"Aspects négatifs":"Điểm tiêu cực",items:report.negative_aspects},
+        {title:fr?"Conclusion":"Kết luận",items:[report.conclusion]},
+        {title:fr?"Recommandations":"Khuyến nghị",items:report.recommendations},
+      ].map(section=><div key={section.title}><h4>{section.title}</h4>{section.items.length===0&&<p>{fr?"À réexaminer":"Cần xem lại"}</p>}
+        {section.items.map((a,i)=><article key={i}><p>{a.text??(fr?"À réexaminer":"Cần xem lại")}</p><p className="evidence-id">{a.evidence_ids.join(" · ")}</p></article>)}</div>)}
+      <p>{fr?"Jugements IA, pas validation humaine indépendante. Couverture limitée aux avis analysés.":"Đánh giá AI, không phải xác nhận độc lập của con người. Chỉ bao phủ các đánh giá đã phân tích."}</p>
+    </>}
+  </section>;
 }
 export function JlsEntry() {
   const { language } = useI18n(), t = jlsMessages[language];

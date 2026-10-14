@@ -1,0 +1,118 @@
+{
+  "body": {
+    "version": "jls-codex-delegated-pilot-v1",
+    "plan_id": "5295245f-b2c1-4f5d-80ad-ca9f821ae3da",
+    "plan_sha256": "c096931805dbc7d4e655df7d1aaddd6bc92e96a6de784835e07c0220673b485a",
+    "config_sha256": "0004458504a1342e556ddccce7ab2d95eb2c4583305cb15a386e6d3fb09adf37",
+    "dossier_sha256": "d32edd725e7b31adbdad5903a7c62aa09a4dc0ab14272abaae60a4148533fa35",
+    "organization_id": "93228bbb-6397-41e3-b8be-21ee7060eda7",
+    "source_snapshot_id": "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+    "source_sha256": "19ea6e88f81a6243792b0a49ec1aa2a7b3d1915272c50790940a6c5c8259bf7e",
+    "luna_manifest_sha256": "8f4c5b38ed1c394b89ab20eeb650856410932c412951f568a21caa469130261b",
+    "max_luna_calls": 24,
+    "max_sol_calls": 1,
+    "question_count": 25,
+    "jev_new_calls": 0,
+    "luna_model": "gpt-6-luna",
+    "luna_endpoint": "/v1/decisions",
+    "sol_model": "gpt-6.1-sol",
+    "sol_endpoint": "/v1/responses",
+    "language": "vi",
+    "automatic_retry": false,
+    "production_enabled": false,
+    "sufficiency": {
+      "version": "jls-evidence-sufficiency-v1",
+      "accepted": 12,
+      "axes": {
+        "quality": 2,
+        "service": 2,
+        "price": 2,
+        "atmosphere": 1
+      },
+      "negative": 6,
+      "low_star": 4,
+      "complete_calls": 24,
+      "complete_questions": 25,
+      "confidence_min": 0.6
+    },
+    "feasibility": {
+      "passed": true,
+      "accepted": 25,
+      "axes": {
+        "quality": 12,
+        "service": 6,
+        "price": 5,
+        "atmosphere": 2
+      },
+      "negative": 15,
+      "low_star": 11,
+      "reasons": [],
+      "policy": {
+        "version": "jls-evidence-sufficiency-v1",
+        "accepted": 12,
+        "axes": {
+          "quality": 2,
+          "service": 2,
+          "price": 2,
+          "atmosphere": 1
+        },
+        "negative": 6,
+        "low_star": 4,
+        "complete_calls": 24,
+        "complete_questions": 25,
+        "confidence_min": 0.6
+      },
+      "human_validated": false
+    },
+    "estimates": {
+      "sol": {
+        "rates": {
+          "jev_input": 0.042,
+          "sol_input": 2,
+          "jev_output": 0,
+          "provenance": [
+            "Recorded Artisan completed full-configuration cache usage",
+            "Recorded Jev and aggregate Sol narrative rates/usage",
+            "Apify and translation tariff unavailable"
+          ],
+          "sol_output": 10,
+          "apify_import": null,
+          "observed_sol_input": 4162,
+          "english_translation": null,
+          "observed_sol_output": 1420,
+          "observed_jev_input_per_review": 8476.109375,
+          "observed_jev_output_per_review": 1125.203125
+        },
+        "method": "local o200k_base + 12% + 256 framing; not billed tokens",
+        "dossier_bytes": 51866,
+        "actual_cost_usd": null,
+        "estimated_cost_usd": 0.075358,
+        "measured_input_tokens": null,
+        "estimated_input_tokens": 18679,
+        "estimated_output_tokens": 3800,
+        "high_estimated_cost_usd": 0.132358,
+        "conditional_on_luna_acceptance": true
+      },
+      "jev_new_calls": 0,
+      "luna_cost_usd": 0.0022835,
+      "actual_cost_usd": null,
+      "jev_new_cost_usd": 0,
+      "luna_input_tokens": 22835,
+      "jev_reused_cost_usd": 0,
+      "premiums_unverified": true,
+      "luna_rate_per_million": 0.1,
+      "billed_invoice_verified": false,
+      "high_estimated_cost_usd": 0.1346415,
+      "total_estimated_cost_usd": 0.07764149999999999
+    },
+    "future_explicit_execution_consent_required": true,
+    "consent_source": "user_directive_codex_delegation",
+    "operator_identity": {
+      "kind": "codex_admin",
+      "channel": "supabase_mcp"
+    },
+    "attestation": "authenticated_service_role_record_with_directive_and_canonical_sha256_not_a_human_session",
+    "preparation_is_not_spending_authorization": true
+  },
+  "sha": "0c0568714ca971d277f86356ba5a9c30dae1749441e037a3cb8cb7fcf5a1e29b"
+}

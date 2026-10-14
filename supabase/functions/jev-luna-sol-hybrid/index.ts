@@ -1,6 +1,8 @@
 import { requireUser, assertMembership } from "../_shared/auth.ts";
 import { jlsHandler, type JlsView } from "../_shared/jev-luna-sol-api.ts";
 import { verifyJlsPlan, JLS_VERSION } from "../_shared/jev-luna-sol.ts";
+import {JLS_PILOT_PLAN,executionCosts, type JlsExecutionTask} from "../_shared/jev-luna-sol-delegation.ts";
+import {hybridHash} from "../_shared/jev-hybrid-evidence.ts";
 Deno.serve(jlsHandler(async request => {
   const ctx = await requireUser(request), query = new URL(request.url).searchParams;
   const establishment = query.get("establishment_id"), language = query.get("language") ?? "vi";
@@ -24,5 +26,21 @@ Deno.serve(jlsHandler(async request => {
   await verifyJlsPlan(plan.body, a.data, b.data);
   const { data: runs, error: re } = await ctx.client.from("analysis_jev_luna_sol_runs").select("id,status").eq("organization_id", est.organization_id).eq("plan_id", plan.id);
   if (re) throw new Error("JLS_READ_FAILED");
-  return { plan, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
+  const {data:target,error:te}=await ctx.client.from("analysis_jev_luna_sol_plans").select("id").eq("id",JLS_PILOT_PLAN).eq("organization_id",est.organization_id).eq("establishment_id",est.id).maybeSingle();
+  if(te)throw new Error("JLS_READ_FAILED");
+  let delegated:JlsView["delegated"];
+  if(target){
+    const [pr,rr]=await Promise.all([
+      ctx.client.from("analysis_jev_luna_sol_protocols").select("body,sha256").eq("plan_id",target.id).maybeSingle(),
+      ctx.client.from("analysis_jev_luna_sol_runs").select("id,status,consent_source,consent_sha256,expires_at,gate,error_code").eq("plan_id",target.id).maybeSingle()]);
+    if(pr.error||rr.error)throw new Error("JLS_READ_FAILED");
+    if(pr.data&&await hybridHash(pr.data.body)!==pr.data.sha256)throw new Error("JLS_PROTOCOL_CHANGED");
+    const tasks=rr.data?await ctx.client.from("analysis_jev_luna_sol_tasks").select("id,run_id,organization_id,phase,review_id,request_sha256,status,request_count,parsed,input_tokens,output_tokens,cost_usd,duration_ms,served_model,error_code").eq("run_id",rr.data.id):{data:[],error:null};
+    const dossier=rr.data?await ctx.client.from("analysis_jev_luna_sol_dossiers").select("body,sha256").eq("run_id",rr.data.id).maybeSingle():{data:null,error:null};
+    const result=rr.data?await ctx.client.from("analysis_jev_luna_sol_results").select("body,result_sha256").eq("run_id",rr.data.id).maybeSingle():{data:null,error:null};
+    if(tasks.error||dossier.error||result.error)throw new Error("JLS_READ_FAILED");
+    if(dossier.data&&await hybridHash(dossier.data.body)!==dossier.data.sha256||result.data&&await hybridHash(result.data.body)!==result.data.result_sha256)throw new Error("JLS_RESULT_CHANGED");
+    delegated={ready:!!pr.data,plan_id:target.id,protocol:pr.data,run:rr.data,tasks:tasks.data as JlsExecutionTask[],dossier:dossier.data,result:result.data,costs:executionCosts(tasks.data as JlsExecutionTask[])};
+  }
+  return { plan, delegated, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
 }));
