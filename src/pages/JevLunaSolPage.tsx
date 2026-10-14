@@ -100,12 +100,12 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
   </>;
 }
 export function JlsDelegatedStatus({data}:{data:NonNullable<JlsView["delegated"]>}){
-  const {language}=useI18n(),fr=language==="fr",r=data.run,report=data.result?.body.sol_result.report;
+  const {language}=useI18n(),fr=language==="fr",r=data.run,report=(data.revalidation?.body.sol_result??data.result?.body.sol_result)?.report;
   const axes:Record<string,string>=fr?{service:"Service",quality:"Qualité",price:"Prix",atmosphere:"Ambiance"}:{service:"Dịch vụ",quality:"Chất lượng",price:"Giá",atmosphere:"Không gian"};
   return <section className="card jev-card">
     <h3>{fr?"Pilote vietnamien — exécution déléguée":"Thử nghiệm tiếng Việt — chạy được ủy quyền"}</h3>
     <p>{r?r.status:data.ready?(fr?"Lancement délégué prêt — aucune dépense autorisée":"Sẵn sàng chạy được ủy quyền — chưa cho phép chi phí"):(fr?"Préparation du lancement délégué":"Đang chuẩn bị chạy được ủy quyền")}</p>
-    <p>{fr?"Une nouvelle autorisation explicite dans ChatGPT est nécessaire. Aucun clic iPhone n’est requis. Aucun lancement automatique depuis cet écran.":"Cần cho phép rõ ràng mới trong ChatGPT. Không cần bấm trên iPhone. Màn hình này không tự chạy."}</p>
+    {!r&&<p>{fr?"Une nouvelle autorisation explicite dans ChatGPT est nécessaire. Aucun clic iPhone n’est requis. Aucun lancement automatique depuis cet écran.":"Cần cho phép rõ ràng mới trong ChatGPT. Không cần bấm trên iPhone. Màn hình này không tự chạy."}</p>}
     <p>{fr?"Maximum : 24 requêtes Luna, 25 questions, un appel Sol ; aucun retry payant.":"Tối đa: 24 yêu cầu Luna, 25 câu hỏi, một lần gọi Sol; không gọi lại trả phí."}</p>
     <p>{fr?"Avant Sol : 12 preuves acceptées, dont Qualité ≥ 2, Service ≥ 2, Prix ≥ 2, Ambiance ≥ 1 ; 6 critiques et 4 citations issues d’avis 1–3 étoiles. Toute réponse manquante ou tentative incertaine bloque Sol.":"Trước Sol: 12 bằng chứng được chấp nhận, Chất lượng ≥ 2, Dịch vụ ≥ 2, Giá ≥ 2, Không gian ≥ 1; 6 phê bình và 4 trích dẫn từ đánh giá 1–3 sao. Thiếu phản hồi hoặc lần gọi không rõ trạng thái sẽ chặn Sol."}</p>
     {r&&<><p>{fr?"Consentement délégué":"Chấp thuận ủy quyền"} : {r.consent_source} · {new Date(r.expires_at).toLocaleString(language)}</p>
@@ -116,6 +116,7 @@ export function JlsDelegatedStatus({data}:{data:NonNullable<JlsView["delegated"]
       <details><summary>{fr?"Progression, probabilités et erreurs":"Tiến độ, xác suất và lỗi"}</summary><pre>{JSON.stringify(data.tasks,null,2)}</pre></details>
     </>}
     {data.dossier&&<details><summary>{fr?"Dossier Sol après Luna — preuves acceptées uniquement":"Hồ sơ Sol sau Luna — chỉ bằng chứng được chấp nhận"}</summary><pre>{JSON.stringify(data.dossier.body,null,2)}</pre></details>}
+    {data.revalidation&&<p>{fr?"Rapport revalidé sans nouvel appel payant. Résultat historique conservé : ":"Báo cáo đã được kiểm tra lại, không gọi thêm dịch vụ trả phí. Giữ nguyên kết quả gốc: "}{r?.status} · {data.revalidation.body.version}</p>}
     {report&&<><h3>{fr?"Rapport expérimental vietnamien":"Báo cáo thử nghiệm tiếng Việt"}</h3>
       {report.axes.map(a=><div key={a.axis}><h4>{axes[a.axis??""]}</h4><p>{a.text??(fr?"À réexaminer":"Cần xem lại")}</p><p className="evidence-id">{a.evidence_ids.join(" · ")}</p></div>)}
       {[

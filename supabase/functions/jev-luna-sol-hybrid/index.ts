@@ -1,3 +1,4 @@
+import { JLS_REVALIDATION_ACTION, verifyJlsRevalidation } from "../_shared/jev-luna-sol-revalidation.ts";
 import { requireUser, assertMembership } from "../_shared/auth.ts";
 import { jlsHandler, type JlsView } from "../_shared/jev-luna-sol-api.ts";
 import { verifyJlsPlan, JLS_VERSION } from "../_shared/jev-luna-sol.ts";
@@ -40,7 +41,13 @@ Deno.serve(jlsHandler(async request => {
     const result=rr.data?await ctx.client.from("analysis_jev_luna_sol_results").select("body,result_sha256").eq("run_id",rr.data.id).maybeSingle():{data:null,error:null};
     if(tasks.error||dossier.error||result.error)throw new Error("JLS_READ_FAILED");
     if(dossier.data&&await hybridHash(dossier.data.body)!==dossier.data.sha256||result.data&&await hybridHash(result.data.body)!==result.data.result_sha256)throw new Error("JLS_RESULT_CHANGED");
-    delegated={ready:!!pr.data,plan_id:target.id,protocol:pr.data,run:rr.data,tasks:tasks.data as JlsExecutionTask[],dossier:dossier.data,result:result.data,costs:executionCosts(tasks.data as JlsExecutionTask[])};
+    const revision=rr.data?await ctx.client.from("analysis_jev_luna_sol_events").select("payload")
+      .eq("organization_id",est.organization_id).eq("plan_id",target.id).eq("action",JLS_REVALIDATION_ACTION)
+      .eq("payload->body->>run_id",rr.data.id).order("id",{ascending:false}).limit(1).maybeSingle():{data:null,error:null};
+    if(revision.error)throw new Error("JLS_READ_FAILED");
+    if(revision.data&&(!rr.data||!result.data))throw new Error("JLS_REVALIDATION_CHANGED");
+    const revalidation=revision.data?await verifyJlsRevalidation(revision.data.payload,rr.data!.id,result.data!):null;
+    delegated={revalidation,ready:!!pr.data,plan_id:target.id,protocol:pr.data,run:rr.data,tasks:tasks.data as JlsExecutionTask[],dossier:dossier.data,result:result.data,costs:executionCosts(tasks.data as JlsExecutionTask[])};
   }
   return { plan, delegated, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
 }));

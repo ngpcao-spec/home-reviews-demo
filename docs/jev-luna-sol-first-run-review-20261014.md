@@ -38,4 +38,10 @@ Ce replay est une nouvelle vérification technique hors réseau. Il ne remplace 
 
 L'unique rejet Luna mérite une revue qualitative séparée : la citation contient une appréciation positive d'un plat et une critique de sa portion, dans un avis globalement mixte. Le taux d'acceptation de 24/25 ne mesure donc pas l'exactitude de Luna. Aucun verdict n'a été modifié pendant cette correction.
 
-Pour appliquer ultérieurement cette validation au rapport affiché, conserver le run et le résultat d'origine et enregistrer une revalidation versionnée distincte ; ne pas contourner leur immutabilité et ne pas relancer les modèles.
+## Revalidation versionnée
+
+La révision `jls-quote-bound-actions-v1` est enregistrée séparément dans le journal append-only `analysis_jev_luna_sol_events`, action `report_revalidated_quote_bound_v1`. Elle contient le run, le hash du résultat original, le commit du validateur, `new_paid_calls: 0`, la sortie revalidée et le hash canonique de son corps. Les politiques RLS et le déclencheur d'immuabilité existants protègent ce journal ; aucune nouvelle table ni permission n'est nécessaire.
+
+L'API GET vérifie l'empreinte de la révision, son rattachement au résultat historique et l'identité des statistiques, décisions Luna, source Sol et sections hors recommandations. L'interface utilise ensuite cette révision en indiquant la revalidation et le statut historique conservé. Sans révision, elle continue d'afficher le résultat original. Aucune route d'écriture ou d'exécution payante n'est ajoutée.
+
+L'enregistrement administratif est transactionnel, conditionné aux empreintes enregistrées et idempotent par run et version. Les requêtes fournisseur, réponses brutes, verdicts, résultat original et statut du run restent inchangés.
