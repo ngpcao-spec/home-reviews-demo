@@ -36,6 +36,17 @@ denied:=false;begin update public.analysis_jev_luna_sol_tasks set status='queued
 if not denied then raise exception 'TEST_RETRY_ALLOWED';end if;
 denied:=false;begin update public.analysis_jev_luna_sol_runs set consent_record='{}'::jsonb where id=rid;exception when others then denied:=sqlerrm='JLS_AUTHORIZATION_IMMUTABLE';end;
 if not denied then raise exception 'TEST_CONSENT_MUTABLE';end if;
+-- A mock revised high estimate requires a new decision BEFORE any Sol reservation.
+v:=p.body->'conditional_sol_preview';
+v:=jsonb_set(v,'{packet,limitations,evidence_scope}','"accepted_only"'::jsonb);
+v:=v||jsonb_build_object('statistics_sha256',p.statistics_sha256,'prompt_sha256',p.body->>'prompt_sha256','schema_sha256',p.body->>'schema_sha256','dossier_sha256',encode(extensions.digest(public.jev_economy_canonical(v->'packet'),'sha256'),'hex'));
+v:=jsonb_set(v,'{request,input,1,content}',to_jsonb((v->'packet')::text));
+v:=jsonb_set(v,'{estimates,high_estimated_cost_usd}',to_jsonb((p.body->'estimates'->'sol'->>'high_estimated_cost_usd')::numeric+1));
+-- Evaluate the mutation before subqueries; SQL boolean operands have no evaluation order guarantee.
+denied:=public.jls_freeze_sol(rid,v,encode(extensions.digest(public.jev_economy_canonical(v),'sha256'),'hex'));
+if denied or
+ (select status from public.analysis_jev_luna_sol_runs where id=rid)<>'cost_review_required' or
+ exists(select 1 from public.analysis_jev_luna_sol_tasks where run_id=rid and phase='sol') then raise exception 'TEST_COST_REVIEW_BYPASSED';end if;
 if has_function_privilege('authenticated','public.jls_authorize_delegated(uuid,text,jsonb)','execute') or has_function_privilege('anon','public.jls_wake_delegated(uuid)','execute') then raise exception 'TEST_RPC_PUBLIC';end if;
 end $test$;
 reset role;
