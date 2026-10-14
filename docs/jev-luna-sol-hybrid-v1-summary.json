@@ -1,0 +1,112 @@
+{
+  "version": "jev-luna-sol-hybrid-v1",
+  "source_plan_id": "71e46e6f-0c95-4d0e-840f-618c3f66e85d",
+  "source_snapshot_id": "f9c8876b-1b5a-4d10-9538-758881b61b6b",
+  "source_sha256": "19ea6e88f81a6243792b0a49ec1aa2a7b3d1915272c50790940a6c5c8259bf7e",
+  "source_plan_sha256": "ca64475707f68f730b4b7476936127ac66d899fe1cacbcfd3dce8669dbaf1d96",
+  "config_sha256": "0004458504a1342e556ddccce7ab2d95eb2c4583305cb15a386e6d3fb09adf37",
+  "statistics_sha256": "c30d8d8b90d78a4032b0b175f50317b45f03826614961127d598870f8a2145a4",
+  "dossier_sha256": "d32edd725e7b31adbdad5903a7c62aa09a4dc0ab14272abaae60a4148533fa35",
+  "luna_manifest_sha256": "8f4c5b38ed1c394b89ab20eeb650856410932c412951f568a21caa469130261b",
+  "prompt_sha256": "24ab3887b38436125ed8565c279b4c5f7a850428abd43304a26dd79238a2f55f",
+  "schema_sha256": "5aed9fe22c1a260348c2b2cfa82689fcffecc58cf1807e689c5430b31f325616",
+  "plans": {
+    "fr_sha256": "2543fcba248f6672ab4eda8aac94fef68dae310b4215bfc014ae377dabed3aac",
+    "vi_sha256": "c096931805dbc7d4e655df7d1aaddd6bc92e96a6de784835e07c0220673b485a"
+  },
+  "coverage": {
+    "google_total": 1615,
+    "english_ready": 422,
+    "stored_reviews": 523,
+    "missing_english": 2,
+    "reused_analyses": 422,
+    "analysed_reviews": 422,
+    "blocked_analyses": 0,
+    "missing_analyses": 0,
+    "textless_reviews": 99,
+    "reviews_with_text": 424,
+    "not_analysable_total": 101,
+    "analysis_text_coverage": 0.9952830188679245,
+    "stored_google_coverage": 0.3238390092879257,
+    "analysed_google_coverage": 0.2613003095975232,
+    "analysis_english_coverage": 1
+  },
+  "selection": {
+    "mixed": 22,
+    "total": 25,
+    "sol_candidate": 0,
+    "covered_themes": 14,
+    "rule_confirmed": 25,
+    "by_axis_polarity": {
+      "price:negative": 4,
+      "price:positive": 1,
+      "quality:negative": 6,
+      "quality:positive": 6,
+      "service:negative": 4,
+      "service:positive": 2,
+      "atmosphere:negative": 1,
+      "atmosphere:positive": 1
+    },
+    "distinct_reviews": 24,
+    "low_star_negative": 9,
+    "star_distribution": {
+      "1": 3,
+      "2": 3,
+      "3": 5,
+      "4": 3,
+      "5": 11
+    },
+    "high_star_negative": 6,
+    "low_star_citations": 11,
+    "covered_theme_polarities": 19,
+    "negative_despite_high_rating": 6
+  },
+  "estimates": {
+    "jev_new_calls": 0,
+    "jev_new_cost_usd": 0,
+    "jev_reused_cost_usd": 0,
+    "luna_input_tokens": 22835,
+    "luna_cost_usd": 0.0022835,
+    "luna_rate_per_million": 0.1,
+    "sol": {
+      "estimated_input_tokens": 18679,
+      "estimated_output_tokens": 3800,
+      "estimated_cost_usd": 0.075358,
+      "high_estimated_cost_usd": 0.132358,
+      "dossier_bytes": 51866,
+      "measured_input_tokens": null,
+      "actual_cost_usd": null,
+      "method": "local o200k_base + 12% + 256 framing; not billed tokens",
+      "conditional_on_luna_acceptance": true,
+      "rates": {
+        "jev_input": 0.042,
+        "sol_input": 2,
+        "jev_output": 0,
+        "provenance": [
+          "Recorded Artisan completed full-configuration cache usage",
+          "Recorded Jev and aggregate Sol narrative rates/usage",
+          "Apify and translation tariff unavailable"
+        ],
+        "sol_output": 10,
+        "apify_import": null,
+        "observed_sol_input": 4162,
+        "english_translation": null,
+        "observed_sol_output": 1420,
+        "observed_jev_input_per_review": 8476.109375,
+        "observed_jev_output_per_review": 1125.203125
+      }
+    },
+    "total_estimated_cost_usd": 0.07764149999999999,
+    "high_estimated_cost_usd": 0.1346415,
+    "actual_cost_usd": null,
+    "premiums_unverified": true,
+    "billed_invoice_verified": false
+  },
+  "paid_enabled": false,
+  "new_paid_calls": 0,
+  "production_enabled": false,
+  "luna_results": 0,
+  "sol_reports": 0,
+  "test_type": "technical_mocks_not_new_semantic_validation",
+  "saved_plan_ids": {"fr":"1b2fdd29-9447-4de3-a134-084dd13ddc49","vi":"5295245f-b2c1-4f5d-80ad-ca9f821ae3da"}
+}

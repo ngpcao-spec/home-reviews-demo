@@ -1,0 +1,8 @@
+.jls-page { overflow-wrap: anywhere; }
+.jls-page pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; }
+.jls-page blockquote { margin: .75rem 0; padding-left: .75rem; border-left: 2px solid var(--color-accent, #d8bc93); }
+.jls-page .jls-star { display: grid; grid-template-columns: 2.5rem minmax(0,1fr) 2rem; gap: .7rem; align-items: center; margin: .8rem 0; }
+.jls-star meter { width: 100%; }
+.jls-status-pair { display: contents; }
+.jls-page select { width: 100%; }
+.jls-page .jev-pairs dd { overflow-wrap: anywhere; min-width: 0; }

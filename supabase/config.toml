@@ -567,3 +567,9 @@ verify_jwt = false
 
 [functions.process-luna-negative-v2]
 verify_jwt = false
+
+[functions.jev-luna-sol-hybrid]
+verify_jwt = false
+
+[functions.process-jev-luna-sol-hybrid]
+verify_jwt = false
