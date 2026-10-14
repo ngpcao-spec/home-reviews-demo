@@ -64,6 +64,11 @@ et vérifier la préparation, ou la calculer gratuitement si elle n'est pas arch
 
 ## Futur essai
 
+Mise à jour du 14 octobre 2026 : le [mécanisme délégué vietnamien](jls-prioritized-delegated-execution-v1.md)
+est désormais préparé séparément. Les paragraphes ci-dessous décrivent l'état de
+la première livraison du format. Aucun consentement ni essai payant n'est créé
+par cette mise à jour ; le GO direct de l'utilisateur reste obligatoire.
+
 Les anciennes autorisations et l'ancien run terminal ne sont jamais réutilisables
 pour lancer cette nouvelle requête. Le format n'est pas raccordé à un endpoint de
 dépense pendant cette livraison. Un GO explicite futur nécessitera un nouveau

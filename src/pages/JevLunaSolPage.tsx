@@ -56,6 +56,7 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
     </section>
     {data.delegated&&<JlsDelegatedStatus data={data.delegated}/>}
     {data.prioritized&&<JlsPrioritizedPreparation data={data.prioritized}/>}
+    {data.prioritized_execution&&<JlsPrioritizedExecutionStatus data={data.prioritized_execution}/>}
     {data.prioritized?.result&&<PrioritizedJlsReport result={data.prioritized.result}/>}
     {data.prioritized_error&&<p role="alert">{language==="fr"?"Nouveau format indisponible ; rapport historique conservé":"Định dạng mới chưa khả dụng; báo cáo cũ được giữ nguyên"} : {data.prioritized_error}</p>}
     {!p ? <p>{t.empty}</p> : <>
@@ -161,5 +162,23 @@ export function JlsPrioritizedPreparation({data}:{data:NonNullable<JlsView["prio
     </details>
     <details><summary>{fr?"Dossier et schéma du futur appel Sol":"Hồ sơ và cấu trúc lần gọi Sol tương lai"}</summary><pre>{JSON.stringify(d.request,null,2)}</pre></details>
     <aside className="jls-methodology"><h4>{fr?"Note méthodologique":"Ghi chú phương pháp"}</h4><p>{d.methodology_note}</p></aside>
+  </section>;
+}
+export function JlsPrioritizedExecutionStatus({data}:{data:NonNullable<JlsView["prioritized_execution"]>}){
+  const {language}=useI18n(),fr=language==="fr",p=data.protocol.body,r=data.run,v=data.result?.body;
+  return <section className="card jev-card jls-prioritized"><h3>{fr?"Exécution déléguée — nouveau rapport vietnamien":"Chạy được ủy quyền — báo cáo tiếng Việt mới"}</h3>
+    <p>{r?r.status:(fr?"Mécanisme prêt — aucun GO enregistré":"Cơ chế sẵn sàng — chưa ghi nhận cho phép chạy")}</p>
+    <p>{fr?"Un GO explicite dans ChatGPT autorisera une seule exécution. Aucune manipulation GitHub ou iPhone. L’ancien run et son consentement restent fermés.":"Cho phép rõ ràng trong ChatGPT sẽ cấp quyền chạy một lần. Không cần thao tác GitHub hay iPhone. Lần chạy và chấp thuận cũ vẫn đóng."}</p>
+    <p>{fr?"JEV, Luna, Apify : zéro nouvel appel. Sol : un appel maximum, aucun retry payant.":"JEV, Luna, Apify: không gọi thêm. Sol: tối đa một lần gọi, không gọi lại trả phí."}</p>
+    <p className="evidence-id">{data.protocol.id}<br/>{p.version}<br/>{data.protocol.sha256}</p>
+    {r&&<><p>{fr?"Consentement spécifique expirant le":"Chấp thuận riêng hết hạn lúc"} {new Date(r.expires_at).toLocaleString(language)}</p><p>{fr?"Tentatives Sol réservées":"Số lần gọi Sol đã giữ chỗ"} : {data.task?.request_count??0} / 1</p></>}
+    {r?.error_code&&<p role="alert">{r.error_code}</p>}
+    {v&&<><dl className="jev-pairs"><dt>{fr?"Modèle servi":"Mô hình thực tế"}</dt><dd>{v.served_model??"—"}</dd>
+      <dt>Input tokens</dt><dd>{v.input_tokens??"—"}</dd><dt>Output tokens</dt><dd>{v.output_tokens??"—"}</dd>
+      <dt>{fr?"Coût calculé":"Chi phí tính toán"}</dt><dd>{v.cost_usd===null?(fr?"Inconnu — usage manquant":"Chưa biết — thiếu dữ liệu sử dụng"):v.cost_usd.toFixed(7)+" USD"}</dd></dl>
+      <p>{fr?"Coût calculé depuis l’usage, pas une facture vérifiée. Conformité technique, pas validation humaine ni garantie de vérité.":"Chi phí tính từ dữ liệu sử dụng, không phải hóa đơn xác nhận. Chỉ kiểm tra kỹ thuật, không phải xác nhận của con người hay bảo đảm sự thật."}</p>
+      <details><summary>{fr?"Réponse brute et contrôles — sans nouvel appel":"Phản hồi gốc và kiểm tra — không gọi thêm"}</summary><pre>{JSON.stringify({controls:v.controls,raw_response_text:v.raw_response_text,sha256:data.result!.sha256},null,2)}</pre></details>
+    </>}
+    <details><summary>{fr?"Protocole, empreintes et estimation":"Quy trình, mã băm và ước tính"}</summary><pre>{JSON.stringify(p,null,2)}</pre></details>
   </section>;
 }

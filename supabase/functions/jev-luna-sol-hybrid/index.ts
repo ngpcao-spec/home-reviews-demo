@@ -5,6 +5,8 @@ import { verifyJlsPlan, JLS_VERSION } from "../_shared/jev-luna-sol.ts";
 import {JLS_PILOT_PLAN,executionCosts, type JlsExecutionTask} from "../_shared/jev-luna-sol-delegation.ts";
 import {hybridHash} from "../_shared/jev-hybrid-evidence.ts";
 import { buildPrioritizedDraft, verifyPrioritizedDraft, JLS_PRIORITIZED_ACTION } from "../_shared/jev-luna-sol-prioritized.ts";
+import { prioritizedExecutionProtocol, type PrioritizedHistory } from "../_shared/jls-prioritized-execution.ts";
+import { validatePrioritizedReport } from "../_shared/jev-luna-sol-prioritized-validation.ts";
 Deno.serve(jlsHandler(async request => {
   const ctx = await requireUser(request), query = new URL(request.url).searchParams;
   const establishment = query.get("establishment_id"), language = query.get("language") ?? "vi";
@@ -33,6 +35,7 @@ Deno.serve(jlsHandler(async request => {
   let delegated:JlsView["delegated"];
   let prioritized:JlsView["prioritized"] = null;
   let prioritized_error:string|null=null;
+  let prioritized_execution:JlsView["prioritized_execution"]=null;
   if(target){
     const [pr,rr]=await Promise.all([
       ctx.client.from("analysis_jev_luna_sol_protocols").select("body,sha256").eq("plan_id",target.id).maybeSingle(),
@@ -67,6 +70,34 @@ Deno.serve(jlsHandler(async request => {
       const draft=body?.draft??await buildPrioritizedDraft(target.body,decisions,language as "fr"|"vi");
       await verifyPrioritizedDraft(draft,target.body,decisions);
       prioritized={draft,artifact_id:saved.data?.id??null,source_run_id:rr.data.id};
+      const qp=await ctx.client.from("analysis_jls_prioritized_protocols").select("id,body,sha256")
+        .eq("source_plan_id",target.id).eq("organization_id",est.organization_id).maybeSingle();
+      if(qp.error)throw new Error("JLS_PRI_PROTOCOL_UNAVAILABLE");
+      if(qp.data){
+        const histTasks=await ctx.client.from("analysis_jev_luna_sol_tasks").select("*").eq("run_id",rr.data.id).eq("organization_id",est.organization_id).eq("phase","luna");
+        if(histTasks.error||!histTasks.data)throw new Error("JLS_PRI_SOURCE_UNAVAILABLE");
+        const ep=await ctx.client.from("analysis_jev_luna_sol_events").select("id,payload").eq("id",qp.data.body.preparation_event_id).eq("organization_id",est.organization_id).single();
+        if(ep.error||!ep.data)throw new Error("JLS_PRI_SOURCE_UNAVAILABLE");
+        const rebuilt=await prioritizedExecutionProtocol({id:ep.data.id,...ep.data.payload},target.body,
+          {run_id:rr.data.id,plan_id:target.id,organization_id:est.organization_id,result:result.data,tasks:histTasks.data} as PrioritizedHistory);
+        if(await hybridHash(qp.data.body)!==qp.data.sha256||await hybridHash(rebuilt)!==qp.data.sha256)throw new Error("JLS_PRI_PROTOCOL_CHANGED");
+        const qr=await ctx.client.from("analysis_jls_prioritized_runs").select("id,status,expires_at,consent_source,error_code").eq("protocol_id",qp.data.id).eq("organization_id",est.organization_id).maybeSingle();
+        if(qr.error)throw new Error("JLS_PRI_READ_FAILED");
+        const qt=qr.data?await ctx.client.from("analysis_jls_prioritized_tasks").select("status,request_count,error_code").eq("run_id",qr.data.id).eq("organization_id",est.organization_id).maybeSingle():{data:null,error:null};
+        const qres=qr.data?await ctx.client.from("analysis_jls_prioritized_results").select("body,sha256").eq("run_id",qr.data.id).eq("organization_id",est.organization_id).maybeSingle():{data:null,error:null};
+        if(qt.error||qres.error)throw new Error("JLS_PRI_READ_FAILED");
+        if(qres.data){
+          const v=qres.data.body;
+          if(await hybridHash(v)!==qres.data.sha256||v.protocol_sha256!==qp.data.sha256||v.request_sha256!==qp.data.body.request_sha256)throw new Error("JLS_PRI_RESULT_CHANGED");
+          if(v.validated_report){
+            const messages=v.response?.output?.filter((x:{type:string})=>x.type==="message")??[];
+            const texts=messages.flatMap((m:{content:{type:string;text:string}[]})=>m.content.filter(c=>c.type==="output_text").map(c=>c.text));
+            if(texts.length!==1||await hybridHash(await validatePrioritizedReport(JSON.parse(texts[0]),target.body,b.data,decisions,"vi"))!==await hybridHash(v.validated_report))throw new Error("JLS_PRI_RESULT_CHANGED");
+            prioritized.result=v.validated_report;
+          }
+        }
+        prioritized_execution={protocol:qp.data,run:qr.data,task:qt.data,result:qres.data};
+      }
     }catch(e){
       // A failed new preparation is never used, but must not hide the separately
       // verified immutable historical report.
@@ -74,5 +105,5 @@ Deno.serve(jlsHandler(async request => {
     }}
     delegated={revalidation,ready:!!pr.data,plan_id:target.id,protocol:pr.data,run:rr.data,tasks:tasks.data as JlsExecutionTask[],dossier:dossier.data,result:result.data,costs:executionCosts(tasks.data as JlsExecutionTask[])};
   }
-  return { plan, delegated, prioritized, prioritized_error, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
+  return { plan, delegated, prioritized, prioritized_error, prioritized_execution, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
 }));
