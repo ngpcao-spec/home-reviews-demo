@@ -9,6 +9,7 @@ import { prioritizedExecutionProtocol, type PrioritizedHistory } from "../_share
 import { validatePrioritizedReport } from "../_shared/jev-luna-sol-prioritized-validation.ts";
 import { JLS_LEGACY_VALIDATOR } from "../_shared/jls-fee-disclosure.ts";
 import { JLS_PRI_REVALIDATION_ACTION, verifyPrioritizedRevalidation } from "../_shared/jls-prioritized-revalidation.ts";
+import {buildEditorialDraft,verifyEditorialDraft,JLS_EDITORIAL_ACTION,JLS_EDITORIAL_VERSION} from "../_shared/jls-prioritized-editorial.ts";
 Deno.serve(jlsHandler(async request => {
   const ctx = await requireUser(request), query = new URL(request.url).searchParams;
   const establishment = query.get("establishment_id"), language = query.get("language") ?? "vi";
@@ -38,6 +39,7 @@ Deno.serve(jlsHandler(async request => {
   let prioritized:JlsView["prioritized"] = null;
   let prioritized_error:string|null=null;
   let prioritized_execution:JlsView["prioritized_execution"]=null;
+  let prioritized_editorial:JlsView["prioritized_editorial"]=null,editorial_error:string|null=null;
   if(target){
     const [pr,rr]=await Promise.all([
       ctx.client.from("analysis_jev_luna_sol_protocols").select("body,sha256").eq("plan_id",target.id).maybeSingle(),
@@ -72,6 +74,18 @@ Deno.serve(jlsHandler(async request => {
       const draft=body?.draft??await buildPrioritizedDraft(target.body,decisions,language as "fr"|"vi");
       await verifyPrioritizedDraft(draft,target.body,decisions);
       prioritized={draft,artifact_id:saved.data?.id??null,source_run_id:rr.data.id};
+      try {
+        const er=await ctx.client.from("analysis_jev_luna_sol_events").select("id,payload").eq("organization_id",est.organization_id)
+          .eq("plan_id",target.id).eq("action",JLS_EDITORIAL_ACTION).eq("payload->body->>language",language).maybeSingle();
+        if(er.error)throw Error("JLS_EDITORIAL_READ_FAILED");
+        const eb=er.data?.payload.body;
+        if(eb&&(eb.version!==JLS_EDITORIAL_VERSION||eb.source_run_id!==rr.data.id||eb.source_result_sha256!==result.data.result_sha256||
+          eb.source_plan_sha256!==target.result_sha256||eb.organization_id!==est.organization_id||eb.execution_authorized!==false||
+          await hybridHash(eb)!==er.data!.payload.sha256))throw Error("JLS_EDITORIAL_PREPARATION_CHANGED");
+        const editorial=eb?.draft??await buildEditorialDraft(target.body,decisions,language as "fr"|"vi");
+        await verifyEditorialDraft(editorial,target.body,decisions);
+        prioritized_editorial={draft:editorial,artifact_id:er.data?.id??null};
+      }catch(e){editorial_error=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_EDITORIAL_PREPARATION_CHANGED";}
       const qp=await ctx.client.from("analysis_jls_prioritized_protocols").select("id,body,sha256")
         .eq("source_plan_id",target.id).eq("organization_id",est.organization_id).maybeSingle();
       if(qp.error)throw new Error("JLS_PRI_PROTOCOL_UNAVAILABLE");
@@ -117,5 +131,5 @@ Deno.serve(jlsHandler(async request => {
     }}
     delegated={revalidation,ready:!!pr.data,plan_id:target.id,protocol:pr.data,run:rr.data,tasks:tasks.data as JlsExecutionTask[],dossier:dossier.data,result:result.data,costs:executionCosts(tasks.data as JlsExecutionTask[])};
   }
-  return { plan, delegated, prioritized, prioritized_error, prioritized_execution, runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
+  return { plan, delegated, prioritized, prioritized_error, prioritized_execution, prioritized_editorial,editorial_error,runs: runs ?? [], paid_enabled: false, production_enabled: false, new_paid_calls: 0 } as JlsView;
 }));

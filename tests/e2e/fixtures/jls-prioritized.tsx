@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { I18nProvider } from "../../../src/i18n";
 import { JlsPrioritizedPreparation, JlsPrioritizedExecutionStatus } from "../../../src/pages/JevLunaSolPage";
 import { PrioritizedJlsReport } from "../../../src/components/analysis/PrioritizedJlsReport";
+import {JlsEditorialPreparation} from "../../../src/components/analysis/JlsEditorialPreparation";
 import "../../../src/styles/global.css";
 import "../../../src/styles/pages.css";
 import "../../../src/styles/warm-theme.css";
@@ -9,6 +10,8 @@ const language = new URLSearchParams(location.search).get("language") === "vi" ?
 const fixture = await fetch("/tests/e2e/fixtures/jls-prioritized.json").then(r => r.json());
 if (!fixture.simulated_test_fixture) throw Error("EXPLICIT_MOCK_REQUIRED");
 const view = fixture.views[language];
+const editorial=await fetch("/tests/e2e/fixtures/jls-editorial.json").then(r=>r.json());
+if(!editorial.simulated_test_fixture)throw Error("EXPLICIT_MOCK_REQUIRED");
 const execution=await fetch("/tests/e2e/fixtures/jls-prioritized-execution.json").then(r=>r.json());
 if(!execution.simulated_test_fixture)throw Error("EXPLICIT_MOCK_REQUIRED");
 const completed=new URLSearchParams(location.search).get("state")==="completed";
@@ -19,5 +22,6 @@ createRoot(document.getElementById("root")!).render(<I18nProvider language={lang
     <JlsPrioritizedPreparation data={{draft:view.draft,artifact_id:null,source_run_id:"explicit_mock_only"}}/>
     <JlsPrioritizedExecutionStatus data={revalidated?revalidationView:completed?execution:{protocol:execution.protocol,run:null,task:null,result:null}}/>
     <PrioritizedJlsReport result={view.result}/>
+    <JlsEditorialPreparation draft={editorial.views[language]}/>
   </div></main>
 </I18nProvider>);

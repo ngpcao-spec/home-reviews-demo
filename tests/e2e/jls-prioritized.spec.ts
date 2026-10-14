@@ -11,7 +11,7 @@ for(const language of ["fr","vi"]) test(`prioritized ${language}: observation/ac
   await expect(page.getByText(language==="fr"?"Ce que les clients rapportent":"Nội dung khách hàng phản ánh")).toBeVisible();
   await expect(page.getByText(language==="fr"?"Action proposée au restaurateur":"Hành động đề xuất cho nhà hàng")).toBeVisible();
   await page.getByText(language==="fr"?"Consulter la preuve et son contexte":"Xem bằng chứng và ngữ cảnh",{exact:true}).click();
-  await expect(page.locator("blockquote").last()).toContainText("waited");
+  await expect(page.locator("details").filter({has:page.getByText(language==="fr"?"Consulter la preuve et son contexte":"Xem bằng chứng và ngữ cảnh",{exact:true})}).locator("blockquote").first()).toContainText("waited");
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
   await page.reload();await expect(button).toBeDisabled();
   await expect(page.getByText(language==="fr"?"Note méthodologique":"Ghi chú phương pháp").last()).toBeVisible();
@@ -31,4 +31,12 @@ for(const language of ["fr","vi"]) test(`prioritized ${language}: observation/ac
   await page.reload();await expect(page.getByTestId("prioritized-revalidation")).toBeVisible();
   expect(paid).toEqual([]);
   await page.screenshot({path:`test-results/prioritized-revalidation-${language}-${test.info().project.name}.png`,fullPage:true});
+  const future=page.getByTestId("editorial-preparation");
+  await expect(future.getByRole("button")).toBeDisabled();
+  await expect(future).toContainText(language==="fr"?"Exemple synthétique — aucun rapport généré":"Ví dụ giả lập — chưa tạo báo cáo");
+  await future.getByText(language==="fr"?"Couverture des critiques — tous les thèmes":"Bao phủ phản ánh tiêu cực — tất cả chủ đề",{exact:true}).click();
+  await expect(future.locator("article")).toHaveCount(25);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+  expect(paid).toEqual([]);
+  await page.screenshot({path:`test-results/editorial-${language}-${test.info().project.name}.png`,fullPage:true});
 });

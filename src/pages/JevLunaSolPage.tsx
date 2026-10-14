@@ -8,6 +8,7 @@ import { jlsPreview, type JlsView } from "../lib/jev-luna-sol";
 import { jlsMessages } from "../i18n/jev-luna-sol";
 import { GOLD_TAXONOMY } from "../../supabase/functions/_shared/gold-taxonomy";
 import { PrioritizedJlsReport } from "../components/analysis/PrioritizedJlsReport";
+import {JlsEditorialPreparation} from "../components/analysis/JlsEditorialPreparation";
 import "./JevBenchmarkPage.css";
 import "./GoldSetPage.css";
 import "./PilotEvidenceV3Page.css";
@@ -58,6 +59,8 @@ export function JlsWorkspace({ data }: { data: JlsView }) {
     {data.prioritized&&<JlsPrioritizedPreparation data={data.prioritized}/>}
     {data.prioritized_execution&&<JlsPrioritizedExecutionStatus data={data.prioritized_execution}/>}
     {data.prioritized?.result&&<PrioritizedJlsReport result={data.prioritized.result}/>}
+    {data.prioritized_editorial&&<JlsEditorialPreparation draft={data.prioritized_editorial.draft}/>}
+    {data.editorial_error&&<p role="alert">{data.editorial_error}</p>}
     {data.prioritized_error&&<p role="alert">{language==="fr"?"Nouveau format indisponible ; rapport historique conservé":"Định dạng mới chưa khả dụng; báo cáo cũ được giữ nguyên"} : {data.prioritized_error}</p>}
     {!p ? <p>{t.empty}</p> : <>
       <section className="card jev-card"><h2>{p.establishment_name}</h2><p>{t.source}</p><p>{t.preparation}</p>

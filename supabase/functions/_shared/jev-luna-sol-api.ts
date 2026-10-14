@@ -1,5 +1,6 @@
 import type { JlsRevalidation } from "./jev-luna-sol-revalidation.ts";
 import type { PrioritizedRevalidation } from "./jls-prioritized-revalidation.ts";
+import type {EditorialDraft} from "./jls-prioritized-editorial.ts";
 import type { PrioritizedDraft } from "./jev-luna-sol-prioritized.ts";
 import type { validatePrioritizedReport } from "./jev-luna-sol-prioritized-validation.ts";
 import type { PrioritizedProtocol } from "./jls-prioritized-execution.ts";
@@ -17,6 +18,8 @@ export interface JlsView {
   prioritized?: { draft: PrioritizedDraft; artifact_id: number | null; source_run_id: string;
     result?: Awaited<ReturnType<typeof validatePrioritizedReport>> | null } | null;
   prioritized_error?: string | null;
+  prioritized_editorial?:{draft:EditorialDraft;artifact_id:number|null}|null;
+  editorial_error?:string|null;
   prioritized_execution?: { protocol:{id:string;body:PrioritizedProtocol;sha256:string};
     run:{id:string;status:string;expires_at:string;consent_source:string;error_code:string|null}|null;
     task:{status:string;request_count:number;error_code:string|null}|null;
