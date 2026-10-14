@@ -1,4 +1,5 @@
 import type { JlsRevalidation } from "./jev-luna-sol-revalidation.ts";
+import type { PrioritizedRevalidation } from "./jls-prioritized-revalidation.ts";
 import type { PrioritizedDraft } from "./jev-luna-sol-prioritized.ts";
 import type { validatePrioritizedReport } from "./jev-luna-sol-prioritized-validation.ts";
 import type { PrioritizedProtocol } from "./jls-prioritized-execution.ts";
@@ -19,7 +20,8 @@ export interface JlsView {
   prioritized_execution?: { protocol:{id:string;body:PrioritizedProtocol;sha256:string};
     run:{id:string;status:string;expires_at:string;consent_source:string;error_code:string|null}|null;
     task:{status:string;request_count:number;error_code:string|null}|null;
-    result:{body:PrioritizedExecutionResult;sha256:string}|null } | null;
+    result:{body:PrioritizedExecutionResult;sha256:string}|null;
+    revalidation?: {id:number;created_at:string;payload:PrioritizedRevalidation}|null } | null;
   delegated?: {
     ready: boolean; plan_id: string;
     protocol: { body: Awaited<ReturnType<typeof delegatedProtocol>>; sha256: string } | null;

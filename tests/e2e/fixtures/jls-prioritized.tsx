@@ -12,10 +12,12 @@ const view = fixture.views[language];
 const execution=await fetch("/tests/e2e/fixtures/jls-prioritized-execution.json").then(r=>r.json());
 if(!execution.simulated_test_fixture)throw Error("EXPLICIT_MOCK_REQUIRED");
 const completed=new URLSearchParams(location.search).get("state")==="completed";
+const revalidated=new URLSearchParams(location.search).get("state")==="revalidated";
+const revalidationView={...execution,run:{...execution.run,status:"needs_review"},revalidation:{id:777,created_at:"2026-10-14T00:00:00Z",payload:{sha256:"b".repeat(64),body:{validator_version:"jls-prioritized-disclosure-v1.1",provenance:{commit:"a".repeat(40)},controls:{report_validation_passed:true},validation:view.result}}}};
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}>
   <main className="page-frame"><div className="jev-page gold-page evidence-v3-page jls-page"><p>EXPLICIT SYNTHETIC TEST — NO REAL SOL RESULT</p>
     <JlsPrioritizedPreparation data={{draft:view.draft,artifact_id:null,source_run_id:"explicit_mock_only"}}/>
-    <JlsPrioritizedExecutionStatus data={completed?execution:{protocol:execution.protocol,run:null,task:null,result:null}}/>
+    <JlsPrioritizedExecutionStatus data={revalidated?revalidationView:completed?execution:{protocol:execution.protocol,run:null,task:null,result:null}}/>
     <PrioritizedJlsReport result={view.result}/>
   </div></main>
 </I18nProvider>);

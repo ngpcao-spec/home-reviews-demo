@@ -7,10 +7,10 @@ import { buildJlsPlan, parseJlsLuna } from "../../supabase/functions/_shared/jev
 import { buildPrioritizedDraft, JLS_PRIORITIZED_VERSION } from "../../supabase/functions/_shared/jev-luna-sol-prioritized.ts";
 import { mockJlsLuna, mockJlsReport } from "./jev-luna-sol.ts";
 import type { PrioritizedResponse } from "../../supabase/functions/_shared/jev-luna-sol-prioritized-validation.ts";
-export async function prioritizedFixture(language: "fr" | "vi" = "fr") {
+export async function prioritizedFixture(language: "fr" | "vi" = "fr", billingText = "The bill included a service fee that was not announced. Staff explained it afterwards.") {
   const f = await syntheticPilot(), cases = [
     { text: "We waited a long time for our food on the terrace. The waiter later apologised and offered a discount.", themes: ["wait_time:negative"] },
-    { text: "The bill included a service fee that was not announced. Staff explained it afterwards.", themes: ["billing:negative"] },
+    { text: billingText, themes: ["billing:negative"] },
     { text: "The soup was delicious but the portion was too small. The waitress offered an extra serving.", themes: ["food_quality:positive", "portions:negative"] },
     { text: "The restaurant is far from the city center but the atmosphere was lovely.", themes: ["location:negative", "atmosphere:positive"] },
     { text: "The coffee was delicious. Our pasta was overcooked, but staff offered to replace it.", themes: ["drinks:positive", "cooking:negative"] },

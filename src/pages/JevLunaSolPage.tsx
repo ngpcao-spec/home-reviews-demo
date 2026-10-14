@@ -167,12 +167,19 @@ export function JlsPrioritizedPreparation({data}:{data:NonNullable<JlsView["prio
 export function JlsPrioritizedExecutionStatus({data}:{data:NonNullable<JlsView["prioritized_execution"]>}){
   const {language}=useI18n(),fr=language==="fr",p=data.protocol.body,r=data.run,v=data.result?.body;
   return <section className="card jev-card jls-prioritized"><h3>{fr?"Exécution déléguée — nouveau rapport vietnamien":"Chạy được ủy quyền — báo cáo tiếng Việt mới"}</h3>
-    <p>{r?r.status:(fr?"Mécanisme prêt — aucun GO enregistré":"Cơ chế sẵn sàng — chưa ghi nhận cho phép chạy")}</p>
+    <p>{r?(fr?"Statut historique : ":"Trạng thái lịch sử: ")+r.status:(fr?"Mécanisme prêt — aucun GO enregistré":"Cơ chế sẵn sàng — chưa ghi nhận cho phép chạy")}</p>
     <p>{fr?"Un GO explicite dans ChatGPT autorisera une seule exécution. Aucune manipulation GitHub ou iPhone. L’ancien run et son consentement restent fermés.":"Cho phép rõ ràng trong ChatGPT sẽ cấp quyền chạy một lần. Không cần thao tác GitHub hay iPhone. Lần chạy và chấp thuận cũ vẫn đóng."}</p>
     <p>{fr?"JEV, Luna, Apify : zéro nouvel appel. Sol : un appel maximum, aucun retry payant.":"JEV, Luna, Apify: không gọi thêm. Sol: tối đa một lần gọi, không gọi lại trả phí."}</p>
     <p className="evidence-id">{data.protocol.id}<br/>{p.version}<br/>{data.protocol.sha256}</p>
     {r&&<><p>{fr?"Consentement spécifique expirant le":"Chấp thuận riêng hết hạn lúc"} {new Date(r.expires_at).toLocaleString(language)}</p><p>{fr?"Tentatives Sol réservées":"Số lần gọi Sol đã giữ chỗ"} : {data.task?.request_count??0} / 1</p></>}
     {r?.error_code&&<p role="alert">{r.error_code}</p>}
+    {data.revalidation&&<aside className="jls-methodology" data-testid="prioritized-revalidation"><h4>{fr?"Revalidation séparée — aucun nouvel appel":"Kiểm tra lại riêng — không gọi thêm"}</h4>
+      <p>{data.revalidation.payload.body.controls.report_validation_passed?(fr?"Contrôles techniques réussis":"Kiểm tra kỹ thuật đạt"):(fr?"À réexaminer":"Cần xem lại")}</p>
+      <p>{fr?"Le statut historique est conservé. Cette revalidation ne garantit pas la vérité sémantique et n’est pas une validation humaine.":"Giữ nguyên trạng thái lịch sử. Kiểm tra lại không bảo đảm đúng về ngữ nghĩa và không phải xác nhận của con người."}</p>
+      <p className="evidence-id">{data.revalidation.id} · {data.revalidation.payload.body.validator_version}<br/>{data.revalidation.payload.body.provenance.commit}<br/>{data.revalidation.payload.sha256}</p>
+      <details><summary>{fr?"Provenance et contrôles de la revalidation":"Nguồn gốc và kiểm tra lại"}</summary><pre>{JSON.stringify(data.revalidation,null,2)}</pre></details>
+      {v?.validated_report&&<details data-testid="prioritized-original"><summary>{fr?"Consulter le rapport original immuable":"Xem báo cáo gốc bất biến"}</summary><PrioritizedJlsReport result={v.validated_report}/></details>}
+    </aside>}
     {v&&<><dl className="jev-pairs"><dt>{fr?"Modèle servi":"Mô hình thực tế"}</dt><dd>{v.served_model??"—"}</dd>
       <dt>Input tokens</dt><dd>{v.input_tokens??"—"}</dd><dt>Output tokens</dt><dd>{v.output_tokens??"—"}</dd>
       <dt>{fr?"Coût calculé":"Chi phí tính toán"}</dt><dd>{v.cost_usd===null?(fr?"Inconnu — usage manquant":"Chưa biết — thiếu dữ liệu sử dụng"):v.cost_usd.toFixed(7)+" USD"}</dd></dl>

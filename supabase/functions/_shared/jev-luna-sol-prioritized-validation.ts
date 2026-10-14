@@ -8,6 +8,7 @@ import { hybridHash } from "./jev-hybrid-evidence.ts";
 import { negativeHash } from "./negative-validation-core.ts";
 import { PILOT_AXES, type PilotSnapshot } from "./jev-pilot-core.ts";
 import { THEME_KEYS } from "./jev-themes.ts";
+import { explicitFeeDisclosureComplaint, legacyFeeDisclosure, JLS_DISCLOSURE_VALIDATOR, JLS_LEGACY_VALIDATOR } from "./jls-fee-disclosure.ts";
 
 const text = z.string().trim().min(1).max(1200), ids = z.array(z.string()).max(25), axis = z.enum(PILOT_AXES),
   prose = z.object({ text, axis, evidence_ids: ids }).strict();
@@ -31,7 +32,8 @@ export type PrioritizedResponse = z.infer<typeof prioritizedResponse>;
 // Conservative tripwires, not a replacement for contextual semantic review.
 export const unsupportedClaim = (s: string) => /\p{N}|https?:\/\//u.test(s) || /illég(?:al|ale|aux|ales)/iu.test(s) ||
   /\b(?:recurrent|récurrent|récurrente|systématique|toujours|garantit|garantira|prouvé|illégal|obligation juridique|causé par|responsable de|dû à|deux|trois|quatre|cinq|dix|cent|mille)\b|(?:thường xuyên|lặp đi lặp lại|bảo đảm|đảm bảo|vi phạm pháp luật|nghĩa vụ pháp lý|do đó gây|do nhân viên|hai|ba|bốn|năm|mười)\s+(?:avis|clients|mentions|commentaires|đánh giá|khách|lượt)|(?:thường xuyên|lặp đi lặp lại|bảo đảm|đảm bảo|vi phạm pháp luật|nghĩa vụ pháp lý)/iu.test(s);
-export async function validatePrioritizedReport(raw: unknown, p: JlsPlan, snapshot: PilotSnapshot, decisions: JlsDecision[], language: "fr" | "vi" = p.language) {
+export async function validatePrioritizedReport(raw: unknown, p: JlsPlan, snapshot: PilotSnapshot, decisions: JlsDecision[], language: "fr" | "vi" = p.language, validatorVersion: string = JLS_DISCLOSURE_VALIDATOR) {
+  if (![JLS_DISCLOSURE_VALIDATOR, JLS_LEGACY_VALIDATOR].includes(validatorVersion)) throw new Error("JLS_PRI_VALIDATOR_UNKNOWN");
   const r = prioritizedResponse.parse(raw), draft = await buildPrioritizedDraft(p, decisions, language);
   // Reuse the existing snapshot, exact quotation, theme, polarity, statistics and
   // Luna-binding verifier. No legacy recommendation/catalogue is submitted here.
@@ -68,8 +70,7 @@ export async function validatePrioritizedReport(raw: unknown, p: JlsPlan, snapsh
     if (a.priority.rank !== i + 1) reasons.push("PRIORITY_ORDER_CHANGED");
     const focus = ACTION_FOCUS[a.proposed_action.focus], anchors = a.evidence_ids.map(id => p.selected.find(e => e.evidence_id === id));
     const disclosure = (e: JlsPlan["selected"][number]) => e.theme_key === "billing" && e.polarity === "negative" &&
-      /\b(?:fee|charge|vat|tax|surcharge|bill)\b/i.test(e.quote) &&
-      /\b(?:not (?:announced|mentioned|disclosed)|no (?:mention|notice)|hidden|without (?:notice|warning)|didn.t (?:see|know)|unannounced)/i.test(e.quote);
+      (validatorVersion === JLS_LEGACY_VALIDATOR ? legacyFeeDisclosure(e.quote) : explicitFeeDisclosureComplaint(e.quote));
     const supported = anchors.filter(e => e && draft.accepted_ids.includes(e.evidence_id) && e.polarity === "negative" &&
       (focus.theme === null ? e.axis === "atmosphere" : e.theme_key === focus.theme) &&
       (jlsActionEvidenceSupported(e, focus.claims ?? undefined) || a.proposed_action.focus === "billing_disclosure" && disclosure(e)));

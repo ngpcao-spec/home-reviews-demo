@@ -1,5 +1,6 @@
 import { hybridHash } from "./jev-hybrid-evidence.ts";
 import { negativeHash } from "./negative-validation-core.ts";
+import { JLS_DISCLOSURE_VALIDATOR } from "./jls-fee-disclosure.ts";
 import { validatePrioritizedReport } from "./jev-luna-sol-prioritized-validation.ts";
 import type { PrioritizedPreparation, PrioritizedProtocol } from "./jls-prioritized-execution.ts";
 import type { JlsPlan, JlsDecision } from "./jev-luna-sol.ts";
@@ -23,7 +24,7 @@ export interface PrioritizedExecutionResult {
   raw_response_text:string|null;raw_response_sha256:string|null;response:Record<string,unknown>|null;
   response_sha256:string|null;response_id:string|null;provider_request_id:string|null;
   validated_report:Awaited<ReturnType<typeof validatePrioritizedReport>>|null;
-  controls:{json_valid:boolean;usage_complete:boolean;model_matches:boolean;report_validation_passed:boolean;error_code:string|null};
+  controls:{json_valid:boolean;usage_complete:boolean;model_matches:boolean;report_validation_passed:boolean;error_code:string|null;validator_version?:string};
   served_model:string|null;input_tokens:number|null;output_tokens:number|null;usage_details:unknown;
   cost_usd:number|null;duration_ms:number;human_validated:false;production_enabled:false;
 }
@@ -36,7 +37,7 @@ export async function processPrioritizedSol(port:PrioritizedExecutionPort,s:Prio
   const out:PrioritizedExecutionResult={version:"jls-prioritized-vi-execution-result-v1",protocol_sha256:s.protocol.sha256,
     source_plan_sha256:q.source_plan_sha256,decisions_sha256:q.decisions_sha256,request_sha256:q.request_sha256,
     raw_response_text:null,raw_response_sha256:null,response:null,response_sha256:null,response_id:null,provider_request_id:null,
-    validated_report:null,controls:{json_valid:false,usage_complete:false,model_matches:false,report_validation_passed:false,error_code:null},
+    validated_report:null,controls:{json_valid:false,usage_complete:false,model_matches:false,report_validation_passed:false,error_code:null,validator_version:JLS_DISCLOSURE_VALIDATOR},
     served_model:null,input_tokens:null,output_tokens:null,usage_details:null,cost_usd:null,duration_ms:0,human_validated:false,production_enabled:false};
   let dispatched=false,status="billing_uncertain";
   try{

@@ -7,6 +7,8 @@ import {hybridHash} from "../_shared/jev-hybrid-evidence.ts";
 import { buildPrioritizedDraft, verifyPrioritizedDraft, JLS_PRIORITIZED_ACTION } from "../_shared/jev-luna-sol-prioritized.ts";
 import { prioritizedExecutionProtocol, type PrioritizedHistory } from "../_shared/jls-prioritized-execution.ts";
 import { validatePrioritizedReport } from "../_shared/jev-luna-sol-prioritized-validation.ts";
+import { JLS_LEGACY_VALIDATOR } from "../_shared/jls-fee-disclosure.ts";
+import { JLS_PRI_REVALIDATION_ACTION, verifyPrioritizedRevalidation } from "../_shared/jls-prioritized-revalidation.ts";
 Deno.serve(jlsHandler(async request => {
   const ctx = await requireUser(request), query = new URL(request.url).searchParams;
   const establishment = query.get("establishment_id"), language = query.get("language") ?? "vi";
@@ -92,11 +94,21 @@ Deno.serve(jlsHandler(async request => {
           if(v.validated_report){
             const messages=v.response?.output?.filter((x:{type:string})=>x.type==="message")??[];
             const texts=messages.flatMap((m:{content:{type:string;text:string}[]})=>m.content.filter(c=>c.type==="output_text").map(c=>c.text));
-            if(texts.length!==1||await hybridHash(await validatePrioritizedReport(JSON.parse(texts[0]),target.body,b.data,decisions,"vi"))!==await hybridHash(v.validated_report))throw new Error("JLS_PRI_RESULT_CHANGED");
+            if(texts.length!==1||await hybridHash(await validatePrioritizedReport(JSON.parse(texts[0]),target.body,b.data,decisions,"vi",v.controls.validator_version??JLS_LEGACY_VALIDATOR))!==await hybridHash(v.validated_report))throw new Error("JLS_PRI_RESULT_CHANGED");
             prioritized.result=v.validated_report;
           }
         }
         prioritized_execution={protocol:qp.data,run:qr.data,task:qt.data,result:qres.data};
+        if(qr.data&&qres.data){
+          const rev=await ctx.client.from("analysis_jls_prioritized_events").select("id,created_at,payload")
+            .eq("run_id",qr.data.id).eq("organization_id",est.organization_id).eq("action",JLS_PRI_REVALIDATION_ACTION).maybeSingle();
+          if(rev.error)throw new Error("JLS_PRI_READ_FAILED");
+          if(rev.data){
+            await verifyPrioritizedRevalidation(rev.data.payload,qr.data.id,qres.data,target.body,b.data,decisions);
+            prioritized_execution.revalidation=rev.data;
+            prioritized.result=rev.data.payload.body.validation;
+          }
+        }
       }
     }catch(e){
       // A failed new preparation is never used, but must not hide the separately

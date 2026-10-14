@@ -22,4 +22,13 @@ for(const language of ["fr","vi"]) test(`prioritized ${language}: observation/ac
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
   expect(paid).toEqual([]);
   await page.screenshot({path:`test-results/prioritized-${language}-${test.info().project.name}.png`,fullPage:true});
+  await page.goto(`/tests/e2e/fixtures/jls-prioritized.html?language=${language}&state=revalidated`);
+  await expect(page.getByTestId("prioritized-revalidation")).toContainText("jls-prioritized-disclosure-v1.1");
+  await expect(page.getByText(language==="fr"?"Statut historique : needs_review":"Trạng thái lịch sử: needs_review",{exact:true})).toBeVisible();
+  await page.getByTestId("prioritized-original").locator("summary").first().click();
+  await expect(page.getByTestId("prioritized-original")).toContainText(language==="fr"?"Recommandations proposées":"Khuyến nghị đề xuất");
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+  await page.reload();await expect(page.getByTestId("prioritized-revalidation")).toBeVisible();
+  expect(paid).toEqual([]);
+  await page.screenshot({path:`test-results/prioritized-revalidation-${language}-${test.info().project.name}.png`,fullPage:true});
 });
