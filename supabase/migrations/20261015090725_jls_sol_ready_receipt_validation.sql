@@ -6,6 +6,8 @@ create table public.analysis_jls_sol_ready_artifacts(
  source_run_id uuid not null references public.analysis_jls_restaurant_runs(id),
  body jsonb not null,sha256 text not null unique,created_at timestamptz not null default now());
 create index on public.analysis_jls_sol_ready_artifacts(organization_id,source_protocol_id,source_run_id);
+create index on public.analysis_jls_sol_ready_artifacts(source_protocol_id);
+create index on public.analysis_jls_sol_ready_artifacts(source_run_id);
 create table public.analysis_jls_sol_ready_operations(
  id uuid primary key default gen_random_uuid(),organization_id uuid not null references public.organizations(id),
  artifact_id uuid not null references public.analysis_jls_sol_ready_artifacts(id),mode text not null check(mode in('mock','paid')),
@@ -19,6 +21,7 @@ create table public.analysis_jls_sol_ready_operations(
  check(mode='mock' and run_id is null and task_id is null and protocol_id is null and protocol_body is not null and nonce is not null
  or mode='paid' and run_id is not null and task_id is not null and protocol_id is not null and protocol_body is null));
 create index on public.analysis_jls_sol_ready_operations(organization_id,artifact_id);
+create index on public.analysis_jls_sol_ready_operations(artifact_id);
 create index on public.analysis_jls_sol_ready_operations(protocol_id);
 create table public.analysis_jls_sol_ready_checks(
  id uuid primary key default gen_random_uuid(),organization_id uuid not null references public.organizations(id),
