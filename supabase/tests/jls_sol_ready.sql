@@ -28,7 +28,11 @@ do $$declare c jsonb=current_setting('jls.sol_ready_fixture')::jsonb;a uuid;op u
  op=public.create_jls_sol_ready_probe(c->'protocol'->'body',c->'protocol'->>'sha256','SQL_ROLLBACK_READY_LOST');
  o=public.claim_jls_sol_ready(op,'lost_mock');
  update public.analysis_jls_sol_ready_operations set lease_until=now()-interval '1 minute' where id=op;
- if public.claim_jls_sol_ready(op,'lost_again') is not null or not exists(select 1 from public.analysis_jls_sol_ready_operations where id=op and status='billing_uncertain' and request_count=1) then raise exception 'TEST_LOST_RESPONSE_RETRIED';end if;
+ -- Read the durable state in a separate SQL statement after the mutating
+ -- function. A combined expression can observe its pre-function snapshot.
+ o=public.claim_jls_sol_ready(op,'lost_again');
+ if o is not null then raise exception 'TEST_LOST_RESPONSE_RETRIED';end if;
+ if not exists(select 1 from public.analysis_jls_sol_ready_operations where id=op and status='billing_uncertain' and request_count=1) then raise exception 'TEST_LOST_RESPONSE_NOT_TERMINAL';end if;
  perform set_config('jls.ready_test_user',c->'protocol'->'body'->>'authority_user_id',true);
  perform set_config('jls.ready_test_operation',op::text,true);
 end $$;
