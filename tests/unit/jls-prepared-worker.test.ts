@@ -59,6 +59,9 @@ it("prepared request and validators use the same exact probability/quote binding
 it("SQL splits only the free stage; RLS, immutable artifacts and zero retry remain",()=>{
  const sql=readFileSync("supabase/migrations/20261015062832_jls_prepared_cpu_bounded_worker.sql","utf8");expect(sql).toContain("prepare_sol");expect(sql).toContain("enable row level security");expect(sql).toContain("pilot_evidence_immutable");
  expect(sql).not.toMatch(/update public.analysis_jls_restaurant_runs set status='(?:queued|running)'/i);
+ const size=readFileSync("supabase/migrations/20261015070100_jls_prepared_sol_size_guard.sql","utf8");
+ expect(size).toContain("p_stage='sol' and p.body->>'version' in('jls-restaurant-resume-vi-32k-v1','jls-restaurant-prepared-vi-v1')");
+ expect(size).toContain("not between 1 and 32768");expect(size).toContain("is distinct from '9500'");
  const worker=readFileSync("supabase/functions/process-jls-restaurant/index.ts","utf8");expect(worker.indexOf('mode==="cpu_probe"')).toBeLessThan(worker.indexOf('Deno.env.get("OPENAI_API_KEY")'));
 });
 
