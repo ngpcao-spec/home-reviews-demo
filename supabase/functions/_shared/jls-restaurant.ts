@@ -1,3 +1,4 @@
+import {PREPARED_RESTAURANT_VERSION,verifyPreparedProtocol} from "./jls-restaurant-prepared.ts";
 import {SOL_SIZE_POLICY,solRequestSize,type SolSizePolicy} from "./jls-sol-size.ts";
 import {conditionalEditorialRequest} from "./jls-prioritized-editorial.ts";
 // Separate delegated restaurant experiment. Preparation never creates consent.
@@ -37,12 +38,13 @@ export async function restaurantConfiguration(sizePolicy?:SolSizePolicy) {
 }
 export interface RestaurantProtocol {
   version:string;organization_id:string;establishment_id:string;authority_user_id:string;
+  prepared?:{version:string;artifact_sha256:string;source_protocol_id:string;source_protocol_sha256:string;source_run_id:string};
   sol_size_policy?:SolSizePolicy;
   resume?:{source_protocol_id:string;source_protocol_sha256:string;source_run_id:string;
     evidence_sha256:string;luna_manifest_sha256:string;conditional_sol:Awaited<ReturnType<typeof conditionalEditorialRequest>>};
   snapshot:PilotSnapshot;cache: (EconomyCache & {theme_results?:unknown})[];
   pending: {review_id:string;identity:Awaited<ReturnType<typeof economyIdentity>>;cache_key:string;payload:Omit<ReturnType<typeof economyPayload>,"questions">;request_sha256:string}[];
-  configuration:Awaited<ReturnType<typeof restaurantConfiguration>>;
+  configuration:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>,"policy"> & {policy:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>["policy"],"version"> & {version:string;sol_size_policy?:SolSizePolicy};prepared_execution?:unknown};
   configuration_sha256:string;cache_sha256:string;pending_sha256:string;
   max_jev_calls:number;max_luna_calls:number;max_sol_calls:1;
   english_review_ids:string[];english_manifest_sha256:string;provider_sources:unknown;
@@ -79,6 +81,7 @@ export async function verifyRestaurantSnapshot(s:PilotSnapshot) {
     r.analysis_text!==null&&(r.analysis_language!=="en"||!r.analysis_text.trim()||await negativeHash(r.analysis_text)!==r.analysis_text_sha256))throw Error("JLS_RESTAURANT_TEXT_CHANGED");
 }
 export async function verifyRestaurantProtocol(p:RestaurantProtocol,sha:string) {
+  if(p.version===PREPARED_RESTAURANT_VERSION)return verifyPreparedProtocol(p,sha);
   if(await hybridHash(p)!==sha)throw Error("JLS_RESTAURANT_PROTOCOL_CHANGED");
   if(p.version===RESTAURANT_RESUME_VERSION){
     if(!p.resume||!p.sol_size_policy)throw Error("JLS_RESTART_BINDING_MISSING");

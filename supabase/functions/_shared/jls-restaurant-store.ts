@@ -14,10 +14,14 @@ export function restaurantPort(admin:SupabaseClient):RestaurantPort {
   return {protocol:p.data,run:rr.data,tasks:t.data,artifacts:a.data};
  };
  return {load,tick:async(id,worker)=>{
-  const s=await load(id);if(!["queued","running"].includes(s.run.status))return false;
-  await assertEvidence40ActiveUser(admin,s.protocol.body.authority_user_id);
+  const r=await admin.from("analysis_jls_restaurant_runs").select("status,protocol_id,organization_id").eq("id",id).single();
+  if(r.error)throw Error("FORBIDDEN");if(!["queued","running"].includes(r.data.status))return false;
+  const p=await admin.from("analysis_jls_restaurant_protocols").select("authority_user_id").eq("id",r.data.protocol_id).eq("organization_id",r.data.organization_id).single();
+  if(p.error)throw Error("FORBIDDEN");await assertEvidence40ActiveUser(admin,p.data.authority_user_id);
   return await rpc("claim_jls_restaurant_tick",{p_run:id,p_worker:worker})===true;
- },cache:async p=>{
+ },prepared:async p=>{const r=await admin.from("analysis_jls_restaurant_prepared_artifacts").select("body,sha256").eq("sha256",p.prepared!.artifact_sha256).eq("organization_id",p.organization_id).single();if(r.error)throw Error("JLS_PREPARED_ARTIFACT_MISSING");return r.data;},
+ cacheCompatible:async id=>await rpc("check_jls_restaurant_prepared_cache",{p_protocol:id})===true,
+ cache:async p=>{
   const r=await admin.from("analysis_jev_review_cache").select("*").eq("organization_id",p.organization_id)
    .eq("establishment_id",p.establishment_id).eq("configuration_id","v12_economy_1pass_v1").in("review_id",p.english_review_ids);
   if(r.error)throw Error("JLS_CACHE_READ_FAILED");return r.data;

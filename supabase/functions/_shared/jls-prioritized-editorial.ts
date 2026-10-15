@@ -1,9 +1,10 @@
+import {planTokenMemo,planTokens} from "./jls-token-memo.ts";
 import {solRequestSize} from "./jls-sol-size.ts";
 import {jlsSolDraft} from "./jev-luna-sol.ts";
 import {prioritizedDraftFromDossier} from "./jev-luna-sol-prioritized.ts";
 // Future-generation preparation only. Historical prompts and execution stay frozen.
 import { buildPrioritizedDraft, prioritizedInstructions, JLS_PRIORITIZED_VERSION, JLS_PRIORITIZED_CONFIG } from "./jev-luna-sol-prioritized.ts";
-import { hybridHash, localHybridTokens } from "./jev-hybrid-evidence.ts";
+import { hybridHash } from "./jev-hybrid-evidence.ts";
 import { negativeHash } from "./negative-validation-core.ts";
 import type { JlsPlan, JlsDecision } from "./jev-luna-sol.ts";
 export const JLS_EDITORIAL_VERSION = "jls-prioritized-editorial-v1";
@@ -32,11 +33,11 @@ export async function buildEditorialDraft(p:JlsPlan,decisions:JlsDecision[],lang
 }
 // Conditional sizing only; never dispatch or treat these candidates as accepted.
 export async function conditionalEditorialRequest(p:JlsPlan) {
- const base=jlsSolDraft({analytics:p.statistics,statistics_sha256:p.statistics_sha256,estimates:{rates:p.estimates.sol.rates}},p.selected,p.language,"conditional_estimate",p.sol_size_policy);
+ const base=jlsSolDraft({analytics:p.statistics,statistics_sha256:p.statistics_sha256,estimates:{rates:p.estimates.sol.rates}},p.selected,p.language,"conditional_estimate",p.sol_size_policy,planTokenMemo(p));
  const conditional={...base,dossier_sha256:await hybridHash(base.packet),prompt_sha256:await negativeHash(base.prompt),schema_sha256:await hybridHash(base.schema),
   decisions_sha256:"",accepted_ids:[],rejected_ids:[],uncertain_ids:[],human_validated:false,statistics_sha256:p.statistics_sha256};
  const d=await editorialFromPrioritized(p,await prioritizedDraftFromDossier(p,conditional,p.language),p.language);
- return {request:d.request,measurement:solRequestSize(d.request,p.sol_size_policy),request_sha256:d.request_sha256,
+ return {request:d.request,measurement:solRequestSize(d.request,p.sol_size_policy,planTokenMemo(p)?.count),request_sha256:d.request_sha256,
   dossier_sha256:d.dossier_sha256,prompt_sha256:d.prompt_sha256,schema_sha256:d.schema_sha256,scope:"all_candidates_conditional_not_luna_verdicts" as const};
 }
 async function editorialFromPrioritized(p:JlsPlan,legacy:Awaited<ReturnType<typeof buildPrioritizedDraft>>,language:"fr"|"vi") {
@@ -64,8 +65,8 @@ async function editorialFromPrioritized(p:JlsPlan,legacy:Awaited<ReturnType<type
   const prompt=editorialInstructions(language),schema=legacy.schema;
   const request={...legacy.request,input:[{role:"system",content:prompt},{role:"user",content:JSON.stringify(packet)}],
     text:{format:{...legacy.request.text.format,name:"jls_prioritized_editorial_v1"}}};
-  const tokens=Math.ceil(localHybridTokens(JSON.stringify(request))*1.12)+256;
-  if(p.sol_size_policy)solRequestSize(request,p.sol_size_policy);
+  const tokens=Math.ceil(planTokens(p,JSON.stringify(request))*1.12)+256;
+  if(p.sol_size_policy)solRequestSize(request,p.sol_size_policy,planTokenMemo(p)?.count);
   else if(tokens>JLS_EDITORIAL_CONFIG.input_budget_tokens)throw Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED",{cause:{estimated_input_tokens:tokens}});
   const rates=legacy.estimates.rates,cost=(output:number)=>rates.sol_input===null||rates.sol_output===null?null:(tokens*rates.sol_input+output*rates.sol_output)/1e6;
   const config=p.sol_size_policy?{...JLS_EDITORIAL_CONFIG,input_budget_tokens:p.sol_size_policy.input_budget_tokens,sol_size_policy:p.sol_size_policy}:JLS_EDITORIAL_CONFIG;

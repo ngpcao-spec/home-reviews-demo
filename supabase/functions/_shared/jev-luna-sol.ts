@@ -1,3 +1,4 @@
+import {planTokenMemo,type PlanTokenMemo} from "./jls-token-memo.ts";
 import {solRequestSize,type SolSizePolicy} from "./jls-sol-size.ts";
 // Experimental preparation only. No provider client, fetch, credentials or dispatch.
 import { type BalancedPlan, balancedPacketEvidence, verifyBalancedPlan } from "./jev-hybrid-balanced.ts";
@@ -65,7 +66,7 @@ export function jlsProvenanceMetadata(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !omitted.has(key))
     .map(([key, v]) => [key, jlsProvenanceMetadata(v)]));
 }
-export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sha256"> & {estimates:{rates:BalancedPlan["estimates"]["rates"]}}, evidence: JlsEvidence[], language: "fr" | "vi", kind: "conditional_estimate" | "accepted_only", sizePolicy?:SolSizePolicy) {
+export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sha256"> & {estimates:{rates:BalancedPlan["estimates"]["rates"]}}, evidence: JlsEvidence[], language: "fr" | "vi", kind: "conditional_estimate" | "accepted_only", sizePolicy?:SolSizePolicy, memo?:PlanTokenMemo) {
   const packet = {
     version: JLS_VERSION, language, statistics: source.analytics,
     statistics_sha256: source.statistics_sha256,
@@ -81,8 +82,8 @@ export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sh
     max_output_tokens: JLS_CONFIG.max_output_tokens, store: false,
     input: [{ role: "system", content: prompt }, { role: "user", content: JSON.stringify(packet) }],
     text: { format: { type: "json_schema", name: "jev_luna_sol_report", strict: true, schema } } };
-  const tokens = Math.ceil(localHybridTokens(JSON.stringify(request)) * 1.12) + 256;
-  if(sizePolicy)solRequestSize(request,sizePolicy);
+  const tokens = Math.ceil((memo?.count(JSON.stringify(request))??localHybridTokens(JSON.stringify(request))) * 1.12) + 256;
+  if(sizePolicy)solRequestSize(request,sizePolicy,memo?.count);
   else if (tokens > JLS_CONFIG.input_budget_tokens) throw new Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED");
   const out = Math.min(JLS_CONFIG.max_output_tokens, 1800 + 80 * evidence.length);
   const r = source.estimates.rates;
@@ -198,7 +199,7 @@ export async function parseJlsLuna(p: JlsPlan, group: JlsPlan["luna_groups"][num
   return { decisions, usage: e.usage, cost_usd: e.input_only_estimated_cost_usd,
     served_model: e.model, response_sha256, billed_invoice_verified: false };
 }
-export async function acceptedSolDossier(p: JlsPlan, decisions: JlsDecision[]) {
+export function acceptedJlsEvidence(p:JlsPlan,decisions:JlsDecision[]) {
   if (decisions.length !== p.question_count || new Set(decisions.map(d => d.evidence_id)).size !== p.question_count) {
     throw new Error("JLS_LUNA_RESULTS_INCOMPLETE");
   }
@@ -221,8 +222,12 @@ export async function acceptedSolDossier(p: JlsPlan, decisions: JlsDecision[]) {
       !["ACCEPTED", "REJECTED", "UNCERTAIN"].includes(d.status)) throw new Error("JLS_DECISION_BINDING_CHANGED");
   }
   const accepted = p.selected.filter(e => decisions.find(d => d.evidence_id === e.evidence_id)!.status === "ACCEPTED");
+  return accepted;
+}
+export async function acceptedSolDossier(p:JlsPlan,decisions:JlsDecision[]) {
+  const accepted=acceptedJlsEvidence(p,decisions);
   const draft = jlsSolDraft({ analytics: p.statistics, statistics_sha256: p.statistics_sha256,
-    estimates: { rates: p.estimates.sol.rates } } as BalancedPlan, accepted, p.language, "accepted_only", p.sol_size_policy);
+    estimates: { rates: p.estimates.sol.rates } } as BalancedPlan, accepted, p.language, "accepted_only", p.sol_size_policy,planTokenMemo(p));
   return { ...draft, dossier_sha256: await hybridHash(draft.packet),
     prompt_sha256: await negativeHash(draft.prompt), schema_sha256: await hybridHash(draft.schema),
     decisions_sha256: await hybridHash(decisions), accepted_ids: accepted.map(e => e.evidence_id),

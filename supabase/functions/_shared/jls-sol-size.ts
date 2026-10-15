@@ -10,11 +10,11 @@ export const SOL_SIZE_POLICY=Object.freeze({version:"jls-sol-envelope-32k-v1",mo
  infrastructure_limits_source:"https://supabase.com/docs/guides/functions/limits",
  verified_on:"2026-10-15",account_access_and_quotas_verified:false});
 export type SolSizePolicy=typeof SOL_SIZE_POLICY;
-export function solRequestSize(request:unknown,policy:SolSizePolicy=SOL_SIZE_POLICY) {
+export function solRequestSize(request:unknown,policy:SolSizePolicy=SOL_SIZE_POLICY,count:(text:string)=>number=localHybridTokens) {
  if(canonicalJson(policy)!==canonicalJson(SOL_SIZE_POLICY))throw Error("JLS_SOL_SIZE_POLICY_CHANGED");
  const q=request as {model?:string;max_output_tokens?:number;input?:{role:string;content:string}[];text?:{format?:{schema?:unknown}}};
  if(q.model!==policy.model||q.max_output_tokens!==policy.max_output_tokens)throw Error("JLS_SOL_ENVELOPE_MODEL_OR_OUTPUT_CHANGED");
- const serialized=JSON.stringify(request),tokens=localHybridTokens(serialized),bytes=new TextEncoder().encode(serialized).length;
+ const serialized=JSON.stringify(request),tokens=count(serialized),bytes=new TextEncoder().encode(serialized).length;
  const guarded=Math.ceil(tokens*(1+policy.token_margin_ratio))+policy.framing_margin_tokens;
  if(bytes>policy.max_request_bytes)throw Error("JLS_SOL_REQUEST_BYTES_EXCEEDED");
  if(guarded>policy.input_budget_tokens)throw Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED");
@@ -24,7 +24,7 @@ export function solRequestSize(request:unknown,policy:SolSizePolicy=SOL_SIZE_POL
  return {version:policy.version,request_bytes:bytes,local_input_tokens:tokens,guarded_input_tokens:guarded,
   margin_tokens:guarded-tokens,input_budget_tokens:policy.input_budget_tokens,input_headroom_tokens:policy.input_budget_tokens-guarded,
   output_reserved_tokens:policy.max_output_tokens,total_reserved_tokens:guarded+policy.max_output_tokens,model_context_tokens:policy.model_context_tokens,
-  prompt_tokens:localHybridTokens(q.input?.find(x=>x.role==="system")?.content??""),
-  dossier_tokens:localHybridTokens(q.input?.find(x=>x.role==="user")?.content??""),schema_tokens:localHybridTokens(JSON.stringify(q.text?.format?.schema??{})),
+  prompt_tokens:count(q.input?.find(x=>x.role==="system")?.content??""),
+  dossier_tokens:count(q.input?.find(x=>x.role==="user")?.content??""),schema_tokens:count(JSON.stringify(q.text?.format?.schema??{})),
   tokenizer:"o200k_base",method:"serialized complete request; local estimate + 12% + 256 framing; not billed tokens"};
 }

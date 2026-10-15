@@ -1,7 +1,8 @@
+import {planTokenMemo,planTokens} from "./jls-token-memo.ts";
 import {solRequestSize} from "./jls-sol-size.ts";
 // Free preparation only: no credentials, network, job or spending authorization.
 import { acceptedSolDossier, type JlsPlan, type JlsDecision, JLS_CONFIG } from "./jev-luna-sol.ts";
-import { hybridHash, localHybridTokens } from "./jev-hybrid-evidence.ts";
+import { hybridHash } from "./jev-hybrid-evidence.ts";
 import { negativeHash } from "./negative-validation-core.ts";
 import { PILOT_AXES } from "./jev-pilot-core.ts";
 import { THEME_KEYS } from "./jev-themes.ts";
@@ -116,9 +117,9 @@ export async function prioritizedDraftFromDossier(p:JlsPlan,legacy:Awaited<Retur
   const request = { model: JLS_CONFIG.sol_model, reasoning: { effort: "low" }, max_output_tokens: JLS_CONFIG.max_output_tokens,
     store: false, input: [{ role: "system", content: prompt }, { role: "user", content: JSON.stringify(packet) }],
     text: { format: { type: "json_schema", name: "jls_prioritized_recommendations_v1", strict: true, schema } } };
-  const tokens = Math.ceil(localHybridTokens(JSON.stringify(request)) * 1.12) + 256,
+  const tokens = Math.ceil(planTokens(p,JSON.stringify(request)) * 1.12) + 256,
     output = Math.min(JLS_CONFIG.max_output_tokens, 2300 + 85 * evidence.length), rates = p.estimates.sol.rates;
-  if(p.sol_size_policy)solRequestSize(request,p.sol_size_policy);
+  if(p.sol_size_policy)solRequestSize(request,p.sol_size_policy,planTokenMemo(p)?.count);
   else if (tokens > JLS_CONFIG.input_budget_tokens) throw new Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED", { cause: { estimated_input_tokens: tokens } });
   const cost = (out: number) => rates.sol_input === null || rates.sol_output === null ? null : (tokens * rates.sol_input + out * rates.sol_output) / 1e6;
   const config=p.sol_size_policy?{...JLS_PRIORITIZED_CONFIG,input_budget_tokens:p.sol_size_policy.input_budget_tokens,sol_size_policy:p.sol_size_policy}:JLS_PRIORITIZED_CONFIG;

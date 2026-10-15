@@ -5,7 +5,7 @@ export interface RestaurantView {
  protocol:null|{id:string;sha256:string;created_at:string;establishment_name:string;source_sha256:string;configuration_sha256:string;
   coverage:{google_total:number|null;stored_reviews:number;reviews_with_text:number;english_ready:number;reused_analyses:number;missing_analyses:number;missing_english:number};
   sol_preflight?:null|{request_bytes:number;local_input_tokens:number;guarded_input_tokens:number;input_budget_tokens:number;output_reserved_tokens:number;input_headroom_tokens:number};
-  source_run_id?:string|null;
+  source_run_id?:string|null;prepared_artifact_sha256?:string|null;
   max_jev_calls:number;max_luna_calls:number;max_sol_calls:number;language:string;format_version:string;editorial_version:string};
  historical_runs?:{id:string;status:string;stage:string;error_code:string|null}[];
  run:null|{id:string;status:string;stage:string;error_code:string|null};
@@ -29,6 +29,7 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
   <p>{fr?"Couverture partielle : seuls les textes anglais figés pourront être analysés. Aucun import ni traduction automatique.":"Phạm vi chưa đầy đủ: chỉ phân tích nội dung tiếng Anh đã cố định. Không tự nhập hay dịch thêm."}</p>
   <p>{fr?"Limites de la future exécution":"Giới hạn lần thực thi tương lai"} : JEV {p.max_jev_calls} · Luna {p.max_luna_calls} · Sol {p.max_sol_calls}.</p>
   <p>{fr?"Questions Luna regroupées par avis. Aucune relance payante ; un contrôle des preuves peut bloquer Sol.":"Câu hỏi Luna gộp theo đánh giá. Không gọi lại có tính phí; kiểm tra bằng chứng có thể chặn Sol."}</p>
+  {p.prepared_artifact_sha256&&<p>{fr?"Artefacts déterministes figés. Vérification des empreintes à chaque réveil ; préparation Sol dans une étape serveur distincte. Nouveau GO requis.":"Đã cố định dữ liệu chuẩn bị tất định. Kiểm tra dấu vân tay mỗi lần đánh thức; chuẩn bị Sol trong bước máy chủ riêng. Cần cho phép mới."}</p>}
   {p.sol_preflight&&<div data-testid="jls-sol-size"><h3>{fr?"Dossier Sol complet — contrôle de taille":"Hồ sơ Sol đầy đủ — kiểm tra kích thước"}</h3>
    <p>{fr?"Mesure conditionnelle avant Luna, avec toutes les citations. Le dossier accepté sera contrôlé à nouveau avant Sol.":"Đo có điều kiện trước Luna, gồm toàn bộ trích dẫn. Hồ sơ được chấp nhận sẽ được kiểm tra lại trước Sol."}</p>
    <dl className="jev-pairs">{[
@@ -42,11 +43,12 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
   </div>}
   {data.historical_runs?.length? <details><summary>{fr?"Exécutions historiques conservées":"Các lần thực thi cũ được giữ nguyên"}</summary>
    {data.historical_runs.map(r=><p key={r.id} style={{overflowWrap:"anywhere"}}>{r.id} · {r.status} · {r.error_code}</p>)}</details>:null}
+  {data.run&&<p>{fr?"Étape serveur":"Bước máy chủ"} : {({jev:p.prepared_artifact_sha256?(fr?"Vérification des artefacts figés":"Kiểm tra dữ liệu đã cố định"):(fr?"Analyses JEV":"Phân tích JEV"),luna:fr?"Vérification Luna":"Kiểm tra Luna",prepare_sol:fr?"Préparation gratuite du dossier Sol":"Chuẩn bị hồ sơ Sol miễn phí",sol:fr?"Rapport Sol":"Báo cáo Sol"} as Record<string,string>)[data.run.stage]}</p>}
   <p>{data.run?data.run.status:fr?"Prêt — aucun GO enregistré":"Sẵn sàng — chưa ghi nhận cho phép chạy"}</p>
   {data.progress&&<p>{data.progress.filter(t=>["completed","reused"].includes(t.status)).length} / {data.progress.length}</p>}
   {data.run?.error_code&&<p role="alert">{data.run.error_code}</p>}
   <button disabled className="primary-button full-width">{fr?"Exécution déléguée — GO explicite requis":"Thực thi ủy quyền — cần cho phép rõ ràng"}</button>
-  <details><summary>{fr?"Provenance du protocole":"Nguồn gốc giao thức"}</summary><p className="evidence-id" style={{overflowWrap:"anywhere"}}>{p.id}<br/>{p.sha256}<br/>{p.source_sha256}<br/>{p.configuration_sha256}<br/>{p.format_version}<br/>{p.editorial_version}</p></details>
+  <details><summary>{fr?"Provenance du protocole":"Nguồn gốc giao thức"}</summary><p className="evidence-id" style={{overflowWrap:"anywhere"}}>{p.id}<br/>{p.sha256}<br/>{p.source_sha256}<br/>{p.configuration_sha256}<br/>{p.format_version}<br/>{p.editorial_version}<br/>{p.prepared_artifact_sha256}</p></details>
   {data.result?.validated_report&&<PrioritizedJlsReport result={data.result.validated_report}/>}
  </section>;
 }
