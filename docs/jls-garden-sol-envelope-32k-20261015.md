@@ -90,3 +90,31 @@ HTTP après réservation, reprise sans clé JEV, citations et contextes complets
 SQL/RLS exécutés en transaction annulée : idempotence, absence de consentement,
 ancien run bloqué, rôles et organisations, anti-doublons, bail, immutabilité,
 absence de retry. Tests FR/VI 360/390/430 et iPad 768, rechargement et zéro POST.
+
+## Livraison enregistrée
+
+- Code : `714742d13fac971b0a4a231f84f8d563901e0baf`.
+- Préparation serveur : `2f7d02b1-05dd-4b32-a2a9-e98b25a8db85`.
+- SHA256 du protocole : `f495e0501279df1778f0aeb3b5fc5a569ec46c08d99f457408858ae85601d5c2`.
+- Les empreintes du protocole relu depuis JSONB ont été reconstruites et
+  vérifiées hors réseau avec le code livré.
+- 1 759 tests unitaires / 167 fichiers ; 2 tests Deno sans réseau ; 8 tests
+  mobiles FR/VI ; SQL/RLS en transactions annulées ; lint, build, Deno check
+  et Deno lint réussis.
+- Migration `20261015054930_jls_restaurant_sol_envelope_32k.sql` appliquée.
+- Edge `jls-restaurant` et `process-jls-restaurant` : version 2 ACTIVE.
+  Les deux refusent les requêtes non authentifiées avec HTTP 401.
+- [GitHub Pages, workflow de livraison réussi](https://github.com/ngpcao-spec/home-reviews-demo/actions/runs/38689941387).
+- Fonctions modifiées SECURITY INVOKER, droits serveur uniquement ; aucun
+  EXECUTE pour anon ou authenticated. RLS et contrôles organisationnels conservés.
+- Après livraison : cache JEV global, anciens résultats Sol, run arrêté et
+  ses 71 artefacts identiques aux empreintes prises avant modification.
+- Zéro nouveau consentement, run ou tâche payante enregistré ; zéro appel
+  fournisseur. Aucun réveil serveur authentifié effectué par cette préparation.
+
+Instruction possible pour une future décision explicite, non exécutée ici :
+
+> GO — J’autorise une seule reprise du rapport vietnamien Xóm Mới Garden selon
+> le protocole 2f7d02b1-05dd-4b32-a2a9-e98b25a8db85 : zéro nouvel appel JEV,
+> 28 appels Luna maximum pour 32 questions, un appel gpt-6.1-sol maximum,
+> aucun Apify et aucune relance payante automatique.
