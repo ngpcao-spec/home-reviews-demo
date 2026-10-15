@@ -5,7 +5,7 @@ import {validateEditorialReport} from "./jls-editorial-validation.ts";
 import {hybridHash} from "./jev-hybrid-evidence.ts";
 import {negativeHash} from "./negative-validation-core.ts";
 import {planTokenMemo} from "./jls-token-memo.ts";
-export interface ReadyOperation {id:string;organization_id:string;mode:"mock"|"paid";run_id:string|null;phase:"sol"|"validate_sol";
+export interface ReadyOperation {id:string;organization_id:string;artifact_id?:string;mode:"mock"|"paid";run_id:string|null;phase:"sol"|"validate_sol";
  status:string;request_count:number;worker:string|null;receipt:ReadyReceipt|null;receipt_sha256:string|null;result:Record<string,unknown>|null;}
 export interface ReadyReceipt {version:string;request_sha256:string;request_raw_sha256:string;http_status:number|null;provider_request_id:string|null;
  raw_response_text:string|null;raw_response_sha256:string|null;duration_ms:number;error_code:string|null;mock:boolean;}
@@ -20,9 +20,9 @@ export interface ReadyPort {
 const terminal=new Set(["completed","needs_review","invalid_output","blocked","billing_uncertain","authorization_expired"]);
 const code=(e:unknown)=>e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_SOL_READY_BILLING_UNCERTAIN";
 export async function processReadySol(port:ReadyPort,id:string,key:string,http:typeof fetch){
- const worker=crypto.randomUUID();let claimed=false,phase="",sent=false;
+ const worker=crypto.randomUUID();let claimed=false,phase="",sent=false,mock=false;
  try{
-  const s=await port.load(id);if(terminal.has(s.operation.status))return {phase:"already_recorded",provider_calls:0};
+  const s=await port.load(id);mock=s.operation.mode==="mock";if(terminal.has(s.operation.status))return {phase:"already_recorded",provider_calls:0};
   await port.active(s);await verifySolReadyProtocol(s.protocol.body,s.protocol.sha256);
   const plan=await verifySolReadyArtifact(s.protocol.body,s.ready);
   if(!await port.compatible(s))throw Error("JLS_SOL_READY_REUSED_SOURCE_CHANGED");
@@ -45,7 +45,7 @@ export async function processReadySol(port:ReadyPort,id:string,key:string,http:t
     provider_request_id:null,raw_response_text:raw,raw_response_sha256:raw===null?null:await negativeHash(raw),duration_ms:Date.now()-at,
     error_code:code(e),mock:op.mode==="mock"};}
    if(!await port.receive(id,worker,receipt,await hybridHash(receipt)))throw Error("JLS_SOL_RECEIPT_SAVE_UNCERTAIN_NO_RETRY");
-   return {phase:"raw_receipt_saved",provider_calls:1,tokenizer_misses:planTokenMemo(plan)!.misses};
+   return {phase:"raw_receipt_saved",provider_calls:mock?0:1,mock_http_calls:mock?1:0,tokenizer_misses:planTokenMemo(plan)!.misses};
   }
   const receipt=op.receipt;
   if(op.request_count!==1||!receipt||!op.receipt_sha256||await hybridHash(receipt)!==op.receipt_sha256||
@@ -78,5 +78,5 @@ export async function processReadySol(port:ReadyPort,id:string,key:string,http:t
   out.receipt_sha256=op.receipt_sha256;
   if(!await port.finish(id,worker,status,out,await hybridHash(out)))throw Error("JLS_SOL_VALIDATION_SAVE_UNCERTAIN_NO_RETRY");
   return {phase:"validation_saved",provider_calls:0,tokenizer_misses:planTokenMemo(plan)!.misses,status};
- }catch(e){await port.abort(id,worker,code(e));return {phase,provider_calls:sent?1:0,error_code:code(e),claimed};}
+ }catch(e){await port.abort(id,worker,code(e));return {phase,provider_calls:sent&&!mock?1:0,mock_http_calls:sent&&mock?1:0,error_code:code(e),claimed};}
 }

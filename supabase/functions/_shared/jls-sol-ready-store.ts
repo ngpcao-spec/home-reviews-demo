@@ -5,7 +5,7 @@ import type {SupabaseClient} from "npm:@supabase/supabase-js@2.117.2";
 import {assertEvidence40ActiveUser} from "./decisions-evidence40-auth.ts";
 import type {ReadyPort,ReadyState} from "./jls-sol-ready-worker.ts";
 export function solReadyPort(admin:SupabaseClient):ReadyPort {
- const rpc=async(name:string,args:Record<string,unknown>)=>{const r=await admin.rpc(name,args);if(r.error)throw Error("JLS_READY_DATABASE_FAILED");return r.data;};
+ const rpc=async(name:string,args:Record<string,unknown>)=>{const r=await admin.rpc(name,args);if(r.error)throw Error("JLS_READY_RPC_"+name.toUpperCase()+"_"+(r.error.code??"UNKNOWN"));return r.data;};
  return {
  load:async id=>{
   const op=await admin.from("analysis_jls_sol_ready_operations").select("*").eq("id",id).single();if(op.error)throw Error("FORBIDDEN");
@@ -23,7 +23,7 @@ export function solReadyPort(admin:SupabaseClient):ReadyPort {
    .eq("user_id",s.protocol.body.authority_user_id).in("role",["owner","admin","manager"]).maybeSingle();
   if(m.error||!m.data)throw Error("FORBIDDEN");
  },
- compatible:async s=>await rpc("check_jls_sol_ready_sources",{p_body:s.ready.body})===true,
+ compatible:async s=>await rpc("check_jls_sol_ready_sources_id",{p_artifact:s.operation.artifact_id})===true,
  claim:async(id,worker)=>await rpc("claim_jls_sol_ready",{p_operation:id,p_worker:worker}),
  receive:async(id,worker,body,sha)=>await rpc("receive_jls_sol_ready",{p_operation:id,p_worker:worker,p_body:body,p_sha:sha})===true,
  finish:async(id,worker,status,body,sha)=>await rpc("finish_jls_sol_ready",{p_operation:id,p_worker:worker,p_status:status,p_body:body,p_sha:sha})===true,

@@ -10,6 +10,8 @@ import type {SolReadyArtifact} from "./jls-sol-ready.ts";
 export async function readyTechnicalResponse(a:SolReadyArtifact,variant="normal"){
  const accepted=a.plan.selected.filter(e=>a.decisions.some(d=>d.evidence_id===e.evidence_id&&d.status==="ACCEPTED"));
  const report=technicalSolMock({...a.plan,selected:accepted});
+ // A short valid report and a deliberately demanding recommendation/byte case.
+ if(variant==="normal")report.report.recommendations=[];
  for(const r of report.report.recommendations)for(const o of r.observations)o.context_sha256=await negativeHash(o.context_quote);
  return {id:"explicit_mock_not_provider",model:"gpt-6.1-sol",status:"completed",
  usage:{input_tokens:a.measurement.local_input_tokens,output_tokens:9500,total_tokens:a.measurement.local_input_tokens+9500},
@@ -27,7 +29,7 @@ export async function solReadyProbe(admin:SupabaseClient,id:string,variant:strin
   mockCalls++;return new Response(JSON.stringify(await readyTechnicalResponse(s.ready.body,variant)),{headers:{"x-request-id":"explicit_mock"}});
  };
  const result=await processReadySol(port,id,"explicit_mock_key_no_provider_access",http),after=process.cpuUsage();
- const metric={version:"jls-sol-ready-full-worker-probe-v1",operation_id:id,phase:stage,variant,full_worker_path:true,provider_calls:0,mock_http_calls:mockCalls,
+ const metric={version:"jls-sol-ready-full-worker-probe-v1.1",operation_id:id,phase:stage,variant,full_worker_path:true,provider_calls:0,mock_http_calls:mockCalls,
   cpu_ms:probeCpuMillis(before,after),cpu_source:"native_Shutdown_required_when_null",wall_ms:performance.now()-start,memory:Deno.memoryUsage(),
   execution_id:Deno.env.get("SB_EXECUTION_ID")??null,runtime:Deno.version,result};
  const saved=await admin.rpc("record_jls_sol_ready_metric",{p_operation:id,p_metric:metric});if(saved.error)throw Error("JLS_READY_METRIC_SAVE_FAILED");

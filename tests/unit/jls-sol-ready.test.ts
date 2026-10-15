@@ -6,8 +6,10 @@ it("full durable path: exact request, atomic claim, raw receipt, separate valida
  const f=await readyFixture(),http=vi.fn(f.http);
  const a=await processReadySol(f.port,f.state.operation.id,"mock",http);
  expect(a?.phase).toBe("raw_receipt_saved");expect(f.state.operation.result).toBeNull();expect(f.state.operation.receipt?.raw_response_text).toBeTruthy();
+ expect(a?.provider_calls).toBe(0);expect(a?.mock_http_calls).toBe(1);
  const b=await processReadySol(f.port,f.state.operation.id,"mock",http);
  expect(b?.phase).toBe("validation_saved");expect(b?.tokenizer_misses).toBe(0);expect(f.state.operation.result?.validated_report).toBeTruthy();
+ expect(f.state.operation.status).toBe("completed");
  await processReadySol(f.port,f.state.operation.id,"mock",http);expect(http).toHaveBeenCalledTimes(1);expect(f.state.operation.request_count).toBe(1);
 },15000);
 it("concurrent/repeated wakes make exactly one HTTP attempt",async()=>{
@@ -47,4 +49,6 @@ it("shared SQL bounds paid calls, protects organizations and preserves both sour
  expect(sql).toContain("claim_jls_restaurant_task");expect(sql).toContain("request_count in(0,1)");expect(sql).toContain("enable row level security");
  expect(sql).toContain("raw_response_sha256");expect(sql).toContain("authorize_jls_restaurant_pre_ready");expect(sql).toContain("request_count=1");
  expect(sql).not.toMatch(/update public.analysis_jls_restaurant_runs set status='(?:running|queued)'/);
+ const followup=readFileSync("supabase/migrations/20261015093752_jls_sol_ready_frozen_source_checks.sql","utf8");
+ expect(followup).toContain("old.status='received'");expect(followup).toContain("jls-restaurant-sol-ready-vi-v1");
 });

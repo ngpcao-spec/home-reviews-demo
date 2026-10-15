@@ -10,6 +10,7 @@ import {solRequestSize,SOL_SIZE_POLICY} from "../../supabase/functions/_shared/j
 import {readyTechnicalResponse} from "../../supabase/functions/_shared/jls-sol-ready-probe";
 import type {JlsPlan,JlsDecision} from "../../supabase/functions/_shared/jev-luna-sol";
 import type {ReadyState,ReadyPort} from "../../supabase/functions/_shared/jls-sol-ready-worker";
+import {canonicalJson} from "../../supabase/functions/_shared/jev-exploratory-core";
 let base:Promise<ReadyState>;
 async function build():Promise<ReadyState>{
  const f=await gardenFixture();f.authorize();for(let i=0;i<4;i++)await processRestaurant(f.port,f.state.run.id,{jev:"mock",openai:"mock"},f.http);
@@ -33,7 +34,7 @@ async function build():Promise<ReadyState>{
 export async function readyFixture(){
  base??=build();const state=structuredClone(await base);let leased=false,allowed=true,compatible=true,calls=0;
  const port:ReadyPort={
- load:async()=>structuredClone(state),active:async()=>{if(!allowed)throw Error("AUTHORIZATION_EXPIRED");},compatible:async()=>compatible,
+ load:async()=>JSON.parse(canonicalJson(state)),active:async()=>{if(!allowed)throw Error("AUTHORIZATION_EXPIRED");},compatible:async()=>compatible,
  claim:async(_id,worker)=>{const o=state.operation;if(leased||["completed","needs_review","invalid_output","blocked","billing_uncertain"].includes(o.status))return null;
  if(o.phase==="sol"&&o.request_count){o.status="billing_uncertain";return null;}leased=true;o.worker=worker;o.status=o.phase==="sol"?"dispatched":"validating";
  if(o.phase==="sol")o.request_count=1;return structuredClone(o);},
