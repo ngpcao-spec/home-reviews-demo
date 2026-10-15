@@ -4,7 +4,7 @@ import {prepareRestaurantResume,verifyRestaurantProtocol,restaurantSol} from "..
 import {compilePreparedRestaurant,verifyPreparedArtifact} from "../../supabase/functions/_shared/jls-restaurant-prepared";
 import {attachPlanTokenMemo,planTokenMemo,tokenCertificate} from "../../supabase/functions/_shared/jls-token-memo";
 import {hybridHash} from "../../supabase/functions/_shared/jev-hybrid-evidence";
-import {technicalLunaMocks,preparedCpuExercise} from "../../supabase/functions/_shared/jls-restaurant-cpu-probe";
+import {technicalLunaMocks,preparedCpuExercise,probeCpuMillis} from "../../supabase/functions/_shared/jls-restaurant-cpu-probe";
 import {processRestaurant} from "../../supabase/functions/_shared/jls-restaurant-worker";
 import {readFileSync} from "node:fs";
 async function fixture(){const f=await gardenFixture();f.authorize();for(let i=0;i<2;i++)await processRestaurant(f.port,f.state.run.id,{jev:"mock",openai:"mock"},f.http);
@@ -60,4 +60,9 @@ it("SQL splits only the free stage; RLS, immutable artifacts and zero retry rema
  const sql=readFileSync("supabase/migrations/20261015062832_jls_prepared_cpu_bounded_worker.sql","utf8");expect(sql).toContain("prepare_sol");expect(sql).toContain("enable row level security");expect(sql).toContain("pilot_evidence_immutable");
  expect(sql).not.toMatch(/update public.analysis_jls_restaurant_runs set status='(?:queued|running)'/i);
  const worker=readFileSync("supabase/functions/process-jls-restaurant/index.ts","utf8");expect(worker.indexOf('mode==="cpu_probe"')).toBeLessThan(worker.indexOf('Deno.env.get("OPENAI_API_KEY")'));
+});
+
+it("zero/unavailable CPU counters are unknown, never a claim of zero CPU",()=>{
+ expect(probeCpuMillis({user:0,system:0},{user:0,system:0})).toBeNull();expect(probeCpuMillis(null,null)).toBeNull();
+ expect(probeCpuMillis({user:100,system:10},{user:1000,system:110})).toBe(1);
 });

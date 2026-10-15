@@ -46,6 +46,9 @@ export async function preparedCpuExercise(p:RestaurantProtocol,sha:string,row:Pr
  }
  return {checked_requests:checked,measurement,memo_misses:planTokenMemo(plan)?.misses??0,synthetic_recommendations:recommendations};
 }
+export function probeCpuMillis(before:{user:number;system:number}|null,after:{user:number;system:number}|null){
+ const delta=before&&after?(after.user+after.system-before.user-before.system)/1000:null;return delta!==null&&delta>0?delta:null;
+}
 function cpu(){try{return process.cpuUsage();}catch{return null;}}
 export async function restaurantCpuProbe(admin:SupabaseClient,request:{protocol_id:string;nonce:string;phase:string}){
  const start=performance.now(),before=cpu();
@@ -56,9 +59,9 @@ export async function restaurantCpuProbe(admin:SupabaseClient,request:{protocol_
  const ar=await admin.from("analysis_jls_restaurant_prepared_artifacts").select("body,sha256").eq("sha256",pr.data.body.prepared?.artifact_sha256??"").eq("organization_id",pr.data.organization_id).single();if(ar.error)throw Error("JLS_PREPARED_ARTIFACT_MISSING");
  const cache=await admin.rpc("check_jls_restaurant_prepared_cache",{p_protocol:request.protocol_id});if(cache.error||cache.data!==true)throw Error("JLS_REUSED_CACHE_CHANGED");
  const exercise=await preparedCpuExercise(pr.data.body,pr.data.sha256,ar.data,request.phase),after=cpu();
- const result={version:"jls-edge-cpu-probe-v1",explicit_non_provider_test:true,provider_calls:0,paid_consent_created:false,paid_run_created:false,
+ const result={version:"jls-edge-cpu-probe-v1.1-platform-telemetry",explicit_non_provider_test:true,provider_calls:0,paid_consent_created:false,paid_run_created:false,
  phase:request.phase,protocol_id:request.protocol_id,nonce:request.nonce,wall_ms:performance.now()-start,
- cpu_ms:before&&after?(after.user+after.system-before.user-before.system)/1000:null,cpu_limit_ms:2000,
+ cpu_ms:probeCpuMillis(before,after),cpu_measurement_source:probeCpuMillis(before,after)===null?"supabase_function_logs_shutdown_required":"process_cpu_usage",cpu_limit_ms:2000,
  ...exercise,runtime:Deno.version,memory:Deno.memoryUsage(),mock_data:"only_in_memory_native_Luna_and_Sol_mocks_never_real_results"};
  const save=await admin.rpc("record_jls_restaurant_cpu_probe",{p_protocol:request.protocol_id,p_nonce:request.nonce,p_body:result,p_sha:await hybridHash(result)});if(save.error)throw Error("JLS_PROBE_SAVE_FAILED");
  console.log(JSON.stringify({event:"jls_cpu_probe_complete",id:save.data,phase:request.phase,cpu_ms:result.cpu_ms,wall_ms:result.wall_ms,provider_calls:0}));
