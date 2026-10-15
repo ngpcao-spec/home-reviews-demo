@@ -9,7 +9,7 @@ create table public.analysis_jls_restaurant_cpu_probes(
  foreign key(protocol_id,organization_id) references public.analysis_jls_restaurant_protocols(id,organization_id));
 create index jls_prepared_source_org on public.analysis_jls_restaurant_prepared_artifacts(source_protocol_id,organization_id);
 create index jls_cpu_probe_protocol_org on public.analysis_jls_restaurant_cpu_probes(protocol_id,organization_id);
-do $declare t text;begin foreach t in array array['analysis_jls_restaurant_prepared_artifacts','analysis_jls_restaurant_cpu_probes'] loop
+do $$declare t text;begin foreach t in array array['analysis_jls_restaurant_prepared_artifacts','analysis_jls_restaurant_cpu_probes'] loop
  execute format('alter table public.%I enable row level security',t);
  execute format('revoke all on public.%I from public,anon,authenticated',t);
  execute format('grant select on public.%I to authenticated',t);
