@@ -1,3 +1,5 @@
+import {SOL_SIZE_POLICY,solRequestSize,type SolSizePolicy} from "./jls-sol-size.ts";
+import {conditionalEditorialRequest} from "./jls-prioritized-editorial.ts";
 // Separate delegated restaurant experiment. Preparation never creates consent.
 import { ECONOMY_CONFIG, ECONOMY_THRESHOLDS, economyPayload } from "./jev-economy-config.ts";
 import { economyIdentity, economyCacheKey, type EconomyCache } from "./jev-economy-cache.ts";
@@ -22,8 +24,10 @@ export const RESTAURANT_POLICY=Object.freeze({version:RESTAURANT_PROTOCOL_VERSIO
   sufficiency:{minimum_accepted:8,minimum_per_axis:1,negative_if_available:3,low_star_if_available:2},
   consent_source:"user_directive_codex_delegation",operator_identity:{kind:"codex_admin",channel:"supabase_mcp"},
   no_monetary_estimate:true,no_amount_confirmation:true});
-export async function restaurantConfiguration() {
-  return {policy:RESTAURANT_POLICY,selector_version:BALANCED_VERSION,economy_sha256:await hybridHash(ECONOMY_CONFIG),
+export const RESTAURANT_RESUME_VERSION="jls-restaurant-resume-vi-32k-v1";
+export async function restaurantConfiguration(sizePolicy?:SolSizePolicy) {
+  const policy=sizePolicy?{...RESTAURANT_POLICY,version:RESTAURANT_RESUME_VERSION,input_budget_tokens:sizePolicy.input_budget_tokens,sol_size_policy:sizePolicy}:RESTAURANT_POLICY;
+  return {policy,selector_version:BALANCED_VERSION,economy_sha256:await hybridHash(ECONOMY_CONFIG),
     jev_request_template:{model:"jev-latest",questions:economyPayload("unused","unused").questions},
     thresholds_sha256:await hybridHash(ECONOMY_THRESHOLDS),selector_sha256:await balancedSelectorHash(),
     luna_questions_sha256:await hybridHash(EVIDENCE_CONFIG.source_questions),
@@ -33,6 +37,9 @@ export async function restaurantConfiguration() {
 }
 export interface RestaurantProtocol {
   version:string;organization_id:string;establishment_id:string;authority_user_id:string;
+  sol_size_policy?:SolSizePolicy;
+  resume?:{source_protocol_id:string;source_protocol_sha256:string;source_run_id:string;
+    evidence_sha256:string;luna_manifest_sha256:string;conditional_sol:Awaited<ReturnType<typeof conditionalEditorialRequest>>};
   snapshot:PilotSnapshot;cache: (EconomyCache & {theme_results?:unknown})[];
   pending: {review_id:string;identity:Awaited<ReturnType<typeof economyIdentity>>;cache_key:string;payload:Omit<ReturnType<typeof economyPayload>,"questions">;request_sha256:string}[];
   configuration:Awaited<ReturnType<typeof restaurantConfiguration>>;
@@ -72,6 +79,12 @@ export async function verifyRestaurantSnapshot(s:PilotSnapshot) {
     r.analysis_text!==null&&(r.analysis_language!=="en"||!r.analysis_text.trim()||await negativeHash(r.analysis_text)!==r.analysis_text_sha256))throw Error("JLS_RESTAURANT_TEXT_CHANGED");
 }
 export async function verifyRestaurantProtocol(p:RestaurantProtocol,sha:string) {
+  if(await hybridHash(p)!==sha)throw Error("JLS_RESTAURANT_PROTOCOL_CHANGED");
+  if(p.version===RESTAURANT_RESUME_VERSION){
+    if(!p.resume||!p.sol_size_policy)throw Error("JLS_RESTART_BINDING_MISSING");
+    const rebuilt=await prepareRestaurantResume(p.snapshot,p.cache,p.provider_sources,p.code_provenance,p.cache[0]?.served_model??"",p.resume);
+    if(await hybridHash(rebuilt)!==sha)throw Error("JLS_RESTAURANT_PROTOCOL_CHANGED");return;
+  }
   if(await hybridHash(p)!==sha||p.version!==RESTAURANT_PROTOCOL_VERSION||p.establishment_id!==GARDEN||
     p.authority_user_id!==p.snapshot.created_by||p.organization_id!==p.snapshot.organization_id||
     p.establishment_id!==p.snapshot.establishment_id||p.preparation_is_not_spending_authorization!==true||
@@ -89,7 +102,7 @@ export async function restaurantConsent(p:RestaurantProtocol,sha:string,directGo
     protocol_sha256:sha,user_directive:directGo,directive_sha256:await negativeHash(directGo),requested_at:at,
     expires_at:new Date(Date.parse(at)+24*3600000).toISOString(),scope:{establishment_id:p.establishment_id,
       organization_id:p.organization_id,language:"vi",configuration_sha256:p.configuration_sha256,
-      max_jev_calls:p.max_jev_calls,max_luna_calls:32,max_sol_calls:1,automatic_retry:false,provider_client_retries:0,apify_calls:0}};
+      max_jev_calls:p.max_jev_calls,max_luna_calls:p.max_luna_calls,max_sol_calls:1,automatic_retry:false,provider_client_retries:0,apify_calls:0}};
 }
 // Reuse the exact V1.1 selector and native Luna bindings; no historical builder
 // is changed. Null rates deliberately prevent ANY monetary forecast.
@@ -99,7 +112,7 @@ export async function restaurantEvidencePlan(p:RestaurantProtocol,cache:Restaura
   const statistics=hybridAnalytics(s,pilotStatistics(s.source.reviews,a,s.source.google_total_reviews));
   const selected=selectBalancedEvidence(await balancedCandidates(s,a.used,[]),32);
   if(!selected.length)throw Error("JLS_NO_ADMISSIBLE_EVIDENCE");
-  const config={...JLS_CONFIG,source_question_set:EVIDENCE_CONFIG.source_question_set,
+  const config={...JLS_CONFIG,...(p.sol_size_policy?{input_budget_tokens:p.sol_size_policy.input_budget_tokens,sol_size_policy:p.sol_size_policy}:{}),source_question_set:EVIDENCE_CONFIG.source_question_set,
     source_questions_sha256:await hybridHash(EVIDENCE_CONFIG.source_questions),source_threshold_version:ECONOMY_CONFIG.threshold_version,
     source_threshold_sha256:await hybridHash(ECONOMY_THRESHOLDS),source_jev_config_sha256:s.config_sha256,
     evidence_boundary_version:"explicit_quote_evidence_boundaries_v1",evidence_semantic_boundaries:JLS_EVIDENCE_BOUNDARIES};
@@ -115,8 +128,8 @@ export async function restaurantEvidencePlan(p:RestaurantProtocol,cache:Restaura
       payload,request_sha256:await hybridHash(payload),questions_sha256:await hybridHash(payload.questions),estimated_input_tokens:localHybridTokens(JSON.stringify(payload))});
   }
   const statsSha=await hybridHash(statistics),neutral={analytics:statistics,statistics_sha256:statsSha,estimates:{rates:s.rates}};
-  const sol=jlsSolDraft(neutral,selected,"vi","conditional_estimate");
-  return {version:JLS_CONFIG.version,source_plan_id:s.id,source_plan_sha256:await hybridHash(p),source_snapshot_id:s.id,
+  const sol=jlsSolDraft(neutral,selected,"vi","conditional_estimate",p.sol_size_policy);
+  return {...(p.sol_size_policy?{sol_size_policy:p.sol_size_policy}:{}),version:JLS_CONFIG.version,source_plan_id:s.id,source_plan_sha256:await hybridHash(p),source_snapshot_id:s.id,
     source_sha256:s.source_sha256,organization_id:p.organization_id,establishment_id:p.establishment_id,establishment_name:s.source.establishment_name,
     language:"vi",config,config_sha256:await hybridHash(config),statistics,statistics_sha256:statsSha,selected,
     selected_summary:balancedSummary(selected),cache_fingerprints:await Promise.all(a.used.map(async c=>({cache_id:c.id,review_id:c.review_id,
@@ -143,4 +156,25 @@ export async function restaurantSol(p:JlsPlan,ds:JlsDecision[]) {
   if(!gate.passed)return {gate,draft:null};
   const draft=await buildEditorialDraft(p,ds,"vi");
   return {gate,draft};
+}
+
+// Free, separate restart only. Old protocol/run and authorization never reopened.
+export async function prepareRestaurantResume(snapshot:PilotSnapshot,cache:RestaurantProtocol["cache"],sources:unknown,code:string,expectedModel:string,
+ history:Pick<NonNullable<RestaurantProtocol["resume"]>,"source_protocol_id"|"source_protocol_sha256"|"source_run_id">):Promise<RestaurantProtocol> {
+ if(!/^[a-f0-9]{64}$/.test(history.source_protocol_sha256)||!history.source_run_id||!history.source_protocol_id)throw Error("JLS_RESTART_BINDING_MISSING");
+ const base=await prepareRestaurant(snapshot,cache,sources,code,expectedModel);
+ if(base.pending.length)throw Error("JLS_RESTART_REQUIRES_COMPLETE_COMPATIBLE_CACHE");
+ const configuration=await restaurantConfiguration(SOL_SIZE_POLICY);
+ const p:RestaurantProtocol={...base,version:RESTAURANT_RESUME_VERSION,configuration,configuration_sha256:await hybridHash(configuration),sol_size_policy:SOL_SIZE_POLICY};
+ const plan=await restaurantEvidencePlan(p,cache),conditional_sol=await conditionalEditorialRequest(plan);
+ return {...p,max_luna_calls:plan.max_luna_calls,resume:{source_protocol_id:history.source_protocol_id,
+  source_protocol_sha256:history.source_protocol_sha256,source_run_id:history.source_run_id,
+  evidence_sha256:plan.dossier_sha256,luna_manifest_sha256:plan.luna_manifest_sha256,conditional_sol}};
+}
+export async function verifyRestaurantResumePlan(p:RestaurantProtocol,plan:JlsPlan) {
+ if(!p.resume)return;
+ const measured=await conditionalEditorialRequest(plan);
+ if(plan.dossier_sha256!==p.resume.evidence_sha256||plan.luna_manifest_sha256!==p.resume.luna_manifest_sha256||
+  plan.max_luna_calls!==p.max_luna_calls||await hybridHash(measured)!==await hybridHash(p.resume.conditional_sol))throw Error("JLS_RESTART_PREFLIGHT_CHANGED");
+ solRequestSize(measured.request,p.sol_size_policy);
 }

@@ -29,9 +29,12 @@ Deno.serve(async r=>{
     result=ar.data?.body??null;
    }
   }
-  return json({protocol:{id:p.id,sha256:p.sha256,created_at:p.created_at,establishment_name:p.body.snapshot.source.establishment_name,
+  const history=await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,protocol_id").eq("organization_id",er.data.organization_id).neq("protocol_id",p.id);
+  if(history.error)throw Error("JLS_READ_FAILED");
+  return json({historical_runs:history.data,protocol:{id:p.id,sha256:p.sha256,created_at:p.created_at,establishment_name:p.body.snapshot.source.establishment_name,
    source_sha256:p.body.snapshot.source_sha256,configuration_sha256:p.body.configuration_sha256,
    coverage:p.body.coverage,max_jev_calls:p.body.max_jev_calls,max_luna_calls:p.body.max_luna_calls,max_sol_calls:1,
+   sol_preflight:p.body.resume?.conditional_sol.measurement??null,source_run_id:p.body.resume?.source_run_id??null,
    language:"vi",format_version:p.body.configuration.policy.format_version,editorial_version:p.body.configuration.policy.editorial_version},
    run:rr.data,result,progress,new_paid_calls:0,production_enabled:false});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_READ_FAILED";

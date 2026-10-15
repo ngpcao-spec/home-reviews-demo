@@ -8,7 +8,8 @@ import "../../../src/pages/JevLunaSolPage.css";
 const language=new URLSearchParams(location.search).get("language")==="vi"?"vi":"fr";
 const data:RestaurantView={protocol:{id:"11111111-1111-4111-8111-111111111111",sha256:"a".repeat(64),created_at:"2026-10-14",
  establishment_name:"Xóm Mới Garden",source_sha256:"b".repeat(64),configuration_sha256:"c".repeat(64),
- coverage:{google_total:17038,stored_reviews:587,reviews_with_text:550,english_ready:78,reused_analyses:7,missing_analyses:71,missing_english:472},
- max_jev_calls:71,max_luna_calls:32,max_sol_calls:1,language:"vi",format_version:"jls-prioritized-recommendations-v1",
+ coverage:{google_total:17038,stored_reviews:587,reviews_with_text:550,english_ready:78,reused_analyses:78,missing_analyses:0,missing_english:472},
+ max_jev_calls:0,max_luna_calls:28,max_sol_calls:1,language:"vi",format_version:"jls-prioritized-recommendations-v1",
+ sol_preflight:{request_bytes:67867,local_input_tokens:19137,guarded_input_tokens:21690,input_budget_tokens:32768,output_reserved_tokens:9500,input_headroom_tokens:11078},
  editorial_version:"jls-prioritized-editorial-v1"},run:null,result:null,progress:null};
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

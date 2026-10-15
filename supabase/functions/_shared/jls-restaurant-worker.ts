@@ -1,4 +1,5 @@
-import { restaurantEvidencePlan, restaurantSol, verifyRestaurantProtocol, type RestaurantProtocol, RESTAURANT_POLICY } from "./jls-restaurant.ts";
+import {solRequestSize} from "./jls-sol-size.ts";
+import { restaurantEvidencePlan, restaurantSol, verifyRestaurantProtocol, verifyRestaurantResumePlan, type RestaurantProtocol, RESTAURANT_POLICY } from "./jls-restaurant.ts";
 import { hybridHash } from "./jev-hybrid-evidence.ts";
 import { negativeHash } from "./negative-validation-core.ts";
 import { parseJlsLuna, type JlsPlan } from "./jev-luna-sol.ts";
@@ -47,6 +48,7 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
    if(!sol?.gate.passed||!sol.draft||sol.draft.request_sha256!==task.request_sha256||
     sol.draft.prompt_sha256!==p.configuration.sol_prompt_sha256||sol.draft.schema_sha256!==p.configuration.sol_schema_sha256)
     throw Error("JLS_SOL_MANIFEST_CHANGED");
+   if(p.sol_size_policy)solRequestSize(task.request,p.sol_size_policy);
   }
   sent=true;
   const response=await http(task.phase==="jev"?JEV_ENDPOINT:task.phase==="luna"?"https://api.openai.com/v1/decisions":"https://api.openai.com/v1/responses",
@@ -94,7 +96,7 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
   const reused=cache.filter(c=>p.cache.some(x=>x.id===c.id)).sort((a,b)=>a.id.localeCompare(b.id));
   if(await hybridHash(reused)!==await hybridHash([...p.cache].sort((a,b)=>a.id.localeCompare(b.id))))throw Error("JLS_REUSED_CACHE_CHANGED");
   const key=state.run.stage==="jev"?keys.jev:keys.openai;
-  if(!key.trim())throw Error("JLS_PROVIDER_KEY_UNAVAILABLE");
+  if(state.tasks.some(t=>t.phase===state.run.stage&&t.status==="pending")&&!key.trim())throw Error("JLS_PROVIDER_KEY_UNAVAILABLE");
   const tasks=[];
   for(let i=0;i<(state.run.stage==="sol"?1:8);i++){const t=await port.claim(run,worker);if(!t)break;tasks.push(t);}
   const outcomes=await Promise.allSettled(tasks.map(async t=>{
@@ -107,7 +109,7 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
   if(state.tasks.some(t=>t.phase===state.run.stage&&!["completed","reused"].includes(t.status)))return;
   const save=async(kind:string,b:unknown)=>{if(!await port.artifact(run,worker,kind,b,await hybridHash(b)))throw Error("JLS_ARTIFACT_SAVE_UNCERTAIN");};
   if(state.run.stage==="jev"){
-   const plan=await restaurantEvidencePlan(p,await port.cache(p));await save("evidence_plan",plan);
+   const plan=await restaurantEvidencePlan(p,await port.cache(p));await verifyRestaurantResumePlan(p,plan);await save("evidence_plan",plan);
    if(!await port.stage(run,worker,"luna",plan.luna_groups.map(g=>({review_id:g.review_id,request:g.payload,request_sha256:g.request_sha256}))))throw Error("JLS_STAGE_CHANGED");
   }else if(state.run.stage==="luna"){
    const plan=artifact<JlsPlan>(state,"evidence_plan")!,ds=[];

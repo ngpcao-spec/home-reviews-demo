@@ -1,3 +1,4 @@
+import {solRequestSize,type SolSizePolicy} from "./jls-sol-size.ts";
 // Experimental preparation only. No provider client, fetch, credentials or dispatch.
 import { type BalancedPlan, balancedPacketEvidence, verifyBalancedPlan } from "./jev-hybrid-balanced.ts";
 import { hybridHash, HYBRID_ACTIONS, HYBRID_LIMITS, hybridSchema, localHybridTokens } from "./jev-hybrid-evidence.ts";
@@ -64,7 +65,7 @@ export function jlsProvenanceMetadata(value: unknown): unknown {
   return Object.fromEntries(Object.entries(value).filter(([key]) => !omitted.has(key))
     .map(([key, v]) => [key, jlsProvenanceMetadata(v)]));
 }
-export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sha256"> & {estimates:{rates:BalancedPlan["estimates"]["rates"]}}, evidence: JlsEvidence[], language: "fr" | "vi", kind: "conditional_estimate" | "accepted_only") {
+export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sha256"> & {estimates:{rates:BalancedPlan["estimates"]["rates"]}}, evidence: JlsEvidence[], language: "fr" | "vi", kind: "conditional_estimate" | "accepted_only", sizePolicy?:SolSizePolicy) {
   const packet = {
     version: JLS_VERSION, language, statistics: source.analytics,
     statistics_sha256: source.statistics_sha256,
@@ -81,7 +82,8 @@ export function jlsSolDraft(source: Pick<BalancedPlan,"analytics"|"statistics_sh
     input: [{ role: "system", content: prompt }, { role: "user", content: JSON.stringify(packet) }],
     text: { format: { type: "json_schema", name: "jev_luna_sol_report", strict: true, schema } } };
   const tokens = Math.ceil(localHybridTokens(JSON.stringify(request)) * 1.12) + 256;
-  if (tokens > JLS_CONFIG.input_budget_tokens) throw new Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED");
+  if(sizePolicy)solRequestSize(request,sizePolicy);
+  else if (tokens > JLS_CONFIG.input_budget_tokens) throw new Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED");
   const out = Math.min(JLS_CONFIG.max_output_tokens, 1800 + 80 * evidence.length);
   const r = source.estimates.rates;
   const cost = (output: number) => r.sol_input === null || r.sol_output === null
@@ -168,7 +170,7 @@ export async function buildJlsPlan(s: JlsSource, snapshot: PilotSnapshot, langua
     stage: "prepared_not_authorized", human_validated: false,
   };
 }
-export type JlsPlan = Awaited<ReturnType<typeof buildJlsPlan>>;
+export type JlsPlan = Omit<Awaited<ReturnType<typeof buildJlsPlan>>, "config"> & {config:Omit<Awaited<ReturnType<typeof buildJlsPlan>>["config"],"input_budget_tokens"> & {input_budget_tokens:number;sol_size_policy?:SolSizePolicy};sol_size_policy?:SolSizePolicy};
 export async function verifyJlsPlan(p: JlsPlan, s: JlsSource, snapshot: PilotSnapshot) {
   const rebuilt = await buildJlsPlan(s, snapshot, p.language);
   if (canonicalJson(p) !== canonicalJson(rebuilt)) throw new Error("JLS_PLAN_CHANGED");
@@ -220,7 +222,7 @@ export async function acceptedSolDossier(p: JlsPlan, decisions: JlsDecision[]) {
   }
   const accepted = p.selected.filter(e => decisions.find(d => d.evidence_id === e.evidence_id)!.status === "ACCEPTED");
   const draft = jlsSolDraft({ analytics: p.statistics, statistics_sha256: p.statistics_sha256,
-    estimates: { rates: p.estimates.sol.rates } } as BalancedPlan, accepted, p.language, "accepted_only");
+    estimates: { rates: p.estimates.sol.rates } } as BalancedPlan, accepted, p.language, "accepted_only", p.sol_size_policy);
   return { ...draft, dossier_sha256: await hybridHash(draft.packet),
     prompt_sha256: await negativeHash(draft.prompt), schema_sha256: await hybridHash(draft.schema),
     decisions_sha256: await hybridHash(decisions), accepted_ids: accepted.map(e => e.evidence_id),

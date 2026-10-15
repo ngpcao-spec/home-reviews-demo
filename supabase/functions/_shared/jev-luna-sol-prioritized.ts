@@ -1,3 +1,4 @@
+import {solRequestSize} from "./jls-sol-size.ts";
 // Free preparation only: no credentials, network, job or spending authorization.
 import { acceptedSolDossier, type JlsPlan, type JlsDecision, JLS_CONFIG } from "./jev-luna-sol.ts";
 import { hybridHash, localHybridTokens } from "./jev-hybrid-evidence.ts";
@@ -85,6 +86,10 @@ export function prioritizedMethodology(language: "fr" | "vi", p: JlsPlan) {
 }
 export async function buildPrioritizedDraft(p: JlsPlan, decisions: JlsDecision[], language: "fr" | "vi" = p.language) {
   const legacy = await acceptedSolDossier(p, decisions);
+  return prioritizedDraftFromDossier(p,legacy,language);
+}
+// Shared pure serializer; conditional preflight creates no Luna verdict.
+export async function prioritizedDraftFromDossier(p:JlsPlan,legacy:Awaited<ReturnType<typeof acceptedSolDossier>>,language:"fr"|"vi") {
   // All native Luna bindings are validated by the existing verifier, unchanged.
   const evidence = legacy.packet.evidence;
   const frequency = p.statistics.themes.flatMap(t => (["positive", "negative"] as const)
@@ -113,10 +118,12 @@ export async function buildPrioritizedDraft(p: JlsPlan, decisions: JlsDecision[]
     text: { format: { type: "json_schema", name: "jls_prioritized_recommendations_v1", strict: true, schema } } };
   const tokens = Math.ceil(localHybridTokens(JSON.stringify(request)) * 1.12) + 256,
     output = Math.min(JLS_CONFIG.max_output_tokens, 2300 + 85 * evidence.length), rates = p.estimates.sol.rates;
-  if (tokens > JLS_CONFIG.input_budget_tokens) throw new Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED", { cause: { estimated_input_tokens: tokens } });
+  if(p.sol_size_policy)solRequestSize(request,p.sol_size_policy);
+  else if (tokens > JLS_CONFIG.input_budget_tokens) throw new Error("JLS_SOL_TOKEN_BUDGET_EXCEEDED", { cause: { estimated_input_tokens: tokens } });
   const cost = (out: number) => rates.sol_input === null || rates.sol_output === null ? null : (tokens * rates.sol_input + out * rates.sol_output) / 1e6;
+  const config=p.sol_size_policy?{...JLS_PRIORITIZED_CONFIG,input_budget_tokens:p.sol_size_policy.input_budget_tokens,sol_size_policy:p.sol_size_policy}:JLS_PRIORITIZED_CONFIG;
   return { version: JLS_PRIORITIZED_VERSION, language, source_plan_sha256: await hybridHash(p),
-    config: JLS_PRIORITIZED_CONFIG, config_sha256: await hybridHash(JLS_PRIORITIZED_CONFIG),
+    config, config_sha256: await hybridHash(config),
     packet, prompt, schema, request, dossier_sha256: await hybridHash(packet),
     prompt_sha256: await negativeHash(prompt), schema_sha256: await hybridHash(schema), request_sha256: await hybridHash(request),
     decisions_sha256: legacy.decisions_sha256, accepted_ids: legacy.accepted_ids,

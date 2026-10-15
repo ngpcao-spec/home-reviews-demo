@@ -2,7 +2,7 @@
 do $$declare p uuid;r uuid;again uuid;b jsonb;c jsonb;s text;org uuid;u uuid;e uuid='d40d3438-79d8-4c28-8b09-eba640598201';begin
  select organization_id into org from public.establishments where id=e;
  select user_id into u from public.organization_members where organization_id=org and role='owner' limit 1;
- b=jsonb_build_object('version','SYNTHETIC_SQL_TEST','configuration_sha256',repeat('a',64),'max_jev_calls',0,'pending','[]'::jsonb);
+ b=jsonb_build_object('version','SYNTHETIC_SQL_TEST','configuration_sha256',repeat('a',64),'max_jev_calls',0,'max_luna_calls',32,'pending','[]'::jsonb);
  insert into public.analysis_jls_restaurant_protocols(organization_id,establishment_id,authority_user_id,body,sha256) values(org,e,u,b,public.jls_restaurant_hash(b)) returning id into p;
  perform set_config('jls.test_protocol',p::text,true);perform set_config('jls.test_org',org::text,true);perform set_config('jls.test_user',u::text,true);
  c=jsonb_build_object('protocol_sha256',public.jls_restaurant_hash(b),'consent_source','user_directive_codex_delegation',
@@ -34,7 +34,7 @@ do $$declare org uuid=current_setting('jls.test_org')::uuid;u uuid=current_setti
  'configuration_id',cfg.id,'instruction_version',cfg.config->>'instruction_version','instruction_sha256',cfg.instruction_sha256,
  'threshold_version',cfg.config->>'threshold_version','threshold_sha256',cfg.threshold_sha256,'requested_model','jev-latest','expected_served_model','jev-1.13.0');
  payload=jsonb_build_object('model','jev-latest','state',jsonb_build_object('review_alias','mock','analysis_text','SYNTHETIC RESERVATION TEST ONLY'),'questions',cfg.config->'questions');
- b=jsonb_build_object('version','SYNTHETIC_RESERVATION_TEST','configuration_sha256',repeat('b',64),'max_jev_calls',1,
+ b=jsonb_build_object('version','SYNTHETIC_RESERVATION_TEST','configuration_sha256',repeat('b',64),'max_jev_calls',1,'max_luna_calls',32,
  'configuration',jsonb_build_object('jev_request_template',jsonb_build_object('questions',cfg.config->'questions')),
  'pending',jsonb_build_array(jsonb_build_object('review_id',rid,'identity',ident,'payload',payload-'questions','request_sha256',public.jls_restaurant_hash(payload))));
  insert into public.analysis_jls_restaurant_protocols(organization_id,establishment_id,authority_user_id,body,sha256)

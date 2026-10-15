@@ -12,3 +12,11 @@ Deno.test("offline configuration and bounded delegated scope, no monetary estima
   if(!editorialInstructions("vi").includes("dish, ingredients")||!editorialInstructions("vi").includes("ALL themes"))throw Error("EDITORIAL_MISSING");
  }finally{globalThis.fetch=before;}
 });
+
+Deno.test("32k opt-in retains output reserve and complete request size without network",async()=>{
+ const before=globalThis.fetch;globalThis.fetch=()=>{throw Error("NETWORK_FORBIDDEN");};
+ try{const {SOL_SIZE_POLICY,solRequestSize}=await import("../functions/_shared/jls-sol-size.ts");
+ const m=solRequestSize({model:"gpt-6.1-sol",max_output_tokens:9500,input:[{role:"system",content:"instructions"},{role:"user",content:"word ".repeat(21000)}]});
+ if(m.guarded_input_tokens<=20000||m.guarded_input_tokens>32768||m.output_reserved_tokens!==9500||SOL_SIZE_POLICY.provider_timeout_ms>=150000)throw Error("ENVELOPE_INVALID");
+ }finally{globalThis.fetch=before;}
+});
