@@ -1,4 +1,5 @@
 import {PREPARED_RESTAURANT_VERSION,verifyPreparedProtocol} from "./jls-restaurant-prepared.ts";
+import {SOL_READY_VERSION,verifySolReadyProtocol,type SolReadyBinding} from "./jls-sol-ready.ts";
 import {SOL_SIZE_POLICY,solRequestSize,type SolSizePolicy} from "./jls-sol-size.ts";
 import {conditionalEditorialRequest} from "./jls-prioritized-editorial.ts";
 // Separate delegated restaurant experiment. Preparation never creates consent.
@@ -37,6 +38,7 @@ export async function restaurantConfiguration(sizePolicy?:SolSizePolicy) {
     sol_prompt_sha256:await negativeHash(editorialInstructions("vi")),sol_schema_sha256:await hybridHash(prioritizedSchema())};
 }
 export interface RestaurantProtocol {
+  sol_ready?:SolReadyBinding;
   version:string;organization_id:string;establishment_id:string;authority_user_id:string;
   prepared?:{version:string;artifact_sha256:string;source_protocol_id:string;source_protocol_sha256:string;source_run_id:string};
   sol_size_policy?:SolSizePolicy;
@@ -44,7 +46,7 @@ export interface RestaurantProtocol {
     evidence_sha256:string;luna_manifest_sha256:string;conditional_sol:Awaited<ReturnType<typeof conditionalEditorialRequest>>};
   snapshot:PilotSnapshot;cache: (EconomyCache & {theme_results?:unknown})[];
   pending: {review_id:string;identity:Awaited<ReturnType<typeof economyIdentity>>;cache_key:string;payload:Omit<ReturnType<typeof economyPayload>,"questions">;request_sha256:string}[];
-  configuration:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>,"policy"> & {policy:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>["policy"],"version"> & {version:string;sol_size_policy?:SolSizePolicy};prepared_execution?:unknown};
+  configuration:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>,"policy"> & {policy:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>["policy"],"version"|"max_luna_calls"> & {version:string;max_luna_calls:number;sol_size_policy?:SolSizePolicy};prepared_execution?:unknown;sol_ready_execution?:unknown};
   configuration_sha256:string;cache_sha256:string;pending_sha256:string;
   max_jev_calls:number;max_luna_calls:number;max_sol_calls:1;
   english_review_ids:string[];english_manifest_sha256:string;provider_sources:unknown;
@@ -81,6 +83,7 @@ export async function verifyRestaurantSnapshot(s:PilotSnapshot) {
     r.analysis_text!==null&&(r.analysis_language!=="en"||!r.analysis_text.trim()||await negativeHash(r.analysis_text)!==r.analysis_text_sha256))throw Error("JLS_RESTAURANT_TEXT_CHANGED");
 }
 export async function verifyRestaurantProtocol(p:RestaurantProtocol,sha:string) {
+  if(p.version===SOL_READY_VERSION)return verifySolReadyProtocol(p,sha);
   if(p.version===PREPARED_RESTAURANT_VERSION)return verifyPreparedProtocol(p,sha);
   if(await hybridHash(p)!==sha)throw Error("JLS_RESTAURANT_PROTOCOL_CHANGED");
   if(p.version===RESTAURANT_RESUME_VERSION){
