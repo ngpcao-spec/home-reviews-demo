@@ -17,7 +17,7 @@ Deno.serve(async r=>{
   const p=pr.data;await verifyRestaurantProtocol(p.body,p.sha256);
   const rr=await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,created_at").eq("protocol_id",p.id).maybeSingle();
   if(rr.error)throw Error("JLS_READ_FAILED");
-  let result=null,progress=null;
+  let result=null,progress=null,recommendationReview=null,resultSha=null;
   if(rr.data){
    const ts=await c.client.from("analysis_jls_restaurant_tasks").select("id,phase,status,request_count").eq("run_id",rr.data.id);
    if(ts.error)throw Error("JLS_READ_FAILED");
@@ -26,8 +26,11 @@ Deno.serve(async r=>{
    if(ids.length){
     const ar=await c.client.from("analysis_jls_restaurant_artifacts").select("body,sha256").eq("run_id",rr.data.id).in("kind",ids).maybeSingle();
     if(ar.error||ar.data&&await hybridHash(ar.data.body)!==ar.data.sha256)throw Error("JLS_RESULT_CHANGED");
-    result=ar.data?.body??null;
+    result=ar.data?.body??null;resultSha=ar.data?.sha256??null;
    }
+   const review=await c.client.from("analysis_jls_recommendation_reviews").select("id,body,sha256,created_at").eq("run_id",rr.data.id).eq("organization_id",er.data.organization_id).eq("version","jls-recommendation-review-v2").maybeSingle();
+   if(review.error||review.data&&(await hybridHash(review.data.body)!==review.data.sha256||review.data.body.original_result_sha256!==resultSha||review.data.body.run_id!==rr.data.id))throw Error("JLS_RECOMMENDATION_REVIEW_CHANGED");
+   recommendationReview=review.data;
   }
   const history=await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,protocol_id").eq("organization_id",er.data.organization_id).neq("protocol_id",p.id);
   if(history.error)throw Error("JLS_READ_FAILED");
@@ -37,7 +40,7 @@ Deno.serve(async r=>{
    sol_final_request_ready:!!p.body.sol_ready,reused_luna_calls:p.body.sol_ready?28:0,reused_luna_decisions:p.body.sol_ready?32:0,
    prepared_artifact_sha256:p.body.sol_ready?.artifact_sha256??p.body.prepared?.artifact_sha256??null,sol_preflight:p.body.sol_ready?.measurement??p.body.resume?.conditional_sol.measurement??null,source_run_id:p.body.sol_ready?.source_run_id??p.body.resume?.source_run_id??null,
    language:"vi",format_version:p.body.configuration.policy.format_version,editorial_version:p.body.configuration.policy.editorial_version},
-   run:rr.data,result,progress,new_paid_calls:0,production_enabled:false});
+   run:rr.data,result,progress,recommendation_review:recommendationReview,new_paid_calls:0,production_enabled:false});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_READ_FAILED";
   return json({error:code},code==="UNAUTHORIZED"?401:code==="FORBIDDEN"?403:409);}
 });

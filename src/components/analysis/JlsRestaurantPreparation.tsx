@@ -1,7 +1,9 @@
 import {useI18n} from "../../i18n";
 import {PrioritizedJlsReport} from "./PrioritizedJlsReport";
+import {JlsRecommendationReview,type RecommendationReviewView} from "./JlsRecommendationReview";
 import type {validateEditorialReport} from "../../../supabase/functions/_shared/jls-editorial-validation";
 export interface RestaurantView {
+ recommendation_review?:RecommendationReviewView|null;
  protocol:null|{id:string;sha256:string;created_at:string;establishment_name:string;source_sha256:string;configuration_sha256:string;
   coverage:{google_total:number|null;stored_reviews:number;reviews_with_text:number;english_ready:number;reused_analyses:number;missing_analyses:number;missing_english:number};
   sol_preflight?:null|{request_bytes:number;local_input_tokens:number;guarded_input_tokens:number;input_budget_tokens:number;output_reserved_tokens:number;input_headroom_tokens:number};
@@ -51,5 +53,6 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
   <button disabled className="primary-button full-width">{fr?"Exécution déléguée — GO explicite requis":"Thực thi ủy quyền — cần cho phép rõ ràng"}</button>
   <details><summary>{fr?"Provenance du protocole":"Nguồn gốc giao thức"}</summary><p className="evidence-id" style={{overflowWrap:"anywhere"}}>{p.id}<br/>{p.sha256}<br/>{p.source_sha256}<br/>{p.configuration_sha256}<br/>{p.format_version}<br/>{p.editorial_version}<br/>{p.prepared_artifact_sha256}</p></details>
   {data.result?.validated_report&&<PrioritizedJlsReport result={data.result.validated_report}/>}
+  {data.recommendation_review&&<JlsRecommendationReview value={data.recommendation_review}/>}
  </section>;
 }

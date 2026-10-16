@@ -32,6 +32,9 @@ export function PrioritizedJlsReport({ result }: { result: Report }) {
         <strong>{fr ? "Pourquoi cette priorité" : "Lý do ưu tiên"}</strong><p>{a.priority.reason}</p>
         {a.priority.basis === "isolated_signal_to_verify" && <p>{fr ? "Signal isolé à vérifier, pas un fait confirmé." : "Phản ánh riêng lẻ cần kiểm tra, không phải sự việc đã xác nhận."}</p>}
         {a.frequency.map(f => <p key={f.key}>{editorial?(GOLD_TAXONOMY[f.key.split(":")[0] as keyof typeof GOLD_TAXONOMY]?.[language]??(fr?"Thème":"Chủ đề")):f.key} — {editorial?(fr?"Avis analysés":"Đánh giá đã phân tích"):"JEV"} : {f.mentions} {fr ? "mentions" : "lần đề cập"}, {f.distinct_reviews} {fr ? "avis distincts" : "đánh giá riêng biệt"} / {f.denominator}. {fr ? "Fréquence du thème, pas de cet incident précis." : "Tần suất chủ đề, không phải sự cố cụ thể này."}</p>)}
+        {a.comparison_frequency?.length?<div><strong>{fr?"Comparaison globale — contexte statistique":"So sánh tổng thể — ngữ cảnh thống kê"}</strong>
+          {a.comparison_frequency.map(f=><p key={f.key}>{GOLD_TAXONOMY[f.key.split(":")[0] as keyof typeof GOLD_TAXONOMY]?.[language]} · {f.key.endsWith(":positive")?(fr?"positif":"tích cực"):(fr?"négatif":"tiêu cực")} : {f.distinct_reviews} / {f.denominator}. {fr?"Comptage du thème sur le périmètre figé ; ne prouve pas cet incident.":"Số đếm chủ đề trong phạm vi cố định; không chứng minh sự cố này."}</p>)}
+        </div>:null}
         {editorial&&<details><summary>{fr?"Détails techniques de la priorité":"Chi tiết kỹ thuật về ưu tiên"}</summary><pre>{JSON.stringify({frequency:a.frequency,priority:a.priority,status:a.status},null,2)}</pre></details>}
       </> : editorial?<><p>{review}</p><details><summary>{fr?"Motifs techniques":"Lý do kỹ thuật"}</summary><p>{a.reasons.join(" · ")}</p></details></>:<p>{review} · {a.reasons.join(" · ")}</p>}
     </article>)}

@@ -22,20 +22,22 @@ export function vietnameseDishReasons(source:string,localized:string) {
 export async function validateEditorialReport(raw:unknown,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],language:"fr"|"vi"=p.language) {
   // Preserve every existing citation, hash, Luna, action and numerical safeguard.
   const base=await validatePrioritizedReport(raw,p,snapshot,decisions,language),draft=await buildEditorialDraft(p,decisions,language);
+  return {...base,editorial_version:JLS_EDITORIAL_VERSION,validator_version:JLS_EDITORIAL_VALIDATOR,
+    report:editorialReportControls(base.report,p,language),prompt_sha256:draft.prompt_sha256,schema_sha256:draft.schema_sha256,
+    accepted_dossier_sha256:draft.dossier_sha256,configuration_sha256:draft.config_sha256,priority_coverage:draft.coverage,
+    translation_fidelity_guaranteed:false,priority_selection_semantically_verified:false,raw_response_sha256:await hybridHash(raw)};
+}
+export function editorialReportControls(report:Awaited<ReturnType<typeof validatePrioritizedReport>>["report"],p:JlsPlan,language:"fr"|"vi") {
   const prose=<T extends {text:string|null;status:string;reasons:string[];evidence_ids?:string[]}>(x:T):T=>{
     const reasons=x.text?editorialProseReasons(x.text):[];
     if(language==="vi"&&x.text)for(const id of x.evidence_ids??[]){const e=p.selected.find(e=>e.evidence_id===id);if(e)reasons.push(...vietnameseDishReasons(e.quote,x.text));}
     return reasons.length?{...x,text:null,status:"review_needed",reasons:[...new Set([...x.reasons,...reasons])]}:x;
   };
-  const recommendations=base.report.recommendations.map(a=>{
+  const recommendations=report.recommendations.map(a=>{
     const free=[a.title,a.proposed_action.text,a.priority.reason,...a.observations.flatMap(o=>[o.text,o.context_summary])];
     const reasons=[...a.reasons,...free.flatMap(editorialProseReasons)];
     if(language==="vi")for(const o of a.observations)reasons.push(...vietnameseDishReasons(o.quote,o.text),...vietnameseDishReasons(o.context_quote,o.context_summary));
     return {...a,reasons:[...new Set(reasons)],visible:!reasons.length,status:reasons.length?"review_needed" as const:"technically_bound_proposal" as const};
   });
-  return {...base,editorial_version:JLS_EDITORIAL_VERSION,validator_version:JLS_EDITORIAL_VALIDATOR,
-    report:{...base.report,axes:base.report.axes.map(prose),positive_aspects:base.report.positive_aspects.map(prose),negative_aspects:base.report.negative_aspects.map(prose),conclusion:prose(base.report.conclusion),recommendations},
-    prompt_sha256:draft.prompt_sha256,schema_sha256:draft.schema_sha256,accepted_dossier_sha256:draft.dossier_sha256,
-    configuration_sha256:draft.config_sha256,priority_coverage:draft.coverage,
-    translation_fidelity_guaranteed:false,priority_selection_semantically_verified:false,raw_response_sha256:await hybridHash(raw)};
+  return {...report,axes:report.axes.map(prose),positive_aspects:report.positive_aspects.map(prose),negative_aspects:report.negative_aspects.map(prose),conclusion:prose(report.conclusion),recommendations};
 }

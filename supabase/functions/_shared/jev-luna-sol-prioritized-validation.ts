@@ -29,12 +29,33 @@ export const prioritizedResponse = z.object({ format_version: z.literal(JLS_PRIO
   }).strict(),
 }).strict();
 export type PrioritizedResponse = z.infer<typeof prioritizedResponse>;
+export type BoundRecommendation = Omit<PrioritizedResponse["report"]["recommendations"][number],"proposed_action"|"priority"> & {
+  proposed_action: {text:string;kind:"inspect"|"clarify"|"review";focus:string};
+  priority: PrioritizedResponse["report"]["recommendations"][number]["priority"] & {
+    comparison_context?:{key:string;statistics_sha256:string}[];
+  };
+};
+export type BoundResponse = Omit<PrioritizedResponse,"format_version"|"report"> & {format_version:string;
+  report:Omit<PrioritizedResponse["report"],"recommendations"> & {recommendations:BoundRecommendation[]}};
+type HistoricalDraft=Awaited<ReturnType<typeof buildPrioritizedDraft>>;
+export type BindingDraft = Pick<HistoricalDraft,
+  "accepted_ids"|"dossier_sha256"|"prompt_sha256"|"schema_sha256"|"decisions_sha256"|"methodology_note"> & {
+    packet:Pick<HistoricalDraft["packet"],"evidence"|"frequency">;
+  };
 // Conservative tripwires, not a replacement for contextual semantic review.
 export const unsupportedClaim = (s: string) => /\p{N}|https?:\/\//u.test(s) || /illég(?:al|ale|aux|ales)/iu.test(s) ||
   /\b(?:recurrent|récurrent|récurrente|systématique|toujours|garantit|garantira|prouvé|illégal|obligation juridique|causé par|responsable de|dû à|deux|trois|quatre|cinq|dix|cent|mille)\b|(?:thường xuyên|lặp đi lặp lại|bảo đảm|đảm bảo|vi phạm pháp luật|nghĩa vụ pháp lý|do đó gây|do nhân viên|hai|ba|bốn|năm|mười)\s+(?:avis|clients|mentions|commentaires|đánh giá|khách|lượt)|(?:thường xuyên|lặp đi lặp lại|bảo đảm|đảm bảo|vi phạm pháp luật|nghĩa vụ pháp lý)/iu.test(s);
 export async function validatePrioritizedReport(raw: unknown, p: JlsPlan, snapshot: PilotSnapshot, decisions: JlsDecision[], language: "fr" | "vi" = p.language, validatorVersion: string = JLS_DISCLOSURE_VALIDATOR) {
   if (![JLS_DISCLOSURE_VALIDATOR, JLS_LEGACY_VALIDATOR].includes(validatorVersion)) throw new Error("JLS_PRI_VALIDATOR_UNKNOWN");
   const r = prioritizedResponse.parse(raw), draft = await buildPrioritizedDraft(p, decisions, language);
+  return validatePrioritizedBindings(raw,r,p,snapshot,decisions,language,validatorVersion,draft,ACTION_FOCUS);
+}
+// Shared binding checks. Callers parse their own strict, versioned schema first.
+// The historical wrapper above keeps its exact schema, prompts and output.
+export async function validatePrioritizedBindings(raw:unknown,r:BoundResponse,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],
+  language:"fr"|"vi",validatorVersion:string,draft:BindingDraft,
+  focuses:Readonly<Record<string,{theme:string|null;claims:readonly string[]|null}>>,globalComparisons=false,
+  actionSupport?:(e:JlsPlan["selected"][number],focus:string)=>boolean|undefined) {
   // Reuse the existing snapshot, exact quotation, theme, polarity, statistics and
   // Luna-binding verifier. No legacy recommendation/catalogue is submitted here.
   const base = await validateJlsReport({ statistics_sha256: r.statistics_sha256,
@@ -68,12 +89,12 @@ export async function validatePrioritizedReport(raw: unknown, p: JlsPlan, snapsh
     if (!a.evidence_ids.length || new Set(a.evidence_ids).size !== a.evidence_ids.length ||
       observed.size !== a.observations.length || observed.size !== a.evidence_ids.length || a.evidence_ids.some(id => !observed.has(id))) reasons.push("OBSERVATION_EVIDENCE_SET_MISMATCH");
     if (a.priority.rank !== i + 1) reasons.push("PRIORITY_ORDER_CHANGED");
-    const focus = ACTION_FOCUS[a.proposed_action.focus], anchors = a.evidence_ids.map(id => p.selected.find(e => e.evidence_id === id));
+    const focus = focuses[a.proposed_action.focus], anchors = a.evidence_ids.map(id => p.selected.find(e => e.evidence_id === id));
     const disclosure = (e: JlsPlan["selected"][number]) => e.theme_key === "billing" && e.polarity === "negative" &&
       (validatorVersion === JLS_LEGACY_VALIDATOR ? legacyFeeDisclosure(e.quote) : explicitFeeDisclosureComplaint(e.quote));
-    const supported = anchors.filter(e => e && draft.accepted_ids.includes(e.evidence_id) && e.polarity === "negative" &&
+    const supported = anchors.filter(e => focus && e && draft.accepted_ids.includes(e.evidence_id) && e.polarity === "negative" &&
       (focus.theme === null ? e.axis === "atmosphere" : e.theme_key === focus.theme) &&
-      (jlsActionEvidenceSupported(e, focus.claims ?? undefined) || a.proposed_action.focus === "billing_disclosure" && disclosure(e)));
+      ((actionSupport?.(e,a.proposed_action.focus)??jlsActionEvidenceSupported(e, focus.claims ?? undefined)) || a.proposed_action.focus === "billing_disclosure" && disclosure(e)));
     if (!supported.length) reasons.push("PRECISE_ACTION_REQUIRES_REVIEW");
     if (a.proposed_action.focus === "billing_accuracy" && !supported.some(e => /\b(?:miscalculat|incorrect total|wrong total|charged twice|double charged|arithmetic|calculation error)/i.test(e!.quote))) reasons.push("BILLING_DISCLOSURE_IS_NOT_CALCULATION_ERROR");
     if (a.proposed_action.focus === "billing_disclosure" && !supported.some(e => disclosure(e!))) reasons.push("PRECISE_DISCLOSURE_SUPPORT_REQUIRED");
@@ -92,15 +113,29 @@ export async function validatePrioritizedReport(raw: unknown, p: JlsPlan, snapsh
     if (a.priority.basis === "theme_frequency" && !frequencies.length ||
       a.priority.basis === "frequency_unknown" && frequencies.length) reasons.push("PRIORITY_FREQUENCY_BASIS_MISMATCH");
     if (a.priority.basis === "isolated_signal_to_verify" && new Set(a.observations.map(o => p.selected.find(e => e.evidence_id === o.evidence_id)?.review_id)).size !== 1) reasons.push("ISOLATED_SIGNAL_SCOPE_MISMATCH");
+    // Contextual comparison is an explicitly separate snapshot statistic. It can
+    // never replace direct observation support, an action anchor or a frequency.
+    const comparisonFrequency = (a.priority.comparison_context??[]).flatMap(c=>{
+      const [theme,polarity]=c.key.split(":"),t=p.statistics.themes.find(t=>t.theme_key===theme);
+      if(!globalComparisons||c.statistics_sha256!==p.statistics_sha256){reasons.push("COMPARISON_STATISTICS_CHANGED");return [];}
+      if(!t||!(polarity==="positive"||polarity==="negative")){reasons.push("GLOBAL_COMPARISON_UNAVAILABLE");return [];}
+      const mentions=t[`${polarity}_mentions`],distinct=t[`${polarity}_reviews`],denominator=p.statistics.coverage.analysed_reviews;
+      if(p.statistics.theme_frequency_denominator!==denominator||!Number.isSafeInteger(mentions)||!Number.isSafeInteger(distinct)||
+        distinct<0||distinct>denominator||mentions<distinct){reasons.push("GLOBAL_COMPARISON_UNRELIABLE");return [];}
+      return [{key:c.key,mentions,distinct_reviews:distinct,denominator,reliable:true,statistics_sha256:c.statistics_sha256,
+        scope:"snapshot_theme_comparison_not_incident_frequency" as const}];
+    });
+    if(new Set((a.priority.comparison_context??[]).map(c=>c.key)).size!==(a.priority.comparison_context??[]).length)reasons.push("DUPLICATE_COMPARISON_KEY");
     return { ...a, observations: bound, proposed_action: { ...a.proposed_action, proposal_not_validated_solution: true as const },
       frequency: frequencies.filter(f => f !== undefined),
+      ...(globalComparisons?{comparison_frequency:comparisonFrequency}:{}),
       status: reasons.length ? "review_needed" as const : "technically_bound_proposal" as const,
       visible: !reasons.length, reasons: [...new Set(reasons)], semantic_truth_guaranteed: false as const };
   });
   // Additional prose tripwires also cover the short conclusion and axes.
   const safeProse = <T extends { text: string | null; status: string; reasons: string[] }>(a: T): T =>
     a.text && unsupportedClaim(a.text) ? { ...a, text: null, status: "review_needed", reasons: [...a.reasons, "UNSUPPORTED_FREE_CLAIM"] } : a;
-  return { format_version: JLS_PRIORITIZED_VERSION, language, statistics: base.statistics, statistics_sha256: base.statistics_sha256,
+  return { format_version: r.format_version, language, statistics: base.statistics, statistics_sha256: base.statistics_sha256,
     accepted_dossier_sha256: draft.dossier_sha256, prompt_sha256: draft.prompt_sha256, schema_sha256: draft.schema_sha256,
     decisions_sha256: draft.decisions_sha256, raw_response_sha256: await hybridHash(raw),
     report: { axes: base.report.axes.map(safeProse), positive_aspects: base.report.positive_aspects.map(safeProse),

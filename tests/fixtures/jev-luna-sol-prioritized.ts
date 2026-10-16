@@ -7,7 +7,7 @@ import { buildJlsPlan, parseJlsLuna } from "../../supabase/functions/_shared/jev
 import { buildPrioritizedDraft, JLS_PRIORITIZED_VERSION } from "../../supabase/functions/_shared/jev-luna-sol-prioritized.ts";
 import { mockJlsLuna, mockJlsReport } from "./jev-luna-sol.ts";
 import type { PrioritizedResponse } from "../../supabase/functions/_shared/jev-luna-sol-prioritized-validation.ts";
-export async function prioritizedFixture(language: "fr" | "vi" = "fr", billingText = "The bill included a service fee that was not announced. Staff explained it afterwards.") {
+export async function prioritizedFixture(language: "fr" | "vi" = "fr", billingText = "The bill included a service fee that was not announced. Staff explained it afterwards.",overrides:Partial<Record<number,{text:string;themes:string[]}>>={}) {
   const f = await syntheticPilot(), cases = [
     { text: "We waited a long time for our food on the terrace. The waiter later apologised and offered a discount.", themes: ["wait_time:negative"] },
     { text: billingText, themes: ["billing:negative"] },
@@ -16,6 +16,7 @@ export async function prioritizedFixture(language: "fr" | "vi" = "fr", billingTe
     { text: "The coffee was delicious. Our pasta was overcooked, but staff offered to replace it.", themes: ["drinks:positive", "cooking:negative"] },
     { text: "The waiter could not understand our order. Even with a translator communication was difficult.", themes: ["communication:negative"] },
   ];
+  for(const [i,c] of Object.entries(overrides))if(c)cases[Number(i)]=c;
   cases.forEach((c, i) => { f.raw[i].original_text = c.text; f.raw[i].original_language = "en"; });
   const reviews = await resolvePilotReviews(f.raw, [], f.snapshot.organization_id, f.snapshot.establishment_id, "2026-10-14"), cache = [];
   for (const [i, c] of cases.entries()) {
