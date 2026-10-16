@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useApp } from "../app/AppContext";
 import { useI18n } from "../i18n";
@@ -17,7 +17,8 @@ import "./PilotEvidenceV3Page.css";
 import "./JevLunaSolPage.css";
 export function JevLunaSolPage() {
   const { currentUser, demoMode, establishments } = useApp(), { language } = useI18n(), t = jlsMessages[language];
-  const [selected, setSelected] = useState("");
+  const [params,setParams]=useSearchParams(),selected=params.get("establishment_id")??"";
+  const [historyOpen,setHistoryOpen]=useState(false);
   const est = establishments.find(e => e.id === selected) ??
     establishments.find(e => e.id === "252a8dca-14c7-4f09-bd1f-7b2c40ae97aa") ?? establishments[0];
   const garden=est?.id==="d40d3438-79d8-4c28-8b09-eba640598201";
@@ -26,6 +27,8 @@ export function JevLunaSolPage() {
     queryFn: () => jlsPreview(est!.id, language) });
   const restaurant=useQuery({queryKey:["jls-restaurant",currentUser.id,est?.id],enabled:garden&&!demoMode,retry:false,
     queryFn:async()=>{if(!supabase)throw Error("UNAUTHORIZED");const r=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:est!.id}),{method:"GET"});if(r.error)throw Error("JLS_READ_FAILED");return r.data as RestaurantView;}});
+  const history=useQuery({queryKey:["jls-restaurant-history",currentUser.id,est?.id],enabled:garden&&!demoMode&&historyOpen,retry:false,
+    queryFn:async()=>{if(!supabase)throw Error("UNAUTHORIZED");const r=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:est!.id,view:"historical"}),{method:"GET"});if(r.error)throw Error("JLS_READ_FAILED");return r.data as RestaurantView;}});
   const refetch=garden?restaurant.refetch:q.refetch;
   useEffect(() => {
     const read = () => { if (!document.hidden && !demoMode && est) void refetch(); };
@@ -34,12 +37,18 @@ export function JevLunaSolPage() {
   }, [refetch, demoMode, est]);
   return <><PageHeader title={t.title} back /><div className="jev-page gold-page evidence-v3-page jls-page">
     <label htmlFor="jls-est">{language === "fr" ? "Établissement" : "Cơ sở"}</label>
-    <select id="jls-est" value={est?.id ?? ""} onChange={e => setSelected(e.target.value)}>
+    <select id="jls-est" value={est?.id ?? ""} onChange={e => {setHistoryOpen(false);setParams({establishment_id:e.target.value});}}>
       {establishments.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
     </select>
     {(garden?restaurant.isFetching:q.isFetching) && <p role="status">{t.loading}</p>}
     {(garden?restaurant.isError:q.isError) && <p role="alert">{t.error} : {garden?restaurant.error?.message:q.error?.message}</p>}
     {garden?restaurant.data&&<JlsRestaurantPreparation data={restaurant.data}/>:q.data&&<JlsWorkspace data={q.data}/>}
+    {garden&&restaurant.data?.history_available&&<details className="card jev-card" onToggle={e=>setHistoryOpen(e.currentTarget.open)}>
+      <summary>{language==="fr"?"Consulter les rapports historiques conservés":"Xem các báo cáo cũ được giữ nguyên"}</summary>
+      {history.isFetching&&<p role="status">{t.loading}</p>}
+      {history.isError&&<p role="alert">{t.error}</p>}
+      {history.data&&<JlsRestaurantPreparation data={history.data}/>}
+    </details>}
     {!est && <p>{t.empty}</p>}
     <button className="secondary-button full-width" disabled={!est || (garden?restaurant.isFetching:q.isFetching) || demoMode} onClick={() => void (garden?restaurant.refetch():q.refetch())}>{t.refresh}</button>
     <Link to="/plus/jev-benchmark">{t.back}</Link>

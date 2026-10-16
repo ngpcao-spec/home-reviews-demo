@@ -1,8 +1,11 @@
 import {useI18n} from "../../i18n";
 import {PrioritizedJlsReport} from "./PrioritizedJlsReport";
 import {JlsRecommendationReview,type RecommendationReviewView} from "./JlsRecommendationReview";
+import {JlsContractV2Report} from "./JlsContractV2Report";
+import type {ContractReportView} from "../../../supabase/functions/_shared/jls-contract-v2-view";
 import type {validateEditorialReport} from "../../../supabase/functions/_shared/jls-editorial-validation";
 export interface RestaurantView {
+ contract_v2?:ContractReportView;history_available?:boolean;
  recommendation_review?:RecommendationReviewView|null;
  protocol:null|{id:string;sha256:string;created_at:string;establishment_name:string;source_sha256:string;configuration_sha256:string;
   coverage:{google_total:number|null;stored_reviews:number;reviews_with_text:number;english_ready:number;reused_analyses:number;missing_analyses:number;missing_english:number};
@@ -15,7 +18,9 @@ export interface RestaurantView {
  progress:null|{id:string;phase:string;status:string;request_count:number}[];
 }
 export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
- const {language}=useI18n(),fr=language==="fr",p=data.protocol;if(!p)return null;
+ const {language}=useI18n(),fr=language==="fr",p=data.protocol;
+ if(data.contract_v2)return <JlsContractV2Report value={data.contract_v2}/>;
+ if(!p)return null;
  const c=p.coverage;
  return <section className="card jev-card" data-testid="jls-restaurant-preparation">
   <h2>{p.establishment_name} — {fr?"Deuxième test délégué":"Thử nghiệm ủy quyền thứ hai"}</h2>

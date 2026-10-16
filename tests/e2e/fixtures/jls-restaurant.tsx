@@ -2,6 +2,7 @@ import {createRoot} from "react-dom/client";
 import {I18nProvider} from "../../../src/i18n";
 import {JlsRestaurantPreparation,type RestaurantView} from "../../../src/components/analysis/JlsRestaurantPreparation";
 import reviewFixture from "./jls-recommendation-review.json";
+import {contractViewFixture} from "../../fixtures/jls-contract-v2-view";
 import "../../../src/styles/global.css";
 import "../../../src/styles/pages.css";
 import "../../../src/styles/warm-theme.css";
@@ -18,5 +19,8 @@ const data:RestaurantView={protocol:{id:"11111111-1111-4111-8111-111111111111",s
 if(new URLSearchParams(location.search).has("review")){
  data.recommendation_review=reviewFixture.value as unknown as NonNullable<RestaurantView["recommendation_review"]>;
  data.result={validated_report:reviewFixture.original as unknown as NonNullable<NonNullable<RestaurantView["result"]>["validated_report"]>};
+}
+if(new URLSearchParams(location.search).has("contract-v2")){
+ data.protocol=null;data.contract_v2=contractViewFixture();
 }
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

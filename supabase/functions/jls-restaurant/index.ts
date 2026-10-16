@@ -2,14 +2,32 @@ import {requireUser,assertMembership} from "../_shared/auth.ts";
 import {json,preflight} from "../_shared/cors.ts";
 import {hybridHash} from "../_shared/jev-hybrid-evidence.ts";
 import {verifyRestaurantProtocol} from "../_shared/jls-restaurant.ts";
+import {contractReportView} from "../_shared/jls-contract-v2-view.ts";
 Deno.serve(async r=>{
  const pre=preflight(r);if(pre)return pre;
  if(r.method!=="GET")return json({error:"METHOD_NOT_ALLOWED"},405);
  try{
   const c=await requireUser(r),est=new URL(r.url).searchParams.get("establishment_id");
-  const er=await c.client.from("establishments").select("id,organization_id").eq("id",est).single();
+  const er=await c.client.from("establishments").select("id,organization_id,name").eq("id",est).single();
   if(er.error||!er.data)throw Error("FORBIDDEN");
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
+  // New V2 results live in a separate immutable store. Read them before loading
+  // the large historical protocol; an old report must not hide the current one.
+  if(new URL(r.url).searchParams.get("view")!=="historical"){
+   const cp=await c.client.from("analysis_jls_contract_v2_protocols")
+    .select("id,organization_id,establishment_id,sha256").eq("organization_id",er.data.organization_id)
+    .eq("establishment_id",er.data.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
+   if(cp.error)throw Error("JLS_READ_FAILED");
+   if(cp.data){
+    const co=await c.client.from("analysis_jls_contract_v2_operations")
+     .select("id,protocol_id,organization_id,mode,status,phase,luna_count,sol_count,error_code,created_at,result,result_sha256,luna_result,luna_result_sha256")
+     .eq("organization_id",er.data.organization_id).eq("protocol_id",cp.data.id).eq("mode","paid").maybeSingle();
+    if(co.error)throw Error("JLS_READ_FAILED");
+    if(co.data)return json({protocol:null,run:null,result:null,progress:null,
+     contract_v2:await contractReportView(cp.data,co.data,{organization_id:er.data.organization_id,establishment_id:er.data.id,establishment_name:er.data.name}),
+     history_available:true,new_paid_calls:0,production_enabled:false});
+   }
+  }
   const pr=await c.client.from("analysis_jls_restaurant_protocols").select("id,body,sha256,created_at")
    .eq("establishment_id",er.data.id).eq("organization_id",er.data.organization_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pr.error)throw Error("JLS_READ_FAILED");
