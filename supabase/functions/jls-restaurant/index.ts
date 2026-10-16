@@ -13,7 +13,7 @@ Deno.serve(async r=>{
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
   // New V2 results live in a separate immutable store. Read them before loading
   // the large historical protocol; an old report must not hide the current one.
-  if(new URL(r.url).searchParams.get("view")!=="historical"){
+  if(new URL(r.url).searchParams.get("view")==="contract_v2"){
    const cp=await c.client.from("analysis_jls_contract_v2_protocols")
     .select("id,organization_id,establishment_id,sha256").eq("organization_id",er.data.organization_id)
     .eq("establishment_id",er.data.id).order("created_at",{ascending:false}).limit(1).maybeSingle();

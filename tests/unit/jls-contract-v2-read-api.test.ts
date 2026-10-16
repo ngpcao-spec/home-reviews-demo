@@ -20,7 +20,7 @@ beforeEach(async()=>{
  vi.mocked(assertMembership).mockReset().mockResolvedValue("owner");
 });
 afterAll(()=>{expect(net).not.toHaveBeenCalled();net.mockRestore();vi.unstubAllGlobals();});
-const request=(suffix="",method="GET")=>handle(new Request("https://example.test/jls-restaurant?establishment_id=d40d3438-79d8-4c28-8b09-eba640598201"+suffix,{method}));
+const request=(suffix="",method="GET")=>handle(new Request("https://example.test/jls-restaurant?establishment_id=d40d3438-79d8-4c28-8b09-eba640598201"+(suffix||"&view=contract_v2"),{method}));
 it("serves the completed V2 result before touching the expensive historical preparation",async()=>{
  const response=await request(),body=await response.json();expect(response.status).toBe(200);
  expect(body.contract_v2.status).toBe("completed");expect(body.contract_v2.report.format_version).toBe("jls-prioritized-recommendations-v2");
@@ -46,6 +46,10 @@ it("rejects tampered stored output without showing a legacy result instead",asyn
 });
 it("keeps explicit historical reads separate from the current report",async()=>{
  expect((await request("&view=historical")).status).toBe(200);
+ expect(tables).not.toContain("analysis_jls_contract_v2_operations");expect(tables).toContain("analysis_jls_restaurant_protocols");
+});
+it("keeps older clients on their original read contract",async()=>{
+ expect((await request("&view=legacy")).status).toBe(200);
  expect(tables).not.toContain("analysis_jls_contract_v2_operations");expect(tables).toContain("analysis_jls_restaurant_protocols");
 });
 it("falls back when no V2 paid execution exists",async()=>{
