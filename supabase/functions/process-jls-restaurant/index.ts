@@ -2,6 +2,9 @@ import {restaurantCpuProbe} from "../_shared/jls-restaurant-cpu-probe.ts";
 import {solReadyProbe} from "../_shared/jls-sol-ready-probe.ts";
 import {solReadyPort} from "../_shared/jls-sol-ready-store.ts";
 import {processReadySol} from "../_shared/jls-sol-ready-worker.ts";
+import {contractV2Port} from "../_shared/jls-contract-v2-store.ts";
+import {processContractV2} from "../_shared/jls-contract-v2-worker.ts";
+import {contractV2Probe} from "../_shared/jls-contract-v2-probe.ts";
 // deno-lint-ignore no-import-prefix
 import {createClient} from "npm:@supabase/supabase-js@2.117.2";
 import {json} from "../_shared/cors.ts";
@@ -23,10 +26,23 @@ Deno.serve(async r=>{
   EdgeRuntime.waitUntil(restaurantCpuProbe(admin,payload).catch(e=>{console.error("JLS_CPU_PROBE_FAILED",e instanceof Error?e.message:"UNKNOWN");}));
   return json({accepted_free_probe:true,provider_calls:0,nonce:payload.nonce},202);
  }
+ if(payload?.mode==="contract_v2_operation"){
+  const op=await admin.from("analysis_jls_contract_v2_operations").select("mode").eq("id",payload.operation_id).single();
+  if(op.error)return json({error:"FORBIDDEN"},403);
+  // Mock branch exits before loading any provider secret or native transport.
+  EdgeRuntime.waitUntil((op.data.mode==="mock"?contractV2Probe(admin,payload.operation_id):
+   processContractV2(contractV2Port(admin),payload.operation_id,Deno.env.get("OPENAI_API_KEY")??"",fetch))
+   .catch(e=>console.error("JLS_CONTRACT_V2_FAILED",e instanceof Error?e.message:"UNKNOWN")));
+  return json({accepted_background:true,technical_mock:op.data.mode==="mock"},202);
+ }
  const {data:runs,error}=await admin.from("analysis_jls_restaurant_runs").select("id").in("status",["queued","running"]);
  if(error)return json({error:"JLS_DATABASE_FAILED"},409);
- if(!runs?.length)return json({claimed:0,new_paid_calls:0});
- const work=(async()=>{for(const run of runs)try{
+ const next=await admin.from("analysis_jls_contract_v2_operations").select("id").eq("mode","paid").in("status",["queued","received","dispatched","validating"]).limit(1);
+ if(next.error)return json({error:"JLS_DATABASE_FAILED"},409);
+ if(!runs?.length&&!next.data?.length)return json({claimed:0,new_paid_calls:0});
+ const work=(async()=>{
+  for(const op of next.data??[])await processContractV2(contractV2Port(admin),op.id,Deno.env.get("OPENAI_API_KEY")??"",fetch);
+  for(const run of runs??[])try{
   const ready=await admin.from("analysis_jls_sol_ready_operations").select("id").eq("run_id",run.id).eq("mode","paid").maybeSingle();
   if(ready.error)continue;
   if(ready.data){await processReadySol(solReadyPort(admin),ready.data.id,Deno.env.get("OPENAI_API_KEY")??"",fetch);continue;}

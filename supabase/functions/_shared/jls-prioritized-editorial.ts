@@ -40,7 +40,7 @@ export async function conditionalEditorialRequest(p:JlsPlan) {
  return {request:d.request,measurement:solRequestSize(d.request,p.sol_size_policy,planTokenMemo(p)?.count),request_sha256:d.request_sha256,
   dossier_sha256:d.dossier_sha256,prompt_sha256:d.prompt_sha256,schema_sha256:d.schema_sha256,scope:"all_candidates_conditional_not_luna_verdicts" as const};
 }
-async function editorialFromPrioritized(p:JlsPlan,legacy:Awaited<ReturnType<typeof buildPrioritizedDraft>>,language:"fr"|"vi") {
+export async function editorialFromPrioritized(p:JlsPlan,legacy:Awaited<ReturnType<typeof buildPrioritizedDraft>>,language:"fr"|"vi") {
   const evidence=legacy.packet.evidence;
   const coverage=p.statistics.themes.map(t=>{
     const accepted=evidence.filter(e=>e.theme_key===t.theme_key&&e.polarity==="negative");

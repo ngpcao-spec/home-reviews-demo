@@ -17,14 +17,21 @@ export interface ReadyPort {
  finish(id:string,worker:string,status:string,result:Record<string,unknown>,sha:string):Promise<boolean>;
  abort(id:string,worker:string,error:string):Promise<void>;
 }
+// Optional versioned contract adapter. Historical callers keep the original path.
+export interface ReadyContract {
+ verify(s:ReadyState):Promise<import("./jev-luna-sol.ts").JlsPlan>;
+ validate(raw:unknown,s:ReadyState,plan:import("./jev-luna-sol.ts").JlsPlan):Promise<Awaited<ReturnType<typeof validateEditorialReport>>>;
+}
 const terminal=new Set(["completed","needs_review","invalid_output","blocked","billing_uncertain","authorization_expired"]);
 const code=(e:unknown)=>e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_SOL_READY_BILLING_UNCERTAIN";
-export async function processReadySol(port:ReadyPort,id:string,key:string,http:typeof fetch){
+export async function processReadySol(port:ReadyPort,id:string,key:string,http:typeof fetch,contract?:ReadyContract){
  const worker=crypto.randomUUID();let claimed=false,phase="",sent=false,mock=false;
  try{
   const s=await port.load(id);mock=s.operation.mode==="mock";if(terminal.has(s.operation.status))return {phase:"already_recorded",provider_calls:0};
-  await port.active(s);await verifySolReadyProtocol(s.protocol.body,s.protocol.sha256);
-  const plan=await verifySolReadyArtifact(s.protocol.body,s.ready);
+  await port.active(s);
+  let plan;
+  if(contract)plan=await contract.verify(s);
+  else {await verifySolReadyProtocol(s.protocol.body,s.protocol.sha256);plan=await verifySolReadyArtifact(s.protocol.body,s.ready);}
   if(!await port.compatible(s))throw Error("JLS_SOL_READY_REUSED_SOURCE_CHANGED");
   if(s.operation.phase==="sol"&&!key.trim())throw Error("JLS_SOL_READY_KEY_UNAVAILABLE");
   const op=await port.claim(id,worker);if(!op)return {phase:"concurrent_or_consumed",provider_calls:0};
@@ -69,7 +76,8 @@ export async function processReadySol(port:ReadyPort,id:string,key:string,http:t
    const content=raw.output.filter((x:{type:string})=>x.type==="message").flatMap((x:{content:unknown[]})=>x.content);
    if(content.some((x:{type:string})=>x.type==="refusal"))throw Error("JLS_SOL_REFUSED");
    const texts=content.filter((x:{type:string})=>x.type==="output_text");if(texts.length!==1)throw Error("JLS_SOL_OUTPUT_INVALID");
-   const validated=await validateEditorialReport(JSON.parse(texts[0].text),plan,s.protocol.body.snapshot,s.ready.body.decisions,"vi");
+   const validated=contract?await contract.validate(JSON.parse(texts[0].text),s,plan):
+    await validateEditorialReport(JSON.parse(texts[0].text),plan,s.protocol.body.snapshot,s.ready.body.decisions,"vi");
    out.validated_report=validated;out.validator_version=validated.validator_version;
    const r=validated.report,items=[...r.axes,...r.positive_aspects,...r.negative_aspects,r.conclusion,...r.recommendations];
    status=items.some(x=>x.status==="review_needed")?"needs_review":"completed";

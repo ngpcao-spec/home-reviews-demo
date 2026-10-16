@@ -61,6 +61,9 @@ export async function buildRecommendationDraftV2(plan:JlsPlan,decisions:JlsDecis
  // Offline preparation uses its own token memo, never unseals a historical one.
  const p={...plan};await attachPlanTokenMemo(p);
  const old=await buildEditorialDraft(p,decisions,language);
+ return recommendationFromEditorialV2(p,old,language,plan);
+}
+export async function recommendationFromEditorialV2(p:JlsPlan,old:Awaited<ReturnType<typeof buildEditorialDraft>>,language:"fr"|"vi",sourcePlan:JlsPlan=p){
  const frequency=old.packet.frequency.map(f=>{
   const [key,polarity]=f.key.split(":"),t=p.statistics.themes.find(t=>t.theme_key===key)!;
   const side=polarity as "positive"|"negative";
@@ -80,14 +83,15 @@ export async function buildRecommendationDraftV2(plan:JlsPlan,decisions:JlsDecis
  return {...old,version:RECOMMENDATION_CONFIG.version,format_version:RECOMMENDATION_VERSION,config,
   config_sha256:await hybridHash(config),packet,prompt,schema,request,
   prompt_sha256:await negativeHash(prompt),schema_sha256:await hybridHash(schema),dossier_sha256:await hybridHash(packet),
-  request_sha256:await hybridHash(request),source_plan_sha256:await hybridHash(plan),measurement:size,
+  request_sha256:await hybridHash(request),source_plan_sha256:await hybridHash(sourcePlan),measurement:size,
   local_request_tokens:planTokens(p,JSON.stringify(request)),token_certificate:certificate,token_certificate_sha256:await hybridHash(certificate),
   // No monetary estimate in this preparation.
   estimates:{...old.estimates,estimated_cost_usd:null,high_estimated_cost_usd:null},
   new_paid_calls:0,spending_authorization:null,execution_protocol:null,paid_enabled:false,production_enabled:false};
 }
-export async function validateRecommendationReportV2(raw:unknown,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],language:"fr"|"vi"=p.language){
- const parsed=recommendationResponseV2.parse(raw),draft=await buildRecommendationDraftV2(p,decisions,language);
+export async function validateRecommendationReportV2(raw:unknown,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],language:"fr"|"vi"=p.language,
+ prepared?:Awaited<ReturnType<typeof buildRecommendationDraftV2>>){
+ const parsed=recommendationResponseV2.parse(raw),draft=prepared??await buildRecommendationDraftV2(p,decisions,language);
  const base=await validatePrioritizedBindings(raw,parsed as BoundResponse,p,snapshot,decisions,language,
   JLS_DISCLOSURE_VALIDATOR,draft,ACTION_FOCUS_V2,true,actionSupportV2);
  return {...base,editorial_version:RECOMMENDATION_CONFIG.version,validator_version:RECOMMENDATION_VALIDATOR,
