@@ -102,6 +102,9 @@ consultables. Les comparaisons globales sont séparées des fréquences de souti
 
 - Suite complète locale : 1 810 tests passés ; trois régressions supplémentaires
   ont ensuite porté les tests ciblés V2 à 27, tous passés.
+- CI sur le commit `e81e35ef3bb7fbcf195a78665f2863502052c6d7` :
+  **1 813 tests passés dans 170 fichiers**, lint, build et publication Pages
+  réussis ([exécution 38835059959](https://github.com/ngpcao-spec/home-reviews-demo/actions/runs/38835059959)).
 - SQL/RLS dans une transaction annulée : immutabilité, idempotence, refus des
   textes dérivés modifiés, refus du verdict Luna hérité, isolement des tenants,
   source et nombre de tentatives inchangés.
@@ -112,6 +115,45 @@ consultables. Les comparaisons globales sont séparées des fréquences de souti
 - Un premier lancement concurrent des suites a saturé le poste : la suite
   complète a été relancée avec deux workers et le test de démarrage navigateur
   a été rejoué seul. Aucun délai ni assertion n'a été assoupli.
+
+## Livraison et contrôle sur le serveur déployé
+
+- Code : `e81e35ef3bb7fbcf195a78665f2863502052c6d7`.
+- Migration serveur : `20261016012621_jls_recommendation_reviews_v2`.
+- Fonction `jls-restaurant` : version 5, active.
+- Fonction `process-jls-restaurant` : version 8, active.
+- GitHub Pages : publication réussie, sans déclenchement fournisseur.
+- Archive immuable : `cf693741-5e08-4e4f-b3e1-2a8cc4dcbd9b`.
+- SHA256 de l'archive :
+  `0f67396ed6155e6aa95016fdd314f8cb9467eda0c58a0b3176d4885766ec96c5`.
+
+Le code de provenance de l'archive reste celui du commit ci-dessus, même si la
+documentation ou le nom local de la migration sont alignés après livraison.
+La requête future V2 est préparée gratuitement et archivée ; elle ne constitue
+ni un protocole d'exécution autorisé, ni une nouvelle génération. Les modules
+V2 ne déverrouillent pas le worker payant historique.
+
+Une sonde technique explicite du worker Edge déployé a parcouru réservation,
+envoi simulé, réception, validation et sauvegarde. Elle n'est pas un run de
+rapport : `e4f59990-f54b-4c3b-829c-78546822c544`. Elle a terminé avec
+**zéro appel fournisseur**, un seul envoi simulé et aucune tokenisation nouvelle.
+
+| Étape Edge | CPU natif | Durée totale | Mémoire au signal Shutdown |
+| --- | ---: | ---: | ---: |
+| Envoi/réception simulés | 226 ms | 9 757 ms | 27 946 263 octets |
+| Validation/sauvegarde | 338 ms | 2 514 ms | 28 320 527 octets |
+
+Mesures natives `Shutdown`, raison `EarlyDrop`, Edge Runtime 1.77.0 / Deno 2.1.4,
+région Singapour. Marge CPU minimale observée : 1 662 ms sur 2 000 ms.
+Ce sont des mesures sur cette sonde et ce dossier, pas une garantie universelle
+pour toute réponse future. Les mémoires heap + external échantillonnées dans
+les phases étaient respectivement 37 145 821 et 48 420 335 octets.
+
+Contrôle final en base : run historique inchangé, statut `needs_review`, une
+seule tentative Sol historique ; empreintes de résultat et de réception
+inchangées. Les 78 analyses JEV et 28 réponses Luna sources restent exactement
+compatibles. Aucun run actif pour ce protocole. Les cinq empreintes de contrôle
+des données et rapports Artisan sont inchangées.
 
 ## Étapes futures non lancées
 
