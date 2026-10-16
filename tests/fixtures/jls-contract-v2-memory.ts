@@ -19,9 +19,10 @@ export function contractMemoryFixture(initial:ContractState,variant:"ACCEPTED"|"
  };
  const http:typeof fetch=async(url,options)=>{
   if(!leased||state.operation.status!=="dispatched")throw Error("MOCK_NOT_RESERVED");
-  const phase=state.operation.phase,wire=phase==="luna"?state.protocol.body.luna_request_json:state.protocol.body.branches.find(b=>b.assumption===variant)!.request_json;
+  const phase=state.operation.phase,actual=phase==="sol"?state.operation.luna_result!.decisions[0].status:variant,
+   wire=phase==="luna"?state.protocol.body.luna_request_json:state.protocol.body.branches.find(b=>b.assumption===actual)!.request_json;
   if(options?.body!==wire||String(url)!==(phase==="luna"?"https://api.openai.com/v1/decisions":"https://api.openai.com/v1/responses"))throw Error("MOCK_WIRE_CHANGED");
-  calls.push(phase);return new Response(JSON.stringify(contractTechnicalResponse(state,variant)),{headers:{"x-request-id":"explicit_mock"}});
+  calls.push(phase);return new Response(JSON.stringify(contractTechnicalResponse(state,actual)),{headers:{"x-request-id":"explicit_mock"}});
  };
  return {state,port,http,calls,deny:()=>{allowed=false;},incompatible:()=>{compatible=false;},interrupt:()=>{leased=false;state.operation.worker=null;}};
 }

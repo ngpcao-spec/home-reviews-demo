@@ -23,13 +23,14 @@ for(const variant of ["ACCEPTED","REJECTED","UNCERTAIN"] as const){
  results.push({variant,stages,status:f.state.operation.status,calls_simulated:f.calls,provider_calls:0});
 }
 const checks=[];
-for(const kind of ["permission","source","protocol","quote","concurrent","timeout_luna","timeout_sol","missing_usage","invalid_sol","changed_native","lost_receipt"]){
+for(const kind of ["permission","source","protocol","quote","concurrent","timeout_luna","timeout_sol","missing_usage","invalid_sol","changed_native","lost_receipt","low_confidence"]){
  const f=contractMemoryFixture(successfulInitial!,"ACCEPTED");let calls=0;
  if(kind==="permission")f.deny();if(kind==="source")f.incompatible();if(kind==="protocol")f.state.protocol.body.language="fr" as "vi";
  if(kind==="quote")f.state.protocol.body.plan.selected[0].quote+=" changed";
  const http:typeof fetch=async(...args)=>{calls++;
   if(kind==="timeout_luna"||kind==="timeout_sol"&&f.state.operation.phase==="sol")throw Error("EXPLICIT_MOCK_TIMEOUT");
   const response=await f.http(...args);if(kind==="missing_usage"){const raw=JSON.parse(await response.text());delete raw.usage;return new Response(JSON.stringify(raw));}
+  if(kind==="low_confidence"&&f.state.operation.phase==="luna"){const raw=JSON.parse(await response.text());raw.answers[0].confidence=.25;return new Response(JSON.stringify(raw));}
   if(kind==="invalid_sol"&&f.state.operation.phase==="sol")return new Response("{invalid mock");return response;};
  if(kind==="lost_receipt"){const receive=f.port.receive;f.port.receive=async(...args)=>{await receive(...args);return false;};}
  if(kind==="concurrent")await Promise.all(Array.from({length:8},()=>processContractV2(f.port,f.state.operation.id,"mock_key",http)));
@@ -43,6 +44,7 @@ for(const kind of ["permission","source","protocol","quote","concurrent","timeou
  if(["permission","source","protocol","quote"].includes(kind)&&calls!==0)throw Error("PREFLIGHT_NOT_BLOCKED_"+kind);
  if(["timeout_luna","missing_usage","changed_native","lost_receipt"].includes(kind)&&calls!==1)throw Error("LUNA_FAILURE_MUST_NOT_REACH_SOL_"+kind);
  if(kind==="concurrent"&&calls!==2)throw Error("CONCURRENT_PATH_INCOMPLETE");
+ if(kind==="low_confidence"&&(f.state.operation.luna_result?.decisions[0].status!=="UNCERTAIN"||f.state.operation.status!=="completed"))throw Error("LOW_CONFIDENCE_MUST_NOT_ACCEPT");
  checks.push({kind,status:f.state.operation.status,simulated_attempts:calls,provider_calls:0});
 }
 await Deno.writeTextFile(outPath,JSON.stringify({provider_calls:0,results,checks}));console.log(JSON.stringify({provider_calls:0,results,checks}));
