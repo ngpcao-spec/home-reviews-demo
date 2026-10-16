@@ -22,3 +22,9 @@ it("SQL guards scope, expiry, organization, immutable results, concurrency and b
  for(const required of ["for update","luna_count in(0,1)","sol_count in(0,1)","enable row level security","JLS_V2_NEW_GO_REQUIRED","JLS_V2_LOST_ATTEMPT_NO_RETRY","JLS_V2_RESULT_IMMUTABLE","user_directive_codex_delegation","24 hours","JLS_V2_FULL_PATH_NOT_QUALIFIED"])expect(sql).toContain(required);
  expect(sql).not.toContain("security definer");expect(sql).not.toMatch(/select\s+(?:public\.)?authorize_jls_contract_v2\s*\(/);
 });
+it("immutable-parent guard avoids duplicate canonicalization while retaining live/native and worker body hashes",()=>{
+ const sql=readFileSync("supabase/migrations/20261016025619_jls_contract_v2_immutable_source_guard.sql","utf8");
+ expect(sql).toContain("public.check_jls_sol_ready_sources(a.body)");expect(sql).toContain("source_archive_sha256");
+ expect(sql).not.toContain("public.jls_restaurant_hash(a.body)");expect(sql).not.toContain("public.jls_restaurant_hash(r.body)");
+ const verifier=readFileSync("supabase/functions/_shared/jls-contract-v2-preparation.ts","utf8");expect(verifier).toContain("await hybridHash(source.artifact.body)!==source.artifact.sha256");
+});

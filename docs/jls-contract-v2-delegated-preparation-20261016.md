@@ -93,3 +93,12 @@ aucun de ces objets n'est passé au mécanisme d'autorisation ou enregistré.
 
 Les identifiants du protocole scellé, sa qualification Edge et les vérifications
 finales de livraison sont consignés après leur contrôle effectif.
+
+Une première sonde ACCEPTED conserve un arrêt RPC avant Sol, compteur Sol zéro.
+Le journal PostgREST confirme le code `57014` (statement timeout) pendant la
+canonisation des parents. Mesure SQL isolée : 1 248,858 ms avant, 315,050 ms après
+suppression de deux empreintes redondantes de parents immuables. Les empreintes
+liées sont toujours comparées ; le worker calcule toujours l'empreinte complète
+de l'artefact réellement chargé. Les contrôles des 78 caches et 28 réponses
+natives restent inchangés. L'ancienne sonde n'est pas réactivée : une nouvelle
+sonde gratuite distincte qualifie le même protocole préparé.
