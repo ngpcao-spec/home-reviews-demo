@@ -27,4 +27,7 @@ it("immutable-parent guard avoids duplicate canonicalization while retaining liv
  expect(sql).toContain("public.check_jls_sol_ready_sources(a.body)");expect(sql).toContain("source_archive_sha256");
  expect(sql).not.toContain("public.jls_restaurant_hash(a.body)");expect(sql).not.toContain("public.jls_restaurant_hash(r.body)");
  const verifier=readFileSync("supabase/functions/_shared/jls-contract-v2-preparation.ts","utf8");expect(verifier).toContain("await hybridHash(source.artifact.body)!==source.artifact.sha256");
+ const rpc=readFileSync("supabase/migrations/20261016030105_jls_contract_v2_rpc_jit_guard.sql","utf8");
+ expect(rpc).toContain("ALTER FUNCTION public.check_jls_contract_v2_sources(uuid) SET jit TO 'off'");
+ expect(rpc).not.toMatch(/ALTER\s+(?:ROLE|DATABASE)/i);
 });

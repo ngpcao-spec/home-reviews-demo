@@ -102,3 +102,12 @@ liées sont toujours comparées ; le worker calcule toujours l'empreinte complè
 de l'artefact réellement chargé. Les contrôles des 78 caches et 28 réponses
 natives restent inchangés. L'ancienne sonde n'est pas réactivée : une nouvelle
 sonde gratuite distincte qualifie le même protocole préparé.
+
+Le test déployé révèle aussi une différence d'environnement : les requêtes MCP
+utilisent `jit=off` et un délai de deux minutes ; PostgREST utilise une limite de
+huit secondes et peut activer JIT. Le journal confirme plusieurs `57014` dans le
+vérificateur natif, après la première optimisation. Sur une enveloppe SQL
+reproduisant l'appel RPC : 801,402 ms avec JIT, 303,091 ms avec JIT désactivé
+localement dans la nouvelle fonction, sous le délai de huit secondes.
+Ce réglage n'affecte ni les rôles, ni RLS, ni les autres fonctions/expériences.
+Les sondes échouées restent immuables et ne qualifient pas le protocole.
