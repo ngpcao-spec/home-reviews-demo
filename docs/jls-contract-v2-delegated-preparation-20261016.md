@@ -109,5 +109,84 @@ huit secondes et peut activer JIT. Le journal confirme plusieurs `57014` dans le
 vérificateur natif, après la première optimisation. Sur une enveloppe SQL
 reproduisant l'appel RPC : 801,402 ms avec JIT, 303,091 ms avec JIT désactivé
 localement dans la nouvelle fonction, sous le délai de huit secondes.
-Ce réglage n'affecte ni les rôles, ni RLS, ni les autres fonctions/expériences.
+Ce réglage ne modifie ni les rôles, ni RLS, ni les autres workflows. Il reste
+local à la vérification V2 et à ses appels imbriqués.
 Les sondes échouées restent immuables et ne qualifient pas le protocole.
+
+## Protocole figé
+
+- ID : `8484a2e8-ac56-4d16-abcf-964eeb15e5d5`.
+- SHA256 : `68d6c549276a278fadef49ae787bc9114bfe3b402d304b50a03bc27b5f146143`.
+- Compilation : `9a28e49b68e57812b3a70d8956a3028abae6b96d`.
+- Correctifs SQL de contrôle : `9cba98a` et `8a24845`.
+- Worker `process-jls-restaurant` v9 actif ; bundle
+  `9777d31ef8790550e183b71e898f440db5dac403e8b5813417e6f7f07491363b`.
+- Les noms des trois fichiers de migration sont alignés sur les versions
+  effectivement enregistrées dans Supabase.
+
+CI : 1 823 tests dans 171 fichiers, lint, build et publication Pages réussis.
+Sept tests Deno sans réseau, contrôles Deno/lint, SQL/RLS et huit cas mobiles
+FR/VI (360, 390, 430, iPad 768), rechargement et aucun POST.
+Les douze scénarios de panne/concurrence de la répétition hors réseau passent.
+
+Trois sondes finales complètes ont terminé après le correctif PostgREST :
+
+- ACCEPTED : `69a4b535-cf09-4ef9-a0e6-e1bf7b239170` ;
+- REJECTED : `e76061b9-7757-48f3-bdcc-83463431a420` ;
+- UNCERTAIN : `19ad959a-5041-4418-86f7-e717b2e65d3b`.
+
+Elles sauvegardent chacune un Luna simulé, puis un Sol simulé, jamais un résultat
+de fournisseur réel. Une sonde supplémentaire, `87315b7d-d8d8-4b2e-85e9-ad3311a74d7f`,
+teste la validation/sauvegarde d'une réception de stress construite explicitement
+en SQL : plus de 376 000 caractères et cinq recommandations synthétiques
+redondantes. Elle termine `needs_review` et conserve sa réponse ; les garde-fous
+ne sont pas retirés pour obtenir un résultat favorable. La sonde de stress
+précédente, dépourvue d'un champ de réception typé, reste arrêtée séparément.
+
+Ces mesures ne démontrent ni la qualité d'un futur texte Sol, ni une validation
+humaine. Un futur résultat peut conserver des propositions masquées ou produire
+moins de trois recommandations.
+
+## Qualification finale et GO futur
+
+Qualification immuable : `3e85fbc7-d487-4e27-92a3-c132a829424f`.
+Les 13 mesures natives `Shutdown` correspondent aux exécutions enregistrées :
+
+| Phase | ACCEPTED CPU | REJECTED CPU | UNCERTAIN CPU |
+| --- | ---: | ---: | ---: |
+| Envoi Luna simulé | 246 ms | 276 ms | 282 ms |
+| Validation Luna | 290 ms | 289 ms | 309 ms |
+| Envoi Sol simulé | 306 ms | 305 ms | 292 ms |
+| Validation et sauvegarde Sol | 328 ms | 325 ms | 302 ms |
+
+La validation/sauvegarde de stress utilise 380 ms CPU ; les quatre propositions
+redondantes restent masquées. Mémoire native à l'arrêt : de 28 029 743 à
+28 533 391 octets. Durée totale des phases : 2 348 à 11 565 ms, avec Auth et SQL.
+Le CPU maximal observé laisse 1 620 ms sous la limite de 2 000 ms. Ces mesures
+ne garantissent pas toute charge future ou toute sortie arbitraire.
+
+La réception de stress mesure exactement **376 418 caractères / 377 309 octets**.
+Un rectificatif technique append-only accompagne la qualification : son champ
+informatif de longueur avait été copié avant le changement final du titre du
+mock (écart de cinq caractères). La réception, son SHA256, les mesures CPU et
+la qualification d'intégrité ne sont pas modifiés.
+
+Relecture finale : SHA256 du protocole conforme, sources compatibles,
+zéro consentement, opération payante ou tentative fournisseur. Les empreintes
+des anciens runs, du résultat et de la réception Sol historiques, du cache et
+des rapports Artisan sont identiques à leurs valeurs avant intervention.
+
+Instruction possible, qui nécessitera un nouveau message humain explicite :
+
+> GO — J'autorise Codex à exécuter une seule fois le rapport vietnamien Xóm Mới
+> Garden selon le protocole 8484a2e8-ac56-4d16-abcf-964eeb15e5d5. Réutiliser les
+> 78 analyses JEV et les décisions Luna exactement compatibles. Maximum une
+> nouvelle requête gpt-6-luna pour la citation précise sur la boisson manquante,
+> puis un seul appel gpt-6.1-sol si les preuves sont suffisantes. Aucun appel JEV
+> ou Apify, aucune relance payante automatique. Si Luna rejette la preuve ou reste
+> incertaine, l'exclure sans forcer la recommandation. Conserver tous les anciens
+> runs et rapports. Codex assure le lancement et le suivi, sans manipulation
+> GitHub ou iPhone.
+
+Ce texte documenté n'est pas un consentement et n'est jamais transmis au
+mécanisme d'autorisation par les scripts de préparation.

@@ -18,16 +18,16 @@ it("absence of delegated authorization blocks before source loading, reservation
  expect(port.claim).not.toHaveBeenCalled();expect(http).not.toHaveBeenCalled();
 });
 it("SQL guards scope, expiry, organization, immutable results, concurrency and both one-shot counters",()=>{
- const sql=readFileSync("supabase/migrations/20261016022029_jls_contract_v2_delegated_preparation.sql","utf8");
+ const sql=readFileSync("supabase/migrations/20261016025141_jls_contract_v2_delegated_preparation.sql","utf8");
  for(const required of ["for update","luna_count in(0,1)","sol_count in(0,1)","enable row level security","JLS_V2_NEW_GO_REQUIRED","JLS_V2_LOST_ATTEMPT_NO_RETRY","JLS_V2_RESULT_IMMUTABLE","user_directive_codex_delegation","24 hours","JLS_V2_FULL_PATH_NOT_QUALIFIED"])expect(sql).toContain(required);
  expect(sql).not.toContain("security definer");expect(sql).not.toMatch(/select\s+(?:public\.)?authorize_jls_contract_v2\s*\(/);
 });
 it("immutable-parent guard avoids duplicate canonicalization while retaining live/native and worker body hashes",()=>{
- const sql=readFileSync("supabase/migrations/20261016025619_jls_contract_v2_immutable_source_guard.sql","utf8");
+ const sql=readFileSync("supabase/migrations/20261016025746_jls_contract_v2_immutable_source_guard.sql","utf8");
  expect(sql).toContain("public.check_jls_sol_ready_sources(a.body)");expect(sql).toContain("source_archive_sha256");
  expect(sql).not.toContain("public.jls_restaurant_hash(a.body)");expect(sql).not.toContain("public.jls_restaurant_hash(r.body)");
  const verifier=readFileSync("supabase/functions/_shared/jls-contract-v2-preparation.ts","utf8");expect(verifier).toContain("await hybridHash(source.artifact.body)!==source.artifact.sha256");
- const rpc=readFileSync("supabase/migrations/20261016030105_jls_contract_v2_rpc_jit_guard.sql","utf8");
+ const rpc=readFileSync("supabase/migrations/20261016030155_jls_contract_v2_rpc_jit_guard.sql","utf8");
  expect(rpc).toContain("ALTER FUNCTION public.check_jls_contract_v2_sources(uuid) SET jit TO 'off'");
  expect(rpc).not.toMatch(/ALTER\s+(?:ROLE|DATABASE)/i);
 });
