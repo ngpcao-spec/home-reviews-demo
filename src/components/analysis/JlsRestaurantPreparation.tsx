@@ -6,7 +6,9 @@ import type {ContractReportView} from "../../../supabase/functions/_shared/jls-c
 import {supabase} from "../../lib/supabase";
 import {useState} from "react";
 import type {validateEditorialReport} from "../../../supabase/functions/_shared/jls-editorial-validation";
+import type {SavedResponseView} from "../../../supabase/functions/_shared/jls-saved-response-view";
 export interface RestaurantView {
+ saved_response_validation?:SavedResponseView|null;
  frozen_source?:{establishment_id:string;historical_run_id:string;source_fingerprint:string;source_ids:string[];statistics_denominators:{overall:number;thematic:number};no_paid_go:boolean;immutable_historical_report:boolean};
  contract_v2?:ContractReportView;history_available?:boolean;
  recommendation_review?:RecommendationReviewView|null;
@@ -42,7 +44,7 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
     const a=document.createElement("a");a.href=url;a.download="chill-thai-snapshot-v2-audit.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
    }catch{setAuditError(true);}finally{setAuditBusy(false);}}}>{fr?"Exporter les données pour notre audit":"Xuất dữ liệu để đánh giá"}</button>
   </aside>}
-  <p>{fr?"Rapport vietnamien. Périmètre figé ; préparation sans autorisation d’exécution.":"Báo cáo tiếng Việt. Phạm vi cố định; việc chuẩn bị không cấp phép thực thi."}</p>
+  <p>{data.frozen_source&&data.run?(fr?"Exécution autorisée enregistrée. Périmètre figé ; historique conservé.":"Đã ghi nhận lần chạy được cho phép. Phạm vi cố định; giữ nguyên lịch sử."):(fr?"Rapport vietnamien. Périmètre figé ; préparation sans autorisation d’exécution.":"Báo cáo tiếng Việt. Phạm vi cố định; việc chuẩn bị không cấp phép thực thi.")}</p>
   <dl className="jev-pairs">{[
    ["Google Maps",c.google_total],[fr?"Avis stockés":"Đánh giá đã lưu",c.stored_reviews],
    [fr?"Avis avec texte":"Đánh giá có nội dung",c.reviews_with_text],
@@ -74,9 +76,16 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
   <p>{data.run?data.run.status:fr?"Prêt — aucun GO enregistré":"Sẵn sàng — chưa ghi nhận cho phép chạy"}</p>
   {data.progress&&<p>{data.progress.filter(t=>["completed","reused"].includes(t.status)).length} / {data.progress.length}</p>}
   {data.run?.error_code&&<p role="alert">{data.run.error_code}</p>}
-  <button disabled className="primary-button full-width">{fr?"Exécution déléguée — GO explicite requis":"Thực thi ủy quyền — cần cho phép rõ ràng"}</button>
+  <button disabled className="primary-button full-width">{data.frozen_source&&data.run?(fr?"Exécution enregistrée — aucun nouveau lancement":"Đã ghi nhận lần chạy — không chạy lại"):(fr?"Exécution déléguée — GO explicite requis":"Thực thi ủy quyền — cần cho phép rõ ràng")}</button>
   <details><summary>{fr?"Provenance du protocole":"Nguồn gốc giao thức"}</summary><p className="evidence-id" style={{overflowWrap:"anywhere"}}>{p.id}<br/>{p.sha256}<br/>{p.source_sha256}<br/>{p.configuration_sha256}<br/>{p.format_version}<br/>{p.editorial_version}<br/>{p.prepared_artifact_sha256}</p></details>
   {data.result?.validated_report&&<PrioritizedJlsReport result={data.result.validated_report}/>}
+  {data.saved_response_validation&&<section data-testid="jls-saved-response">
+   <h3>{fr?"Rapport issu de la réponse Sol conservée":"Báo cáo từ phản hồi Sol đã lưu"}</h3>
+   <p>{fr?"Vérification rejouée hors réseau, sans nouvel appel fournisseur. Le run historique reste bloqué après l’erreur de sauvegarde. Cette revalidation est conservée séparément ; elle ne constitue pas une validation humaine.":"Kiểm tra lại ngoại tuyến, không gọi thêm nhà cung cấp. Lần chạy gốc vẫn bị chặn sau lỗi lưu kết quả. Bản kiểm tra lại được lưu riêng; đây không phải xác nhận của con người."}</p>
+   <p>{fr?"État de la revalidation":"Trạng thái kiểm tra lại"} : {data.saved_response_validation.validation_status}. {fr?"Modèle servi":"Mô hình thực tế"} : {data.saved_response_validation.result.served_model}.</p>
+   <details><summary>{fr?"Provenance de la revalidation":"Nguồn gốc bản kiểm tra lại"}</summary><p style={{overflowWrap:"anywhere"}}>{data.saved_response_validation.id}<br/>{data.saved_response_validation.sha256}<br/>{data.saved_response_validation.source_receipt_sha256}<br/>{data.saved_response_validation.validator_version}<br/>{data.saved_response_validation.validator_code_provenance}</p></details>
+   <PrioritizedJlsReport result={data.saved_response_validation.result.validated_report}/>
+  </section>}
   {data.recommendation_review&&<JlsRecommendationReview value={data.recommendation_review}/>}
  </section>;
 }

@@ -29,4 +29,10 @@ if(new URLSearchParams(location.search).has("snapshot-v2")){
  data.protocol!.max_jev_calls=80;data.protocol!.max_luna_calls=32;data.protocol!.format_version="jls-prioritized-recommendations-v2";
  data.frozen_source={establishment_id:"synthetic",historical_run_id:"synthetic-historical",source_fingerprint:"e".repeat(64),source_ids:[],statistics_denominators:{overall:100,thematic:80},no_paid_go:true,immutable_historical_report:true};
 }
+if(new URLSearchParams(location.search).has("saved-response")){
+ data.run={id:"synthetic-run",stage:"validate_sol",status:"blocked",error_code:"SYNTHETIC_SAVE_BLOCKAGE"};
+ data.saved_response_validation={id:"synthetic-saved-validation",sha256:"f".repeat(64),created_at:"2026-10-17",run_id:"synthetic-run",run_status:"blocked",operation_id:"synthetic-operation",
+ validation_status:"needs_review",validator_version:"synthetic_validator",validator_code_provenance:"synthetic_commit",source_receipt_sha256:"e".repeat(64),result_sha256:"d".repeat(64),human_validated:false,provider_calls:0,
+ result:{validated_report:contractViewFixture().report!,input_tokens:10,output_tokens:2,duration_ms:5,served_model:"gpt-6.1-sol"}};
+}
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

@@ -1,4 +1,15 @@
 import {test,expect} from "@playwright/test";
+for(const language of ["fr","vi"])test("Saved response "+language+" is readable with provenance and blocked history",async({page})=>{
+ if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});
+ const posts:string[]=[];page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});
+ await page.goto("/tests/e2e/fixtures/jls-restaurant.html?language="+language+"&snapshot-v2&saved-response");
+ await expect(page.getByTestId("jls-saved-response")).toContainText("needs_review");
+ await expect(page.getByRole("alert")).toContainText("SYNTHETIC_SAVE_BLOCKAGE");
+ await page.getByText(language==="fr"?"Provenance de la revalidation":"Nguồn gốc bản kiểm tra lại",{exact:true}).click();
+ await expect(page.getByTestId("jls-saved-response")).toContainText("synthetic_commit");
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+ await page.reload();await expect(page.getByTestId("jls-saved-response")).toBeVisible();expect(posts).toEqual([]);
+});
 for(const language of ["fr","vi"])test("Chill frozen V2 "+language+" preserves 100/80/20 and reloads without launch",async({page})=>{
  if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});
  const posts:string[]=[];page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});

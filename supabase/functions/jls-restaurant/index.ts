@@ -4,6 +4,7 @@ import {hybridHash} from "../_shared/jev-hybrid-evidence.ts";
 import {verifyRestaurantProtocol} from "../_shared/jls-restaurant.ts";
 import {contractReportView} from "../_shared/jls-contract-v2-view.ts";
 import {SNAPSHOT_V2,verifySnapshotV2} from "../_shared/jls-snapshot-v2.ts";
+import {savedResponseView} from "../_shared/jls-saved-response-view.ts";
 Deno.serve(async r=>{
  const pre=preflight(r);if(pre)return pre;
  if(r.method!=="GET")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -36,6 +37,19 @@ Deno.serve(async r=>{
   const p=pr.data;if(p.body.version===SNAPSHOT_V2)await verifySnapshotV2(p.body,p.sha256);else await verifyRestaurantProtocol(p.body,p.sha256);
   const rr=await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,created_at").eq("protocol_id",p.id).maybeSingle();
   if(rr.error)throw Error("JLS_READ_FAILED");
+  let savedValidation=null,savedValidationArchive=null;
+  if(p.body.version===SNAPSHOT_V2&&rr.data){
+   const sv=await c.client.from("analysis_jls_snapshot_preparations").select("id,organization_id,body,sha256,created_at").eq("protocol_id",p.id).eq("organization_id",er.data.organization_id).eq("kind","saved_sol_response_validation_v1").maybeSingle();
+   if(sv.error)throw Error("JLS_READ_FAILED");
+   if(sv.data){
+    const op=await c.client.from("analysis_jls_sol_ready_operations").select("id,organization_id,protocol_id,run_id,artifact_id,receipt,receipt_sha256,request_count").eq("id",sv.data.body.source_operation_id).eq("run_id",rr.data.id).eq("protocol_id",p.id).eq("organization_id",er.data.organization_id).eq("mode","paid").single();
+    if(op.error)throw Error("JLS_SAVED_RESPONSE_CHANGED");
+    const ar=await c.client.from("analysis_jls_sol_ready_artifacts").select("id,organization_id,source_protocol_id,source_run_id,sha256,request_sha256:body->>request_sha256").eq("id",op.data.artifact_id).eq("organization_id",er.data.organization_id).single();
+    if(ar.error)throw Error("JLS_SAVED_RESPONSE_CHANGED");
+    savedValidation=await savedResponseView(sv.data,{organization_id:er.data.organization_id,protocol_id:p.id,protocol_sha256:p.sha256,run_id:rr.data.id,run_status:rr.data.status},op.data,ar.data);
+    savedValidationArchive=sv.data;
+   }
+  }
   if(new URL(r.url).searchParams.get("view")==="audit"&&p.body.version===SNAPSHOT_V2){
    const [archive,tasks,artifacts]=await Promise.all([
     c.client.from("analysis_jls_snapshot_preparations").select("kind,body,sha256").eq("protocol_id",p.id).eq("organization_id",er.data.organization_id).eq("kind","historical_archive"),
@@ -43,7 +57,7 @@ Deno.serve(async r=>{
     rr.data?c.client.from("analysis_jls_restaurant_artifacts").select("kind,body,sha256").eq("run_id",rr.data.id).eq("organization_id",er.data.organization_id):Promise.resolve({data:[],error:null})]);
    if(archive.error||tasks.error||artifacts.error)throw Error("JLS_READ_FAILED");
    return json({audit_only:true,qualitative_audit_performed:false,new_paid_calls:0,protocol:{id:p.id,sha256:p.sha256,body:p.body},
-    reference:archive.data,run:rr.data,tasks:tasks.data,artifacts:artifacts.data});
+    reference:archive.data,run:rr.data,tasks:tasks.data,artifacts:artifacts.data,saved_response_validation:savedValidation,saved_response_validation_archive:savedValidationArchive});
   }
   let result=null,progress=null,recommendationReview=null,resultSha=null;
   if(rr.data){
@@ -71,7 +85,7 @@ Deno.serve(async r=>{
    ...(p.body.version===SNAPSHOT_V2?{frozen_source:{establishment_id:p.body.establishment_id,historical_run_id:p.body.frozen_v2.historical_run_id,source_fingerprint:p.body.frozen_v2.source_fingerprint,
     source_ids:p.body.snapshot.source.reviews.map((r:{id:string})=>r.id),statistics_denominators:{overall:100,thematic:80},no_paid_go:!rr.data,
     immutable_historical_report:true}}:{}),
-   run:rr.data,result,progress,recommendation_review:recommendationReview,new_paid_calls:0,production_enabled:false});
+   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,new_paid_calls:0,production_enabled:false});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_READ_FAILED";
   return json({error:code},code==="UNAUTHORIZED"?401:code==="FORBIDDEN"?403:409);}
 });
