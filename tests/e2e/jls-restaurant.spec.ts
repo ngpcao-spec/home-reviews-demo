@@ -1,4 +1,14 @@
 import {test,expect} from "@playwright/test";
+for(const language of ["fr","vi"])test("Chill frozen V2 "+language+" preserves 100/80/20 and reloads without launch",async({page})=>{
+ if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});
+ const posts:string[]=[];page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});
+ await page.goto("/tests/e2e/fixtures/jls-restaurant.html?language="+language+"&snapshot-v2");
+ await expect(page.getByTestId("jls-frozen-source")).toContainText("100");await expect(page.getByTestId("jls-frozen-source")).toContainText("80");await expect(page.getByTestId("jls-frozen-source")).toContainText("20");
+ await expect(page.getByRole("button",{disabled:true})).toHaveCount(1);
+ expect(await page.locator("body").innerText()).not.toMatch(/USD|coût|chi phí/i);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+ await page.reload();await expect(page.getByTestId("jls-frozen-source")).toBeVisible();expect(posts).toEqual([]);
+});
 for(const language of ["fr","vi"])test("Garden "+language+" closed delegated preparation, reload, no amount",async({page})=>{
  if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});
  const posts:string[]=[];page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});

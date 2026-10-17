@@ -5,6 +5,7 @@ import {processReadySol} from "../_shared/jls-sol-ready-worker.ts";
 import {contractV2Port} from "../_shared/jls-contract-v2-store.ts";
 import {processContractV2} from "../_shared/jls-contract-v2-worker.ts";
 import {contractV2Probe} from "../_shared/jls-contract-v2-probe.ts";
+import {processSnapshotRun,snapshotNativeProbe} from "../_shared/jls-snapshot-v2-server.ts";
 // deno-lint-ignore no-import-prefix
 import {createClient} from "npm:@supabase/supabase-js@2.117.2";
 import {json} from "../_shared/cors.ts";
@@ -17,6 +18,11 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==="snapshot_v2_probe"){
+  // Ends before any supplier key is loaded; injected mock transport only.
+  EdgeRuntime.waitUntil(snapshotNativeProbe(admin,payload).catch(e=>console.error("JLS_SNAPSHOT_PROBE_FAILED",e instanceof Error?e.message:"UNKNOWN")));
+  return json({accepted_free_probe:true,provider_calls:0},202);
+ }
  if(payload?.mode==="sol_ready_probe"){
   EdgeRuntime.waitUntil(solReadyProbe(admin,payload.operation_id,payload.variant??"normal").catch(e=>console.error("JLS_READY_PROBE_FAILED",e instanceof Error?e.message:"UNKNOWN")));
   return json({accepted_free_probe:true,provider_calls:0},202);
@@ -43,6 +49,11 @@ Deno.serve(async r=>{
  const work=(async()=>{
   for(const op of next.data??[])await processContractV2(contractV2Port(admin),op.id,Deno.env.get("OPENAI_API_KEY")??"",fetch);
   for(const run of runs??[])try{
+  const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
+  const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version==="jls-historical-snapshot-v2-vi-v1"){
+   await processSnapshotRun(admin,run.id,{jev:Deno.env.get("TYPESAFE_API_KEY")??"",openai:Deno.env.get("OPENAI_API_KEY")??""},fetch);continue;
+  }
   const ready=await admin.from("analysis_jls_sol_ready_operations").select("id").eq("run_id",run.id).eq("mode","paid").maybeSingle();
   if(ready.error)continue;
   if(ready.data){await processReadySol(solReadyPort(admin),ready.data.id,Deno.env.get("OPENAI_API_KEY")??"",fetch);continue;}

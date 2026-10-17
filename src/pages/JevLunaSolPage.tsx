@@ -21,7 +21,7 @@ export function JevLunaSolPage() {
   const [historyOpen,setHistoryOpen]=useState(false);
   const est = establishments.find(e => e.id === selected) ??
     establishments.find(e => e.id === "252a8dca-14c7-4f09-bd1f-7b2c40ae97aa") ?? establishments[0];
-  const garden=est?.id==="d40d3438-79d8-4c28-8b09-eba640598201";
+  const garden=est?.id==="d40d3438-79d8-4c28-8b09-eba640598201"||est?.id==="a9a6ec1c-cbb3-4e39-a498-86f2e68bd4b8";
   const q = useQuery({ queryKey: ["jls-free-preview", currentUser.id, est?.id, language],
     enabled: !garden && !demoMode && !!currentUser.id && !!est, retry: false,
     queryFn: () => jlsPreview(est!.id, language) });

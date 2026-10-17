@@ -38,6 +38,7 @@ export async function restaurantConfiguration(sizePolicy?:SolSizePolicy) {
     sol_prompt_sha256:await negativeHash(editorialInstructions("vi")),sol_schema_sha256:await hybridHash(prioritizedSchema())};
 }
 export interface RestaurantProtocol {
+  frozen_v2?:{version:string;historical_run_id:string;historical_generation_id:string;historical_run_sha256:string;historical_snapshot_sha256:string;source_fingerprint:string;historical_snapshot:Record<string,unknown>};
   sol_ready?:SolReadyBinding;
   version:string;organization_id:string;establishment_id:string;authority_user_id:string;
   prepared?:{version:string;artifact_sha256:string;source_protocol_id:string;source_protocol_sha256:string;source_run_id:string};
@@ -46,7 +47,7 @@ export interface RestaurantProtocol {
     evidence_sha256:string;luna_manifest_sha256:string;conditional_sol:Awaited<ReturnType<typeof conditionalEditorialRequest>>};
   snapshot:PilotSnapshot;cache: (EconomyCache & {theme_results?:unknown})[];
   pending: {review_id:string;identity:Awaited<ReturnType<typeof economyIdentity>>;cache_key:string;payload:Omit<ReturnType<typeof economyPayload>,"questions">;request_sha256:string}[];
-  configuration:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>,"policy"> & {policy:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>["policy"],"version"|"max_luna_calls"> & {version:string;max_luna_calls:number;sol_size_policy?:SolSizePolicy};prepared_execution?:unknown;sol_ready_execution?:unknown};
+  configuration:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>,"policy"> & {policy:Omit<Awaited<ReturnType<typeof restaurantConfiguration>>["policy"],"version"|"max_luna_calls"|"format_version"|"editorial_version"> & {version:string;format_version:string;editorial_version:string;max_luna_calls:number;sol_size_policy?:SolSizePolicy};prepared_execution?:unknown;sol_ready_execution?:unknown};
   configuration_sha256:string;cache_sha256:string;pending_sha256:string;
   max_jev_calls:number;max_luna_calls:number;max_sol_calls:1;
   english_review_ids:string[];english_manifest_sha256:string;provider_sources:unknown;
@@ -55,6 +56,10 @@ export interface RestaurantProtocol {
 }
 export async function prepareRestaurant(snapshot:PilotSnapshot,cache:RestaurantProtocol["cache"],providerSources:unknown,code:string,expectedModel:string) {
   if(snapshot.establishment_id!==GARDEN||snapshot.production_enabled!==false)throw Error("JLS_RESTAURANT_SCOPE_INVALID");
+  return prepareRestaurantInputs(snapshot,cache,providerSources,code,expectedModel);
+}
+// Shared input compiler. New callers must apply their own versioned scope guard.
+export async function prepareRestaurantInputs(snapshot:PilotSnapshot,cache:RestaurantProtocol["cache"],providerSources:unknown,code:string,expectedModel:string) {
   await verifyRestaurantSnapshot(snapshot);
   const a=await auditPilotCache(snapshot.source.reviews,cache,snapshot.organization_id,snapshot.establishment_id);
   if(a.blocked_review_ids.length)throw Error("JLS_EXISTING_CACHE_ATTEMPT_UNCERTAIN");
@@ -101,8 +106,8 @@ export async function verifyRestaurantProtocol(p:RestaurantProtocol,sha:string) 
   const rebuilt=await prepareRestaurant(p.snapshot,p.cache,p.provider_sources,p.code_provenance,expected);
   if(await hybridHash(rebuilt)!==sha)throw Error("JLS_RESTAURANT_PROTOCOL_CHANGED");
 }
-export async function restaurantConsent(p:RestaurantProtocol,sha:string,directGo:string,at:string) {
-  await verifyRestaurantProtocol(p,sha);
+export async function restaurantConsent(p:RestaurantProtocol,sha:string,directGo:string,at:string,verify=verifyRestaurantProtocol) {
+  await verify(p,sha);
   if(directGo.trim().length<20||!Number.isFinite(Date.parse(at)))throw Error("JLS_NEW_GO_REQUIRED");
   return {consent_source:RESTAURANT_POLICY.consent_source,operator_identity:RESTAURANT_POLICY.operator_identity,
     protocol_sha256:sha,user_directive:directGo,directive_sha256:await negativeHash(directGo),requested_at:at,
@@ -112,11 +117,11 @@ export async function restaurantConsent(p:RestaurantProtocol,sha:string,directGo
 }
 // Reuse the exact V1.1 selector and native Luna bindings; no historical builder
 // is changed. Null rates deliberately prevent ANY monetary forecast.
-export async function restaurantEvidencePlan(p:RestaurantProtocol,cache:RestaurantProtocol["cache"]):Promise<JlsPlan> {
+export async function restaurantEvidencePlan(p:RestaurantProtocol,cache:RestaurantProtocol["cache"],selection?:JlsPlan["selected"]):Promise<JlsPlan> {
   const s=p.snapshot,a=await auditPilotCache(s.source.reviews,cache,p.organization_id,p.establishment_id);
   if(a.missing_review_ids.length||a.blocked_review_ids.length||a.used.length!==p.english_review_ids.length)throw Error("JLS_JEV_COVERAGE_INCOMPLETE");
   const statistics=hybridAnalytics(s,pilotStatistics(s.source.reviews,a,s.source.google_total_reviews));
-  const selected=selectBalancedEvidence(await balancedCandidates(s,a.used,[]),32);
+  const selected=selection??selectBalancedEvidence(await balancedCandidates(s,a.used,[]),32);
   if(!selected.length)throw Error("JLS_NO_ADMISSIBLE_EVIDENCE");
   const config={...JLS_CONFIG,...(p.sol_size_policy?{input_budget_tokens:p.sol_size_policy.input_budget_tokens,sol_size_policy:p.sol_size_policy}:{}),source_question_set:EVIDENCE_CONFIG.source_question_set,
     source_questions_sha256:await hybridHash(EVIDENCE_CONFIG.source_questions),source_threshold_version:ECONOMY_CONFIG.threshold_version,

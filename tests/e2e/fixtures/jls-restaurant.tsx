@@ -23,4 +23,10 @@ if(new URLSearchParams(location.search).has("review")){
 if(new URLSearchParams(location.search).has("contract-v2")){
  data.protocol=null;data.contract_v2=contractViewFixture();
 }
+if(new URLSearchParams(location.search).has("snapshot-v2")){
+ data.protocol!.establishment_name="Chill Thái - Thai Food";
+ data.protocol!.coverage={google_total:2745,stored_reviews:100,reviews_with_text:80,english_ready:80,reused_analyses:0,missing_analyses:80,missing_english:0};
+ data.protocol!.max_jev_calls=80;data.protocol!.max_luna_calls=32;data.protocol!.format_version="jls-prioritized-recommendations-v2";
+ data.frozen_source={establishment_id:"synthetic",historical_run_id:"synthetic-historical",source_fingerprint:"e".repeat(64),source_ids:[],statistics_denominators:{overall:100,thematic:80},no_paid_go:true,immutable_historical_report:true};
+}
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

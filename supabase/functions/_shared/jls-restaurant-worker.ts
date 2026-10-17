@@ -12,7 +12,7 @@ import { JEV_ENDPOINT } from "./jev.ts";
 export interface RestaurantTask {id:string;run_id:string;organization_id:string;phase:"jev"|"luna"|"sol";review_id:string|null;
  request:unknown;request_sha256:string;identity:{expected_served_model:string}|null;status:string;request_count:number;worker:string;}
 export interface RestaurantState {protocol:{id:string;body:RestaurantProtocol;sha256:string};
- run:{id:string;stage:"jev"|"luna"|"prepare_sol"|"sol";status:string};tasks:(RestaurantTask&{cache_id:string|null})[];
+ run:{id:string;stage:"jev"|"luna"|"prepare_evidence"|"prepare_sol"|"sol";status:string};tasks:(RestaurantTask&{cache_id:string|null})[];
  artifacts:{kind:string;body:Record<string,unknown>;sha256:string}[];}
 export interface RestaurantPort {
  tick(run:string,worker:string):Promise<boolean>;load(run:string):Promise<RestaurantState>;
@@ -96,11 +96,16 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
  }catch(e){if(!sent)status="blocked";out.error_code=fail(e);}
  out.duration_ms=Date.now()-start;return {status,body:out,sha256:await hybridHash(out)};
 }
-export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev:string;openai:string},http:typeof fetch) {
+export interface RestaurantExecutionContract {
+ verify(p:RestaurantProtocol,sha:string):Promise<void>;
+ completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
+}
+export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev:string;openai:string},http:typeof fetch,contract?:RestaurantExecutionContract) {
  const worker=crypto.randomUUID();if(!await port.tick(run,worker))return;
  let error:string|null=null;
  try{
-  let state=await port.load(run);const p=state.protocol.body;await verifyRestaurantProtocol(p,state.protocol.sha256);
+  let state=await port.load(run);const p=state.protocol.body;
+  if(contract)await contract.verify(p,state.protocol.sha256);else await verifyRestaurantProtocol(p,state.protocol.sha256);
   for(const a of state.artifacts)if(await hybridHash(a.body)!==a.sha256)throw Error("JLS_ARTIFACT_CHANGED");
   let prepared:PreparedRestaurantRow|null=null;
   if(p.prepared){
@@ -133,6 +138,7 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
   state=await port.load(run);
   if(!["queued","running"].includes(state.run.status))return;
   if(state.tasks.some(t=>t.phase===state.run.stage&&!["completed","reused"].includes(t.status)))return;
+  if(contract){await contract.completed(state,worker,port);return;}
   const save=async(kind:string,b:unknown)=>{if(!await port.artifact(run,worker,kind,b,await hybridHash(b)))throw Error("JLS_ARTIFACT_SAVE_UNCERTAIN");};
   if(state.run.stage==="jev"){
    const plan=prepared?prepared.body.plan:await restaurantEvidencePlan(p,await port.cache(p));if(!prepared)await verifyRestaurantResumePlan(p,plan);await save("evidence_plan",plan);

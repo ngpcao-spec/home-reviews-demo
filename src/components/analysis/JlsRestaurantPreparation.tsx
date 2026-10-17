@@ -3,8 +3,11 @@ import {PrioritizedJlsReport} from "./PrioritizedJlsReport";
 import {JlsRecommendationReview,type RecommendationReviewView} from "./JlsRecommendationReview";
 import {JlsContractV2Report} from "./JlsContractV2Report";
 import type {ContractReportView} from "../../../supabase/functions/_shared/jls-contract-v2-view";
+import {supabase} from "../../lib/supabase";
+import {useState} from "react";
 import type {validateEditorialReport} from "../../../supabase/functions/_shared/jls-editorial-validation";
 export interface RestaurantView {
+ frozen_source?:{establishment_id:string;historical_run_id:string;source_fingerprint:string;source_ids:string[];statistics_denominators:{overall:number;thematic:number};no_paid_go:boolean;immutable_historical_report:boolean};
  contract_v2?:ContractReportView;history_available?:boolean;
  recommendation_review?:RecommendationReviewView|null;
  protocol:null|{id:string;sha256:string;created_at:string;establishment_name:string;source_sha256:string;configuration_sha256:string;
@@ -19,11 +22,24 @@ export interface RestaurantView {
 }
 export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
  const {language}=useI18n(),fr=language==="fr",p=data.protocol;
+ const [auditError,setAuditError]=useState(false),[auditBusy,setAuditBusy]=useState(false);
  if(data.contract_v2)return <JlsContractV2Report value={data.contract_v2}/>;
  if(!p)return null;
  const c=p.coverage;
  return <section className="card jev-card" data-testid="jls-restaurant-preparation">
-  <h2>{p.establishment_name} — {fr?"Deuxième test délégué":"Thử nghiệm ủy quyền thứ hai"}</h2>
+  <h2>{p.establishment_name} — {data.frozen_source?(fr?"Test complet V2":"Thử nghiệm đầy đủ V2"):(fr?"Deuxième test délégué":"Thử nghiệm ủy quyền thứ hai")}</h2>
+  {data.frozen_source&&<aside className="jls-methodology" data-testid="jls-frozen-source">
+   <h3>{fr?"Même snapshot historique — contrat V2":"Cùng dữ liệu gốc — hợp đồng V2"}</h3>
+   <p>{fr?"100 avis figés : 80 avis avec texte à analyser et 20 avis sans texte conservés pour les statistiques. Les fréquences des thèmes utilisent 80, les statistiques globales utilisent 100.":"Cố định 100 đánh giá: 80 đánh giá có nội dung để phân tích và 20 đánh giá không có nội dung chỉ dùng cho thống kê. Tần suất chủ đề dùng 80, thống kê tổng thể dùng 100."}</p>
+   <p>{fr?"Dossiers préparés hors du chemin Edge par Codex entre les étapes serveur persistantes. Aucun appel ni audit qualitatif depuis cet écran.":"Codex chuẩn bị hồ sơ ngoài đường xử lý Edge giữa các bước máy chủ bền vững. Màn hình này không gọi mô hình hay đánh giá chất lượng."}</p>
+   <p className="evidence-id" style={{overflowWrap:"anywhere"}}>{data.frozen_source.historical_run_id}<br/>{data.frozen_source.source_fingerprint}</p>
+   {auditError&&<p role="alert">{fr?"Export indisponible. Le rapport reste conservé ; aucun appel IA n’a été lancé.":"Chưa xuất được dữ liệu. Báo cáo vẫn được giữ; chưa gọi thêm AI."}</p>}
+   <button disabled={auditBusy} className="secondary-button full-width" onClick={async()=>{setAuditError(false);setAuditBusy(true);try{
+    if(!supabase)throw Error("UNAUTHORIZED");const response=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:data.frozen_source!.establishment_id,view:"audit"}),{method:"GET"});
+    if(response.error||response.data?.error)throw Error("JLS_EXPORT_FAILED");const url=URL.createObjectURL(new Blob([JSON.stringify(response.data,null,2)],{type:"application/json"}));
+    const a=document.createElement("a");a.href=url;a.download="chill-thai-snapshot-v2-audit.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   }catch{setAuditError(true);}finally{setAuditBusy(false);}}}>{fr?"Exporter les données pour notre audit":"Xuất dữ liệu để đánh giá"}</button>
+  </aside>}
   <p>{fr?"Rapport vietnamien. Périmètre figé ; préparation sans autorisation d’exécution.":"Báo cáo tiếng Việt. Phạm vi cố định; việc chuẩn bị không cấp phép thực thi."}</p>
   <dl className="jev-pairs">{[
    ["Google Maps",c.google_total],[fr?"Avis stockés":"Đánh giá đã lưu",c.stored_reviews],
@@ -51,7 +67,7 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
   </div>}
   {data.historical_runs?.length? <details><summary>{fr?"Exécutions historiques conservées":"Các lần thực thi cũ được giữ nguyên"}</summary>
    {data.historical_runs.map(r=><p key={r.id} style={{overflowWrap:"anywhere"}}>{r.id} · {r.status} · {r.error_code}</p>)}</details>:null}
-  {data.run&&<p>{fr?"Étape serveur":"Bước máy chủ"} : {({jev:p.prepared_artifact_sha256?(fr?"Vérification des artefacts figés":"Kiểm tra dữ liệu đã cố định"):(fr?"Analyses JEV":"Phân tích JEV"),luna:fr?"Vérification Luna":"Kiểm tra Luna",prepare_sol:fr?"Préparation gratuite du dossier Sol":"Chuẩn bị hồ sơ Sol miễn phí",sol:fr?"Rapport Sol":"Báo cáo Sol",validate_sol:fr?"Validation de la réponse Sol déjà sauvegardée":"Kiểm tra phản hồi Sol đã lưu"} as Record<string,string>)[data.run.stage]}</p>}
+  {data.run&&<p>{fr?"Étape serveur":"Bước máy chủ"} : {({jev:p.prepared_artifact_sha256?(fr?"Vérification des artefacts figés":"Kiểm tra dữ liệu đã cố định"):(fr?"Analyses JEV":"Phân tích JEV"),prepare_evidence:fr?"Préparation gratuite des preuves":"Chuẩn bị bằng chứng miễn phí",luna:fr?"Vérification Luna":"Kiểm tra Luna",prepare_sol:fr?"Préparation gratuite du dossier Sol":"Chuẩn bị hồ sơ Sol miễn phí",sol:fr?"Rapport Sol":"Báo cáo Sol",validate_sol:fr?"Validation de la réponse Sol déjà sauvegardée":"Kiểm tra phản hồi Sol đã lưu"} as Record<string,string>)[data.run.stage]}</p>}
   <p>{data.run?data.run.status:fr?"Prêt — aucun GO enregistré":"Sẵn sàng — chưa ghi nhận cho phép chạy"}</p>
   {data.progress&&<p>{data.progress.filter(t=>["completed","reused"].includes(t.status)).length} / {data.progress.length}</p>}
   {data.run?.error_code&&<p role="alert">{data.run.error_code}</p>}
