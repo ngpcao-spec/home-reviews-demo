@@ -44,3 +44,20 @@ Accès : Plus / Thêm → Test Jev → Rapport hybride JEV + Luna + Sol → Chil
 L'export sert à l'audit comparatif dans le chat d'analyse ; aucun audit qualitatif n'est réalisé pendant la préparation. Il permet de distinguer les étapes réellement exécutées/réutilisées, les fréquences par avis distinct, les décisions Luna, les contrôles de recommandations, l'usage et les durées enregistrées.
 
 Le protocole définitif et son SHA256 sont conservés dans Supabase après les tests, avec la provenance du commit de code. Le GO futur doit identifier explicitement ce protocole ; aucun consentement n'est enregistré lors de cette livraison.
+
+## Préparation enregistrée le 17 octobre 2026
+
+- Protocole : `52964d84-f0a0-411c-8c64-8fbc69e00913`.
+- SHA256 : `b466a654bf4a4ef630faff3479beec1c9639ee0b7553ca8a4f926400ebc8b71f`.
+- Provenance du compilateur : `cf81e1cebbc94fe46fafedd2455cc543bddd7da3`.
+- Archive source : `a7827793-aa25-4181-8b8f-8d7abcb4fc98`.
+- Qualification : `1cd37216-23bd-43f4-b5e9-912b093a260e`.
+- CPU natif Edge : JEV 261 ms, Luna 324 ms, réception Sol 263 ms, validation 301 ms, validation volumineuse 256 ms. Arrêts `EarlyDrop` sans dépassement. Critère conservateur : 1 500 ms ; limite Edge : 2 000 ms.
+- Durées totales correspondantes : 2 146 / 1 812 / 1 306 / 754 / 668 ms, distinctes du CPU. Mémoire native à l'arrêt : 28,1–28,7 Mo ; mémoire JS observée pendant la probe : jusqu'à 53,4 Mo.
+- Simulation sur textes réels : 80 analyses fictives, 32 preuves fictivement acceptées réparties sur 30 avis, une réponse Sol fictive validée et sauvegardée. Ce ne sont pas des résultats fournisseurs. Plafond Luna réel futur : 32 requêtes, nombre exact non encore connu.
+- Requête Sol simulée complète : 79 318 octets, 21 625 tokens locaux, 24 477 avec marge, 8 291 de réserve sur l'entrée, 9 500 réservés pour la sortie. Les mesures du dossier final seront refaites après JEV et Luna réels.
+- Empreintes du rapport historique, caches existants, anciens runs, opérations V2 et résultats Artisan identiques avant/après.
+- Contrôle SQL des citations corrigé pour les positions UTF-16 JavaScript : un emoji présent dans une source aurait provoqué un faux rejet. La correspondance exacte des citations et des fenêtres de contexte reste exigée, y compris après un caractère hors BMP.
+- Contrôles : 11 régressions réelles hors réseau avec mocks, 9 tests Deno, SQL/RLS, unitaires, lint, build et affichage FR/VI en 360/390/430/768 px. CI GitHub et Pages vérifiés.
+
+GO proposé : « GO — J'autorise Codex à exécuter une seule fois le rapport vietnamien Chill Thái - Thai Food selon le protocole 52964d84-f0a0-411c-8c64-8fbc69e00913. Maximum 80 appels JEV V12 économiques, 32 requêtes Luna regroupées par avis, puis un seul appel gpt-6.1-sol si les preuves sont suffisantes. Réutiliser uniquement les caches exactement compatibles. Aucun appel Apify et aucune relance payante automatique. Conserver les rapports et historiques inchangés. Assurer le lancement et le suivi, puis présenter le rapport, les contrôles et les appels, tokens et durées observés. »

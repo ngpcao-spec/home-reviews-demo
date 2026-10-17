@@ -60,7 +60,7 @@ Deno.serve(async r=>{
    if(review.error||review.data&&(await hybridHash(review.data.body)!==review.data.sha256||review.data.body.original_result_sha256!==resultSha||review.data.body.run_id!==rr.data.id))throw Error("JLS_RECOMMENDATION_REVIEW_CHANGED");
    recommendationReview=review.data;
   }
-  const history=await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,protocol_id").eq("organization_id",er.data.organization_id).neq("protocol_id",p.id);
+  const history=p.body.version===SNAPSHOT_V2?{data:[],error:null}:await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,protocol_id").eq("organization_id",er.data.organization_id).neq("protocol_id",p.id);
   if(history.error)throw Error("JLS_READ_FAILED");
   return json({historical_runs:history.data,protocol:{id:p.id,sha256:p.sha256,created_at:p.created_at,establishment_name:p.body.snapshot.source.establishment_name,
    source_sha256:p.body.snapshot.source_sha256,configuration_sha256:p.body.configuration_sha256,

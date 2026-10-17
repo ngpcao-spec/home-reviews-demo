@@ -26,6 +26,8 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
  if(data.contract_v2)return <JlsContractV2Report value={data.contract_v2}/>;
  if(!p)return null;
  const c=p.coverage;
+ const finishedJev=data.progress?.filter(t=>t.phase==="jev"&&["completed","reused"].includes(t.status))??[];
+ const analysed=c.reused_analyses+finishedJev.length,reused=c.reused_analyses+finishedJev.filter(t=>t.status==="reused").length;
  return <section className="card jev-card" data-testid="jls-restaurant-preparation">
   <h2>{p.establishment_name} — {data.frozen_source?(fr?"Test complet V2":"Thử nghiệm đầy đủ V2"):(fr?"Deuxième test délégué":"Thử nghiệm ủy quyền thứ hai")}</h2>
   {data.frozen_source&&<aside className="jls-methodology" data-testid="jls-frozen-source">
@@ -45,8 +47,9 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
    ["Google Maps",c.google_total],[fr?"Avis stockés":"Đánh giá đã lưu",c.stored_reviews],
    [fr?"Avis avec texte":"Đánh giá có nội dung",c.reviews_with_text],
    [fr?"Textes anglais prêts":"Nội dung tiếng Anh sẵn sàng",c.english_ready],
-   [fr?"Analyses réutilisables":"Phân tích có thể dùng lại",c.reused_analyses],
-   [fr?"Analyses manquantes":"Phân tích còn thiếu",c.missing_analyses],
+   ...(data.frozen_source?[[fr?"Avis analysés":"Đánh giá đã phân tích",analysed]]:[]),
+   [fr?"Analyses réutilisables":"Phân tích có thể dùng lại",data.frozen_source?reused:c.reused_analyses],
+   [fr?"Analyses manquantes":"Phân tích còn thiếu",data.frozen_source?Math.max(0,c.english_ready-analysed):c.missing_analyses],
    [fr?"Textes sans anglais":"Nội dung chưa có tiếng Anh",c.missing_english],
   ].map(([label,n])=><div className="jls-status-pair" key={String(label)}><dt>{label}</dt><dd>{n}</dd></div>)}</dl>
   <p>{fr?"Couverture partielle : seuls les textes anglais figés pourront être analysés. Aucun import ni traduction automatique.":"Phạm vi chưa đầy đủ: chỉ phân tích nội dung tiếng Anh đã cố định. Không tự nhập hay dịch thêm."}</p>

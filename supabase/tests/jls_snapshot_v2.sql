@@ -1,6 +1,22 @@
 -- Free preparation only. No consent/run/task/authorization/wake, even in rollback.
 begin;
 set local role service_role;
+do $test$ begin
+ if not public.jls_snapshot_quote_matches('Good 😀 food.',8,12,'food')
+ or not public.jls_snapshot_quote_matches('Good food.',5,9,'food')
+ or public.jls_snapshot_quote_matches('Good 😀 food.',7,11,'food')
+ or public.jls_snapshot_quote_matches('Good 😀 food.',5,6,'😀')
+ or public.jls_snapshot_quote_matches('Good food.',5,9,'drink') then raise exception 'UTF16_EXACT_QUOTE_FAILED';end if;
+end $test$;
+do $test$ declare bad int;begin
+ with f as(select body->'input'->'state' s from public.analysis_jls_snapshot_preparations where kind='probe_input_luna'),
+ pl as(select a->'body'->'plan' p from f,jsonb_array_elements(s->'artifacts')a where a->>'kind'='snapshot_evidence'),
+ src as(select body->'snapshot'->'source'->'reviews' r from public.analysis_jls_restaurant_protocols where establishment_id='a9a6ec1c-cbb3-4e39-a498-86f2e68bd4b8')
+ select count(*) into bad from pl,jsonb_array_elements(p->'selected')e,src,jsonb_array_elements(r)v where v->>'id'=e->>'review_id' and
+ (not public.jls_snapshot_quote_matches(v->>'analysis_text',(e->>'quote_start')::int,(e->>'quote_end')::int,e->>'quote')
+ or not public.jls_snapshot_quote_matches(v->>'analysis_text',(e->>'context_start')::int,(e->>'context_end')::int,e->>'context'));
+ if bad<>0 then raise exception 'REAL_FROZEN_QUOTES_CHANGED';end if;
+end $test$;
 do $test$ declare p public.analysis_jls_restaurant_protocols;a uuid;b uuid;begin
  select * into p from public.analysis_jls_restaurant_protocols where establishment_id='a9a6ec1c-cbb3-4e39-a498-86f2e68bd4b8' order by created_at desc limit 1;
  if p.id is null or not public.check_jls_snapshot_v2_source(p.body) then raise exception 'SOURCE_MISSING';end if;
