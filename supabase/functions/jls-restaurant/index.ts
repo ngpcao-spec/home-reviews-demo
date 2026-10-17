@@ -39,7 +39,8 @@ Deno.serve(async r=>{
   if(rr.error)throw Error("JLS_READ_FAILED");
   let savedValidation=null,savedValidationArchive=null;
   if(p.body.version===SNAPSHOT_V2&&rr.data){
-   const sv=await c.client.from("analysis_jls_snapshot_preparations").select("id,organization_id,body,sha256,created_at").eq("protocol_id",p.id).eq("organization_id",er.data.organization_id).eq("kind","saved_sol_response_validation_v1").maybeSingle();
+   const sv=await c.client.from("analysis_jls_snapshot_preparations").select("id,organization_id,body,sha256,created_at").eq("protocol_id",p.id).eq("organization_id",er.data.organization_id)
+    .in("kind",new URL(r.url).searchParams.get("validation_version")==="v1"?["saved_sol_response_validation_v1"]:["saved_sol_response_validation_v1","saved_sol_response_validation_v2"]).order("kind",{ascending:false}).limit(1).maybeSingle();
    if(sv.error)throw Error("JLS_READ_FAILED");
    if(sv.data){
     const op=await c.client.from("analysis_jls_sol_ready_operations").select("id,organization_id,protocol_id,run_id,artifact_id,receipt,receipt_sha256,request_count").eq("id",sv.data.body.source_operation_id).eq("run_id",rr.data.id).eq("protocol_id",p.id).eq("organization_id",er.data.organization_id).eq("mode","paid").single();
@@ -85,7 +86,8 @@ Deno.serve(async r=>{
    ...(p.body.version===SNAPSHOT_V2?{frozen_source:{establishment_id:p.body.establishment_id,historical_run_id:p.body.frozen_v2.historical_run_id,source_fingerprint:p.body.frozen_v2.source_fingerprint,
     source_ids:p.body.snapshot.source.reviews.map((r:{id:string})=>r.id),statistics_denominators:{overall:100,thematic:80},no_paid_go:!rr.data,
     immutable_historical_report:true}}:{}),
-   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,new_paid_calls:0,production_enabled:false});
+   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,
+   history_available:!!savedValidation?.source_original_validation_id,new_paid_calls:0,production_enabled:false});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_READ_FAILED";
   return json({error:code},code==="UNAUTHORIZED"?401:code==="FORBIDDEN"?403:409);}
 });

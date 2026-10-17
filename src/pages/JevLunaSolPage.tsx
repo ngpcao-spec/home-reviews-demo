@@ -28,7 +28,7 @@ export function JevLunaSolPage() {
   const restaurant=useQuery({queryKey:["jls-restaurant",currentUser.id,est?.id],enabled:garden&&!demoMode,retry:false,
     queryFn:async()=>{if(!supabase)throw Error("UNAUTHORIZED");const r=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:est!.id,view:"contract_v2"}),{method:"GET"});if(r.error)throw Error("JLS_READ_FAILED");return r.data as RestaurantView;}});
   const history=useQuery({queryKey:["jls-restaurant-history",currentUser.id,est?.id],enabled:garden&&!demoMode&&historyOpen,retry:false,
-    queryFn:async()=>{if(!supabase)throw Error("UNAUTHORIZED");const r=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:est!.id,view:"historical"}),{method:"GET"});if(r.error)throw Error("JLS_READ_FAILED");return r.data as RestaurantView;}});
+    queryFn:async()=>{if(!supabase)throw Error("UNAUTHORIZED");const r=await supabase.functions.invoke("jls-restaurant?"+new URLSearchParams({establishment_id:est!.id,view:"historical",...(est!.id==="a9a6ec1c-cbb3-4e39-a498-86f2e68bd4b8"?{validation_version:"v1"}:{})}),{method:"GET"});if(r.error)throw Error("JLS_READ_FAILED");return r.data as RestaurantView;}});
   const refetch=garden?restaurant.refetch:q.refetch;
   useEffect(() => {
     const read = () => { if (!document.hidden && !demoMode && est) void refetch(); };

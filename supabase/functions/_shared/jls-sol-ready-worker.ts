@@ -24,36 +24,8 @@ export interface ReadyContract {
 }
 const terminal=new Set(["completed","needs_review","invalid_output","blocked","billing_uncertain","authorization_expired"]);
 const code=(e:unknown)=>e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_SOL_READY_BILLING_UNCERTAIN";
-export async function processReadySol(port:ReadyPort,id:string,key:string,http:typeof fetch,contract?:ReadyContract){
- const worker=crypto.randomUUID();let claimed=false,phase="",sent=false,mock=false;
- try{
-  const s=await port.load(id);mock=s.operation.mode==="mock";if(terminal.has(s.operation.status))return {phase:"already_recorded",provider_calls:0};
-  await port.active(s);
-  let plan;
-  if(contract)plan=await contract.verify(s);
-  else {await verifySolReadyProtocol(s.protocol.body,s.protocol.sha256);plan=await verifySolReadyArtifact(s.protocol.body,s.ready);}
-  if(!await port.compatible(s))throw Error("JLS_SOL_READY_REUSED_SOURCE_CHANGED");
-  if(s.operation.phase==="sol"&&!key.trim())throw Error("JLS_SOL_READY_KEY_UNAVAILABLE");
-  const op=await port.claim(id,worker);if(!op)return {phase:"concurrent_or_consumed",provider_calls:0};
-  claimed=true;phase=op.phase;
-  if(op.phase==="sol"){
-   if(op.request_count!==1||op.worker!==worker||op.status!=="dispatched"||op.mode!==s.operation.mode)throw Error("JLS_SOL_READY_RESERVED_ATTEMPT_CHANGED");
-   const a=s.ready.body,at=Date.now();let raw:string|null=null,receipt:ReadyReceipt;
-   try{
-    sent=true;
-    const response=await http("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},
-     body:a.request_json,redirect:"error",signal:AbortSignal.timeout(s.protocol.body.sol_size_policy!.provider_timeout_ms)});
-    raw=(await response.text()).replaceAll(key,"[REDACTED_SECRET]");
-    receipt={version:"jls-sol-raw-receipt-v1",request_sha256:a.request_sha256,request_raw_sha256:a.request_raw_sha256,
-     http_status:response.status,provider_request_id:response.headers.get("x-request-id"),raw_response_text:raw,
-     raw_response_sha256:await negativeHash(raw),duration_ms:Date.now()-at,error_code:null,mock:op.mode==="mock"};
-    if(new TextEncoder().encode(raw).length>SOL_READY_POLICY.max_response_bytes)receipt.error_code="JLS_SOL_RESPONSE_BYTES_EXCEEDED";
-   }catch(e){receipt={version:"jls-sol-raw-receipt-v1",request_sha256:a.request_sha256,request_raw_sha256:a.request_raw_sha256,http_status:null,
-    provider_request_id:null,raw_response_text:raw,raw_response_sha256:raw===null?null:await negativeHash(raw),duration_ms:Date.now()-at,
-    error_code:code(e),mock:op.mode==="mock"};}
-   if(!await port.receive(id,worker,receipt,await hybridHash(receipt)))throw Error("JLS_SOL_RECEIPT_SAVE_UNCERTAIN_NO_RETRY");
-   return {phase:"raw_receipt_saved",provider_calls:mock?0:1,mock_http_calls:mock?1:0,tokenizer_misses:planTokenMemo(plan)!.misses};
-  }
+// Pure receipt validation, shared with explicit offline replay; no transport.
+export async function validateReadyReceipt(s:ReadyState,op:ReadyOperation,plan:import("./jev-luna-sol.ts").JlsPlan,contract?:ReadyContract){
   const receipt=op.receipt;
   if(op.request_count!==1||!receipt||!op.receipt_sha256||await hybridHash(receipt)!==op.receipt_sha256||
    receipt.raw_response_text===null||await negativeHash(receipt.raw_response_text)!==receipt.raw_response_sha256||
@@ -84,6 +56,39 @@ export async function processReadySol(port:ReadyPort,id:string,key:string,http:t
    if(status==="needs_review")out.error_code="JLS_REPORT_NEEDS_REVIEW";
   }catch(e){out.error_code=code(e);}
   out.receipt_sha256=op.receipt_sha256;
+  return {out,status};
+}
+export async function processReadySol(port:ReadyPort,id:string,key:string,http:typeof fetch,contract?:ReadyContract){
+ const worker=crypto.randomUUID();let claimed=false,phase="",sent=false,mock=false;
+ try{
+  const s=await port.load(id);mock=s.operation.mode==="mock";if(terminal.has(s.operation.status))return {phase:"already_recorded",provider_calls:0};
+  await port.active(s);
+  let plan;
+  if(contract)plan=await contract.verify(s);
+  else {await verifySolReadyProtocol(s.protocol.body,s.protocol.sha256);plan=await verifySolReadyArtifact(s.protocol.body,s.ready);}
+  if(!await port.compatible(s))throw Error("JLS_SOL_READY_REUSED_SOURCE_CHANGED");
+  if(s.operation.phase==="sol"&&!key.trim())throw Error("JLS_SOL_READY_KEY_UNAVAILABLE");
+  const op=await port.claim(id,worker);if(!op)return {phase:"concurrent_or_consumed",provider_calls:0};
+  claimed=true;phase=op.phase;
+  if(op.phase==="sol"){
+   if(op.request_count!==1||op.worker!==worker||op.status!=="dispatched"||op.mode!==s.operation.mode)throw Error("JLS_SOL_READY_RESERVED_ATTEMPT_CHANGED");
+   const a=s.ready.body,at=Date.now();let raw:string|null=null,receipt:ReadyReceipt;
+   try{
+    sent=true;
+    const response=await http("https://api.openai.com/v1/responses",{method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},
+     body:a.request_json,redirect:"error",signal:AbortSignal.timeout(s.protocol.body.sol_size_policy!.provider_timeout_ms)});
+    raw=(await response.text()).replaceAll(key,"[REDACTED_SECRET]");
+    receipt={version:"jls-sol-raw-receipt-v1",request_sha256:a.request_sha256,request_raw_sha256:a.request_raw_sha256,
+     http_status:response.status,provider_request_id:response.headers.get("x-request-id"),raw_response_text:raw,
+     raw_response_sha256:await negativeHash(raw),duration_ms:Date.now()-at,error_code:null,mock:op.mode==="mock"};
+    if(new TextEncoder().encode(raw).length>SOL_READY_POLICY.max_response_bytes)receipt.error_code="JLS_SOL_RESPONSE_BYTES_EXCEEDED";
+   }catch(e){receipt={version:"jls-sol-raw-receipt-v1",request_sha256:a.request_sha256,request_raw_sha256:a.request_raw_sha256,http_status:null,
+    provider_request_id:null,raw_response_text:raw,raw_response_sha256:raw===null?null:await negativeHash(raw),duration_ms:Date.now()-at,
+    error_code:code(e),mock:op.mode==="mock"};}
+   if(!await port.receive(id,worker,receipt,await hybridHash(receipt)))throw Error("JLS_SOL_RECEIPT_SAVE_UNCERTAIN_NO_RETRY");
+   return {phase:"raw_receipt_saved",provider_calls:mock?0:1,mock_http_calls:mock?1:0,tokenizer_misses:planTokenMemo(plan)!.misses};
+  }
+  const {out,status}=await validateReadyReceipt(s,op,plan,contract);
   if(!await port.finish(id,worker,status,out,await hybridHash(out)))throw Error("JLS_SOL_VALIDATION_SAVE_UNCERTAIN_NO_RETRY");
   return {phase:"validation_saved",provider_calls:0,tokenizer_misses:planTokenMemo(plan)!.misses,status};
  }catch(e){await port.abort(id,worker,code(e));return {phase,provider_calls:sent&&!mock?1:0,mock_http_calls:sent&&mock?1:0,error_code:code(e),claimed};}

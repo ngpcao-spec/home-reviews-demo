@@ -18,7 +18,7 @@ export function PrioritizedJlsReport({ result }: { result: Report }) {
     <h4>{fr ? "Conclusion et priorités" : "Kết luận và ưu tiên"}</h4><p>{r.conclusion.text ?? review}</p>
     <h4>{fr ? "Recommandations proposées" : "Khuyến nghị đề xuất"}</h4>
     {!r.recommendations.length && <p>{fr ? "Preuves insuffisantes pour proposer une action précise." : "Chưa đủ bằng chứng để đề xuất hành động cụ thể."}</p>}
-    {r.recommendations.map((a, i) => <article className="evidence-proof" key={i}>
+    {r.recommendations.map((a, i) => <article className="evidence-proof" style={{overflowWrap:"anywhere",minWidth:0}} key={i}>
       <h4>{a.priority.rank}. {a.visible ? a.title : review}</h4>
       {a.visible ? <>
         <strong>{fr ? "Ce que les clients rapportent" : "Nội dung khách hàng phản ánh"}</strong>
@@ -36,7 +36,11 @@ export function PrioritizedJlsReport({ result }: { result: Report }) {
           {a.comparison_frequency.map(f=><p key={f.key}>{GOLD_TAXONOMY[f.key.split(":")[0] as keyof typeof GOLD_TAXONOMY]?.[language]} · {f.key.endsWith(":positive")?(fr?"positif":"tích cực"):(fr?"négatif":"tiêu cực")} : {f.distinct_reviews} / {f.denominator}. {fr?"Comptage du thème sur le périmètre figé ; ne prouve pas cet incident.":"Số đếm chủ đề trong phạm vi cố định; không chứng minh sự cố này."}</p>)}
         </div>:null}
         {editorial&&<details><summary>{fr?"Détails techniques de la priorité":"Chi tiết kỹ thuật về ưu tiên"}</summary><pre>{JSON.stringify({frequency:a.frequency,priority:a.priority,status:a.status},null,2)}</pre></details>}
-      </> : editorial?<><p>{review}</p><details><summary>{fr?"Motifs techniques":"Lý do kỹ thuật"}</summary><p>{a.reasons.join(" · ")}</p></details></>:<p>{review} · {a.reasons.join(" · ")}</p>}
+      </> : editorial?<><p>{review}</p><details><summary>{fr?"Recommandation masquée — statut et motifs":"Khuyến nghị bị ẩn — trạng thái và lý do"}</summary>
+        <p>{fr?"Texte original conservé pour examen ; proposition non validée.":"Nội dung gốc được giữ để xem xét; đề xuất chưa được xác nhận."}</p>
+        <p>{a.title}</p><p>{a.proposed_action.text}</p><p className="evidence-id">{a.status} · {a.reasons.join(" · ")}</p>
+        {a.observations.map(o=><div key={o.evidence_id}><blockquote lang="en">{o.quote}</blockquote><p lang="en">{o.context_quote}</p><p className="evidence-id">{o.evidence_id} · {o.theme_key} · {o.polarity}</p></div>)}
+      </details></>:<p>{review} · {a.reasons.join(" · ")}</p>}
     </article>)}
     <aside className="jls-methodology"><h4>{fr ? "Note méthodologique" : "Ghi chú phương pháp"}</h4><p>{result.methodology_note}</p></aside>
   </section>;

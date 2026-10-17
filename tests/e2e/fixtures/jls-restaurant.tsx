@@ -32,7 +32,12 @@ if(new URLSearchParams(location.search).has("snapshot-v2")){
 if(new URLSearchParams(location.search).has("saved-response")){
  data.run={id:"synthetic-run",stage:"validate_sol",status:"blocked",error_code:"SYNTHETIC_SAVE_BLOCKAGE"};
  data.saved_response_validation={id:"synthetic-saved-validation",sha256:"f".repeat(64),created_at:"2026-10-17",run_id:"synthetic-run",run_status:"blocked",operation_id:"synthetic-operation",
- validation_status:"needs_review",validator_version:"synthetic_validator",validator_code_provenance:"synthetic_commit",source_receipt_sha256:"e".repeat(64),result_sha256:"d".repeat(64),human_validated:false,provider_calls:0,
+ validation_status:"needs_review",validator_version:"synthetic_validator",validator_code_provenance:"synthetic_commit",revalidation_version:"jls-saved-response-validation-v2",finalization_version:"jls-received-finalization-v2",source_original_validation_id:"synthetic-v1",source_receipt_sha256:"e".repeat(64),result_sha256:"d".repeat(64),human_validated:false,provider_calls:0,
  result:{validated_report:contractViewFixture().report!,input_tokens:10,output_tokens:2,duration_ms:5,served_model:"gpt-6.1-sol"}};
+ const report=data.saved_response_validation.result.validated_report;
+ Object.assign(report,{editorial_version:"SYNTHETIC_EDITORIAL"});
+ const masked=structuredClone(report.report.recommendations[0]);
+ Object.assign(masked,{title:"SYNTHETIC_MASKED_RECOMMENDATION",visible:false,status:"review_needed",reasons:["PRECISE_ACTION_REQUIRES_REVIEW"],priority:{...masked.priority,rank:2}});
+ report.report.recommendations.push(masked);
 }
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

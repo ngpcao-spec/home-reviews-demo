@@ -42,6 +42,14 @@ it("does not trust a rehashed result that differs from the real native receipt",
  r.usage={input_tokens:999,output_tokens:2};f.row.body.result_sha256=await hybridHash(r);f.row.sha256=await hybridHash(f.row.body);
  await expect(savedResponseView(f.row,f.scope,f.op,f.artifact)).rejects.toThrow("JLS_SAVED_RESPONSE_CHANGED");
 });
+it("reads versioned V2 and V1 separately, preserving source provenance",async()=>{
+ const f=await fixture(),legacy=await savedResponseView(f.row,f.scope,f.op,f.artifact);
+ f.row.body={...f.row.body,version:"jls-saved-response-validation-v2",finalization_version:"jls-received-finalization-v2",source_original_validation_id:legacy.id,source_original_validation_sha256:legacy.sha256};
+ f.row.id="v2";f.row.sha256=await hybridHash(f.row.body);
+ const current=await savedResponseView(f.row,f.scope,f.op,f.artifact);
+ expect(current.id).toBe("v2");expect(current.source_original_validation_id).toBe(legacy.id);expect(legacy.revalidation_version).toBe("jls-saved-response-validation-v1");
+ expect(current.result.validated_report).toEqual(legacy.result.validated_report);
+});
 it.each(["fr","vi"] as const)("%s clearly labels the saved-response validation and retains the blockage",async language=>{
  const f=await fixture(),view=await savedResponseView(f.row,f.scope,f.op,f.artifact);
  const data:RestaurantView={protocol:{id:"p",sha256:"a".repeat(64),created_at:"2026-10-17",establishment_name:"SYNTHETIC CHILL",source_sha256:"b".repeat(64),configuration_sha256:"c".repeat(64),

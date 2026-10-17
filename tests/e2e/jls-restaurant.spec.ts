@@ -7,6 +7,9 @@ for(const language of ["fr","vi"])test("Saved response "+language+" is readable 
  await expect(page.getByRole("alert")).toContainText("SYNTHETIC_SAVE_BLOCKAGE");
  await page.getByText(language==="fr"?"Provenance de la revalidation":"Nguồn gốc bản kiểm tra lại",{exact:true}).click();
  await expect(page.getByTestId("jls-saved-response")).toContainText("synthetic_commit");
+ await page.getByText(language==="fr"?"Recommandation masquée — statut et motifs":"Khuyến nghị bị ẩn — trạng thái và lý do",{exact:true}).click();
+ await expect(page.getByText("SYNTHETIC_MASKED_RECOMMENDATION",{exact:true})).toBeVisible();
+ await expect(page.getByTestId("jls-saved-response")).toContainText("PRECISE_ACTION_REQUIRES_REVIEW");
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
  await page.reload();await expect(page.getByTestId("jls-saved-response")).toBeVisible();expect(posts).toEqual([]);
 });
