@@ -2,7 +2,7 @@
 -- jls.v2_test_protocol to the result of save_jls_chill_v21_protocol.
 -- Then include jls_contract_v2.sql for durable reservation / receipt / RLS tests.
 do $fn$
-declare p public.analysis_jls_contract_v2_protocols;bad jsonb;rid uuid;
+declare p public.analysis_jls_contract_v2_protocols;bad jsonb;rid uuid;source_body jsonb;cache_id uuid;
 begin
  select * into p from public.analysis_jls_contract_v2_protocols where id=current_setting('jls.v2_test_protocol')::uuid;
  if p.body->>'version'<>'jls-chill-targeted-v2.1-delegated-vi-v1' or p.source_archive_id is not null
@@ -25,4 +25,13 @@ begin
  end loop;
  if has_function_privilege('authenticated','public.save_jls_chill_v21_protocol(jsonb,text)','EXECUTE')
  or has_function_privilege('anon','public.save_jls_chill_v21_protocol(jsonb,text)','EXECUTE') then raise exception 'TEST_CHILL_SERVER_WRITES_ONLY';end if;
+ select body into source_body from public.analysis_jls_sol_ready_artifacts where id=p.source_artifact_id;
+ if not public.check_jls_chill_v21_immutable_sources(source_body)
+ or public.check_jls_chill_v21_immutable_sources(jsonb_set(source_body,'{plan,cache_fingerprints,0,response_sha256}','"changed"'))
+ then raise exception 'TEST_CHILL_SEALED_MANIFEST_BINDING';end if;
+ cache_id=(source_body->'plan'->'cache_fingerprints'->0->>'cache_id')::uuid;
+ begin
+  update public.analysis_jev_review_cache set theme_results='{}' where id=cache_id;
+  raise exception 'TEST_COMPLETED_CACHE_MUTABLE';
+ exception when others then if sqlerrm<>'ECONOMY_CACHE_IMMUTABLE' then raise;end if;end;
 end $fn$;
