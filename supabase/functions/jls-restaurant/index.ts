@@ -5,6 +5,7 @@ import {verifyRestaurantProtocol} from "../_shared/jls-restaurant.ts";
 import {contractReportView} from "../_shared/jls-contract-v2-view.ts";
 import {SNAPSHOT_V2,verifySnapshotV2} from "../_shared/jls-snapshot-v2.ts";
 import {savedResponseView} from "../_shared/jls-saved-response-view.ts";
+import {serviceReviewView} from "../_shared/jls-service-review-v21.ts";
 Deno.serve(async r=>{
  const pre=preflight(r);if(pre)return pre;
  if(r.method!=="GET")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -37,7 +38,7 @@ Deno.serve(async r=>{
   const p=pr.data;if(p.body.version===SNAPSHOT_V2)await verifySnapshotV2(p.body,p.sha256);else await verifyRestaurantProtocol(p.body,p.sha256);
   const rr=await c.client.from("analysis_jls_restaurant_runs").select("id,status,stage,error_code,created_at").eq("protocol_id",p.id).maybeSingle();
   if(rr.error)throw Error("JLS_READ_FAILED");
-  let savedValidation=null,savedValidationArchive=null;
+  let savedValidation=null,savedValidationArchive=null,serviceReview=null,serviceReviewArchive=null;
   if(p.body.version===SNAPSHOT_V2&&rr.data){
    const sv=await c.client.from("analysis_jls_snapshot_preparations").select("id,organization_id,body,sha256,created_at").eq("protocol_id",p.id).eq("organization_id",er.data.organization_id)
     .in("kind",new URL(r.url).searchParams.get("validation_version")==="v1"?["saved_sol_response_validation_v1"]:["saved_sol_response_validation_v1","saved_sol_response_validation_v2"]).order("kind",{ascending:false}).limit(1).maybeSingle();
@@ -49,6 +50,12 @@ Deno.serve(async r=>{
     if(ar.error)throw Error("JLS_SAVED_RESPONSE_CHANGED");
     savedValidation=await savedResponseView(sv.data,{organization_id:er.data.organization_id,protocol_id:p.id,protocol_sha256:p.sha256,run_id:rr.data.id,run_status:rr.data.status},op.data,ar.data);
     savedValidationArchive=sv.data;
+    if(sv.data.body.version==="jls-saved-response-validation-v2"){
+     const sr=await c.client.from("analysis_jls_snapshot_preparations").select("id,organization_id,body,sha256,created_at")
+      .eq("protocol_id",p.id).eq("organization_id",er.data.organization_id).eq("kind","recommendation_limits_v21").maybeSingle();
+     if(sr.error)throw Error("JLS_READ_FAILED");
+     if(sr.data){serviceReview=await serviceReviewView(sr.data,savedValidation,er.data.organization_id);serviceReviewArchive=sr.data;}
+    }
    }
   }
   if(new URL(r.url).searchParams.get("view")==="audit"&&p.body.version===SNAPSHOT_V2){
@@ -58,7 +65,8 @@ Deno.serve(async r=>{
     rr.data?c.client.from("analysis_jls_restaurant_artifacts").select("kind,body,sha256").eq("run_id",rr.data.id).eq("organization_id",er.data.organization_id):Promise.resolve({data:[],error:null})]);
    if(archive.error||tasks.error||artifacts.error)throw Error("JLS_READ_FAILED");
    return json({audit_only:true,qualitative_audit_performed:false,new_paid_calls:0,protocol:{id:p.id,sha256:p.sha256,body:p.body},
-    reference:archive.data,run:rr.data,tasks:tasks.data,artifacts:artifacts.data,saved_response_validation:savedValidation,saved_response_validation_archive:savedValidationArchive});
+    reference:archive.data,run:rr.data,tasks:tasks.data,artifacts:artifacts.data,saved_response_validation:savedValidation,saved_response_validation_archive:savedValidationArchive,
+    service_review_v21:serviceReview,service_review_v21_archive:serviceReviewArchive});
   }
   let result=null,progress=null,recommendationReview=null,resultSha=null;
   if(rr.data){
@@ -86,7 +94,7 @@ Deno.serve(async r=>{
    ...(p.body.version===SNAPSHOT_V2?{frozen_source:{establishment_id:p.body.establishment_id,historical_run_id:p.body.frozen_v2.historical_run_id,source_fingerprint:p.body.frozen_v2.source_fingerprint,
     source_ids:p.body.snapshot.source.reviews.map((r:{id:string})=>r.id),statistics_denominators:{overall:100,thematic:80},no_paid_go:!rr.data,
     immutable_historical_report:true}}:{}),
-   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,
+   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,service_review_v21:serviceReview,
    history_available:!!savedValidation?.source_original_validation_id,new_paid_calls:0,production_enabled:false});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_READ_FAILED";
   return json({error:code},code==="UNAUTHORIZED"?401:code==="FORBIDDEN"?403:409);}

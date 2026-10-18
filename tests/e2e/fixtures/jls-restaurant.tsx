@@ -3,6 +3,7 @@ import {I18nProvider} from "../../../src/i18n";
 import {JlsRestaurantPreparation,type RestaurantView} from "../../../src/components/analysis/JlsRestaurantPreparation";
 import reviewFixture from "./jls-recommendation-review.json";
 import {contractViewFixture} from "../../fixtures/jls-contract-v2-view";
+import {serviceReviewFixture} from "../../fixtures/jls-service-review-v21";
 import "../../../src/styles/global.css";
 import "../../../src/styles/pages.css";
 import "../../../src/styles/warm-theme.css";
@@ -40,4 +41,5 @@ if(new URLSearchParams(location.search).has("saved-response")){
  Object.assign(masked,{title:"SYNTHETIC_MASKED_RECOMMENDATION",visible:false,status:"review_needed",reasons:["PRECISE_ACTION_REQUIRES_REVIEW"],priority:{...masked.priority,rank:2}});
  report.report.recommendations.push(masked);
 }
+if(new URLSearchParams(location.search).has("service-review-v21"))data.service_review_v21=serviceReviewFixture();
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

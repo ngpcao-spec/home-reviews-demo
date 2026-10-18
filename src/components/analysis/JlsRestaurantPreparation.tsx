@@ -7,8 +7,11 @@ import {supabase} from "../../lib/supabase";
 import {useState} from "react";
 import type {validateEditorialReport} from "../../../supabase/functions/_shared/jls-editorial-validation";
 import type {SavedResponseView} from "../../../supabase/functions/_shared/jls-saved-response-view";
+import {JlsServiceReviewV21} from "./JlsServiceReviewV21";
+import type {ServiceReviewView} from "../../../supabase/functions/_shared/jls-service-review-v21";
 export interface RestaurantView {
  saved_response_validation?:SavedResponseView|null;
+ service_review_v21?:ServiceReviewView|null;
  frozen_source?:{establishment_id:string;historical_run_id:string;source_fingerprint:string;source_ids:string[];statistics_denominators:{overall:number;thematic:number};no_paid_go:boolean;immutable_historical_report:boolean};
  contract_v2?:ContractReportView;history_available?:boolean;
  recommendation_review?:RecommendationReviewView|null;
@@ -86,6 +89,7 @@ export function JlsRestaurantPreparation({data}:{data:RestaurantView}) {
    <details><summary>{fr?"Provenance de la revalidation":"Nguồn gốc bản kiểm tra lại"}</summary><p style={{overflowWrap:"anywhere"}}>analysis_jls_snapshot_preparations<br/>{data.saved_response_validation.id}<br/>{data.saved_response_validation.sha256}<br/>{data.saved_response_validation.source_receipt_sha256}<br/>{data.saved_response_validation.validator_version}<br/>{data.saved_response_validation.validator_code_provenance}</p></details>
    <PrioritizedJlsReport result={data.saved_response_validation.result.validated_report}/>
   </section>}
+  {data.service_review_v21&&<JlsServiceReviewV21 value={data.service_review_v21}/>}
   {data.recommendation_review&&<JlsRecommendationReview value={data.recommendation_review}/>}
  </section>;
 }

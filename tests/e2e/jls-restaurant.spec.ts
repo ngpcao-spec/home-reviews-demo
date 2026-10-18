@@ -1,4 +1,15 @@
 import {test,expect} from "@playwright/test";
+for(const language of ["fr","vi"])test("Service V2.1 "+language+" separates revalidation and missing wait evidence",async({page})=>{
+ if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});
+ const posts:string[]=[];page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});
+ await page.goto("/tests/e2e/fixtures/jls-restaurant.html?language="+language+"&snapshot-v2&saved-response&service-review-v21");
+ const view=page.getByTestId("jls-service-review-v21");await expect(view).toContainText("SYNTHETIC_BOOKING_CLARIFICATION");
+ await expect(view.getByRole("note")).toContainText("wait_time");await expect(view).toContainText("BEVERAGE_DELAY_REQUIRES_WAIT_TIME_EVIDENCE");
+ await view.getByText(language==="fr"?"Provenance du réexamen V2.1":"Nguồn gốc kiểm tra lại V2.1",{exact:true}).click();
+ await expect(view).toContainText("SYNTHETIC_SERVICE_REVIEW");
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+ await page.reload();await expect(view).toBeVisible();await expect(page.getByRole("alert")).toContainText("SYNTHETIC_SAVE_BLOCKAGE");expect(posts).toEqual([]);
+});
 for(const language of ["fr","vi"])test("Saved response "+language+" is readable with provenance and blocked history",async({page})=>{
  if(test.info().project.name==="desktop")await page.setViewportSize({width:768,height:1024});
  const posts:string[]=[];page.on("request",r=>{if(r.method()==="POST")posts.push(r.url());});
