@@ -50,7 +50,7 @@ export async function processChill80(port:Chill80Port,id:string,key:string,trans
  const fetcher:typeof fetch=async(url,init)=>{
   if(url!==JEV_ENDPOINT||init?.method!=='POST'||init.body!==JSON.stringify(payload))throw Error('CHILL80_TRANSPORT_FORBIDDEN');
   const start=Date.now(),started_at=new Date().toISOString();let response:Response,text:string;
-  try{response=await transport(url,init);http=response.status;text=await response.text();}
+  try{response=await transport(url,{...init,redirect:'error'});http=response.status;text=await response.text();}
   catch{duration=Date.now()-start;receipt=await port.save('jev_chill80_receipt_'+suffix,{...base,started_at,finished_at:new Date().toISOString(),
    duration_ms:duration,http_status:http,raw_response_text:null,billing_state:'uncertain_no_retry',error:'JEV_NETWORK_OR_BODY_LOST'});throw TypeError('JEV_NETWORK_ERROR');}
   duration=Date.now()-start;

@@ -62,7 +62,7 @@ async function workerFixture(){
    if(records.some(r=>r.kind===kind))return null;const r={id:crypto.randomUUID(),kind,body:{review_id:review},sha256:await hybridHash({review_id:review})};
    if(records.some(r=>r.kind===kind))return null;records.push(r);return r.id;},
   save:async(kind,body)=>{const r={id:crypto.randomUUID(),kind,body,sha256:await hybridHash(body)};records.push(r);return r.id;},wake:async()=>{}};
- const fetcher:typeof fetch=async()=>{calls++;return new Response(JSON.stringify(syntheticJev()));};
+ const fetcher:typeof fetch=async(_url,init)=>{expect(init?.redirect).toBe('error');calls++;return new Response(JSON.stringify(syntheticJev()));};
  return {id,port,records,execution,protocol,fetcher,calls:()=>calls};
 }
 it.each(['missing_go','expired','changed_scope'])('never reserves or dispatches after %s',async kind=>{

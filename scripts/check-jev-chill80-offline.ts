@@ -17,7 +17,7 @@ const port:Chill80Port={load:()=>Promise.resolve({protocol,protocol_id:pid,execu
   if(records.some(r=>r.kind===kind))return null;const r={id:crypto.randomUUID(),kind,body:{review_id:review},sha256:await hybridHash({review_id:review})};
   if(records.some(r=>r.kind===kind))return null;records.push(r);return r.id;},
  save:async(kind,body)=>{const r={id:crypto.randomUUID(),kind,body,sha256:await hybridHash(body)};records.push(r);return r.id;},wake:()=>Promise.resolve()};
-const mock:typeof fetch=(url,init)=>{if(url!=='https://api.typesafe.ai/v1/systemone'||init?.method!=='POST')throw Error('WRONG_MOCK_ROUTE');
+const mock:typeof fetch=(url,init)=>{if(url!=='https://api.typesafe.ai/v1/systemone'||init?.method!=='POST'||init.redirect!=='error')throw Error('WRONG_MOCK_ROUTE');
  calls++;const p=JSON.parse(String(init.body));if(Object.keys(p.state).join(',')!=='review_alias,analysis_text'||Object.keys(p.questions).length!==25)throw Error('WRONG_MOCK_PAYLOAD');
  return Promise.resolve(new Response(JSON.stringify({model:'jev-1.13.0',usage:{input_tokens:10,output_tokens:0},
   answers:Object.fromEntries(THEME_KEYS.map(k=>[k,{type:'choice',choice:'absent',probabilities:{absent:1,positive:0,negative:0,both:0}}]))})));};
