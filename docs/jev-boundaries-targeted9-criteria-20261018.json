@@ -1,0 +1,1957 @@
+{
+  "version": "jev-audit-boundaries-targeted9-criteria-v1",
+  "source_code_commit": "13cff76ef38fedaf964ca96515710e72a8b874d2",
+  "scope": "seen_historical_examples_diagnostic_regression_not_independent_validation",
+  "review_count": 9,
+  "theme_count": 25,
+  "assessment_count": 225,
+  "human_gold": false,
+  "ia_reference_annotations_created": false,
+  "quality_audit_owner": "user_analysis_chat",
+  "policy": {
+    "all_25_themes_audited": true,
+    "unknowns_excluded_from_automatic_binary_scores": true,
+    "no_automatic_performance_claim": true,
+    "no_post_run_criteria_edit": true,
+    "record_all_native_probabilities": true
+  },
+  "cases": [
+    {
+      "position": 1,
+      "review_id": "a3acf747-e095-49b9-a49c-9b84f0bce7a2",
+      "role": "target",
+      "label": "Bord de marmite",
+      "primary_criteria": {
+        "portions": "absent"
+      },
+      "ambiguities": "Le bord étroit et la difficulté à puiser ne prouvent pas une quantité insuffisante. Pas de réaffectation automatique à comfort. Le tarif et la mention hors TVA ne prouvent pas une critique de prix/facture.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "freshness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cooking": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "attentiveness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "wait_time": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    },
+    {
+      "position": 2,
+      "review_id": "4b5dae79-7eea-479a-b616-51904c71d939",
+      "role": "target",
+      "label": "Trop de plats commandés",
+      "primary_criteria": {
+        "portions": "absent",
+        "wait_time": "negative"
+      },
+      "ambiguities": "Choix de commande des clients distinct d'une portion excessive. Garder attente des plats/boissons distincte de leur qualité ; amabilité distincte d'attention/organisation.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "freshness": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "cooking": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "attentiveness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "wait_time": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    },
+    {
+      "position": 3,
+      "review_id": "6fa38e77-27fa-43e5-8c46-68fe636071ce",
+      "role": "target",
+      "label": "Demande de réduction du piment",
+      "primary_criteria": {
+        "order_accuracy": "negative"
+      },
+      "ambiguities": "Le client rapporte une demande et un résultat non réduit ; le plat préparé d'avance reste son hypothèse. Épicé n'établit pas automatiquement une erreur de cuisson. Les autres appréciations positives restent présentes.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "positive",
+            "both"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "freshness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cooking": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "negative"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "attentiveness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "wait_time": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "negative"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "order_accuracy": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "professionalism": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        }
+      }
+    },
+    {
+      "position": 4,
+      "review_id": "9ce752cf-40e0-41bd-8ef3-788f47973bc4",
+      "role": "target",
+      "label": "Publicité midi pendant dîner",
+      "primary_criteria": {
+        "communication": "negative",
+        "portions": "absent"
+      },
+      "ambiguities": "Le signal d'information commerciale critiquée ne disparaît pas derrière l'appréciation globale. Ni tromperie, indisponibilité du menu ni frais déduits. Small loaf est descriptif.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "freshness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cooking": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "temperature": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "attentiveness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "wait_time": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    },
+    {
+      "position": 5,
+      "review_id": "20b36393-0319-46b3-af90-057ce4e8b254",
+      "role": "target",
+      "label": "Stationnement peu clair",
+      "primary_criteria": {},
+      "ambiguities": "Préférence diagnostique billing négatif pour la transparence ; existence, montant et responsabilité restent inconnus. Une sortie absent demande l'audit du chat et n'est pas comptée comme réussite automatique. Ne pas inventer prix excessif, surfacturation, illégalité ou faute.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "freshness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cooking": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "attentiveness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "wait_time": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "negative",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "billing": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "negative",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    },
+    {
+      "position": 6,
+      "review_id": "b11e77a1-6249-4ca8-b279-33832681d957",
+      "role": "target",
+      "label": "Good service exact",
+      "primary_criteria": {
+        "coordination": "absent"
+      },
+      "ambiguities": "Organisation absente du texte. L'attention et le professionnalisme conservent les définitions complètes V12 ; leur lecture d'un compliment très bref est à examiner, sans exiger systématiquement expertise/compétence explicite.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "freshness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cooking": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "attentiveness": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "wait_time": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "communication": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "positive",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    },
+    {
+      "position": 7,
+      "review_id": "a5864271-a7df-4c9e-8cb7-d374f98602ec",
+      "role": "witness",
+      "label": "Vraie petite portion",
+      "primary_criteria": {
+        "portions": "negative"
+      },
+      "ambiguities": "Quantité explicitement petite et maigre ; séparer bouillon apprécié, ingrédients critiqués et boissons okay. Texture seule ne prouve pas cooking ; congélation seule ne prouve pas fraîcheur, mais apparence aigre est un autre signal. Mention de TVA sans faute de facture.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "both",
+          "allowed_choices": [
+            "both"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "freshness": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "cooking": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "positive",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "attentiveness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "wait_time": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "negative",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    },
+    {
+      "position": 8,
+      "review_id": "cb063ce7-d700-46ed-bdc8-89f5962e2135",
+      "role": "witness",
+      "label": "Attention concrète",
+      "primary_criteria": {
+        "attentiveness": "positive"
+      },
+      "ambiguities": "Observation et assistance des clients décrites explicitement. Conserver les points positifs concrets. Ni rapidité seule ni présence de plusieurs employés ne suffit à la coordination.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "freshness": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "cooking": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "presentation": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "absent",
+            "positive"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "attentiveness": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "wait_time": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "coordination": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "communication": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "positive",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "atmosphere": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "decor": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "noise": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "comfort": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "cleanliness": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "positive",
+          "allowed_choices": [
+            "positive"
+          ],
+          "manual_review_only": false,
+          "criterion": "unchanged_textual_signal"
+        }
+      }
+    },
+    {
+      "position": 9,
+      "review_id": "ef5fb3ab-785e-4971-b64a-30a671158598",
+      "role": "witness",
+      "label": "Organisation décrite",
+      "primary_criteria": {
+        "coordination": "negative",
+        "attentiveness": "negative",
+        "professionalism": "negative"
+      },
+      "ambiguities": "Critique des procédures et du partage de prise en charge à la porte ; pas seulement good service. Pushing each other traduit đùn đẩy : ne pas en déduire une agression physique. Conserver cette ambiguïté, sans réécrire la traduction figée. Porte/service distinct d'un accès géographique difficile.",
+      "expectation_provenance": "prospective_protocol_criteria_not_human_gold_not_new_ai_reference",
+      "themes": {
+        "food_quality": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "freshness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cooking": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "temperature": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "portions": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "presentation": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "drinks": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "variety": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "consistency": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "friendly_staff": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "negative",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "attentiveness": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "wait_time": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "coordination": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "communication": {
+          "expected_choice": null,
+          "allowed_choices": [
+            "negative",
+            "absent"
+          ],
+          "manual_review_only": true,
+          "criterion": "explicitly_ambiguous_freeze_before_execution"
+        },
+        "order_accuracy": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "professionalism": {
+          "expected_choice": "negative",
+          "allowed_choices": [
+            "negative"
+          ],
+          "manual_review_only": false,
+          "criterion": "targeted_boundary_or_witness"
+        },
+        "atmosphere": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "decor": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "noise": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "comfort": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "cleanliness": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "location": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "value": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "billing": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        },
+        "price_level": {
+          "expected_choice": "absent",
+          "allowed_choices": [
+            "absent"
+          ],
+          "manual_review_only": false,
+          "criterion": "no_explicit_theme_no_inference_from_metadata_or_other_themes"
+        }
+      }
+    }
+  ]
+}
