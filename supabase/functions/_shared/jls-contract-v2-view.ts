@@ -1,8 +1,9 @@
 // Read-only projection of the saved execution. Never prepares or wakes a job.
 import {hybridHash} from "./jev-hybrid-evidence.ts";
 import type {validateRecommendationReportV2} from "./jls-recommendation-contract-v2.ts";
-type SavedReport=Awaited<ReturnType<typeof validateRecommendationReportV2>>;
-export interface ContractViewProtocol {id:string;organization_id:string;establishment_id:string;sha256:string;}
+import type {validateRecommendationReportV21} from "./jls-recommendation-contract-v21.ts";
+type SavedReport=Awaited<ReturnType<typeof validateRecommendationReportV2>>|Awaited<ReturnType<typeof validateRecommendationReportV21>>;
+export interface ContractViewProtocol {id:string;organization_id:string;establishment_id:string;sha256:string;version?:string;}
 export interface ContractViewOperation {
  id:string;protocol_id:string;organization_id:string;mode:string;status:string;phase:string;
  luna_count:number;sol_count:number;error_code:string|null;created_at:string;
@@ -25,6 +26,7 @@ export async function contractReportView(p:ContractViewProtocol,o:ContractViewOp
   o.luna_result!==null&&await hybridHash(o.luna_result)!==o.luna_result_sha256)throw Error("JLS_RESULT_CHANGED");
  const r=o.result?.validated_report as SavedReport|undefined;
  if(r&&(r.format_version!=="jls-prioritized-recommendations-v2"||r.language!=="vi"||r.human_validated!==false))throw Error("JLS_RESULT_CHANGED");
+ if(r&&p.version==="jls-chill-targeted-v2.1-delegated-vi-v1"&&r.editorial_version!=="jls-recommendation-contract-v2.1")throw Error("JLS_RESULT_CHANGED");
  const model=(v:unknown)=>typeof v==="string"?v:null,cost=(v:unknown)=>typeof v==="number"&&Number.isFinite(v)?v:null;
  return {id:o.id,protocol_id:p.id,protocol_sha256:p.sha256,result_sha256:o.result_sha256,created_at:o.created_at,
   establishment_id:p.establishment_id,establishment_name:scope.establishment_name,status:o.status,phase:o.phase,error_code:o.error_code,

@@ -2,6 +2,8 @@
 import {processReadySol,type ReadyPort,type ReadyState,type ReadyReceipt} from "./jls-sol-ready-worker.ts";
 import {verifyContractV2,contractBranch,contractNativeDecision,type ContractV2Row,type ContractSource} from "./jls-contract-v2-preparation.ts";
 import {validateRecommendationReportV2} from "./jls-recommendation-contract-v2.ts";
+import {CHILL_V21,verifyChillV21,chillV21Branch} from "./jls-chill-v21-preparation.ts";
+import {validateRecommendationReportV21} from "./jls-recommendation-contract-v21.ts";
 import {hybridHash} from "./jev-hybrid-evidence.ts";
 import {negativeHash} from "./negative-validation-core.ts";
 import type {JlsDecision} from "./jev-luna-sol.ts";
@@ -28,6 +30,7 @@ export async function processContractV2(port:ContractPort,id:string,key:string,h
   const s=await port.load(id),o=s.operation;mock=o.mode==="mock";phase=o.phase;
   if(terminal.has(o.status))return {phase:"already_recorded",provider_calls:0};
   const p=s.protocol.body;
+  const verify=p.version===CHILL_V21?verifyChillV21:verifyContractV2,branch=p.version===CHILL_V21?chillV21Branch:contractBranch;
   if(o.phase==="sol"||o.phase==="validate_sol"){
    const state=s;let prepared:Awaited<ReturnType<typeof contractBranch>>;
    const asReady=async(x:ContractState):Promise<ReadyState>=>{
@@ -38,7 +41,7 @@ export async function processContractV2(port:ContractPort,id:string,key:string,h
      x.operation.luna_result_sha256&&await hybridHash(x.operation.luna_result)!==x.operation.luna_result_sha256)throw Error("JLS_V2_LUNA_RECEIPT_CHANGED");
     const native=await contractNativeDecision(p,JSON.parse(receipt.raw_response_text));
     if(await hybridHash(native.decisions)!==await hybridHash(x.operation.luna_result.decisions))throw Error("JLS_V2_NATIVE_DECISION_CHANGED");
-    const b=await contractBranch(x.protocol,x.source,x.operation.luna_result.decisions[0]);prepared=b;
+    const b=await branch(x.protocol,x.source,x.operation.luna_result.decisions[0]);prepared=b;
     if(!b.branch.gate.passed)throw Error("JLS_SOL_EVIDENCE_INSUFFICIENT");
     // Internal adapter only; the original source protocol/artifact are never written.
     return {operation:{...readyOperation(x.operation),organization_id:x.protocol.body.organization_id},protocol:x.source.protocol,
@@ -47,15 +50,17 @@ export async function processContractV2(port:ContractPort,id:string,key:string,h
       measurement:b.draft.measurement,sol:{gate:{...b.branch.gate,policy:p.configuration.sufficiency,human_validated:false},draft:b.draft} as unknown as ReadyState["ready"]["body"]["sol"]}}};
    };
    const readyPort:ReadyPort={load:()=>asReady(state),
-    active:async()=>{await port.active(state);await verifyContractV2(state.protocol,state.source);},compatible:()=>port.compatible(state),
+    active:async()=>{await port.active(state);await verify(state.protocol,state.source);},compatible:()=>port.compatible(state),
     claim:async(_id,w)=>{const next=await port.claim(id,w);return next?{...readyOperation(next),organization_id:p.organization_id}:null;},
     receive:(_id,w,b,sha)=>port.receive(id,w,"sol",b,sha),finish:(_id,w,status,b,sha)=>port.finishSol(id,w,status,b,sha),abort:port.abort};
    return processReadySol(readyPort,id,key,http,{
     verify:()=>Promise.resolve(prepared.plan),
-    validate:(raw,_ready,plan)=>validateRecommendationReportV2(raw,plan,state.source.protocol.body.snapshot,prepared.decisions,"vi",prepared.draft)
+    validate:(raw,_ready,plan)=>p.version===CHILL_V21?
+     validateRecommendationReportV21(raw,plan,state.source.protocol.body.snapshot,prepared.decisions,"vi",prepared.draft as unknown as NonNullable<Parameters<typeof validateRecommendationReportV21>[5]>):
+     validateRecommendationReportV2(raw,plan,state.source.protocol.body.snapshot,prepared.decisions,"vi",prepared.draft)
    });
   }
-  await port.active(s);await verifyContractV2(s.protocol,s.source);
+  await port.active(s);await verify(s.protocol,s.source);
   if(!await port.compatible(s))throw Error("JLS_V2_REUSED_SOURCE_CHANGED");
   if(o.phase==="luna"&&!key.trim())throw Error("JLS_V2_KEY_UNAVAILABLE");
   worker=crypto.randomUUID();const op=await port.claim(id,worker);if(!op)return {phase:"concurrent_or_consumed",provider_calls:0};claimed=true;
@@ -80,7 +85,7 @@ export async function processContractV2(port:ContractPort,id:string,key:string,h
   if(receipt.error_code||receipt.http_status!==200)throw Error(receipt.error_code??"JLS_LUNA_PROVIDER_HTTP_ERROR");
   const raw=JSON.parse(receipt.raw_response_text),native=await contractNativeDecision(p,raw);
   const u=native.usage;if(!u||!Number.isSafeInteger(u.input_tokens)||u.input_tokens<1||!Number.isSafeInteger(u.output_tokens)||u.output_tokens<0)throw Error("JLS_USAGE_MISSING_BILLING_UNCERTAIN");
-  const b=await contractBranch(s.protocol,s.source,native.decisions[0]);
+  const b=await branch(s.protocol,s.source,native.decisions[0]);
   const result={...native,raw_response_sha256:receipt.raw_response_sha256,receipt_sha256:op.luna_receipt_sha256,request_sha256:p.luna_group.request_sha256,
    branch:native.decisions[0].status,sol_gate:b.branch.gate,probabilities_preserved:true,calculated_not_verified_invoice:true};
   if(!await port.finishLuna(id,worker,result,await hybridHash(result),native.decisions[0].status))throw Error("JLS_V2_LUNA_SAVE_UNCERTAIN_NO_RETRY");

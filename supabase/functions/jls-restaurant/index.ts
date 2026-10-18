@@ -16,12 +16,17 @@ Deno.serve(async r=>{
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
   // New V2 results live in a separate immutable store. Read them before loading
   // the large historical protocol; an old report must not hide the current one.
+  let targetedPreparation=null;
   if(new URL(r.url).searchParams.get("view")==="contract_v2"){
    const cp=await c.client.from("analysis_jls_contract_v2_protocols")
-    .select("id,organization_id,establishment_id,sha256").eq("organization_id",er.data.organization_id)
+    .select("id,organization_id,establishment_id,sha256,version:body->>version").eq("organization_id",er.data.organization_id)
     .eq("establishment_id",er.data.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
    if(cp.error)throw Error("JLS_READ_FAILED");
    if(cp.data){
+    if(cp.data.organization_id!==er.data.organization_id||cp.data.establishment_id!==er.data.id)throw Error("FORBIDDEN");
+    if(cp.data.version==="jls-chill-targeted-v2.1-delegated-vi-v1")targetedPreparation={id:cp.data.id,sha256:cp.data.sha256,
+     version:cp.data.version,stored_reviews:100,analysed_reviews:80,textless_reviews:20,reused_jev:80,reused_luna_decisions:31,max_jev_calls:0,max_luna_calls:1,max_sol_calls:1,
+     no_paid_go:true,new_paid_calls:0};
     const co=await c.client.from("analysis_jls_contract_v2_operations")
      .select("id,protocol_id,organization_id,mode,status,phase,luna_count,sol_count,error_code,created_at,result,result_sha256,luna_result,luna_result_sha256")
      .eq("organization_id",er.data.organization_id).eq("protocol_id",cp.data.id).eq("mode","paid").maybeSingle();
@@ -94,7 +99,7 @@ Deno.serve(async r=>{
    ...(p.body.version===SNAPSHOT_V2?{frozen_source:{establishment_id:p.body.establishment_id,historical_run_id:p.body.frozen_v2.historical_run_id,source_fingerprint:p.body.frozen_v2.source_fingerprint,
     source_ids:p.body.snapshot.source.reviews.map((r:{id:string})=>r.id),statistics_denominators:{overall:100,thematic:80},no_paid_go:!rr.data,
     immutable_historical_report:true}}:{}),
-   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,service_review_v21:serviceReview,
+   run:rr.data,result,progress,recommendation_review:recommendationReview,saved_response_validation:savedValidation,service_review_v21:serviceReview,targeted_preparation:targetedPreparation,
    history_available:!!savedValidation?.source_original_validation_id,new_paid_calls:0,production_enabled:false});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_READ_FAILED";
   return json({error:code},code==="UNAUTHORIZED"?401:code==="FORBIDDEN"?403:409);}

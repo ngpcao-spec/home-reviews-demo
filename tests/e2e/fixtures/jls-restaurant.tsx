@@ -42,4 +42,7 @@ if(new URLSearchParams(location.search).has("saved-response")){
  report.report.recommendations.push(masked);
 }
 if(new URLSearchParams(location.search).has("service-review-v21"))data.service_review_v21=serviceReviewFixture();
+if(new URLSearchParams(location.search).has("targeted-v21")){
+ data.targeted_preparation={id:"synthetic-new-protocol",sha256:"a".repeat(64),version:"jls-chill-targeted-v2.1-delegated-vi-v1",stored_reviews:100,analysed_reviews:80,textless_reviews:20,reused_jev:80,reused_luna_decisions:31,max_jev_calls:0,max_luna_calls:1,max_sol_calls:1,no_paid_go:true,new_paid_calls:0};
+}
 createRoot(document.getElementById("root")!).render(<I18nProvider language={language}><main style={{padding:16,maxWidth:700,margin:"auto"}}><p>EXPLICIT SYNTHETIC TEST</p><JlsRestaurantPreparation data={data}/></main></I18nProvider>);

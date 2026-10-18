@@ -5,7 +5,7 @@ export function JlsContractV2Report({value:v}:{value:ContractReportView}){
  const {language}=useI18n(),fr=language==="fr";
  return <div className="jls-page" data-testid="jls-contract-v2-report">
   <section className="card jev-card">
-   <h2>{v.establishment_name} — {fr?"Rapport vietnamien V2":"Báo cáo tiếng Việt V2"}</h2>
+   <h2>{v.establishment_name} — {fr?"Rapport vietnamien":"Báo cáo tiếng Việt"} {v.report?.editorial_version==="jls-recommendation-contract-v2.1"?"V2.1":"V2"}</h2>
    <p role="status">{v.status==="completed"?(fr?"Terminé — contrôles techniques réussis":"Hoàn tất — kiểm tra kỹ thuật đạt"):v.status}</p>
    <p>{fr?"Rapport enregistré. La consultation ne déclenche aucun appel IA.":"Báo cáo đã lưu. Xem báo cáo không gọi thêm AI."}</p>
    {v.report&&<dl className="jev-pairs">

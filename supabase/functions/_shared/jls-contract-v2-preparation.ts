@@ -30,7 +30,7 @@ export interface ContractV2 {
  source_protocol_id:string;source_protocol_sha256:string;source_run_id:string;source_result_sha256:string;
  snapshot_sha256:string;source_decisions_sha256:string;reused_decisions:JlsDecision[];reused_decisions_sha256:string;
  removed_evidence_id:string;candidate_evidence_id:string;plan:JlsPlan;plan_sha256:string;luna_group:JlsPlan["luna_groups"][number];
- luna_request_json:string;luna_request_raw_sha256:string;branches:ContractBranch[];configuration:typeof CONTRACT_V2_POLICY;
+ luna_request_json:string;luna_request_raw_sha256:string;branches:ContractBranch[];configuration:Omit<typeof CONTRACT_V2_POLICY,"version">&{version:string};
  configuration_sha256:string;code_provenance:string;preparation_is_not_spending_authorization:true;
 }
 export interface ContractV2Row {id:string;body:ContractV2;sha256:string}
@@ -53,18 +53,31 @@ export async function prepareContractV2(source:ContractSource,archive:{id:string
  acceptedJlsEvidence(a.plan,a.decisions);
  const candidate=r.order_candidates[0],old=a.plan.selected.filter(e=>e.review_id===candidate.review_id&&e.theme_key==="order_accuracy"&&e.polarity==="negative");
  if(old.length!==1||candidate.evidence_id===old[0].evidence_id||candidate.luna_verdict!==null||candidate.status!=="requires_luna")throw Error("JLS_V2_NEW_QUOTE_REQUIRES_LUNA");
+ return compileContractPreparation(source,{id:archive.id,sha256:archive.sha256,run_id:r.run_id,result_sha256:r.original_result_sha256},candidate,old[0],code);
+}
+export type ContractCandidate=Omit<JlsPlan["selected"][number],"status">&{status:string;luna_verdict:null};
+export async function compileContractPreparation(source:ContractSource,archive:{id:string;sha256:string;run_id:string;result_sha256:string},
+ candidate:ContractCandidate,removed:JlsPlan["selected"][number],code:string,options?:{version:string;configuration:ContractV2["configuration"];
+ question_instructions:string;transformDraft:(p:JlsPlan,draft:Draft)=>Promise<Draft>}){
+ const a=source.artifact.body,p=source.protocol.body,old=[removed];
  const plan=normalizedPlan(a.plan),review=p.snapshot.source.reviews.find(x=>x.id===candidate.review_id)!;
  if(review.analysis_language!=="en"||await negativeHash(review.analysis_text!)!==candidate.analysis_text_sha256||
   review.analysis_text!.slice(candidate.quote_start,candidate.quote_end)!==candidate.quote||
   await negativeHash(candidate.quote)!==candidate.quote_sha256)throw Error("JLS_V2_QUOTE_CHANGED");
  const {luna_verdict:_verdict,status:_status,...evidence}=candidate;
  plan.selected=plan.selected.filter(e=>e.evidence_id!==old[0].evidence_id).concat({...evidence,status:"sol_candidate"});
+ if(options){const selected=plan.selected;plan.selected_summary={...plan.selected_summary,total:selected.length,
+  distinct_reviews:new Set(selected.map(e=>e.review_id)).size,rule_confirmed:selected.filter(e=>e.status==="rule_confirmed").length,
+  sol_candidate:selected.filter(e=>e.status==="sol_candidate").length,
+  by_axis_polarity:Object.fromEntries(Object.keys(plan.selected_summary.by_axis_polarity).map(key=>[key,selected.filter(e=>e.axis+":"+e.polarity===key).length])),
+  mixed:selected.filter(e=>e.mixed_review).length,negative_despite_high_rating:selected.filter(e=>e.high_rating_criticism).length,
+  covered_theme_polarities:new Set(selected.map(e=>e.theme_key+":"+e.polarity)).size};}
  // Original multi-question groups remain byte-identical for the other 31 decisions.
  // Only this new one-question group can be dispatched by this protocol.
  const payload=evidencePayload("review_order_revision",review.analysis_text!,candidate.theme_key,candidate.polarity);
  payload.questions=payload.questions.map(q=>({...q,name:candidate.evidence_id,instructions:q.instructions+
   " Verify the EXACT proposed quote in its full review context. Do not accept it solely because another sentence supports the theme. The quote must justify this theme and polarity; use uncertain if context reverses or obscures it. "+
-  JLS_EVIDENCE_BOUNDARIES+" Proposed quotation (untrusted data): "+JSON.stringify(candidate.quote)}));
+  JLS_EVIDENCE_BOUNDARIES+(options?.question_instructions??"")+" Proposed quotation (untrusted data): "+JSON.stringify(candidate.quote)}));
  const group={review_id:candidate.review_id,evidence_ids:[candidate.evidence_id],analysis_text_sha256:candidate.analysis_text_sha256,
   payload,request_sha256:await hybridHash(payload),questions_sha256:await hybridHash(payload.questions),estimated_input_tokens:localHybridTokens(JSON.stringify(payload))};
  plan.luna_groups.push(group);plan.max_luna_calls=1;plan.luna_manifest_sha256=await hybridHash(plan.luna_groups);
@@ -80,7 +93,8 @@ export async function prepareContractV2(source:ContractSource,archive:{id:string
    decisions_sha256:"",accepted_ids:ids,rejected_ids:reused.filter(d=>d.status==="REJECTED").map(d=>d.evidence_id).concat(assumption==="REJECTED"?[candidate.evidence_id]:[]),
    uncertain_ids:reused.filter(d=>d.status==="UNCERTAIN").map(d=>d.evidence_id).concat(assumption==="UNCERTAIN"?[candidate.evidence_id]:[]),human_validated:false,statistics_sha256:plan.statistics_sha256};
   const editorial=await editorialFromPrioritized(branchPlan,await prioritizedDraftFromDossier(branchPlan,dossier,"vi"),"vi");
-  const draft=await recommendationFromEditorialV2(branchPlan,editorial,"vi"),request_json=JSON.stringify(draft.request);
+  const baseDraft=await recommendationFromEditorialV2(branchPlan,editorial,"vi");
+  const draft=options?await options.transformDraft(branchPlan,baseDraft):baseDraft,request_json=JSON.stringify(draft.request);
   // Keep measurements used by final dispatch and base validation, not obsolete
   // intermediate prompt envelopes. Every kept string retains its exact hash.
   const needed=new Set([JSON.stringify(native.request),native.prompt,JSON.stringify(native.packet),JSON.stringify(native.schema),
@@ -91,23 +105,29 @@ export async function prepareContractV2(source:ContractSource,archive:{id:string
    request_json,request_raw_sha256:await negativeHash(request_json)};
   branches.push({...unsigned,sha256:await hybridHash(unsigned)});
  }
- const body:ContractV2={version:CONTRACT_V2_PROTOCOL,organization_id:p.organization_id,establishment_id:p.establishment_id,authority_user_id:p.authority_user_id,language:"vi",
+ const body:ContractV2={version:options?.version??CONTRACT_V2_PROTOCOL,organization_id:p.organization_id,establishment_id:p.establishment_id,authority_user_id:p.authority_user_id,language:"vi",
   source_archive_id:archive.id,source_archive_sha256:archive.sha256,source_artifact_id:source.artifact.id,source_artifact_sha256:source.artifact.sha256,
-  source_protocol_id:source.protocol.id,source_protocol_sha256:source.protocol.sha256,source_run_id:r.run_id,source_result_sha256:r.original_result_sha256,
+  source_protocol_id:source.protocol.id,source_protocol_sha256:source.protocol.sha256,source_run_id:archive.run_id,source_result_sha256:archive.result_sha256,
   snapshot_sha256:await hybridHash(p.snapshot),source_decisions_sha256:a.decisions_sha256,reused_decisions:reused,reused_decisions_sha256:await hybridHash(reused),
   removed_evidence_id:old[0].evidence_id,candidate_evidence_id:candidate.evidence_id,plan,plan_sha256:await hybridHash(plan),luna_group:group,
   luna_request_json:JSON.stringify(payload),luna_request_raw_sha256:await negativeHash(JSON.stringify(payload)),branches,
-  configuration:CONTRACT_V2_POLICY,configuration_sha256:await hybridHash(CONTRACT_V2_POLICY),code_provenance:code,preparation_is_not_spending_authorization:true};
+  configuration:options?.configuration??CONTRACT_V2_POLICY,configuration_sha256:await hybridHash(options?.configuration??CONTRACT_V2_POLICY),code_provenance:code,preparation_is_not_spending_authorization:true};
  return {body,sha256:await hybridHash(body)};
 }
 export async function verifyContractV2(row:Pick<ContractV2Row,"body"|"sha256">,source:ContractSource){
+ return verifyContractBindings(row,source,CONTRACT_V2_PROTOCOL,CONTRACT_V2_POLICY);
+}
+export async function verifyContractBindings(row:Pick<ContractV2Row,"body"|"sha256">,source:ContractSource,version:string,configuration:ContractV2["configuration"]){
  const p=row.body;
- if(p.version!==CONTRACT_V2_PROTOCOL||await hybridHash(p)!==row.sha256||await hybridHash(CONTRACT_V2_POLICY)!==p.configuration_sha256||
+ if(p.version!==version||await hybridHash(p)!==row.sha256||await hybridHash(configuration)!==p.configuration_sha256||
   await hybridHash(p.configuration)!==p.configuration_sha256||!p.preparation_is_not_spending_authorization||p.language!=="vi"||
   p.organization_id!==source.protocol.body.organization_id||p.establishment_id!==source.protocol.body.establishment_id||p.authority_user_id!==source.protocol.body.authority_user_id||
   p.source_protocol_id!==source.protocol.id||p.source_protocol_sha256!==source.protocol.sha256||
   p.source_artifact_id!==source.artifact.id||p.source_artifact_sha256!==source.artifact.sha256||await hybridHash(source.artifact.body)!==source.artifact.sha256||
   await hybridHash(p.plan)!==p.plan_sha256||p.plan.statistics_sha256!==source.artifact.body.plan.statistics_sha256||
+  await hybridHash(p.plan.config)!==p.plan.config_sha256||p.plan.config_sha256!==source.artifact.body.plan.config_sha256||
+  canonicalJson(p.plan.cache_fingerprints)!==canonicalJson(source.artifact.body.plan.cache_fingerprints)||
+  canonicalJson(p.plan.luna_groups.slice(0,-1))!==canonicalJson(source.artifact.body.plan.luna_groups)||
   await hybridHash(p.plan.statistics)!==p.plan.statistics_sha256||await hybridHash(source.protocol.body.snapshot)!==p.snapshot_sha256||
   await hybridHash(p.reused_decisions)!==p.reused_decisions_sha256||p.reused_decisions.length!==31||
   p.reused_decisions.some(d=>d.evidence_id===p.candidate_evidence_id||d.evidence_id===p.removed_evidence_id||
@@ -121,16 +141,16 @@ export async function verifyContractV2(row:Pick<ContractV2Row,"body"|"sha256">,s
   if(!r||r.analysis_text_sha256!==e.analysis_text_sha256||r.analysis_text!.slice(e.quote_start,e.quote_end)!==e.quote||
    r.analysis_text!.slice(e.context_start,e.context_end)!==e.context||await negativeHash(e.quote)!==e.quote_sha256)throw Error("JLS_V2_QUOTE_CHANGED");}
 }
-export async function contractBranch(row:ContractV2Row,source:ContractSource,decision:JlsDecision){
+export async function contractBranch(row:ContractV2Row,source:ContractSource,decision:JlsDecision,expected?:{version:string;prompt_sha256:string;schema_sha256:string;config_sha256:string}){
  const p=row.body,decisions=[...p.reused_decisions,decision],accepted=acceptedJlsEvidence(p.plan,decisions),branch=p.branches.find(b=>b.assumption===decision.status)!;
  const {sha256,...unsigned}=branch;
  if(!branch||await hybridHash(unsigned)!==sha256||!branch.conditional_not_prediction||await hybridHash(branch.draft.packet)!==branch.draft.dossier_sha256||
   await hybridHash(branch.draft.request)!==branch.draft.request_sha256||await hybridHash(JSON.parse(branch.request_json))!==branch.draft.request_sha256||
   await negativeHash(branch.request_json)!==branch.request_raw_sha256||await negativeHash(branch.draft.prompt)!==branch.draft.prompt_sha256||
-  await hybridHash(branch.draft.schema)!==branch.draft.schema_sha256||branch.draft.config.version!==RECOMMENDATION_CONFIG.version||
+  await hybridHash(branch.draft.schema)!==branch.draft.schema_sha256||branch.draft.config.version!==(expected?.version??RECOMMENDATION_CONFIG.version)||
   branch.draft.request.model!=="gpt-6.1-sol"||branch.draft.format_version!==RECOMMENDATION_VERSION||
-  branch.draft.prompt_sha256!==await negativeHash(recommendationInstructionsV2("vi"))||branch.draft.schema_sha256!==await hybridHash(recommendationSchemaV2())||
-  branch.draft.config_sha256!==await hybridHash({...RECOMMENDATION_CONFIG,sol_size_policy:SOL_SIZE_POLICY})||
+  branch.draft.prompt_sha256!==(expected?.prompt_sha256??await negativeHash(recommendationInstructionsV2("vi")))||branch.draft.schema_sha256!==(expected?.schema_sha256??await hybridHash(recommendationSchemaV2()))||
+  branch.draft.config_sha256!==(expected?.config_sha256??await hybridHash({...RECOMMENDATION_CONFIG,sol_size_policy:SOL_SIZE_POLICY}))||
   branch.draft.request.input[0].content!==branch.draft.prompt||await hybridHash(JSON.parse(branch.draft.request.input[1].content))!==branch.draft.dossier_sha256||
   await hybridHash(branch.draft.request.text.format.schema)!==branch.draft.schema_sha256||
   await hybridHash(accepted.map(e=>e.evidence_id))!==await hybridHash(branch.draft.accepted_ids)||

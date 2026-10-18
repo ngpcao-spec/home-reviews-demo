@@ -19,19 +19,26 @@ export const CONFIG_V21=Object.freeze({...RECOMMENDATION_CONFIG,version:CONTRACT
 export async function buildRecommendationDraftV21(sourcePlan:JlsPlan,decisions:JlsDecision[],language:"fr"|"vi"=sourcePlan.language){
  const p={...sourcePlan};await attachPlanTokenMemo(p);
  const old=await buildRecommendationDraftV2(p,decisions,language);
- const prompt=old.prompt+"\n"+SERVICE_CLASSIFICATION_INSTRUCTIONS+"\n"+[
-  "RESERVATION ACTION: communication may support clarifying or reviewing reservation confirmations ONLY when the accepted quote and context explicitly describe conflicting/unclear messages with staff. A customer question alone is insufficient. Report the customer's uncertainty, never conclude that double booking or a staff fault is established. Distinguish a room reservation from a buffet option and retain any later clarification or resolution.",
-  "BEVERAGE DELAY ACTION: An action about waiting for drinks uses wait_time, axis service, topic service_flow and focus service_delay, with an exact compatible Luna ACCEPTED wait_time negative quotation. Direct frequencies must be wait_time:negative. A drinks verdict, even on the same sentence or review, cannot transfer to wait_time. If no compatible accepted proof exists, omit this action or leave it for review. Beverage taste or preparation remains drinks. Do not rewrite JEV statistics.",
- ].join("\n");
+ return recommendationFromV2DraftV21(p,old);
+}
+// Also used by the offline compiler for explicitly conditional branches. A
+// conditional dossier is never recorded as a Luna decision or reference label.
+export async function recommendationFromV2DraftV21(p:JlsPlan,old:Awaited<ReturnType<typeof buildRecommendationDraftV2>>){
+ const prompt=recommendationPromptV21(old.prompt);
  const config={...old.config,...CONFIG_V21,input_budget_tokens:old.config.input_budget_tokens},packet={...old.packet,editorial_version:CONTRACT_V21,
   service_boundary_policy:{version:SERVICE_BOUNDARIES_V21,booking:"reported_confirmation_ambiguity_not_double_booking_fact",beverage_wait:"wait_time:negative; service_delay; new_verification_if_binding_changes"}};
  const request={...old.request,input:[{role:"system",content:prompt},{role:"user",content:JSON.stringify(packet)}]};
- const certificate=await tokenCertificate(p),measurement=solRequestSize(request,p.sol_size_policy,planTokenMemo(p)?.count);
+ const measurement=solRequestSize(request,p.sol_size_policy,planTokenMemo(p)?.count),local_request_tokens=planTokens(p,JSON.stringify(request));
+ const certificate=await tokenCertificate(p);
  return {...old,version:CONTRACT_V21,config,packet,prompt,request,config_sha256:await hybridHash(config),
   prompt_sha256:await negativeHash(prompt),dossier_sha256:await hybridHash(packet),request_sha256:await hybridHash(request),
-  measurement,local_request_tokens:planTokens(p,JSON.stringify(request)),token_certificate:certificate,token_certificate_sha256:await hybridHash(certificate),
+  measurement,local_request_tokens,token_certificate:certificate,token_certificate_sha256:await hybridHash(certificate),
   new_paid_calls:0,spending_authorization:null,execution_protocol:null};
 }
+export function recommendationPromptV21(base:string){return base+"\n"+SERVICE_CLASSIFICATION_INSTRUCTIONS+"\n"+[
+  "RESERVATION ACTION: communication may support clarifying or reviewing reservation confirmations ONLY when the accepted quote and context explicitly describe conflicting/unclear messages with staff. A customer question alone is insufficient. Report the customer's uncertainty, never conclude that double booking or a staff fault is established. Distinguish a room reservation from a buffet option and retain any later clarification or resolution.",
+  "BEVERAGE DELAY ACTION: An action about waiting for drinks uses wait_time, axis service, topic service_flow and focus service_delay, with an exact compatible Luna ACCEPTED wait_time negative quotation. Direct frequencies must be wait_time:negative. A drinks verdict, even on the same sentence or review, cannot transfer to wait_time. If no compatible accepted proof exists, omit this action or leave it for review. Beverage taste or preparation remains drinks. Do not rewrite JEV statistics.",
+ ].join("\n");}
 const bookingAction=(a:{text:string;kind:string})=>["clarify","review"].includes(a.kind)&&
  /réservation|confirmation|đặt (?:phòng|bàn|chỗ)|xác nhận|booking|reservation/iu.test(a.text);
 export async function validateRecommendationReportV21(raw:unknown,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],language:"fr"|"vi"=p.language,

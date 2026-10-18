@@ -5,6 +5,7 @@ import {JlsRestaurantPreparation} from "../../src/components/analysis/JlsRestaur
 import {contractReportView} from "../../supabase/functions/_shared/jls-contract-v2-view";
 import {contractReadRows,contractViewFixture} from "../fixtures/jls-contract-v2-view";
 import {readFileSync} from "node:fs";
+import {hybridHash} from "../../supabase/functions/_shared/jev-hybrid-evidence";
 let net:ReturnType<typeof vi.spyOn>;
 beforeAll(()=>{net=vi.spyOn(globalThis,"fetch").mockRejectedValue(Error("PROVIDER_NETWORK_FORBIDDEN"));});
 afterEach(cleanup);
@@ -31,6 +32,16 @@ it.each(["result","luna_result"] as const)("rejects a changed %s",async(key)=>{
 it("keeps incomplete executions read-only and never invents a report",async()=>{
  const f=await contractReadRows();f.operation.result=null;f.operation.result_sha256=null;f.operation.status="billing_uncertain";
  expect((await contractReportView(f.protocol,f.operation,f.scope)).report).toBeNull();
+});
+it("reads a separately versioned V2.1 report and refuses a V2 report mislabeled as V2.1",async()=>{
+ const f=await contractReadRows();f.protocol.version="jls-chill-targeted-v2.1-delegated-vi-v1";
+ await expect(contractReportView(f.protocol,f.operation,f.scope)).rejects.toThrow("JLS_RESULT_CHANGED");
+ const report=f.operation.result!.validated_report as NonNullable<ReturnType<typeof contractViewFixture>["report"]>;
+ Object.assign(report,{editorial_version:"jls-recommendation-contract-v2.1"});f.operation.result_sha256=await hybridHash(f.operation.result);
+ const v=await contractReportView(f.protocol,f.operation,f.scope);
+ render(<I18nProvider language="vi"><JlsRestaurantPreparation data={{protocol:null,run:null,result:null,progress:null,contract_v2:v}}/></I18nProvider>);
+ expect(screen.getByRole("heading",{level:2})).toHaveTextContent("V2.1");
+ expect(screen.queryByRole("button")).toBeNull();
 });
 it.each(["fr","vi"] as const)("%s exposes the saved report even without a legacy protocol",language=>{
  const v=contractViewFixture();render(<I18nProvider language={language}><JlsRestaurantPreparation data={{protocol:null,run:null,result:null,progress:null,contract_v2:v}}/></I18nProvider>);
