@@ -1,0 +1,31 @@
+{
+  "source_historical_report_id": "39556285-21ee-4962-9892-da3b4f0e8ca3",
+  "purpose": "Frozen text regression inputs only; no AI reference labels or new independent evaluation",
+  "reviews": [
+    {
+      "review_id": "20b36393-0319-46b3-af90-057ce4e8b254",
+      "analysis_text": "On September 13th, I went to eat at the Hong Ha branch. When I went to pick up my car, the security guard said the parking fee was negotiable and they wouldn't accept bank transfers.\n\nI'm not sure if there's a fee for parking at the restaurant. Could the restaurant please check with the parking attendant and clarify the parking fee?",
+      "analysis_text_sha256": "502df844612fab952ff3c2631a419ba020fb655ca816aaf29cd606176b49a664"
+    },
+    {
+      "review_id": "4b5dae79-7eea-479a-b616-51904c71d939",
+      "analysis_text": "There were two of us, and we ordered three dishes, which seemed a bit much. The food was delicious, the Pad Thai was great, and the seafood was fresh. The manager and staff were lovely, but the only downside was that the dishes took too long to arrive, and the drinks also took a long time, even though we only ordered Coca-Cola and iced tea. Hopefully, the restaurant will improve on this.",
+      "analysis_text_sha256": "5d471a0121c6278f30b982ae2780e206ad15ff03a40f7a8b251f7424d2001a2e"
+    },
+    {
+      "review_id": "6fa38e77-27fa-43e5-8c46-68fe636071ce",
+      "analysis_text": "Overall, the experience was satisfying. The food was delicious and authentically Thai. The food came out quickly (10 minutes). The seating area was spacious and cool, and the decor was pretty. A slight drawback was that I ordered less spice, but the salad seemed pre-made and didn't seem to have any reduced spiciness – it was incredibly spicy. The prices were reasonable. The staff were lovely. I will continue to support this place.",
+      "analysis_text_sha256": "90985302bd9e5f9e1fe02eb8c10a4a43dfcbf4c6561c15fad68cc90a0011423f"
+    },
+    {
+      "review_id": "9ce752cf-40e0-41bd-8ef3-788f47973bc4",
+      "analysis_text": "Loved it. I would caution them not to advertise lunch buffet specials during dinner.\nTomyum was delicious, green mango salad refreshing and the small loaf was straight out of the oven to accompany the shrimp with salted egg sauce.\nWe will be back.",
+      "analysis_text_sha256": "2c4e6e13e64fd546fcfc56a3f0d62b3fcd3a7902522916e72d9b7da5bab73a46"
+    },
+    {
+      "review_id": "a3acf747-e095-49b9-a49c-9b84f0bce7a2",
+      "analysis_text": "The food was to my liking. I had the 239k/person buffet (excluding VAT) and found it quite good, except the hot pot rim was a bit small, making it slightly difficult to scoop broth.\n\nAnd the crispy fried baby squid I ordered extra was super delicious!",
+      "analysis_text_sha256": "4d03fd1c0565f521d1ba020a0585b334b94cd866e8daa141f64484456aa612f4"
+    }
+  ]
+}

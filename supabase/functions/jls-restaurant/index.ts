@@ -6,6 +6,11 @@ import {contractReportView} from "../_shared/jls-contract-v2-view.ts";
 import {SNAPSHOT_V2,verifySnapshotV2} from "../_shared/jls-snapshot-v2.ts";
 import {savedResponseView} from "../_shared/jls-saved-response-view.ts";
 import {serviceReviewView} from "../_shared/jls-service-review-v21.ts";
+import {auditBoundaryManifest} from "../_shared/jev-audit-boundaries-v22.ts";
+import {AUDIT_EVIDENCE_CONFIG,prepareAuditEvidenceReview} from "../_shared/jls-audit-boundaries-v22.ts";
+import type {PilotReview} from "../_shared/jev-pilot-core.ts";
+import type {HybridEvidence} from "../_shared/jev-hybrid-evidence.ts";
+import {CONFIG_V22,AUDIT_REPORT_INSTRUCTIONS} from "../_shared/jls-recommendation-contract-v22.ts";
 Deno.serve(async r=>{
  const pre=preflight(r);if(pre)return pre;
  if(r.method!=="GET")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -14,6 +19,29 @@ Deno.serve(async r=>{
   const er=await c.client.from("establishments").select("id,organization_id,name").eq("id",est).single();
   if(er.error||!er.data)throw Error("FORBIDDEN");
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
+  // Explicit free inspection only: never changes an existing protocol or dispatches work.
+  if(new URL(r.url).searchParams.get("view")==="classification_boundaries"){
+   const basis=await c.client.from("analysis_jls_contract_v2_protocols")
+    .select("id,source_protocol_id:body->>source_protocol_id,plan:body->plan")
+    .eq("organization_id",er.data.organization_id).eq("establishment_id",er.data.id)
+    .order("created_at",{ascending:false}).limit(1).maybeSingle();
+   if(basis.error)throw Error("JLS_READ_FAILED");
+   let evidence_review=null;
+   if(basis.data){
+    const source=await c.client.from("analysis_jls_restaurant_protocols")
+     .select("reviews:body->snapshot->source->reviews")
+     .eq("id",basis.data.source_protocol_id).eq("organization_id",er.data.organization_id)
+     .eq("establishment_id",er.data.id).single();
+    if(source.error)throw Error("JLS_READ_FAILED");
+    evidence_review=await prepareAuditEvidenceReview(source.data.reviews as unknown as PilotReview[],
+     (basis.data.plan as unknown as {selected:HybridEvidence[]}).selected,
+     {organization_id:er.data.organization_id,establishment_id:er.data.id});
+   }
+   return json({...await auditBoundaryManifest(),evidence_configuration:AUDIT_EVIDENCE_CONFIG,
+    report_configuration:CONFIG_V22,report_instructions:AUDIT_REPORT_INSTRUCTIONS,
+    source_protocol_id:basis.data?.source_protocol_id??null,evidence_review,
+    historical_results_unchanged:true,future_execution_requires_new_protocol_and_go:true});
+  }
   // New V2 results live in a separate immutable store. Read them before loading
   // the large historical protocol; an old report must not hide the current one.
   let targetedPreparation=null;
