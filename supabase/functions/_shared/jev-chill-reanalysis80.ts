@@ -150,13 +150,14 @@ export async function aggregateChill80(p:Chill80Protocol,analyses:Chill80Analysi
   const reuse=p.body.reused.find(r=>r.review_id===a.review_id);
   if(reuse?await hybridHash(a)!==await hybridHash(reuse):a.provenance.kind!=='new_execution'||!a.provenance.result_id||!a.provenance.receipt_id)throw Error('CHILL80_RESULT_PROVENANCE_CHANGED');
  }
- const differences=analyses.flatMap(a=>{const b=baseline.find(b=>b.review_id===a.review_id)!;return THEME_KEYS.map(theme_key=>({review_id:a.review_id,theme_key,
+ const ordered=[...analyses].sort((a,b)=>a.review_id.localeCompare(b.review_id));
+ const differences=ordered.flatMap(a=>{const b=baseline.find(b=>b.review_id===a.review_id)!;return THEME_KEYS.map(theme_key=>({review_id:a.review_id,theme_key,
   historical_native:b.response.themes[theme_key],new_native:a.native.themes[theme_key],historical_thresholded:b.theme_results[theme_key],new_thresholded:a.theme_results[theme_key],
   native_choice_changed:b.response.themes[theme_key].choice!==a.native.themes[theme_key].choice,
   thresholded_choice_changed:b.theme_results[theme_key].choice!==a.theme_results[theme_key].choice}));});
  const usage=(rows:Chill80Analysis[])=>({reviews:rows.length,input_tokens:rows.reduce((n,r)=>n+r.usage.input_tokens,0),output_tokens:rows.reduce((n,r)=>n+r.usage.output_tokens,0),duration_ms:rows.reduce((n,r)=>n+r.duration_ms,0)});
  return {version:'jev-chill-reanalysis80-dataset-v1',protocol_sha256:p.sha256,denominators:{all_reviews:100,with_text:80,analysed:80,without_text:20},
-  analyses,counts:{native:chill80Counts(analyses,'native'),thresholded:chill80Counts(analyses,'thresholded')},
+  analyses:ordered,counts:{native:chill80Counts(ordered,'native'),thresholded:chill80Counts(ordered,'thresholded')},
   historical_counts:{native:chill80Counts(baseline.map(b=>({...b,native:b.response})),'native'),thresholded:chill80Counts(baseline.map(b=>({...b,native:b.response})),'thresholded')},
   differences,usage:{reused_historical:usage(analyses.filter(a=>a.provenance.kind==='reused_benchmark')),new_calls:usage(analyses.filter(a=>a.provenance.kind==='new_execution'))},
   textless_review_ids:p.body.reviews.filter(r=>!r.original_text.trim()).map(r=>r.id),historical_data_modified:false,qualitative_audit:'user_analysis_chat'};

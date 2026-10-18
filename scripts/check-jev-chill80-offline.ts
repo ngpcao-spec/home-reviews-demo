@@ -25,6 +25,7 @@ const durations=[];for(let i=0;i<71;i++){const t=performance.now();if(await proc
 const start=performance.now();await processChill80(port,id,'EXPLICIT_MOCK_KEY',mock);const final_ms=performance.now()-start;
 const archive=records.find(r=>r.kind==='jev_chill80_dataset_v1')!,a=archive.body as {analyses:unknown[];differences:unknown[];denominators:unknown};
 if(calls!==71||a.analyses.length!==80||a.differences.length!==2000)throw Error('MOCK_FINALIZATION_FAILED');
+if(await processChill80(port,id,'EXPLICIT_MOCK_KEY',mock)!==archive.id||calls!==71)throw Error('MOCK_FINALIZATION_IDEMPOTENCE_FAILED');
 console.log(JSON.stringify({version:'jev-chill80-offline-qualification-v1',protocol_sha256:protocol.sha256,
  explicit_technical_mock:true,not_real_jev_predictions:true,supplier_calls:0,database_writes:0,
  simulated_requests:calls,retained_real_reuses:9,analysis_slots:a.analyses.length,comparison_cells:a.differences.length,

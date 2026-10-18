@@ -48,6 +48,7 @@ it('counts both polarities by distinct review, without assigning any theme to th
  expect(a.analyses).toHaveLength(80);expect(a.textless_review_ids).toHaveLength(20);
  expect(a.counts.thresholded.portions).toMatchObject({positive_review_count:1,negative_review_count:1,polarity_mentions:2,distinct_mentioned_review_count:1});
  expect(a.usage.new_calls.reviews).toBe(71);expect(a.usage.reused_historical.reviews).toBe(9);
+ expect(await hybridHash(a)).toBe(await hybridHash(await aggregateChill80(p,[...fresh,...p.body.reused].reverse(),i.baseline)));
  await expect(aggregateChill80(p,p.body.reused,i.baseline)).rejects.toThrow('COMPLETE_80');
  expect(()=>chill80Counts([fresh[0],fresh[0]],'native')).toThrow('DUPLICATE_RESULT');
 });
@@ -82,4 +83,5 @@ it.each(['network','http_429','invalid','model'])('saves %s and stops without re
  expect(await processChill80(f.port,f.id,'MOCK',fetcher)).toBe('stopped_no_retry');expect(calls).toBe(1);
  expect(await processChill80(f.port,f.id,'MOCK',fetcher)).toBe('stopped_no_retry');expect(calls).toBe(1);
  expect(f.records.some(r=>r.kind==='jev_chill80_receipt_01')).toBe(true);
+ if(kind==='model'){const r=f.records.find(r=>r.kind==='jev_chill80_result_01')!;expect(r.body.served_model).toBe('different');expect(r.body.usage).toEqual({input_tokens:10,output_tokens:0});}
 });

@@ -25,6 +25,7 @@ export async function processChill80(port:Chill80Port,id:string,key:string,trans
  if(results.some(r=>r.body.status!=='completed'))return 'stopped_no_retry';
  const pending=p.body.pending.find(r=>!results.some(x=>x.body.review_id===r.review_id));
  if(!pending){
+  const existing=s.records.find(r=>r.kind==='jev_chill80_dataset_v1');if(existing)return existing.id;
   const fresh:Chill80Analysis[]=results.map(r=>{
    const receipt=s.records.find(x=>x.id===r.body.receipt_id);if(!receipt)throw Error('CHILL80_RECEIPT_MISSING');
    return {...r.body.result as Awaited<ReturnType<typeof parseChill80>>,duration_ms:Number(r.body.duration_ms),
@@ -43,6 +44,7 @@ export async function processChill80(port:Chill80Port,id:string,key:string,trans
  const attempt=await port.reserve(id,r.id,pending.request_sha256,crypto.randomUUID());if(!attempt)return 'not_claimed';
  let receipt:string|null=null,duration=0,http:number|null=null;
  let parsed:Awaited<ReturnType<typeof parseChill80>>|null=null,error:string|null=null;
+ let servedModel:string|null=null,usage:{input_tokens:number;output_tokens:number}|null=null;
  const base={version:'jev-chill80-receipt-v1',execution_id:id,full_protocol_id:s.protocol_id,protocol_sha256:p.sha256,
   attempt_id:attempt,review_id:r.id,position:pending.position,configuration_id:p.body.configuration_id,
   request_sha256:pending.request_sha256,request_raw_sha256:pending.request_raw_sha256,analysis_text_sha256:r.analysis_text_sha256,
@@ -59,12 +61,12 @@ export async function processChill80(port:Chill80Port,id:string,key:string,trans
    billing_state:response.ok?'response_received':'http_error_no_retry',error:null});
   return new Response(response.status===204?null:text,{status:response.status,headers:{'Content-Type':'application/json'}});
  };
- try{const client=createJevClient(key,{maxAttempts:1,timeoutMs:60000,fetcher,sleep:()=>{throw Error('CHILL80_RETRY_FORBIDDEN');}});
+ try{const client=createJevClient(key,{maxAttempts:1,timeoutMs:60000,fetcher,onUsage:(u,m)=>{usage=u;servedModel=m;},sleep:()=>{throw Error('CHILL80_RETRY_FORBIDDEN');}});
   parsed=await parseChill80(p,r.id,await client.evaluatePayload(payload,x=>x));
  }catch(e){error=e instanceof Error&&/^(JEV|CHILL80)_[A-Z0-9_]+$/.test(e.message)?e.message:'CHILL80_RESPONSE_OR_STORAGE_FAILED';}
  if(!receipt)throw Error('CHILL80_RECEIPT_NOT_CONFIRMED_NO_RETRY');
  await port.save('jev_chill80_result_'+suffix,{version:'jev-chill80-result-v1',execution_id:id,full_protocol_id:s.protocol_id,
   protocol_sha256:p.sha256,review_id:r.id,position:pending.position,attempt_id:attempt,receipt_id:receipt,
-  status:parsed?'completed':'failed_or_uncertain',result:parsed,duration_ms:duration,http_status:http,error,provider_retries:0});
+  status:parsed?'completed':'failed_or_uncertain',result:parsed,duration_ms:duration,http_status:http,error,served_model:servedModel,usage,provider_retries:0});
  if(!parsed)return 'stopped_no_retry';await port.wake(id);return 'completed_one';
 }
