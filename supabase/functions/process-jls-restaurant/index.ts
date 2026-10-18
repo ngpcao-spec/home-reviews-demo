@@ -1,4 +1,6 @@
 import {restaurantCpuProbe} from "../_shared/jls-restaurant-cpu-probe.ts";
+import {processTargeted9} from "../_shared/jev-targeted9-worker.ts";
+import {targeted9Port} from "../_shared/jev-targeted9-store.ts";
 import {solReadyProbe} from "../_shared/jls-sol-ready-probe.ts";
 import {solReadyPort} from "../_shared/jls-sol-ready-store.ts";
 import {processReadySol} from "../_shared/jls-sol-ready-worker.ts";
@@ -18,6 +20,11 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==="jev_targeted9"){
+  EdgeRuntime.waitUntil(processTargeted9(targeted9Port(admin),payload.execution_id,Deno.env.get("TYPESAFE_API_KEY")??"",fetch)
+   .catch(()=>console.error("TARGETED9_STOPPED_NO_RETRY")));
+  return json({accepted_background:true,scope:"jev_targeted9",automatic_retry:false},202);
+ }
  if(payload?.mode==="snapshot_v2_probe"){
   // Ends before any supplier key is loaded; injected mock transport only.
   EdgeRuntime.waitUntil(snapshotNativeProbe(admin,payload).catch(e=>console.error("JLS_SNAPSHOT_PROBE_FAILED",e instanceof Error?e.message:"UNKNOWN")));
