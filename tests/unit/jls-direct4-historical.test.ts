@@ -45,6 +45,13 @@ it('changes only report denominators for a new scope and keeps historical 100/80
  expect(directReportInstructions()).toContain('over 80 analysed reviews of the fixed 100-review lot. The other 20 reviews');
  expect(directReportInstructions({source_reviews:100,analysed_text_reviews:68,textless_statistics_only:32})).toContain('over 68 analysed reviews of the fixed 100-review lot. The other 32 reviews');
 });
+it('retains the certified JEV wire despite JSONB key order, and rejects changed questions',()=>{
+ const q=directCategoryPayload('synthetic','Exact frozen text.'),contract=historicalDirect4Contract();
+ const reordered={questions:Object.fromEntries(Object.entries(q.questions).reverse()),state:{analysis_text:'Exact frozen text.',review_alias:'synthetic'},model:q.model};
+ expect(contract.requestWire!({} as never,{phase:'jev',request:reordered} as RestaurantTask)).toBe(JSON.stringify(q));
+ reordered.questions.service={...reordered.questions.service,instructions:'changed'};
+ expect(()=>contract.requestWire!({} as never,{phase:'jev',request:reordered} as RestaurantTask)).toThrow('DIRECT4_HISTORICAL_REQUEST_CHANGED');
+});
 it('rejects fabricated source identities before preparing requests',async()=>{
  await expect(prepareHistoricalDirect4({historical:{id:'wrong'} as never,published_report:null,record_sha256:'wrong',existing_direct_cache_rows:0,existing_direct4_protocols:0},'0'.repeat(40))).rejects.toThrow('DIRECT4_HISTORICAL_SOURCE_CHANGED');
 });

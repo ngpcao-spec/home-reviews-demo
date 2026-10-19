@@ -17,6 +17,10 @@ export const BISTRO='6a53577a-c816-4548-845e-870995fbaed9';
 export const BISTRO_HISTORY='fa55c8a5-f6e3-43df-a792-e9beed974457';
 export const BISTRO_FINGERPRINT='929b2c3d97b83317c391e4b0a418771ea1b8d4c2eb4566375a52e7baac2077e7';
 export const BISTRO_HISTORY_SHA='0d34685f8bba042afa53f7aab095516f21e17da27ea8390dacca7bbaf0eba46c';
+function requestFromFrozenState(state:Record<string,unknown>){
+ if(typeof state.review_alias!=='string'||typeof state.analysis_text!=='string')throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');
+ return directCategoryPayload(state.review_alias,state.analysis_text);
+}
 export async function prepareHistoricalDirect4(input:{historical:FrozenHistorical;published_report:unknown;record_sha256:string;existing_direct_cache_rows:number;existing_direct4_protocols:number},code:string){
  const h=input.historical;
  if(h.id!==BISTRO_HISTORY||h.establishment_id!==BISTRO||h.status!=='completed'||h.language!=='vi'||h.snapshot.analysis_version!==7||
@@ -78,7 +82,7 @@ export async function verifyHistoricalDirect4(p:HistoricalDirect4Protocol['body'
    r.organization_id!==p.organization_id||r.establishment_id!==p.establishment_id||await analysisTextSha256(r.original_text)!==r.original_text_sha256||
    r.analysis_text&&await analysisTextSha256(r.analysis_text)!==r.analysis_text_sha256)throw Error('DIRECT4_HISTORICAL_TEXT_CHANGED');
  }
- for(const t of p.pending){const r=p.source_snapshot.reviews.find(r=>r.id===t.review_id),request=directCategoryPayload(t.payload.state.review_alias,t.payload.state.analysis_text);
+ for(const t of p.pending){const r=p.source_snapshot.reviews.find(r=>r.id===t.review_id),request=requestFromFrozenState(t.payload.state);
   if(!r?.analysis_text||t.payload.state.analysis_text!==r.analysis_text||t.payload.model!==DIRECT_CONFIG.requested_model||
    await directHash(request)!==t.request_sha256||await analysisTextSha256(JSON.stringify(request))!==t.request_raw_sha256)throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');}
 }
@@ -87,7 +91,7 @@ export function historicalDirect4Contract(preparation?:DirectReportPreparation):
  frozenAnalysisSource:true,verify:async(p,sha)=>verifyHistoricalDirect4(p as unknown as HistoricalDirect4Protocol['body'],sha),
  requestWire:(_s,t)=>{
   if(t.phase!=='jev')return JSON.stringify(t.request);
-  const q=t.request as ReturnType<typeof directCategoryPayload>,wire=directCategoryPayload(q.state.review_alias,q.state.analysis_text);
+  const q=t.request as ReturnType<typeof directCategoryPayload>,wire=requestFromFrozenState(q.state);
   if(directCanonical(q)!==directCanonical(wire))throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');
   return JSON.stringify(wire);
  },

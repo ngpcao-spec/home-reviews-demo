@@ -86,6 +86,7 @@ Deno.serve(async r=>{
   }
   const pr=await c.client.from("analysis_jls_restaurant_protocols").select("id,body,sha256,created_at")
    .neq('body->>version',DIRECT4_PROTOCOL_VERSION)
+   .neq('body->>version','jls-direct4-historical-v1')
    .eq("establishment_id",er.data.id).eq("organization_id",er.data.organization_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pr.error)throw Error("JLS_READ_FAILED");
   if(!pr.data)return json({protocol:null,run:null,new_paid_calls:0});
