@@ -17,6 +17,8 @@ import {restaurantPort} from "../_shared/jls-restaurant-store.ts";
 import {processRestaurant} from "../_shared/jls-restaurant-worker.ts";
 import {processDirect4Run,direct4ActiveProbe} from "../_shared/jls-direct4-server.ts";
 import {DIRECT4_PROTOCOL_VERSION} from "../_shared/jls-direct4-execution.ts";
+import {direct4ReadyContract} from "../_shared/jls-direct4-execution.ts";
+import {inspectDirect4Continuation,probeDirect4Continuation} from "../_shared/jls-direct4-continuation.ts";
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -24,6 +26,12 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='direct4_continuation_inspect'||payload?.mode==='direct4_continuation_probe'){
+  // Inspection and persisted technical mocks exit before provider secrets.
+  try{return json(payload.mode==='direct4_continuation_inspect'?
+   await inspectDirect4Continuation(admin,payload.operation_id):await probeDirect4Continuation(admin,payload.operation_id));}
+  catch(e){return json({error:e instanceof Error?e.message:'DIRECT4_CONTINUATION_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='direct4_probe'){
   // Read sources + injected mocks only; no provider key, authorization or paid queue.
   try{return json(await direct4ActiveProbe(admin,payload));}
@@ -62,12 +70,16 @@ Deno.serve(async r=>{
    .catch(e=>console.error("JLS_CONTRACT_V2_FAILED",e instanceof Error?e.message:"UNKNOWN")));
   return json({accepted_background:true,technical_mock:op.data.mode==="mock"},202);
  }
+ const continuations=await admin.from('analysis_jls_direct4_continuations').select('id').eq('mode','paid')
+  .in('status',['queued','received','dispatched','validating']).limit(1);
+ if(continuations.error)return json({error:'JLS_DATABASE_FAILED'},409);
  const {data:runs,error}=await admin.from("analysis_jls_restaurant_runs").select("id").in("status",["queued","running"]);
  if(error)return json({error:"JLS_DATABASE_FAILED"},409);
  const next=await admin.from("analysis_jls_contract_v2_operations").select("id").eq("mode","paid").in("status",["queued","received","dispatched","validating"]).limit(1);
  if(next.error)return json({error:"JLS_DATABASE_FAILED"},409);
- if(!runs?.length&&!next.data?.length)return json({claimed:0,new_paid_calls:0});
+ if(!runs?.length&&!next.data?.length&&!continuations.data?.length)return json({claimed:0,new_paid_calls:0});
  const work=(async()=>{
+  for(const op of continuations.data??[])await processReadySol(solReadyPort(admin,true),op.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,direct4ReadyContract);
   for(const op of next.data??[])await processContractV2(contractV2Port(admin),op.id,Deno.env.get("OPENAI_API_KEY")??"",fetch);
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
