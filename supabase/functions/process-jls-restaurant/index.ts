@@ -19,6 +19,8 @@ import {processDirect4Run,direct4ActiveProbe} from "../_shared/jls-direct4-serve
 import {DIRECT4_PROTOCOL_VERSION} from "../_shared/jls-direct4-execution.ts";
 import {direct4ReadyContract} from "../_shared/jls-direct4-execution.ts";
 import {inspectDirect4Continuation,probeDirect4Continuation} from "../_shared/jls-direct4-continuation.ts";
+import {HISTORICAL_DIRECT4} from "../_shared/jls-direct4-historical.ts";
+import {processHistoricalDirect4Run,historicalDirect4ActiveProbe} from "../_shared/jls-direct4-historical-server.ts";
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -26,6 +28,11 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='direct4_historical_probe'){
+  // Actual frozen sources and version routing; injected mock suppliers only.
+  try{return json(await historicalDirect4ActiveProbe(admin,payload));}
+  catch(e){return json({error:e instanceof Error?e.message:'DIRECT4_HISTORICAL_PROBE_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='direct4_continuation_inspect'||payload?.mode==='direct4_continuation_probe'){
   // Inspection and persisted technical mocks exit before provider secrets.
   try{return json(payload.mode==='direct4_continuation_inspect'?
@@ -84,6 +91,9 @@ Deno.serve(async r=>{
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
   const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version===HISTORICAL_DIRECT4){
+   await processHistoricalDirect4Run(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
+  }
   if(v?.data?.version===DIRECT4_PROTOCOL_VERSION){
    await processDirect4Run(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
   }

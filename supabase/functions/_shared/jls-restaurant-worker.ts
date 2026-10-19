@@ -40,6 +40,7 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
  try{
   if(!key||task.run_id!==state.run.id||task.organization_id!==p.organization_id||task.request_count!==1||task.status!=="running"||
    task.request_sha256!==await hybridHash(task.request))throw Error("JLS_RESERVED_ATTEMPT_CHANGED");
+  if(contract?.requestWire)wire=contract.requestWire(state,task);
   const q=task.request as {model:string};
   const expected=task.phase==="jev"?"jev-latest":task.phase==="luna"?"gpt-6-luna":"gpt-6.1-sol";
   if(q.model!==expected)throw Error("JLS_REQUEST_MODEL_INVALID");
@@ -74,8 +75,11 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
   out.input_tokens=u.input_tokens;out.output_tokens=u.output_tokens;out.usage=u;
   status="invalid_output";
   if(task.phase==="jev"){
+   if(contract?.parseJev)Object.assign(out,await contract.parseJev(state,task,raw));
+   else {
    const native=parseThemes(raw);if(native.model!==task.identity?.expected_served_model)throw Error("JLS_JEV_SERVED_MODEL_CHANGED");
    out.jev_response=native.decision;out.theme_results=economicThemeResults(native.decision);
+   }
   }else if(task.phase==="luna"){
    const plan=artifact<JlsPlan>(state,"evidence_plan")!,group=plan.luna_groups.find(g=>g.review_id===task.review_id)!;
    if(contract?.parseLuna)Object.assign(out,await contract.parseLuna(state,task,raw));
@@ -101,6 +105,8 @@ export interface RestaurantExecutionContract {
  verify(p:RestaurantProtocol,sha:string):Promise<void>;
  completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
  frozenAnalysisSource?:true;
+ requestWire?(state:RestaurantState,task:RestaurantTask):string;
+ parseJev?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
  parseLuna?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
 }
 export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev:string;openai:string},http:typeof fetch,contract?:RestaurantExecutionContract) {
