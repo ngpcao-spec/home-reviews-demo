@@ -158,7 +158,7 @@ export function directReportInstructions(){return [
  'Preserve mixed opinions, negation, uncertainty, staff reactions, compensation and later resolution. Preserve dish, ingredient and preparation relationships faithfully in Vietnamese. Do not change a compliment because another facet is criticized.',
  'Use natural language for the restaurateur. Keep IDs, hashes, field names and statuses in structured audit fields only. Keep methodological limits in the separate server note. Technical checks and AI judgments are not independent human validation.',
 ].join('\n');}
-function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectReportEvidence[],conditional:boolean){
+function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectReportEvidence[],conditional:boolean,count=localHybridTokens){
  const packet={format_version:DIRECT_REPORT_FORMAT,language:'vi',statistics,statistics_sha256,
   evidence:evidence.map(({evidence_id,review_id,category,polarity,quote,quote_sha256,analysis_text_sha256,translation_source})=>
    ({evidence_id,review_id,category,polarity,quote,quote_sha256,analysis_text_sha256,translation_source,context_same_as_quote:true})),
@@ -168,7 +168,7 @@ function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectRep
  const request={model:'gpt-6.1-sol',reasoning:{effort:'low'},max_output_tokens:SOL_SIZE_POLICY.max_output_tokens,
   input:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(packet)}],
   text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}};
- return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,localHybridTokens)};
+ return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
 export async function prepareDirectReport(i:DirectReportInput,code_commit:string){
  const counts=await verifyDirectReportSources(i);if(!/^[a-f0-9]{40}$/.test(code_commit))throw Error('DIRECT_REPORT_CODE_PROVENANCE_REQUIRED');
@@ -198,7 +198,7 @@ export async function prepareDirectReport(i:DirectReportInput,code_commit:string
  return {body,sha256:await directHash(body)};
 }
 export type DirectReportPreparation=Awaited<ReturnType<typeof prepareDirectReport>>;
-export async function directAcceptedSol(p:DirectReportPreparation,results:DirectLunaResult[]){
+export async function directAcceptedSol(p:DirectReportPreparation,results:DirectLunaResult[],count=localHybridTokens){
  if(p.sha256!==await directHash(p.body)||results.length!==p.body.luna_groups.length||
   new Set(results.map(r=>r.review_id)).size!==results.length)throw Error('DIRECT_REPORT_LUNA_INCOMPLETE_OR_PLAN_CHANGED');
  const decisions:DirectLunaResult['decisions']=[];
@@ -209,11 +209,11 @@ export async function directAcceptedSol(p:DirectReportPreparation,results:Direct
  const accepted=p.body.selection.selected.filter(e=>decisions.find(d=>d.evidence_id===e.evidence_id)?.status==='ACCEPTED');
  const gate={...contractEvidenceGate({selected:p.body.selection.selected.map(e=>({...e,axis:e.category==='ambiance'?'atmosphere':e.category}))},accepted.map(e=>e.evidence_id)),
   policy:DIRECT_REPORT_POLICY.sol_sufficiency,human_validated:false};
- const draft=gate.passed?solDraft(p.body.statistics,p.body.statistics_sha256,accepted,false):null;
+ const draft=gate.passed?solDraft(p.body.statistics,p.body.statistics_sha256,accepted,false,count):null;
  return {gate,accepted,decisions,draft};
 }
-export async function validateDirectReport(raw:unknown,p:DirectReportPreparation,results:DirectLunaResult[]){
- const branch=await directAcceptedSol(p,results);if(!branch.gate.passed)throw Error('DIRECT_REPORT_EVIDENCE_INSUFFICIENT');
+export async function validateDirectReport(raw:unknown,p:DirectReportPreparation,results:DirectLunaResult[],count=localHybridTokens){
+ const branch=await directAcceptedSol(p,results,count);if(!branch.gate.passed)throw Error('DIRECT_REPORT_EVIDENCE_INSUFFICIENT');
  const parsed=directReportResponse.parse(raw),report=parsed.report;
  if(parsed.statistics_sha256!==p.body.statistics_sha256||new Set(report.categories.map(c=>c.category)).size!==4)throw Error('DIRECT_REPORT_STATISTICS_OR_CATEGORIES_CHANGED');
  const check=(refs:string[],category?:DirectCategory,polarity?:string)=>{

@@ -10,6 +10,8 @@ import {auditBoundaryManifest} from "../_shared/jev-audit-boundaries-v22.ts";
 import {AUDIT_EVIDENCE_CONFIG,prepareAuditEvidenceReview} from "../_shared/jls-audit-boundaries-v22.ts";
 import type {PilotReview} from "../_shared/jev-pilot-core.ts";
 import type {HybridEvidence} from "../_shared/jev-hybrid-evidence.ts";
+import {DIRECT4_PROTOCOL_VERSION} from "../_shared/jls-direct4-execution.ts";
+import {direct4ReadView} from "../_shared/jls-direct4-server.ts";
 import {CONFIG_V22,AUDIT_REPORT_INSTRUCTIONS} from "../_shared/jls-recommendation-contract-v22.ts";
 Deno.serve(async r=>{
  const pre=preflight(r);if(pre)return pre;
@@ -19,6 +21,22 @@ Deno.serve(async r=>{
   const er=await c.client.from("establishments").select("id,organization_id,name").eq("id",est).single();
   if(er.error||!er.data)throw Error("FORBIDDEN");
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
+  if(new URL(r.url).searchParams.get('view')==='direct4'){
+   const p=await c.client.from('analysis_jls_restaurant_protocols').select('id,body,sha256')
+    .eq('organization_id',er.data.organization_id).eq('establishment_id',er.data.id).eq('body->>version',DIRECT4_PROTOCOL_VERSION)
+    .order('created_at',{ascending:false}).limit(1).maybeSingle();if(p.error)throw Error('JLS_READ_FAILED');
+   if(!p.data)return json({protocol:null,run:null,read_only:true,new_provider_calls:0});
+   const run=await c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at')
+    .eq('protocol_id',p.data.id).eq('organization_id',er.data.organization_id).maybeSingle();if(run.error)throw Error('JLS_READ_FAILED');
+   if(!run.data)return json(direct4ReadView(p.data,null,[],[],null));
+   const [tasks,artifacts,op]=await Promise.all([
+    c.client.from('analysis_jls_restaurant_tasks').select('*').eq('run_id',run.data.id).eq('organization_id',er.data.organization_id),
+    c.client.from('analysis_jls_restaurant_artifacts').select('*').eq('run_id',run.data.id).eq('organization_id',er.data.organization_id),
+    c.client.from('analysis_jls_sol_ready_operations').select('id,status,result,result_sha256,receipt,receipt_sha256,request_count,error_code')
+     .eq('run_id',run.data.id).eq('organization_id',er.data.organization_id).eq('mode','paid').maybeSingle()]);
+   if(tasks.error||artifacts.error||op.error)throw Error('JLS_READ_FAILED');
+   return json(direct4ReadView(p.data,run.data,tasks.data,artifacts.data,op.data));
+  }
   // Explicit free inspection only: never changes an existing protocol or dispatches work.
   if(new URL(r.url).searchParams.get("view")==="classification_boundaries"){
    const basis=await c.client.from("analysis_jls_contract_v2_protocols")
@@ -65,6 +83,7 @@ Deno.serve(async r=>{
    }
   }
   const pr=await c.client.from("analysis_jls_restaurant_protocols").select("id,body,sha256,created_at")
+   .neq('body->>version',DIRECT4_PROTOCOL_VERSION)
    .eq("establishment_id",er.data.id).eq("organization_id",er.data.organization_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pr.error)throw Error("JLS_READ_FAILED");
   if(!pr.data)return json({protocol:null,run:null,new_paid_calls:0});

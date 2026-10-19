@@ -21,6 +21,7 @@ export interface ReadyPort {
 export interface ReadyContract {
  verify(s:ReadyState):Promise<import("./jev-luna-sol.ts").JlsPlan>;
  validate(raw:unknown,s:ReadyState,plan:import("./jev-luna-sol.ts").JlsPlan):Promise<Awaited<ReturnType<typeof validateEditorialReport>>>;
+ reportItems?(validated:unknown):{status?:string}[];
 }
 const terminal=new Set(["completed","needs_review","invalid_output","blocked","billing_uncertain","authorization_expired"]);
 const code=(e:unknown)=>e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:"JLS_SOL_READY_BILLING_UNCERTAIN";
@@ -51,7 +52,7 @@ export async function validateReadyReceipt(s:ReadyState,op:ReadyOperation,plan:i
    const validated=contract?await contract.validate(JSON.parse(texts[0].text),s,plan):
     await validateEditorialReport(JSON.parse(texts[0].text),plan,s.protocol.body.snapshot,s.ready.body.decisions,"vi");
    out.validated_report=validated;out.validator_version=validated.validator_version;
-   const r=validated.report,items=[...r.axes,...r.positive_aspects,...r.negative_aspects,r.conclusion,...r.recommendations];
+   const r=validated.report,items=contract?.reportItems?contract.reportItems(validated):[...r.axes,...r.positive_aspects,...r.negative_aspects,r.conclusion,...r.recommendations];
    status=items.some(x=>x.status==="review_needed")?"needs_review":"completed";
    if(status==="needs_review")out.error_code="JLS_REPORT_NEEDS_REVIEW";
   }catch(e){out.error_code=code(e);}
@@ -86,10 +87,10 @@ export async function processReadySol(port:ReadyPort,id:string,key:string,http:t
     provider_request_id:null,raw_response_text:raw,raw_response_sha256:raw===null?null:await negativeHash(raw),duration_ms:Date.now()-at,
     error_code:code(e),mock:op.mode==="mock"};}
    if(!await port.receive(id,worker,receipt,await hybridHash(receipt)))throw Error("JLS_SOL_RECEIPT_SAVE_UNCERTAIN_NO_RETRY");
-   return {phase:"raw_receipt_saved",provider_calls:mock?0:1,mock_http_calls:mock?1:0,tokenizer_misses:planTokenMemo(plan)!.misses};
+   return {phase:"raw_receipt_saved",provider_calls:mock?0:1,mock_http_calls:mock?1:0,tokenizer_misses:planTokenMemo(plan)?.misses??0};
   }
   const {out,status}=await validateReadyReceipt(s,op,plan,contract);
   if(!await port.finish(id,worker,status,out,await hybridHash(out)))throw Error("JLS_SOL_VALIDATION_SAVE_UNCERTAIN_NO_RETRY");
-  return {phase:"validation_saved",provider_calls:0,tokenizer_misses:planTokenMemo(plan)!.misses,status};
+  return {phase:"validation_saved",provider_calls:0,tokenizer_misses:planTokenMemo(plan)?.misses??0,status};
  }catch(e){await port.abort(id,worker,code(e));return {phase,provider_calls:sent&&!mock?1:0,mock_http_calls:sent&&mock?1:0,error_code:code(e),claimed};}
 }

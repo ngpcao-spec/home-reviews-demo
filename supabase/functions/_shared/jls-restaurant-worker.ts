@@ -32,7 +32,7 @@ const artifact=<T>(state:RestaurantState,key:string):T|null=>{
  const x=state.artifacts.find(x=>x.kind===key);return x?x.body as T:null;
 };
 // A raw single fetch after transactional reservation. No SDK retry/fallback.
-export async function restaurantAttempt(task:RestaurantTask,state:RestaurantState,key:string,http:typeof fetch) {
+export async function restaurantAttempt(task:RestaurantTask,state:RestaurantState,key:string,http:typeof fetch,contract?:RestaurantExecutionContract) {
  const p=state.protocol.body,start=Date.now();let status="billing_uncertain",sent=false,wire=JSON.stringify(task.request);
  const out:Record<string,unknown>={phase:task.phase,request_sha256:task.request_sha256,raw_response_text:null,
   raw_response_sha256:null,response:null,response_sha256:null,input_tokens:null,output_tokens:null,cost_usd:null,
@@ -78,7 +78,8 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
    out.jev_response=native.decision;out.theme_results=economicThemeResults(native.decision);
   }else if(task.phase==="luna"){
    const plan=artifact<JlsPlan>(state,"evidence_plan")!,group=plan.luna_groups.find(g=>g.review_id===task.review_id)!;
-   const native=await parseJlsLuna(plan,group,raw);out.decisions=native.decisions;out.cost_usd=native.cost_usd;
+   if(contract?.parseLuna)Object.assign(out,await contract.parseLuna(state,task,raw));
+   else {const native=await parseJlsLuna(plan,group,raw);out.decisions=native.decisions;out.cost_usd=native.cost_usd;}
   }else{
    if(raw.model!=="gpt-6.1-sol"||raw.status!=="completed"||!Array.isArray(raw.output))throw Error("JLS_SOL_MODEL_OR_OUTPUT_INVALID");
    const content=raw.output.filter((x:{type:string})=>x.type==="message").flatMap((x:{content:{type:string;text:string}[]})=>x.content);
@@ -99,6 +100,8 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
 export interface RestaurantExecutionContract {
  verify(p:RestaurantProtocol,sha:string):Promise<void>;
  completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
+ frozenAnalysisSource?:true;
+ parseLuna?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
 }
 export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev:string;openai:string},http:typeof fetch,contract?:RestaurantExecutionContract) {
  const worker=crypto.randomUUID();if(!await port.tick(run,worker))return;
@@ -121,7 +124,7 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
     if(await hybridHash(native)!==await hybridHash(sol.decisions))throw Error("JLS_LUNA_NATIVE_CHANGED");
     await attachPlanTokenMemo(plan,sol.token_certificate,true);
    }
-  }else{
+  }else if(!contract?.frozenAnalysisSource){
   const cache=await port.cache(p);
   const reused=cache.filter(c=>p.cache.some(x=>x.id===c.id)).sort((a,b)=>a.id.localeCompare(b.id));
   if(await hybridHash(reused)!==await hybridHash([...p.cache].sort((a,b)=>a.id.localeCompare(b.id))))throw Error("JLS_REUSED_CACHE_CHANGED");
@@ -131,7 +134,7 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
   const tasks=[];
   for(let i=0;i<(state.run.stage==="sol"?1:8);i++){const t=await port.claim(run,worker);if(!t)break;tasks.push(t);}
   const outcomes=await Promise.allSettled(tasks.map(async t=>{
-   const outcome=await restaurantAttempt(t,state,key,http);
+   const outcome=await restaurantAttempt(t,state,key,http,contract);
    if(!await port.finish(t.id,worker,outcome.status,outcome.body,outcome.sha256))throw Error("JLS_RESULT_SAVE_UNCERTAIN_NO_RETRY");
   }));
   const failed=outcomes.find(x=>x.status==="rejected");if(failed?.status==="rejected")throw failed.reason;
