@@ -114,3 +114,40 @@ export privé contenant `state_json` produit par PostgreSQL (`jsonb::text`). Ce
 format préserve précisément l'ordre rencontré sur le serveur. La sortie porte
 explicitement `explicit_technical_mock`, réutilise les 32 résultats réels et
 vérifie également réception, validation, sauvegarde simulées et absence de retry.
+## Continuation Sol après le blocage du premier run
+
+Version : `jls-direct4-sol-continuation-v1`.
+
+Une continuation stockée dans `analysis_jls_direct4_continuations` réutilise
+`processReadySol`, `solReadyPort` et `direct4ReadyContract`. Elle référence le
+run et l'opération bloqués, l'archive des 32 réponses Luna, le même artefact
+Sol certifié et le consentement existant, sans renouveler sa date d'expiration.
+Le run, ses tâches et son opération historiques ne sont jamais réouverts.
+
+La création déléguée est explicite, réservée au serveur et idempotente. Un index
+unique par protocole et par opération source limite les continuations payantes
+à une seule. Le claim verrouille la continuation puis la source, vérifie le
+consentement, les sources et les hashes et réserve durablement `request_count=1`
+avant l'envoi. Les wakes concurrents n'envoient rien de plus. Une tentative sans
+réponse sauvegardée devient `billing_uncertain`, sans retour à la file. La
+réception brute et la validation sont deux étapes persistantes distinctes. Après
+réception, l'expiration du consentement n'empêche pas la validation gratuite.
+
+RLS : lecture owner/admin/manager dans l'organisation, aucune écriture client.
+L'identité active est vérifiée par Auth Admin avant le claim. Le fournisseur
+reste appelé par fetch une fois, sans SDK ni retry. Le cron existant de workers
+est complété par un wake dédié aux continuations déjà explicitement créées ;
+aucune continuation payante n'est créée par migration ou déploiement.
+
+La finalisation archive atomiquement le résultat et le reçu dans
+`analysis_jls_snapshot_preparations`, kind `direct4_sol_continuation_<id>`.
+Le GET authentifié `jls-restaurant?view=direct4` conserve le résultat historique
+et expose séparément `sol_continuation`. Aucun nouveau moteur ni écran.
+
+Qualification : `jls_direct4_continuation.sql` utilise des mocks dans une
+transaction annulée (idempotence, double réservation, perte de réponse,
+immutabilité, accès propriétaire et refus inter-organisations). Les probes
+serveur `direct4_continuation_inspect` et `direct4_continuation_probe` sortent
+avant la lecture d'une clé fournisseur. Le probe exige `mode=mock`, utilise
+le stockage et les RPC réels, puis injecte une réponse explicitement simulée.
+Les mêmes mesures de tokens, règles et 26 preuves acceptées sont conservées.

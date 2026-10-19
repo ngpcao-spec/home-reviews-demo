@@ -29,13 +29,15 @@ Deno.serve(async r=>{
    const run=await c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at')
     .eq('protocol_id',p.data.id).eq('organization_id',er.data.organization_id).maybeSingle();if(run.error)throw Error('JLS_READ_FAILED');
    if(!run.data)return json(direct4ReadView(p.data,null,[],[],null));
-   const [tasks,artifacts,op]=await Promise.all([
+   const [tasks,artifacts,op,continuation]=await Promise.all([
     c.client.from('analysis_jls_restaurant_tasks').select('*').eq('run_id',run.data.id).eq('organization_id',er.data.organization_id),
     c.client.from('analysis_jls_restaurant_artifacts').select('*').eq('run_id',run.data.id).eq('organization_id',er.data.organization_id),
     c.client.from('analysis_jls_sol_ready_operations').select('id,status,result,result_sha256,receipt,receipt_sha256,request_count,error_code')
-     .eq('run_id',run.data.id).eq('organization_id',er.data.organization_id).eq('mode','paid').maybeSingle()]);
-   if(tasks.error||artifacts.error||op.error)throw Error('JLS_READ_FAILED');
-   return json(direct4ReadView(p.data,run.data,tasks.data,artifacts.data,op.data));
+     .eq('run_id',run.data.id).eq('organization_id',er.data.organization_id).eq('mode','paid').maybeSingle(),
+    c.client.from('analysis_jls_direct4_continuations').select('*').eq('run_id',run.data.id)
+     .eq('organization_id',er.data.organization_id).eq('mode','paid').maybeSingle()]);
+   if(tasks.error||artifacts.error||op.error||continuation.error)throw Error('JLS_READ_FAILED');
+   return json({...direct4ReadView(p.data,run.data,tasks.data,artifacts.data,op.data),sol_continuation:continuation.data});
   }
   // Explicit free inspection only: never changes an existing protocol or dispatches work.
   if(new URL(r.url).searchParams.get("view")==="classification_boundaries"){
