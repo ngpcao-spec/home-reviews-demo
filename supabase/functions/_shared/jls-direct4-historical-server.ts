@@ -34,8 +34,14 @@ export async function historicalDirect4ActiveProbe(client:SupabaseClient,request
  const row=await client.from('analysis_jls_snapshot_preparations').select('body,sha256').eq('protocol_id',q.data.id)
   .eq('kind','historical_direct4_probe_input_'+request.phase).single();
  if(row.error||row.data.sha256!==await directHash(row.data.body)||row.data.body.explicit_technical_mock!==true||
-  row.data.body.protocol_sha256!==q.data.sha256||typeof row.data.body.input_json!=='string')throw Error('DIRECT4_HISTORICAL_PROBE_INPUT_CHANGED');
- const at=performance.now(),result=await runHistoricalDirect4Probe(request.phase,JSON.parse(row.data.body.input_json));
+  row.data.body.protocol_sha256!==q.data.sha256)throw Error('DIRECT4_HISTORICAL_PROBE_INPUT_CHANGED');
+ let input=row.data.body.input_json;
+ if(typeof row.data.body.input_gzip_base64==='string'){
+  const bytes=Uint8Array.from(atob(row.data.body.input_gzip_base64),(c:string)=>c.charCodeAt(0));
+  input=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+ }
+ if(typeof input!=='string')throw Error('DIRECT4_HISTORICAL_PROBE_INPUT_CHANGED');
+ const at=performance.now(),result=await runHistoricalDirect4Probe(request.phase,JSON.parse(input));
  const b={version:'jls-direct4-historical-v1',phase:request.phase,protocol_sha256:q.data.sha256,result,provider_calls:0,
   explicit_technical_mock:true,wall_ms:performance.now()-at,memory:Deno.memoryUsage(),execution_id:Deno.env.get('SB_EXECUTION_ID')??null};
  const saved=await client.rpc('save_jls_snapshot_preparation',{p_protocol:q.data.id,p_kind:'historical_direct4_deployed_'+request.phase,p_body:b,p_sha:await directHash(b)});
