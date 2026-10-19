@@ -171,7 +171,7 @@ export async function buildJlsPlan(s: JlsSource, snapshot: PilotSnapshot, langua
     stage: "prepared_not_authorized", human_validated: false,
   };
 }
-export type JlsPlan = Omit<Awaited<ReturnType<typeof buildJlsPlan>>, "config"> & {config:Omit<Awaited<ReturnType<typeof buildJlsPlan>>["config"],"input_budget_tokens"> & {input_budget_tokens:number;sol_size_policy?:SolSizePolicy};sol_size_policy?:SolSizePolicy};
+export type JlsPlan = Omit<Awaited<ReturnType<typeof buildJlsPlan>>, "config"> & {config:Omit<Awaited<ReturnType<typeof buildJlsPlan>>["config"],"input_budget_tokens"|"source_question_set"|"jev_configuration"> & {input_budget_tokens:number;source_question_set:string;jev_configuration:string;sol_size_policy?:SolSizePolicy};sol_size_policy?:SolSizePolicy};
 export async function verifyJlsPlan(p: JlsPlan, s: JlsSource, snapshot: PilotSnapshot) {
   const rebuilt = await buildJlsPlan(s, snapshot, p.language);
   if (canonicalJson(p) !== canonicalJson(rebuilt)) throw new Error("JLS_PLAN_CHANGED");

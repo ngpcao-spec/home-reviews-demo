@@ -206,9 +206,19 @@ export async function balancedCandidates(
     snapshot.source.google_total_reviews,
   );
   const initial = await hybridCandidates(snapshot, audit, stats, contestations);
+  return balancedCandidateExcerpts(snapshot, audit.used, initial);
+}
+
+// Excerpt selection is independent of the cache configuration. Callers must
+// validate their own versioned classifications before using this pure adapter.
+export async function balancedCandidateExcerpts(
+  snapshot: PilotSnapshot,
+  cache: (Pick<EconomyCache, "review_id"> & { theme_results?: unknown })[],
+  initial: HybridEvidence[],
+) {
   return Promise.all(initial.map(async (e): Promise<BalancedEvidence> => {
     const review = snapshot.source.reviews.find((r) => r.id === e.review_id)!;
-    const c = audit.used.find((c) => c.review_id === e.review_id)!;
+    const c = cache.find((c) => c.review_id === e.review_id)!;
     const span = balancedExcerpt(review.analysis_text!, e);
     const flags = span?.flags ?? ["NO_THEME_BOUND_PASSAGE"];
     const ambiguous = flags.includes("AMBIGUOUS_TYPO_PRICE") ||
