@@ -35,7 +35,7 @@ export interface ContractV2 {
 }
 export interface ContractV2Row {id:string;body:ContractV2;sha256:string}
 export interface ContractSource {protocol:{id:string;body:RestaurantProtocol;sha256:string};artifact:{id:string;body:SolReadyArtifact;sha256:string}}
-export function contractEvidenceGate(p:JlsPlan,ids:string[]){
+export function contractEvidenceGate(p:{selected:Pick<JlsPlan['selected'][number],'evidence_id'|'axis'|'polarity'|'rating'>[]},ids:string[]){
  const accepted=p.selected.filter(e=>ids.includes(e.evidence_id)),reasons:string[]=[];
  if(accepted.length<8)reasons.push("ACCEPTED_BELOW_MINIMUM");
  for(const a of ["service","quality","price","atmosphere"])if(!accepted.some(e=>e.axis===a))reasons.push("AXIS_BELOW_MINIMUM_"+a.toUpperCase());

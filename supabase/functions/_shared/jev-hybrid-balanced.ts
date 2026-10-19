@@ -275,16 +275,20 @@ export async function balancedCandidateExcerpts(
   }));
 }
 
-export function selectBalancedEvidence(
-  candidates: BalancedEvidence[],
+// Structural typing lets the four-category preparation reuse the same selection
+// algorithm without projecting its classifications into historical themes.
+export type BalancedSelectionInput=Pick<BalancedEvidence,'evidence_id'|'review_id'|'quote'|'polarity'|'axis'|'rating'|
+ 'mixed_review'|'status'|'quality'|'selection_stage'|'selection_reason'>&{theme_key:string};
+export function selectBalancedEvidence<T extends BalancedSelectionInput>(
+  candidates: T[],
   max: number,
 ) {
-  const selected: BalancedEvidence[] = [],
+  const selected: T[] = [],
     eligible = candidates.filter((c) =>
       c.quality.eligible && c.status !== "explicitly_contested"
     );
   const duplicates = new Map<string, boolean>();
-  const sameQuote = (a: BalancedEvidence, b: BalancedEvidence) => {
+  const sameQuote = (a: T, b: T) => {
     const key = [a.evidence_id, b.evidence_id].sort().join(":");
     if (!duplicates.has(key)) {
       duplicates.set(key, nearDuplicate(a.quote, b.quote));
@@ -299,12 +303,12 @@ export function selectBalancedEvidence(
           s.review_id === c.review_id
         ).length < BALANCED_POLICY.max_per_review
     );
-  const themeFrequency = new Map<ThemeKey, number>();
+  const themeFrequency = new Map<string, number>();
   for (const c of eligible.filter((e) => e.polarity === "negative")) {
     themeFrequency.set(c.theme_key, (themeFrequency.get(c.theme_key) ?? 0) + 1);
   }
-  const rank = (pool: BalancedEvidence[]) => {
-    const score = (c: BalancedEvidence) =>
+  const rank = (pool: T[]) => {
+    const score = (c: T) =>
       c.quality.specificity + (c.polarity === "negative"
         ? 12 +
           Math.min(
@@ -330,7 +334,7 @@ export function selectBalancedEvidence(
     );
   };
   const take = (
-    filter: (e: BalancedEvidence) => boolean,
+    filter: (e: T) => boolean,
     reason: string,
     stage: BalancedEvidence["selection_stage"] = "priority_coverage",
   ) => {
