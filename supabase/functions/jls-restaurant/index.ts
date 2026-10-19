@@ -22,9 +22,12 @@ Deno.serve(async r=>{
   if(er.error||!er.data)throw Error("FORBIDDEN");
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
   if(new URL(r.url).searchParams.get('view')==='direct4'){
-   const p=await c.client.from('analysis_jls_restaurant_protocols').select('id,body,sha256')
-    .eq('organization_id',er.data.organization_id).eq('establishment_id',er.data.id).in('body->>version',[DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1'])
-    .order('created_at',{ascending:false}).limit(1).maybeSingle();if(p.error)throw Error('JLS_READ_FAILED');
+   const selectedProtocol=new URL(r.url).searchParams.get('protocol_id');
+   let pq=c.client.from('analysis_jls_restaurant_protocols').select('id,body,sha256')
+    .eq('organization_id',er.data.organization_id).eq('establishment_id',er.data.id).in('body->>version',selectedProtocol?
+     [DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1','jls-direct4-synthesis-comparison-v1']:[DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1']);
+   if(selectedProtocol)pq=pq.eq('id',selectedProtocol);
+   const p=await pq.order('created_at',{ascending:false}).limit(1).maybeSingle();if(p.error)throw Error('JLS_READ_FAILED');
    if(!p.data)return json({protocol:null,run:null,read_only:true,new_provider_calls:0});
    const run=await c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at')
     .eq('protocol_id',p.data.id).eq('organization_id',er.data.organization_id).maybeSingle();if(run.error)throw Error('JLS_READ_FAILED');
@@ -87,6 +90,7 @@ Deno.serve(async r=>{
   const pr=await c.client.from("analysis_jls_restaurant_protocols").select("id,body,sha256,created_at")
    .neq('body->>version',DIRECT4_PROTOCOL_VERSION)
    .neq('body->>version','jls-direct4-historical-v1')
+   .neq('body->>version','jls-direct4-synthesis-comparison-v1')
    .eq("establishment_id",er.data.id).eq("organization_id",er.data.organization_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pr.error)throw Error("JLS_READ_FAILED");
   if(!pr.data)return json({protocol:null,run:null,new_paid_calls:0});

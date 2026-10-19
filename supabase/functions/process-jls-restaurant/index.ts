@@ -21,6 +21,8 @@ import {direct4ReadyContract} from "../_shared/jls-direct4-execution.ts";
 import {inspectDirect4Continuation,probeDirect4Continuation} from "../_shared/jls-direct4-continuation.ts";
 import {HISTORICAL_DIRECT4} from "../_shared/jls-direct4-historical.ts";
 import {processHistoricalDirect4Run,historicalDirect4ActiveProbe} from "../_shared/jls-direct4-historical-server.ts";
+import {DIRECT4_COMPARISON} from '../_shared/jls-direct4-comparison.ts';
+import {processDirect4ComparisonRun,direct4ComparisonActiveProbe} from '../_shared/jls-direct4-comparison-server.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -28,6 +30,11 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='direct4_comparison_probe'){
+  // Authenticated free qualification; exits before loading any provider key.
+  try{return json(await direct4ComparisonActiveProbe(admin,payload));}
+  catch(e){return json({error:e instanceof Error?e.message:'COMPARISON_PROBE_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='direct4_historical_probe'){
   // Actual frozen sources and version routing; injected mock suppliers only.
   try{return json(await historicalDirect4ActiveProbe(admin,payload));}
@@ -91,6 +98,9 @@ Deno.serve(async r=>{
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
   const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version===DIRECT4_COMPARISON){
+   await processDirect4ComparisonRun(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
+  }
   if(v?.data?.version===HISTORICAL_DIRECT4){
    await processHistoricalDirect4Run(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
   }
