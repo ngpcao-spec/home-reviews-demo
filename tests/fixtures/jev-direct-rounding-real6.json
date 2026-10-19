@@ -1,0 +1,43 @@
+{
+  "source_archive_id": "85683890-8cf2-4dbd-8531-5d18b5acdaab",
+  "source_archive_sha256": "123950779163129d0bad1ed921aa4862d73068c1de62e02d5d6e473de6475771",
+  "semantic_reference": false,
+  "cases": [
+    {
+      "review_id": "4b303f0e-9184-4b34-a865-ce403e715f2b",
+      "receipt_id": "db670bdf-a967-43be-b4ad-8b547a14a0b0",
+      "response_raw_sha256": "5cc1e4c9e502264c7ff36de7c7299f00e532035da9259e992df65e9cba322cad",
+      "raw_response_text": "{\"model\":\"jev-1.13.0\",\"answers\":{\"service\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.95,\"probabilities\":{\"positive\":0.96,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.04,\"uncertain\":0.0}},\"price\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":1.0,\"probabilities\":{\"positive\":0.0,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":1.0,\"uncertain\":0.0}},\"quality\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":0.94,\"probabilities\":{\"positive\":0.05,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.95,\"uncertain\":0.0}},\"ambiance\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.77,\"probabilities\":{\"positive\":0.81,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.16,\"uncertain\":0.02}}},\"usage\":{\"input_tokens\":3541,\"output_tokens\":254}}"
+    },
+    {
+      "review_id": "9f93e2fe-7040-405c-b4ba-2354638e8a0b",
+      "receipt_id": "97800e0d-98e8-4711-b7a6-b895f7edc7a0",
+      "response_raw_sha256": "106a2f9e77ec46cd2c67833f567ec2dafc47dff19adf8a48562d7c266f3fd79d",
+      "raw_response_text": "{\"model\":\"jev-1.13.0\",\"answers\":{\"service\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.92,\"probabilities\":{\"positive\":0.93,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.05,\"uncertain\":0.01}},\"price\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":0.99,\"probabilities\":{\"positive\":0.01,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.99,\"uncertain\":0.0}},\"quality\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.86,\"probabilities\":{\"positive\":0.88,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.1,\"uncertain\":0.02}},\"ambiance\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.96,\"probabilities\":{\"positive\":0.97,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.02,\"uncertain\":0.01}}},\"usage\":{\"input_tokens\":3757,\"output_tokens\":251}}"
+    },
+    {
+      "review_id": "b526b632-d026-4f53-bf37-f0f71d9917d3",
+      "receipt_id": "154ef212-e24c-46cf-b4ab-cefe5f11deb2",
+      "response_raw_sha256": "3f649ff556cca8b768be1d82dab724bcfa110b89120d59e458abef6fe9ab15a3",
+      "raw_response_text": "{\"model\":\"jev-1.13.0\",\"answers\":{\"service\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.96,\"probabilities\":{\"positive\":0.97,\"negative\":0.0,\"mixed\":0.01,\"neutral\":0.0,\"not_mentioned\":0.02,\"uncertain\":0.0}},\"price\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.99,\"probabilities\":{\"positive\":0.99,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.01,\"not_mentioned\":0.0,\"uncertain\":0.0}},\"quality\":{\"type\":\"choice\",\"choice\":\"neutral\",\"confidence\":0.62,\"probabilities\":{\"positive\":0.06,\"negative\":0.01,\"mixed\":0.19,\"neutral\":0.68,\"not_mentioned\":0.03,\"uncertain\":0.02}},\"ambiance\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":1.0,\"probabilities\":{\"positive\":0.0,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":1.0,\"uncertain\":0.0}}},\"usage\":{\"input_tokens\":3550,\"output_tokens\":251}}"
+    },
+    {
+      "review_id": "cb063ce7-d700-46ed-bdc8-89f5962e2135",
+      "receipt_id": "baf45c5f-fbb3-4f5b-8928-97646191e215",
+      "response_raw_sha256": "986a20a62ed6c92bdf129017b32321b03cb9114b5c94044704d7e11872999047",
+      "raw_response_text": "{\"model\":\"jev-1.13.0\",\"answers\":{\"service\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.99,\"probabilities\":{\"positive\":0.99,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.01,\"uncertain\":0.0}},\"price\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.99,\"probabilities\":{\"positive\":0.99,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.01,\"uncertain\":0.0}},\"quality\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.92,\"probabilities\":{\"positive\":0.93,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.05,\"uncertain\":0.01}},\"ambiance\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":1.0,\"probabilities\":{\"positive\":1.0,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.0,\"uncertain\":0.0}}},\"usage\":{\"input_tokens\":3890,\"output_tokens\":248}}"
+    },
+    {
+      "review_id": "cfc7d409-6b2a-40b5-8575-fbad2c730e94",
+      "receipt_id": "b0a2dab2-e49b-484c-b02d-ccce0853043c",
+      "response_raw_sha256": "023d939f679a20f74270b709503f37ba8e67c75c0a423a9450271e1bd09f7853",
+      "raw_response_text": "{\"model\":\"jev-1.13.0\",\"answers\":{\"service\":{\"type\":\"choice\",\"choice\":\"negative\",\"confidence\":0.7,\"probabilities\":{\"positive\":0.0,\"negative\":0.75,\"mixed\":0.2,\"neutral\":0.0,\"not_mentioned\":0.02,\"uncertain\":0.03}},\"price\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":1.0,\"probabilities\":{\"positive\":0.0,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":1.0,\"uncertain\":0.0}},\"quality\":{\"type\":\"choice\",\"choice\":\"negative\",\"confidence\":0.6,\"probabilities\":{\"positive\":0.0,\"negative\":0.67,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.28,\"uncertain\":0.04}},\"ambiance\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":1.0,\"probabilities\":{\"positive\":0.0,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":1.0,\"uncertain\":0.0}}},\"usage\":{\"input_tokens\":3669,\"output_tokens\":254}}"
+    },
+    {
+      "review_id": "f585d6ca-7a7e-48e7-8c71-1c7a915faa27",
+      "receipt_id": "415ca2ba-9808-47b1-b3d7-852a04b1477a",
+      "response_raw_sha256": "bb73ddf2922b4c19529441b6855982ea01810900977683b508cbb3d7d906f6e2",
+      "raw_response_text": "{\"model\":\"jev-1.13.0\",\"answers\":{\"service\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.93,\"probabilities\":{\"positive\":0.9400000000000001,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.06,\"uncertain\":0.0}},\"price\":{\"type\":\"choice\",\"choice\":\"not_mentioned\",\"confidence\":1.0,\"probabilities\":{\"positive\":0.0,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":1.0,\"uncertain\":0.0}},\"quality\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.76,\"probabilities\":{\"positive\":0.8,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.17,\"uncertain\":0.02}},\"ambiance\":{\"type\":\"choice\",\"choice\":\"positive\",\"confidence\":0.98,\"probabilities\":{\"positive\":0.98,\"negative\":0.0,\"mixed\":0.0,\"neutral\":0.0,\"not_mentioned\":0.01,\"uncertain\":0.01}}},\"usage\":{\"input_tokens\":3542,\"output_tokens\":251}}"
+    }
+  ]
+}
