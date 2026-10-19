@@ -15,6 +15,8 @@ import {createClient} from "npm:@supabase/supabase-js@2.117.2";
 import {json} from "../_shared/cors.ts";
 import {restaurantPort} from "../_shared/jls-restaurant-store.ts";
 import {processRestaurant} from "../_shared/jls-restaurant-worker.ts";
+import {processDirect4Run,direct4ActiveProbe} from "../_shared/jls-direct4-server.ts";
+import {DIRECT4_PROTOCOL_VERSION} from "../_shared/jls-direct4-execution.ts";
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -22,6 +24,11 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='direct4_probe'){
+  // Read sources + injected mocks only; no provider key, authorization or paid queue.
+  try{return json(await direct4ActiveProbe(admin,payload));}
+  catch(e){return json({error:e instanceof Error?e.message:'DIRECT4_PROBE_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==="jev_chill80"){
   EdgeRuntime.waitUntil(processChill80(chill80Port(admin),payload.execution_id,Deno.env.get("TYPESAFE_API_KEY")??"",fetch)
    .catch(()=>console.error("CHILL80_STOPPED_NO_RETRY")));
@@ -65,6 +72,9 @@ Deno.serve(async r=>{
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
   const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version===DIRECT4_PROTOCOL_VERSION){
+   await processDirect4Run(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
+  }
   if(v?.data?.version==="jls-historical-snapshot-v2-vi-v1"){
    await processSnapshotRun(admin,run.id,{jev:Deno.env.get("TYPESAFE_API_KEY")??"",openai:Deno.env.get("OPENAI_API_KEY")??""},fetch);continue;
   }
