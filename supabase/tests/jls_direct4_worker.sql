@@ -17,6 +17,9 @@ do $$ declare x record;begin
  and pg_get_constraintdef(oid) like '%protocol_id%') then raise exception 'RUN_IDEMPOTENCE_MISSING';end if;
  if position('request_count' in pg_get_functiondef('public.claim_jls_restaurant_task(uuid,text)'::regprocedure))=0
  then raise exception 'RESERVATION_GUARD_MISSING';end if;
+ if not exists(select 1 from pg_constraint where conrelid='public.analysis_jls_restaurant_protocols'::regclass
+ and conname='analysis_jls_restaurant_protocols_establishment_id_check' and pg_get_constraintdef(oid) like '%jls-direct4-execution-v1%'
+ and pg_get_constraintdef(oid) like '%jls-historical-snapshot-v2-vi-v1%') then raise exception 'DIRECT4_TABLE_SCOPE_MISSING';end if;
 end $$;
 set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000004',true);
