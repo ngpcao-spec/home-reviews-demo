@@ -77,7 +77,7 @@ export interface DirectCategoryResult {version:string;model:string;usage:JevUsag
 export const DIRECT_ROUNDING_PARSER_VERSION='jev-direct-categories-parser-v1.1-rounding';
 export const DIRECT_PROBABILITY_SUM_TOLERANCE=0.01;
 export interface DirectProbabilityDiagnostic {category:DirectCategory;code:'PROBABILITY_SUM_ROUNDING'|'PROBABILITY_SUM_OUTSIDE_TOLERANCE';
- received_sum:number;absolute_deviation:number;absolute_tolerance:number;floating_margin:number;normalized:false}
+ received_sum:number;absolute_deviation:number;absolute_tolerance:number;floating_margin:string;normalized:false}
 export function parseDirectCategories(raw:unknown):DirectCategoryResult{
  return parseCategories(raw,false);
 }
@@ -106,7 +106,8 @@ function parseCategories(raw:unknown,rounding:boolean):DirectCategoryResult{
     const margin=8*Number.EPSILON*Math.max(1,Math.abs(sum),DIRECT_NATIVE_CHOICES.length);
     const outside=deviation>DIRECT_PROBABILITY_SUM_TOLERANCE+margin;
     const diagnostic:DirectProbabilityDiagnostic={category:k,code:outside?'PROBABILITY_SUM_OUTSIDE_TOLERANCE':'PROBABILITY_SUM_ROUNDING',
-     received_sum:sum,absolute_deviation:deviation,absolute_tolerance:DIRECT_PROBABILITY_SUM_TOLERANCE,floating_margin:margin,normalized:false};
+     // Lossless string avoids JS/JSONB canonical-hash differences for this very small exponent.
+     received_sum:sum,absolute_deviation:deviation,absolute_tolerance:DIRECT_PROBABILITY_SUM_TOLERANCE,floating_margin:String(margin),normalized:false};
     if(outside)throw Object.assign(Error('JEV_DIRECT_DISTRIBUTION_OUTSIDE_TOLERANCE'),{diagnostic});
     if(deviation>margin)diagnostics.push(diagnostic);
    }else if(deviation>1e-6)throw Error('JEV_DIRECT_INVALID_DISTRIBUTION');
