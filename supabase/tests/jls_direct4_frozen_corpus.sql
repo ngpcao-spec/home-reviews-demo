@@ -27,7 +27,7 @@ do $$declare p public.analysis_jls_restaurant_protocols;b jsonb;v jsonb;rid uuid
  begin perform public.authorize_jls_restaurant(p.id,null,null);raise exception 'MISSING_GO_ACCEPTED';
  exception when others then if sqlerrm not in('DIRECT4_HISTORICAL_DEPLOYED_QUALIFICATION_REQUIRED','DIRECT4_HISTORICAL_GO_SCOPE_CHANGED','JLS_NEW_GO_REQUIRED') then raise;end if;end;
  begin update public.analysis_jls_restaurant_protocols set body=jsonb_set(body,'{max_sol_calls}','2') where id=p.id;raise exception 'PROTOCOL_MUTABLE';
- exception when others then if sqlerrm<>'JLS_HISTORY_IMMUTABLE' then raise;end if;end;
+ exception when others then if sqlerrm<>'EVIDENCE_AUDIT_IMMUTABLE' then raise;end if;end;
  select id into rid from public.analysis_jls_restaurant_runs where protocol_id=p.id;
  if rid is not null then raise exception 'UNEXPECTED_PAID_RUN';end if;
  perform set_config('direct4_corpus_test.user',p.authority_user_id::text,true);perform set_config('direct4_corpus_test.protocol',p.id::text,true);
