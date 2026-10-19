@@ -47,8 +47,9 @@ export async function buildRecommendationDraftV22(plan:JlsPlan,decisions:JlsDeci
  request_sha256:await hybridHash(request),measurement,local_request_tokens,token_certificate:certificate,token_certificate_sha256:await hybridHash(certificate)};
 }
 const bookingAction=(a:{kind:string;text:string})=>['clarify','review'].includes(a.kind)&&/réservation|confirmation|đặt (?:phòng|bàn|chỗ)|xác nhận|booking|reservation/iu.test(a.text);
-export async function validateRecommendationReportV22(raw:unknown,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],language:'fr'|'vi'=p.language){
- const parsed=recommendationResponseV22.parse(raw),draft=await buildRecommendationDraftV22(p,decisions,language);
+export async function validateRecommendationReportV22(raw:unknown,p:JlsPlan,snapshot:PilotSnapshot,decisions:JlsDecision[],language:'fr'|'vi'=p.language,
+ prepared?:Awaited<ReturnType<typeof buildRecommendationDraftV22>>){
+ const parsed=recommendationResponseV22.parse(raw),draft=prepared??await buildRecommendationDraftV22(p,decisions,language);
  const base=await validatePrioritizedBindings(raw,parsed as BoundResponse,p,snapshot,decisions,language,JLS_DISCLOSURE_VALIDATOR,draft,ACTION_FOCUS_V22,true,(e,focus)=>{
   if(auditAssociationBoundary(e.theme_key,e.polarity,e.quote,e.context).status==='explicitly_contested')return false;
   if(focus==='order_customization')return requestedCustomizationSignal(e.quote,e.context).supported;
