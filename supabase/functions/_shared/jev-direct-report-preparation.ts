@@ -20,6 +20,8 @@ export const DIRECT_SYNTHESIS_VERSION='jls-direct4-balanced-synthesis-v1.1';
 export const DIRECT_SYNTHESIS_POLICY=Object.freeze({version:DIRECT_SYNTHESIS_VERSION,
  same_review_distinct_associations:true,max_per_review:2,original_context:'accepted_review_only_not_separately_verified_by_luna',
  incident_frequency:'not_inferred_from_category_or_selected_quotes',paid_enabled:false,production_enabled:false});
+export const DIRECT_COMPARISON_SELECTION=Object.freeze({version:'cached_accepted_plus_unverified_negative_v1',
+ max_per_review:3,max_evidence:32,reason:'bounded_comparison_keeps_accepted_sources_and_distinct_negative_category_gaps; no_new_positive_checks'});
 interface DirectSynthesis {version:typeof DIRECT_SYNTHESIS_VERSION;configuration_sha256:string;
  originals:{review_id:string;original_text:string;original_text_sha256:string;analysis_text_sha256:string;
   translation_source:string;translation_provenance:unknown}[];originals_sha256:string}
@@ -231,10 +233,15 @@ function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectRep
   text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}},packet,wire);
  return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
-export async function prepareDirectReport(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION){
+export async function prepareDirectReport(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION,comparisonIds?:string[]){
  if(synthesisVersion!==undefined&&synthesisVersion!==DIRECT_SYNTHESIS_VERSION)throw Error('DIRECT_REPORT_SYNTHESIS_VERSION_INVALID');
  const counts=await verifyDirectReportSources(i,binding);if(!/^[a-f0-9]{40}$/.test(code_commit))throw Error('DIRECT_REPORT_CODE_PROVENANCE_REQUIRED');
- const candidates=await directReportCandidates(i),selected=selectDirectEvidence(candidates,!!synthesisVersion),groups=await directReportLunaGroups(selected);
+ const candidates=await directReportCandidates(i);
+ if(comparisonIds&&(synthesisVersion!==DIRECT_SYNTHESIS_VERSION||!comparisonIds.length||comparisonIds.length>32||
+  new Set(comparisonIds).size!==comparisonIds.length||comparisonIds.some(id=>!candidates.some(e=>e.evidence_id===id))))throw Error('DIRECT_COMPARISON_SELECTION_INVALID');
+ const selected=comparisonIds?comparisonIds.map(id=>candidates.find(e=>e.evidence_id===id)!):selectDirectEvidence(candidates,!!synthesisVersion);
+ if(comparisonIds&&selected.some(e=>selected.filter(s=>s.review_id===e.review_id).length>DIRECT_COMPARISON_SELECTION.max_per_review))throw Error('DIRECT_COMPARISON_SELECTION_INVALID');
+ const groups=await directReportLunaGroups(selected);
  const originals=selected.map(e=>e.review_id).filter((id,n,a)=>a.indexOf(id)===n).sort().map(review_id=>{
   const r=i.snapshot.body.reviews.find(r=>r.id===review_id)!,d=i.dataset.body.reviews.find(r=>r.review_id===review_id)!;
   return {review_id,original_text:r.original_text,original_text_sha256:r.original_text_sha256,analysis_text_sha256:d.analysis_text_sha256,
@@ -242,7 +249,8 @@ export async function prepareDirectReport(i:DirectReportInput,code_commit:string
  });
  const synthesis:DirectSynthesis|undefined=synthesisVersion?{version:synthesisVersion,configuration_sha256:await directHash(DIRECT_SYNTHESIS_POLICY),
   originals,originals_sha256:await directHash(originals)}:undefined;
- const configuration=synthesis?{...DIRECT_REPORT_POLICY,synthesis_version:synthesis.version,synthesis_configuration_sha256:synthesis.configuration_sha256}:DIRECT_REPORT_POLICY;
+ const configuration=synthesis?{...DIRECT_REPORT_POLICY,synthesis_version:synthesis.version,synthesis_configuration_sha256:synthesis.configuration_sha256,
+  ...(comparisonIds?{comparison_selection:DIRECT_COMPARISON_SELECTION}:{})}:DIRECT_REPORT_POLICY;
  const stars=(rows:SnapshotReview[])=>Object.fromEntries([1,2,3,4,5].map(s=>[s,rows.filter(r=>r.rating===s).length]));
  const statistics={scope:{source_reviews:binding?.source_reviews??100,analysed_text_reviews:binding?.text_reviews??80,textless_statistics_only:(binding?.source_reviews??100)-(binding?.text_reviews??80)},counts,
   star_distribution_all:stars(i.snapshot.body.reviews),star_distribution_analysed:stars(i.snapshot.body.reviews.filter(r=>r.analysis_text)),
@@ -254,7 +262,8 @@ export async function prepareDirectReport(i:DirectReportInput,code_commit:string
   establishment_id:i.dataset.body.reviews[0].establishment_id,language:'vi',source_archive:{id:i.dataset.id,sha256:i.dataset.sha256},
   source_snapshot:{id:i.snapshot.id,sha256:i.snapshot.sha256,reviews_sha256:i.snapshot.body.source_reviews_sha256},
   configuration,configuration_sha256:await directHash(configuration),
-  selection:{algorithm:'existing_selectBalancedEvidence',algorithm_sha256:await balancedSelectorHash(),policy:BALANCED_POLICY,
+  selection:{algorithm:comparisonIds?DIRECT_COMPARISON_SELECTION.version:'existing_selectBalancedEvidence',algorithm_sha256:await balancedSelectorHash(),policy:BALANCED_POLICY,
+   ...(comparisonIds?{comparison_policy:DIRECT_COMPARISON_SELECTION}:{}),
    ...(synthesis?{association_policy:DIRECT_SYNTHESIS_POLICY,flow}:{}),
    quotation:'complete_frozen_review_exact; no 25-theme lexical pass; all are unverified candidates',
    specificity:'bounded_text_length_for_diversity_only_not_semantic_confidence',candidates,selected,
@@ -272,9 +281,9 @@ export async function prepareDirectReport(i:DirectReportInput,code_commit:string
 export type DirectReportPreparation=Awaited<ReturnType<typeof prepareDirectReport>>;
 export async function directAcceptedSol(p:DirectReportPreparation,results:DirectLunaResult[],count=localHybridTokens,wire?:string){
  if(p.sha256!==await directHash(p.body)||results.length!==p.body.luna_groups.length||
-  new Set(results.map(r=>r.review_id)).size!==results.length)throw Error('DIRECT_REPORT_LUNA_INCOMPLETE_OR_PLAN_CHANGED');
+  new Set(results.map(r=>r.request_sha256)).size!==results.length)throw Error('DIRECT_REPORT_LUNA_INCOMPLETE_OR_PLAN_CHANGED');
  const decisions:DirectLunaResult['decisions']=[];
- for(const group of p.body.luna_groups){const r=results.find(r=>r.review_id===group.review_id);
+ for(const group of p.body.luna_groups){const r=results.find(r=>r.review_id===group.review_id&&r.request_sha256===group.request_sha256);
   if(!r||directCanonical(await parseDirectReportLuna(group,r.raw_response))!==directCanonical(r))throw Error('DIRECT_REPORT_LUNA_RESULT_CHANGED');
   decisions.push(...r.decisions);
  }
