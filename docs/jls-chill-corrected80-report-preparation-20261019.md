@@ -106,3 +106,33 @@ n'est nécessaire. Aucun consentement, run ou tâche payante n'est créé.
 
 Les rapports, verdicts Luna et statistiques historiques demeurent immuables.
 La vérification technique et les décisions IA ne sont pas une validation humaine.
+
+## Identités enregistrées
+
+Dans `public.analysis_jls_snapshot_preparations` :
+
+- Protocole : `4c0e9a1e-1d8e-4793-b581-bfb4261c6b50`.
+- Empreinte du protocole :
+  `121d9dbed06d1c563b34f55c0c9e22c14086282f28074567196e2846bde51baa`.
+- Qualification gratuite : `a6fcfdfa-e3b3-406a-a02d-0d47da0e699b`.
+- Empreinte de qualification :
+  `652ca0884ac15157efe2cffc244ac50c2384bb9559f9343cbe2e11ec8f37aa7b`.
+- Provenance du code : `e741c23a6493e2707481a42b3fba21ab57165526`.
+
+La sauvegarde répétée à contenu identique restitue le même identifiant.
+Les identifiants ci-dessus sont des préparations, pas des runs payants.
+
+Texte de GO proposé, sans valeur de consentement tant que l'utilisateur ne le
+donne pas explicitement :
+
+> GO — J'autorise Codex à exécuter une seule fois le rapport vietnamien Chill Thái
+> selon le protocole 4c0e9a1e-1d8e-4793-b581-bfb4261c6b50, exclusivement à partir
+> de l'ensemble corrigé 3bb12448-e34d-4484-bcca-eafe17ae1415. Conserver le snapshot
+> de 100 avis, dont 80 textes analysés et 20 avis sans texte pour les statistiques.
+> Réutiliser les 25 verdicts Luna strictement compatibles, en conservant leurs
+> acceptations et rejets. Maximum 6 nouvelles requêtes gpt-6-luna regroupant
+> 7 questions, puis un seul appel gpt-6.1-sol avec le contrat compatible V2.2 si
+> les preuves sont suffisantes. Aucun appel JEV ou Apify. Aucun retry, fallback
+> ou appel supplémentaire ; ne jamais renvoyer une requête dont l'issue est
+> incertaine. Ne pas modifier les seuils ni les historiques. Assurer le lancement,
+> le suivi et la sauvegarde des résultats et preuves pour notre audit.
