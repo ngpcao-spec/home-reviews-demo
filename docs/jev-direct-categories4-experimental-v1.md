@@ -156,3 +156,25 @@ technique explicitement identifiée peut être archivée séparément.
 
 Le stockage expérimental utilise la table append-only existante, avec RLS par
 organisation et écriture serveur uniquement, sans nouvelle table ni migration.
+
+## Livraison figée
+
+Dans `public.analysis_jls_snapshot_preparations` :
+
+- Préparation : `f858bb8f-395d-4aa9-bd10-d7f641934244`.
+- SHA256 de préparation : `1edf645ff5bcbb5faf731a3f21b9a95e431a4094f4c746057b126ee127650f9d`.
+- SHA256 de configuration : `e5995c6e4b3a8f5949cbcde2531180ad3af503e50ee38b1b7674fceed561fe69`.
+- Qualification hors réseau : `dc164448-970f-481d-8550-b7d1711ff9b1`.
+- SHA256 de qualification : `8207e083ac33a150f48e31c3354dbba852e3e286b8878f41e318d28d73602d17`.
+- Commit du code figé : `be626a2741faf431b16f76671f670109509fcf4d`.
+
+La sauvegarde identique restitue le même identifiant ; aucune mise à jour ni
+suppression des archives historiques n'est réalisée. La qualification ne
+contient que des contrôles techniques explicitement mockés, aucun résultat
+fournisseur ni annotation des textes réels.
+
+Contrôles locaux : 62 nouveaux tests unitaires, 94 tests ciblés au total avec
+les régressions de l'adaptateur, contrôles Deno, lint et build réussis. Le rejeu
+des 80 payloads et son second passage ont été exécutés sous `--deny-net`.
+La validation sémantique et l'audit des futures classifications restent à faire
+après une autorisation et une exécution distinctes.
