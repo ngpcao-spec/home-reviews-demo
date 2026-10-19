@@ -14,7 +14,8 @@ beforeEach(async()=>{
  rows={establishments:{id:f.scope.establishment_id,organization_id:f.scope.organization_id,name:f.scope.establishment_name},
   analysis_jls_contract_v2_protocols:{...f.protocol},analysis_jls_contract_v2_operations:{...f.operation},analysis_jls_restaurant_protocols:null};
  const client={from:(table:string)=>{tables.push(table);const q={
-  select:()=>q,eq:(column:string,value:unknown)=>{queries.push({table,column,value});return q;},order:()=>q,limit:()=>q,
+  select:()=>q,eq:(column:string,value:unknown)=>{queries.push({table,column,value});return q;},
+  neq:(column:string,value:unknown)=>{queries.push({table,column:'neq:'+column,value});return q;},order:()=>q,limit:()=>q,
   maybeSingle:()=>Promise.resolve({data:rows[table],error:null}),single:()=>Promise.resolve({data:rows[table],error:null})};return q;}};
  vi.mocked(requireUser).mockReset().mockResolvedValue({user:{id:"synthetic-user"},client} as unknown as Awaited<ReturnType<typeof requireUser>>);
  vi.mocked(assertMembership).mockReset().mockResolvedValue("owner");
@@ -47,6 +48,7 @@ it("rejects tampered stored output without showing a legacy result instead",asyn
 it("keeps explicit historical reads separate from the current report",async()=>{
  expect((await request("&view=historical")).status).toBe(200);
  expect(tables).not.toContain("analysis_jls_contract_v2_operations");expect(tables).toContain("analysis_jls_restaurant_protocols");
+ expect(queries).toContainEqual({table:'analysis_jls_restaurant_protocols',column:'neq:body->>version',value:'jls-direct4-execution-v1'});
 });
 it("keeps older clients on their original read contract",async()=>{
  expect((await request("&view=legacy")).status).toBe(200);
@@ -57,4 +59,13 @@ it("falls back when no V2 paid execution exists",async()=>{
 });
 it("refuses every POST without authenticating or creating an operation",async()=>{
  const response=await request("","POST");expect(response.status).toBe(405);expect(requireUser).not.toHaveBeenCalled();expect(tables).toEqual([]);
+});
+it('serves the direct-four read contract with no run, while preserving authentication and tenant filters',async()=>{
+ rows.analysis_jls_restaurant_protocols={id:'synthetic-direct4',sha256:'synthetic',body:{version:'jls-direct4-execution-v1'}};
+ rows.analysis_jls_restaurant_runs=null;
+ const response=await request('&view=direct4'),body=await response.json();expect(response.status).toBe(200);
+ expect(body.protocol.id).toBe('synthetic-direct4');expect(body.run).toBeNull();expect(body.read_only).toBe(true);expect(body.new_provider_calls).toBe(0);
+ expect(tables).not.toContain('analysis_jls_contract_v2_operations');
+ expect(queries).toContainEqual({table:'analysis_jls_restaurant_protocols',column:'body->>version',value:'jls-direct4-execution-v1'});
+ expect(queries).toContainEqual({table:'analysis_jls_restaurant_runs',column:'organization_id',value:'synthetic-org'});
 });

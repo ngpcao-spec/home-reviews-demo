@@ -59,3 +59,18 @@ rejoue quatre étapes en mémoire avec les mêmes workers : `luna`, `prepared`,
 Les mesures CPU/durée/mémoire et identifiants d'exécution Edge sont archivés.
 Ces mocks prouvent le raccordement technique, pas le comportement réel de Luna
 ou Sol ni la justesse sémantique du futur rapport.
+
+Qualification effective du 19 octobre 2026 : worker `process-jls-restaurant` v18,
+lecture `jls-restaurant` v17, code exécuté `3933122`. Les quatre invocations Edge
+ont répondu HTTP 200 et enregistré leur identifiant d'exécution. Les archives
+de chaque étape sont reliées dans la qualification immuable
+`df1a79e4-004e-41c5-9c44-6bcbb1f96334` (`analysis_jls_snapshot_preparations`).
+Le protocole préparé est `16340d77-7743-4b6b-95a2-c897cb74ba1b`, empreinte
+`c497c7afb2e5f126b5ded6b93839b029a7185d91005575a512f50e61b7d856e7`.
+Aucun consentement, run ou appel fournisseur ne lui est associé.
+
+Les durées internes des quatre sondes vont de 726 à 1 179 ms. Le runtime expose
+`process.cpuUsage` à zéro : ce compteur n'est pas une mesure CPU exploitable et
+ne démontre pas une consommation nulle. Les sondes effectivement déployées ont
+terminé sans dépassement ; leurs durées totales incluent aussi les lectures et
+ne doivent pas être présentées comme du temps CPU.
