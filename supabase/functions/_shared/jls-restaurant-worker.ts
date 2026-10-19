@@ -74,8 +74,11 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
   out.input_tokens=u.input_tokens;out.output_tokens=u.output_tokens;out.usage=u;
   status="invalid_output";
   if(task.phase==="jev"){
+   if(contract?.parseJev)Object.assign(out,await contract.parseJev(state,task,raw));
+   else {
    const native=parseThemes(raw);if(native.model!==task.identity?.expected_served_model)throw Error("JLS_JEV_SERVED_MODEL_CHANGED");
    out.jev_response=native.decision;out.theme_results=economicThemeResults(native.decision);
+   }
   }else if(task.phase==="luna"){
    const plan=artifact<JlsPlan>(state,"evidence_plan")!,group=plan.luna_groups.find(g=>g.review_id===task.review_id)!;
    if(contract?.parseLuna)Object.assign(out,await contract.parseLuna(state,task,raw));
@@ -101,6 +104,7 @@ export interface RestaurantExecutionContract {
  verify(p:RestaurantProtocol,sha:string):Promise<void>;
  completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
  frozenAnalysisSource?:true;
+ parseJev?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
  parseLuna?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
 }
 export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev:string;openai:string},http:typeof fetch,contract?:RestaurantExecutionContract) {

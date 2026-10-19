@@ -23,7 +23,7 @@ Deno.serve(async r=>{
   await assertMembership(c.client,c.user.id,er.data.organization_id,["owner","admin","manager"]);
   if(new URL(r.url).searchParams.get('view')==='direct4'){
    const p=await c.client.from('analysis_jls_restaurant_protocols').select('id,body,sha256')
-    .eq('organization_id',er.data.organization_id).eq('establishment_id',er.data.id).eq('body->>version',DIRECT4_PROTOCOL_VERSION)
+    .eq('organization_id',er.data.organization_id).eq('establishment_id',er.data.id).in('body->>version',[DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1'])
     .order('created_at',{ascending:false}).limit(1).maybeSingle();if(p.error)throw Error('JLS_READ_FAILED');
    if(!p.data)return json({protocol:null,run:null,read_only:true,new_provider_calls:0});
    const run=await c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at')
