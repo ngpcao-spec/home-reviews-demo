@@ -71,9 +71,22 @@ export interface DirectCategoryAnswer {native_choice:DirectNativeChoice|null;cla
  status:'classified'|'uncertain'|'refused';probabilities:Record<DirectNativeChoice,number>|null;
  native_confidence:number|null;raw_answer:Record<string,unknown>}
 export interface DirectCategoryResult {version:string;model:string;usage:JevUsage|null;telemetry_warnings:string[];
- categories:Record<DirectCategory,DirectCategoryAnswer>;raw_response:Record<string,unknown>}
+ categories:Record<DirectCategory,DirectCategoryAnswer>;raw_response:Record<string,unknown>;
+ probability_diagnostics?:DirectProbabilityDiagnostic[]}
+// Parser policy only: the frozen supplier configuration and its cache identity stay unchanged.
+export const DIRECT_ROUNDING_PARSER_VERSION='jev-direct-categories-parser-v1.1-rounding';
+export const DIRECT_PROBABILITY_SUM_TOLERANCE=0.01;
+export interface DirectProbabilityDiagnostic {category:DirectCategory;code:'PROBABILITY_SUM_ROUNDING'|'PROBABILITY_SUM_OUTSIDE_TOLERANCE';
+ received_sum:number;absolute_deviation:number;absolute_tolerance:number;floating_margin:string;normalized:false}
 export function parseDirectCategories(raw:unknown):DirectCategoryResult{
+ return parseCategories(raw,false);
+}
+export function parseDirectCategoriesRounded(raw:unknown):DirectCategoryResult{
+ return parseCategories(raw,true);
+}
+function parseCategories(raw:unknown,rounding:boolean):DirectCategoryResult{
  const data=object(raw),answers=object(data.answers),categories={} as Record<DirectCategory,DirectCategoryAnswer>;
+ const diagnostics:DirectProbabilityDiagnostic[]=[];
  if(typeof data.model!=='string'||!data.model.trim()||Object.keys(answers).sort().join()!==[...DIRECT_CATEGORY_KEYS].sort().join())throw Error('JEV_DIRECT_FOUR_ANSWERS_REQUIRED');
  for(const k of DIRECT_CATEGORY_KEYS){
   const a=object(answers[k]);
@@ -87,21 +100,37 @@ export function parseDirectCategories(raw:unknown):DirectCategoryResult{
    if(Object.keys(p).sort().join()!==[...DIRECT_NATIVE_CHOICES].sort().join())throw Error('JEV_DIRECT_INVALID_DISTRIBUTION');
    probabilities=Object.fromEntries(DIRECT_NATIVE_CHOICES.map(c=>[c,probability(p[c])])) as Record<DirectNativeChoice,number>;
    // Numerical format validity only. This is NOT a confidence/classification threshold.
-   if(Math.abs(Object.values(probabilities).reduce((s,n)=>s+n,0)-1)>1e-6)throw Error('JEV_DIRECT_INVALID_DISTRIBUTION');
+   const sum=Object.values(probabilities).reduce((s,n)=>s+n,0),deviation=Math.abs(sum-1);
+   if(rounding){
+    // Bound floating-point addition error for six finite probabilities; not an extra statistical tolerance.
+    const margin=8*Number.EPSILON*Math.max(1,Math.abs(sum),DIRECT_NATIVE_CHOICES.length);
+    const outside=deviation>DIRECT_PROBABILITY_SUM_TOLERANCE+margin;
+    const diagnostic:DirectProbabilityDiagnostic={category:k,code:outside?'PROBABILITY_SUM_OUTSIDE_TOLERANCE':'PROBABILITY_SUM_ROUNDING',
+     // Lossless string avoids JS/JSONB canonical-hash differences for this very small exponent.
+     received_sum:sum,absolute_deviation:deviation,absolute_tolerance:DIRECT_PROBABILITY_SUM_TOLERANCE,floating_margin:String(margin),normalized:false};
+    if(outside)throw Object.assign(Error('JEV_DIRECT_DISTRIBUTION_OUTSIDE_TOLERANCE'),{diagnostic});
+    if(deviation>margin)diagnostics.push(diagnostic);
+   }else if(deviation>1e-6)throw Error('JEV_DIRECT_INVALID_DISTRIBUTION');
   }
   categories[k]={native_choice:choice,classification:choice==='uncertain'?null:choice,status:choice==='uncertain'?'uncertain':'classified',
    probabilities,native_confidence:a.confidence===undefined||a.confidence===null?null:probability(a.confidence),raw_answer:structuredClone(a)};
  }
  let usage:JevUsage|null=null;const telemetry_warnings:string[]=[];
  try{usage=parseUsage(data.usage);}catch{telemetry_warnings.push('USAGE_MISSING_OR_INVALID');}
- return {version:DIRECT_CONFIG.parser_version,model:data.model,usage,telemetry_warnings,categories,raw_response:structuredClone(data)};
+ return {version:rounding?DIRECT_ROUNDING_PARSER_VERSION:DIRECT_CONFIG.parser_version,model:data.model,usage,telemetry_warnings,categories,raw_response:structuredClone(data),
+  ...(rounding?{probability_diagnostics:diagnostics}:{})};
 }
 export interface DirectCountRow {review_id:string;result:DirectCategoryResult|null}
 export function directCategoryCounts(expectedReviewIds:readonly string[],rows:DirectCountRow[]){
  if(new Set(expectedReviewIds).size!==expectedReviewIds.length||new Set(rows.map(r=>r.review_id)).size!==rows.length||
   rows.some(r=>!expectedReviewIds.includes(r.review_id)))throw Error('JEV_DIRECT_DUPLICATE_OR_FOREIGN_REVIEW');
- for(const row of rows)if(row.result&&(row.result.version!==DIRECT_CONFIG.parser_version||
-  directCanonical(parseDirectCategories(row.result.raw_response).categories)!==directCanonical(row.result.categories)))throw Error('JEV_DIRECT_RESULT_CHANGED');
+ for(const row of rows)if(row.result){
+  const r=row.result,rounded=r.version===DIRECT_ROUNDING_PARSER_VERSION;
+  if(!rounded&&r.version!==DIRECT_CONFIG.parser_version)throw Error('JEV_DIRECT_RESULT_CHANGED');
+  const verified=rounded?parseDirectCategoriesRounded(r.raw_response):parseDirectCategories(r.raw_response);
+  if(directCanonical(verified.categories)!==directCanonical(r.categories)||
+   (rounded&&directCanonical(verified.probability_diagnostics)!==directCanonical(r.probability_diagnostics??null)))throw Error('JEV_DIRECT_RESULT_CHANGED');
+ }
  const byCategory=Object.fromEntries(DIRECT_CATEGORY_KEYS.map(k=>{
   const ids=(status:string)=>expectedReviewIds.filter(id=>{const a=rows.find(r=>r.review_id===id)?.result?.categories[k];
    if(status==='unavailable')return !a;if(!a)return false;
