@@ -48,10 +48,12 @@ export async function direct4ActiveProbe(client:SupabaseClient,request:{protocol
  if(dataset.error||snapshot.error)throw Error('DIRECT4_SOURCE_MISSING');
  await verifyDirectReportSources({dataset:dataset.data,snapshot:snapshot.data,prior_luna_requests:[]} as DirectReportInput);
  const fixture=await client.from('analysis_jls_snapshot_preparations').select('body,sha256').eq('protocol_id',loaded.parent_protocol_id)
-  .eq('kind','direct4_worker_probe_input_'+request.phase).single();
+  .eq('kind','direct4_worker_probe_input_'+request.phase+'_'+loaded.protocol.sha256.slice(0,12)).single();
  if(fixture.error||fixture.data.sha256!==await directHash(fixture.data.body)||fixture.data.body.explicit_technical_mock!==true||
-  fixture.data.body.protocol_sha256!==loaded.protocol.sha256)throw Error('DIRECT4_PROBE_INPUT_CHANGED');
- const result=await runDirect4WorkerProbe(request.phase,fixture.data.body.input),delta=process.cpuUsage(cpu);
+  fixture.data.body.protocol_sha256!==loaded.protocol.sha256||typeof fixture.data.body.input_json!=='string')throw Error('DIRECT4_PROBE_INPUT_CHANGED');
+ // Preserve the serialized mock artifact exactly, including sub-micro costs.
+ // JSONB and JS encode exponent numbers differently; do not change their hashes.
+ const result=await runDirect4WorkerProbe(request.phase,JSON.parse(fixture.data.body.input_json)),delta=process.cpuUsage(cpu);
  const body={worker_version:DIRECT4_WORKER_VERSION,protocol_id:loaded.protocol.id,protocol_sha256:loaded.protocol.sha256,
   phase:request.phase,passed:result.passed,result,provider_calls:0,explicit_technical_mock:true,
   cpu_ms:(delta.user+delta.system)/1000,wall_ms:performance.now()-at,memory:Deno.memoryUsage(),execution_id:Deno.env.get('SB_EXECUTION_ID')??null,
