@@ -1,11 +1,11 @@
 // Explicit in-memory test port only, reusing the historical queue/receipt mocks.
 import {snapshotMockPort,snapshotReadyMock} from './jls-snapshot-v2-probe.ts';
 import {processRestaurant,type RestaurantState} from './jls-restaurant-worker.ts';
-import {processReadySol,type ReadyState} from './jls-sol-ready-worker.ts';
+import {processReadySol,type ReadyState,type ReadyPort} from './jls-sol-ready-worker.ts';
 import {DIRECT_CATEGORY_KEYS,directHash} from './jev-direct-categories.ts';
 import {analysisTextSha256} from './analysis-text.ts';
 import {DIRECT_REPORT_FORMAT,type DirectReportPreparation} from './jev-direct-report-preparation.ts';
-import {direct4RestaurantContract,direct4ReadyContract,compileDirect4Ready,type Direct4Protocol,type Direct4Ready} from './jls-direct4-execution.ts';
+import {direct4RestaurantContract,direct4ReadyContract,compileDirect4Ready,DIRECT4_TOKEN_VERIFIER_VERSION,type Direct4Protocol,type Direct4Ready} from './jls-direct4-execution.ts';
 
 export async function direct4MockState(p:DirectReportPreparation,protocol:Direct4Protocol&{id:string}):Promise<RestaurantState>{
  const manifest={luna_groups:p.body.luna_groups,question_count:32,source_sha256:p.body.source_snapshot.sha256};
@@ -32,6 +32,30 @@ export function direct4SolMockPort(state:ReadyState){
   f.state.operation.request_count!==1||f.state.operation.status!=='dispatched')throw Error('DIRECT4_MOCK_NOT_RESERVED');
   f.calls.push(String(url));return new Response(JSON.stringify(direct4MockSolResponse(a)));};
  return {...f,http};
+}
+// Actual persisted request + actual saved Luna verdicts. Only the operation,
+// reservation, receipt and report below are explicit in-memory technical mocks.
+export async function replaySavedDirect4Sol(source:ReadyState,checks?:Pick<ReadyPort,'active'|'compatible'>){
+ if(source.operation.request_count!==0||source.operation.receipt!==null||source.operation.result!==null)
+  throw Error('DIRECT4_SAVED_PROBE_REQUIRES_UNSENT_SOL');
+ const original=await directHash(source),a=source.ready as unknown as Direct4Ready;
+ const state=structuredClone(source);
+ state.operation={...state.operation,id:'EXPLICIT_SAVED_SOL_MOCK',mode:'mock',run_id:null,status:'queued',phase:'sol',worker:null};
+ const f=direct4SolMockPort(state);
+ if(checks){f.port.active=()=>checks.active(source);f.port.compatible=()=>checks.compatible(source);}
+ const sent=await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',f.http,direct4ReadyContract);
+ if(sent.error_code||sent.phase!=='raw_receipt_saved'||f.calls.length!==1)throw Error(sent.error_code??'DIRECT4_SAVED_PROBE_SEND_FAILED');
+ const saved=await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',f.http,direct4ReadyContract);
+ if(saved.error_code||saved.phase!=='validation_saved'||f.state.operation.status!=='completed'||!f.state.operation.result?.validated_report)
+  throw Error(saved.error_code??'DIRECT4_SAVED_PROBE_VALIDATION_FAILED');
+ await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',f.http,direct4ReadyContract);
+ if(f.calls.length!==1||await directHash(source)!==original)throw Error('DIRECT4_SAVED_PROBE_MUTATION_OR_RETRY');
+ return {passed:true,token_verifier_version:DIRECT4_TOKEN_VERIFIER_VERSION,explicit_technical_mock:true,provider_calls:0,
+  mock_sol_calls:f.calls.length,real_luna_results_reused:a.body.results.length,source_operation_id:source.operation.id,
+  source_ready_sha256:source.ready.sha256,request_sha256:a.body.request_sha256,request_raw_sha256:a.body.request_raw_sha256,
+  token_certificate_sha256:a.body.token_certificate_sha256,measurement:a.body.measurement,sufficiency:a.body.sol.gate,
+  tokenizer_misses:[sent.tokenizer_misses,saved.tokenizer_misses],mock_receipt_saved:true,mock_result_readable:true,
+  source_state_unchanged:true,real_reservation_performed:false};
 }
 export async function prepareDirect4WorkerMocks(p:DirectReportPreparation,protocol:Direct4Protocol&{id:string}){
  const f=snapshotMockPort(await direct4MockState(p,protocol)),contract=direct4RestaurantContract(p);let last:RestaurantState|undefined;

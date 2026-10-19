@@ -12,6 +12,7 @@ import type {ReadyContract,ReadyState} from './jls-sol-ready-worker.ts';
 import type {JlsPlan} from './jev-luna-sol.ts';
 
 export const DIRECT4_WORKER_VERSION='jls-direct4-worker-v1';
+export const DIRECT4_TOKEN_VERIFIER_VERSION='jls-direct4-token-wire-v1';
 export const DIRECT4_PROTOCOL_VERSION='jls-direct4-execution-v1';
 export const DIRECT4_READY_VERSION='jls-direct4-sol-ready-v1';
 export const DIRECT4_PREPARATION_ID='bace8577-e302-42fe-8625-ff9951c1c788';
@@ -87,7 +88,7 @@ export async function verifyDirect4Ready(s:ReadyState){
  if(a.sha256!==await directHash(b)||b.version!==DIRECT4_READY_VERSION||b.source_protocol_sha256!==s.protocol.sha256||
   await analysisTextSha256(b.request_json)!==b.request_raw_sha256||await directHash(JSON.parse(b.request_json))!==b.request_sha256||
   await directHash(b.results)!==b.results_sha256||await directHash(b.token_certificate)!==b.token_certificate_sha256)throw Error('DIRECT4_SOL_ARTIFACT_CHANGED');
- const memo=await attachPlanTokenMemo(p.body,b.token_certificate,true),branch=await directAcceptedSol(p,b.results,memo.count);
+ const memo=await attachPlanTokenMemo(p.body,b.token_certificate,true),branch=await directAcceptedSol(p,b.results,memo.count,b.request_json);
  if(!branch.gate.passed||!branch.draft||await directHash(branch.draft)!==await directHash(b.sol.draft)||
   await directHash(branch.gate)!==await directHash(b.sol.gate)||await directHash(branch.draft.request)!==b.request_sha256)throw Error('DIRECT4_SOL_BINDING_CHANGED');
  // Erased type adapter only: the actual object contains four categories, never theme projections.
@@ -95,6 +96,6 @@ export async function verifyDirect4Ready(s:ReadyState){
 }
 export const direct4ReadyContract:ReadyContract={verify:verifyDirect4Ready,validate:async(raw,s,plan)=>{
  const a=(s.ready as unknown as Direct4Ready).body;
- return await validateDirectReport(raw,a.preparation,a.results,planTokenMemo(plan)!.count) as unknown as Awaited<ReturnType<ReadyContract['validate']>>;
+ return await validateDirectReport(raw,a.preparation,a.results,planTokenMemo(plan)!.count,a.request_json) as unknown as Awaited<ReturnType<ReadyContract['validate']>>;
 },reportItems:validated=>{const v=validated as Awaited<ReturnType<typeof validateDirectReport>>;
  return [...v.report.categories,...v.report.positive_aspects,...v.report.negative_aspects,v.report.conclusion,...v.report.recommendations].map(()=>({status:'bound'}));}};

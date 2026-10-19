@@ -74,3 +74,43 @@ Les durées internes des quatre sondes vont de 726 à 1 179 ms. Le runtime expos
 ne démontre pas une consommation nulle. Les sondes effectivement déployées ont
 terminé sans dépassement ; leurs durées totales incluent aussi les lectures et
 ne doivent pas être présentées comme du temps CPU.
+
+## Correction du certificat après le premier lancement réel
+
+Version du vérificateur : `jls-direct4-token-wire-v1`.
+Run source : `1a7b3920-e624-40d0-a829-b276f739dbdc` ; artefact Sol conservé :
+`059a42bc-f92b-4e8f-8076-0afb706ec3fb`.
+
+La mesure existait : 16 365 tokens locaux, 18 585 avec marge, budget 32 768.
+Le certificat contenait bien le texte exact de la requête figée. La relecture
+JSONB a changé l'ordre des clés de `statistics`. Le vérificateur reconstruisait
+ensuite un nouveau texte JSON dans `input[1].content` et cherchait sa mesure
+exacte dans le certificat scellé. Les données étaient identiques, la chaîne ne
+l'était plus : `JLS_TOKEN_MEASUREMENT_MISSING`, avant réservation de Sol.
+
+Le correctif reconstruit toujours le dossier accepté avec les 32 réponses Luna
+réelles, contrôle son égalité canonique avec le contenu figé, ainsi que le prompt,
+le modèle, le schéma, la sortie réservée et tous les autres champs de requête.
+Il mesure et transmet ensuite **la requête figée exacte**. Les doubles clés,
+changements de contenu et entrées de certificat absentes restent refusés.
+Il n'y a aucun fallback de tokenisation, aucune hausse du budget, aucune
+normalisation des probabilités et aucun changement des critères de preuve.
+
+La vérification avant envoi et la validation après réponse utilisent la même
+liaison au texte figé. Le certificat, les empreintes de requête, les verdicts et
+l'artefact historiques restent inchangés. Les nouveaux dossiers compilés sans
+liaison explicite gardent leur construction précédente.
+
+Le probe initial transportait toute sa fixture dans une chaîne JSON, conservant
+l'ordre des clés local. Il ne couvrait donc pas la relecture normale de l'artefact
+Sol JSONB. Le nouveau mode de qualification `direct4_probe`, phase `saved_sol`,
+charge cet artefact et les résultats Luna par le même adaptateur de stockage que
+le worker. Il conserve les contrôles de compte, d'organisation et de sources,
+puis simule uniquement la réservation et le transport Sol en mémoire. Il ne
+réouvre pas le run bloqué et ne crée aucun consentement, tâche ou run payant.
+
+Rejeu local : `scripts/replay-jls-direct4-sol-wire.ts`, avec `--deny-net` et un
+export privé contenant `state_json` produit par PostgreSQL (`jsonb::text`). Ce
+format préserve précisément l'ordre rencontré sur le serveur. La sortie porte
+explicitement `explicit_technical_mock`, réutilise les 32 résultats réels et
+vérifie également réception, validation, sauvegarde simulées et absence de retry.
