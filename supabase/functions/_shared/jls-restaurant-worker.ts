@@ -40,6 +40,7 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
  try{
   if(!key||task.run_id!==state.run.id||task.organization_id!==p.organization_id||task.request_count!==1||task.status!=="running"||
    task.request_sha256!==await hybridHash(task.request))throw Error("JLS_RESERVED_ATTEMPT_CHANGED");
+  if(contract?.requestWire)wire=contract.requestWire(state,task);
   const q=task.request as {model:string};
   const expected=task.phase==="jev"?"jev-latest":task.phase==="luna"?"gpt-6-luna":"gpt-6.1-sol";
   if(q.model!==expected)throw Error("JLS_REQUEST_MODEL_INVALID");
@@ -104,6 +105,7 @@ export interface RestaurantExecutionContract {
  verify(p:RestaurantProtocol,sha:string):Promise<void>;
  completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
  frozenAnalysisSource?:true;
+ requestWire?(state:RestaurantState,task:RestaurantTask):string;
  parseJev?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
  parseLuna?(state:RestaurantState,task:RestaurantTask,raw:unknown):Promise<Record<string,unknown>>;
 }

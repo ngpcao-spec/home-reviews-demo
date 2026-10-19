@@ -34,7 +34,7 @@ export function historicalMockHttp(state:RestaurantState,calls:string[]){
 export async function rehearseHistoricalDirect4(p:HistoricalDirect4Protocol&{id:string}){
  const state:RestaurantState={protocol:{...p,body:asRestaurantProtocol(p.body)},run:{id:'EXPLICIT_MOCK_RUN',stage:'jev',status:'queued'},artifacts:[],
   tasks:p.body.pending.map((t,n)=>({id:'EXPLICIT_MOCK_JEV_'+n,run_id:'EXPLICIT_MOCK_RUN',organization_id:p.body.organization_id,phase:'jev',review_id:t.review_id,
-   request:t.payload,request_sha256:t.request_sha256,identity:t.identity,status:'pending',request_count:0,worker:'',cache_id:null}))};
+   request:{...t.payload,questions:p.body.configuration.jev.questions},request_sha256:t.request_sha256,identity:t.identity,status:'pending',request_count:0,worker:'',cache_id:null}))};
  const f=directMockPort(state),calls:string[]=[],http=historicalMockHttp(f.state,calls),fixtures:Record<string,unknown>={};
  for(let i=0;i<9;i++){if(i===8)fixtures.jev={state:structuredClone(f.state)};await processRestaurant(f.port,f.state.run.id,{jev:'EXPLICIT_MOCK',openai:'EXPLICIT_MOCK'},http,historicalDirect4Contract());}
  if(f.state.run.stage!=='prepare_evidence'||calls.length!==68)throw Error('MOCK_JEV_INCOMPLETE');

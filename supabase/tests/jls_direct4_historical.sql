@@ -13,7 +13,7 @@ do $$declare p public.analysis_jls_restaurant_protocols;r uuid;tid uuid;aid uuid
  insert into public.analysis_jls_restaurant_runs(protocol_id,organization_id,consent,consent_sha256,expires_at,status,stage)
  values(p.id,p.organization_id,c,public.jls_restaurant_hash(c),now()+interval '1 hour','queued','jev') returning id into r;
  insert into public.analysis_jls_restaurant_tasks(run_id,organization_id,phase,task_key,review_id,request,request_sha256,identity)
- select r,p.organization_id,'jev',x->>'review_id',(x->>'review_id')::uuid,x->'payload',x->>'request_sha256',x->'identity' from jsonb_array_elements(p.body->'pending')x;
+ select r,p.organization_id,'jev',x->>'review_id',(x->>'review_id')::uuid,(x->'payload')||jsonb_build_object('questions',p.body->'configuration'->'jev'->'questions'),x->>'request_sha256',x->'identity' from jsonb_array_elements(p.body->'pending')x;
  if not public.claim_jls_restaurant_tick(r,'technical_mock') then raise exception 'MOCK_TICK_FAILED';end if;
  for i in 1..68 loop
  token=public.claim_jls_restaurant_task(r,'technical_mock');

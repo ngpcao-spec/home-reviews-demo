@@ -39,7 +39,7 @@ export async function prepareHistoricalDirect4(input:{historical:FrozenHistorica
  const source_snapshot={reviews,source_reviews_sha256:await directHash(reviews)};
  const pending=await Promise.all([...textual].sort((a,b)=>a.id.localeCompare(b.id)).map(async(r,n)=>{
   const payload=directCategoryPayload('review_'+String(n+1).padStart(3,'0'),r.analysis_text!);
-  return {review_id:r.id,payload,request_sha256:await directHash(payload),request_raw_sha256:await analysisTextSha256(JSON.stringify(payload)),
+  return {review_id:r.id,payload:{model:payload.model,state:payload.state},request_sha256:await directHash(payload),request_raw_sha256:await analysisTextSha256(JSON.stringify(payload)),
    identity:{configuration_id:DIRECT_CONFIG.id,configuration_sha256:await directHash(DIRECT_CONFIG),analysis_text_sha256:r.analysis_text_sha256,
     requested_model:DIRECT_CONFIG.requested_model,expected_served_model:'record_native_no_probe'}};
  }));
@@ -78,14 +78,19 @@ export async function verifyHistoricalDirect4(p:HistoricalDirect4Protocol['body'
    r.organization_id!==p.organization_id||r.establishment_id!==p.establishment_id||await analysisTextSha256(r.original_text)!==r.original_text_sha256||
    r.analysis_text&&await analysisTextSha256(r.analysis_text)!==r.analysis_text_sha256)throw Error('DIRECT4_HISTORICAL_TEXT_CHANGED');
  }
- for(const t of p.pending){const r=p.source_snapshot.reviews.find(r=>r.id===t.review_id);
+ for(const t of p.pending){const r=p.source_snapshot.reviews.find(r=>r.id===t.review_id),request=directCategoryPayload(t.payload.state.review_alias,t.payload.state.analysis_text);
   if(!r?.analysis_text||t.payload.state.analysis_text!==r.analysis_text||t.payload.model!==DIRECT_CONFIG.requested_model||
-   await directHash(t.payload.questions)!==await directHash(DIRECT_CONFIG.questions)||await directHash(t.payload)!==t.request_sha256||
-   await analysisTextSha256(JSON.stringify(t.payload))!==t.request_raw_sha256)throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');}
+   await directHash(request)!==t.request_sha256||await analysisTextSha256(JSON.stringify(request))!==t.request_raw_sha256)throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');}
 }
 const protocol=(s:RestaurantState)=>s.protocol.body as unknown as HistoricalDirect4Protocol['body'];
 export function historicalDirect4Contract(preparation?:DirectReportPreparation):RestaurantExecutionContract{return {
  frozenAnalysisSource:true,verify:async(p,sha)=>verifyHistoricalDirect4(p as unknown as HistoricalDirect4Protocol['body'],sha),
+ requestWire:(_s,t)=>{
+  if(t.phase!=='jev')return JSON.stringify(t.request);
+  const q=t.request as ReturnType<typeof directCategoryPayload>,wire=directCategoryPayload(q.state.review_alias,q.state.analysis_text);
+  if(directCanonical(q)!==directCanonical(wire))throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');
+  return JSON.stringify(wire);
+ },
  parseJev:async(_s,_t,raw)=>({direct4_result:parseDirectCategoriesRounded(raw)}),
  parseLuna:async(_s,t,raw)=>{const g=preparation?.body.luna_groups.find(g=>g.review_id===t.review_id);
   if(!g||t.request_sha256!==g.request_sha256)throw Error('DIRECT4_HISTORICAL_LUNA_MANIFEST_CHANGED');
