@@ -32,7 +32,7 @@ personnalisée, publicité et frais de stationnement. Elles ne remplacent aucun
 comptage JEV et doivent passer Luna avant toute utilisation par Sol.
 
 32 preuves sont sélectionnées. 25 verdicts historiques sont exactement
-réutilisables : 21 ACCEPTED et 4 REJECTED. Les verdicts rejetés restent exclus
+réutilisables : 21 ACCEPTED et 4 UNCERTAIN. Les verdicts incertains restent exclus
 du dossier Sol ; ils ne sont pas renvoyés à Luna.
 7 nouvelles questions concernent 6 avis : **6 nouvelles requêtes maximum**,
 en deçà du plafond demandé de 32. Les deux questions d'un même avis sont groupées.
@@ -130,7 +130,7 @@ donne pas explicitement :
 > de l'ensemble corrigé 3bb12448-e34d-4484-bcca-eafe17ae1415. Conserver le snapshot
 > de 100 avis, dont 80 textes analysés et 20 avis sans texte pour les statistiques.
 > Réutiliser les 25 verdicts Luna strictement compatibles, en conservant leurs
-> acceptations et rejets. Maximum 6 nouvelles requêtes gpt-6-luna regroupant
+> statuts, notamment les incertitudes. Maximum 6 nouvelles requêtes gpt-6-luna regroupant
 > 7 questions, puis un seul appel gpt-6.1-sol avec le contrat compatible V2.2 si
 > les preuves sont suffisantes. Aucun appel JEV ou Apify. Aucun retry, fallback
 > ou appel supplémentaire ; ne jamais renvoyer une requête dont l'issue est
