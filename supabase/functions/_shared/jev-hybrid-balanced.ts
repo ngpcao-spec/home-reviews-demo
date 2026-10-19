@@ -282,6 +282,7 @@ export type BalancedSelectionInput=Pick<BalancedEvidence,'evidence_id'|'review_i
 export function selectBalancedEvidence<T extends BalancedSelectionInput>(
   candidates: T[],
   max: number,
+  options: {same_review_distinct_associations?:boolean} = {},
 ) {
   const selected: T[] = [],
     eligible = candidates.filter((c) =>
@@ -298,7 +299,8 @@ export function selectBalancedEvidence<T extends BalancedSelectionInput>(
   const available = () =>
     eligible.filter((c) =>
       !selected.some((s) =>
-        s.evidence_id === c.evidence_id || sameQuote(s, c)
+        s.evidence_id === c.evidence_id || (sameQuote(s, c) && !(options.same_review_distinct_associations &&
+          s.review_id === c.review_id && (s.theme_key !== c.theme_key || s.polarity !== c.polarity)))
       ) && selected.filter((s) =>
           s.review_id === c.review_id
         ).length < BALANCED_POLICY.max_per_review

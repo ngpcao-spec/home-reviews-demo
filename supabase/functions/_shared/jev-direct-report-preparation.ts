@@ -15,6 +15,14 @@ import {RESTAURANT_POLICY} from './jls-restaurant.ts';
 export const DIRECT_REPORT_VERSION='jev-direct-categories4-luna-sol-report-preparation-v1';
 export const DIRECT_REPORT_FORMAT='jls-direct-categories4-report-v1';
 export const DIRECT_REPORT_KIND='jev_direct_categories4_report_preparation_v1';
+// Explicit opt-in for FUTURE experimental preparations. Frozen V1 stays byte-compatible.
+export const DIRECT_SYNTHESIS_VERSION='jls-direct4-balanced-synthesis-v1.1';
+export const DIRECT_SYNTHESIS_POLICY=Object.freeze({version:DIRECT_SYNTHESIS_VERSION,
+ same_review_distinct_associations:true,max_per_review:2,original_context:'accepted_review_only_not_separately_verified_by_luna',
+ incident_frequency:'not_inferred_from_category_or_selected_quotes',paid_enabled:false,production_enabled:false});
+interface DirectSynthesis {version:typeof DIRECT_SYNTHESIS_VERSION;configuration_sha256:string;
+ originals:{review_id:string;original_text:string;original_text_sha256:string;analysis_text_sha256:string;
+  translation_source:string;translation_provenance:unknown}[];originals_sha256:string}
 export const DIRECT_REPORT_DATASET_ID='087f0b5b-716b-4b94-8a1d-ee2040e22f99';
 export const DIRECT_REPORT_DATASET_SHA='d65660a32ffb736637a0d594e6fa3a6413c017ac8a4eb27fdd5021a14ad662e9';
 export const DIRECT_REPORT_POLICY=Object.freeze({version:DIRECT_REPORT_VERSION,language:'vi',max_evidence:32,
@@ -88,11 +96,11 @@ export async function directReportCandidates(i:DirectReportInput){
  }
  return candidates;
 }
-function selectDirectEvidence(candidates:DirectReportEvidence[]){
+function selectDirectEvidence(candidates:DirectReportEvidence[],balancedSynthesis=false){
  const view=candidates.map(e=>({...e,theme_key:e.category,axis:e.category==='ambiance'?'atmosphere':e.category,
   mixed_review:e.jev_native.classification==='mixed',status:'sol_candidate' as const,
   quality:{eligible:true,specificity:Math.min(60,e.quote.length/8),flags:[] as string[],reason:'EXACT_FULL_REVIEW_CANDIDATE_NOT_SEMANTIC_VALIDATION',human_validated:false as const}}));
- return selectBalancedEvidence(view,DIRECT_REPORT_POLICY.max_evidence).map(e=>({...candidates.find(c=>c.evidence_id===e.evidence_id)!,
+ return selectBalancedEvidence(view,DIRECT_REPORT_POLICY.max_evidence,{same_review_distinct_associations:balancedSynthesis}).map(e=>({...candidates.find(c=>c.evidence_id===e.evidence_id)!,
   selection_stage:e.selection_stage,selection_reason:e.selection_reason}));
 }
 export async function directReportLunaGroups(selected:DirectReportEvidence[]):Promise<DirectLunaGroup[]>{
@@ -160,6 +168,38 @@ export function directReportInstructions(scope={source_reviews:100,analysed_text
  'Preserve mixed opinions, negation, uncertainty, staff reactions, compensation and later resolution. Preserve dish, ingredient and preparation relationships faithfully in Vietnamese. Do not change a compliment because another facet is criticized.',
  'Use natural language for the restaurateur. Keep IDs, hashes, field names and statuses in structured audit fields only. Keep methodological limits in the separate server note. Technical checks and AI judgments are not independent human validation.',
 ].join('\n');}
+export function balancedDirectReportInstructions(scope={source_reviews:100,analysed_text_reviews:80,textless_statistics_only:20}){
+ return directReportInstructions(scope).replace('Never recalculate, replace or generate numerical counts.',
+  'Use only the exact server counts and their denominators; never recalculate or invent numerical counts.')+'\n'+[
+  'OVERALL BALANCE: Read the full-corpus star distribution AND category counts before writing. A strongly positive corpus must remain clearly positive overall, while honestly identifying useful improvements. Stars describe the corpus; never override a textual criticism with its rating. Selected quotations are deliberately diverse, not a representative sample.',
+  'CONCRETE COMPLAINTS: Consider the accepted criticisms, including a precise useful isolated complaint. Describe it as a customer report or a point to verify, not a confirmed fact or recurring problem. No negative subsection or recommendation is required for every category. Do not invent a missing criticism to balance the layout.',
+  'PROPORTIONATE PRIORITIES: Weigh available category frequency, seriousness, evidence precision and actionability together. Category-level criticism counts do not establish how often a specific incident happened. For an isolated signal propose an appropriate check; for a repeated incident require evidence of that same incident in distinct reviews. Several selected citations or two polarities from one review are not independent incidents. Do not force a fixed number of actions.',
+  'ORIGINAL AND TRANSLATION: original_reviews contains the frozen original beside the analysed quotation, with provenance and hashes. Consult it when translation is ambiguous, preserving dishes, ingredients, relations and mixed opinions. It is context, not a new Luna verdict: do not invent a new accepted category, polarity or claim from the original. If the discrepancy cannot be resolved, qualify or omit the claim rather than silently rewriting a quote. No systematic new translation is requested.',
+  'COVERAGE: coverage describes losses at selection and Luna, not semantic truth. A missing accepted proof limits illustration, not the server category statistics. Report proportions describe the analysed perimeter only. Keep the short conclusion focused on the overall strengths and proportionate priorities; keep methodology separate.',
+ ].join('\n');
+}
+// Association flow only: neither an incident counter nor an assessment of semantic correctness.
+export function directEvidenceFlow(candidates:DirectReportEvidence[],selected:DirectReportEvidence[],
+ decisions:{evidence_id:string;status:string}[]=[],referenced:string[]=[]){
+ const chosen=new Set(selected.map(e=>e.evidence_id)),refs=new Set(referenced);
+ return {unit:'review_category_polarity_association_not_incident',semantic_accuracy_measured:false,
+  by_category_polarity:DIRECT_CATEGORY_KEYS.flatMap(category=>(['positive','negative'] as const).map(polarity=>{
+   const pool=candidates.filter(e=>e.category===category&&e.polarity===polarity),picked=pool.filter(e=>chosen.has(e.evidence_id));
+   const ids=(status:string)=>picked.filter(e=>decisions.some(d=>d.evidence_id===e.evidence_id&&d.status===status)).map(e=>e.evidence_id);
+   const accepted=ids('ACCEPTED');
+   return {category,polarity,candidates:pool.length,selected:picked.length,
+    omitted_at_selection:pool.filter(e=>!chosen.has(e.evidence_id)).map(e=>e.evidence_id),accepted,
+    rejected:ids('REJECTED'),uncertain:ids('UNCERTAIN'),
+    pending:picked.filter(e=>!decisions.some(d=>d.evidence_id===e.evidence_id)).map(e=>e.evidence_id),
+    referenced:accepted.filter(id=>refs.has(id)),accepted_not_referenced:accepted.filter(id=>!refs.has(id))};
+  }))};
+}
+export function directSynthesisStatistics(statistics:unknown){
+ const s=statistics as {counts:{categories:Record<string,Record<string,unknown>>;[key:string]:unknown};[key:string]:unknown};
+ // Keep every server count, but leave repeated review-ID lists in the audit archive.
+ return {...s,counts:{...s.counts,categories:Object.fromEntries(Object.entries(s.counts.categories).map(([k,c])=>
+  [k,Object.fromEntries(Object.entries(c).filter(([key])=>!['positive_review_ids','negative_review_ids','mentioned_review_ids'].includes(key)))]))}};
+}
 // JSONB may reorder object keys. Validate reconstructed contents, but measure
 // and send the exact frozen wire whose strings the sealed certificate measured.
 export function bindDirectSolWire<T extends {input:{role:string;content:string}[]}>(expected:T,packet:unknown,wire?:string):T{
@@ -174,33 +214,48 @@ export function bindDirectSolWire<T extends {input:{role:string;content:string}[
  if(directCanonical(comparable)!==directCanonical(expected))throw Error('DIRECT_REPORT_SOL_REQUEST_CHANGED');
  return saved as T;
 }
-function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectReportEvidence[],conditional:boolean,count=localHybridTokens,wire?:string){
+function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectReportEvidence[],conditional:boolean,count=localHybridTokens,wire?:string,
+ synthesis?:DirectSynthesis,coverage?:ReturnType<typeof directEvidenceFlow>){
  const scope=(statistics as {scope:{source_reviews:number;analysed_text_reviews:number;textless_statistics_only:number}}).scope;
- const packet={format_version:DIRECT_REPORT_FORMAT,language:'vi',statistics,statistics_sha256,
+ const packet={format_version:DIRECT_REPORT_FORMAT,language:'vi',statistics:synthesis?directSynthesisStatistics(statistics):statistics,statistics_sha256,
   evidence:evidence.map(({evidence_id,review_id,category,polarity,quote,quote_sha256,analysis_text_sha256,translation_source})=>
    ({evidence_id,review_id,category,polarity,quote,quote_sha256,analysis_text_sha256,translation_source,context_same_as_quote:true})),
+  ...(synthesis?{synthesis_version:synthesis.version,original_reviews:synthesis.originals.filter(r=>evidence.some(e=>e.review_id===r.review_id)),
+   coverage:coverage?.by_category_polarity.map(x=>({category:x.category,polarity:x.polarity,candidates:x.candidates,selected:x.selected,
+    accepted:x.accepted.length,rejected:x.rejected.length,uncertain:x.uncertain.length,pending:x.pending.length}))}:{}),
   scope:conditional?'CONDITIONAL_CANDIDATES_NOT_LUNA_VERDICTS':'LUNA_ACCEPTED_ONLY',
   methodology_vi:`Báo cáo thử nghiệm trên ${scope.analysed_text_reviews} đánh giá có văn bản trong lô ${scope.source_reviews} đánh giá; ${scope.textless_statistics_only} đánh giá không có văn bản chỉ dùng cho thống kê chung. Số liệu theo nhóm không phải tần suất của từng sự cố. Luna và Sol đưa ra nhận định AI, không phải xác nhận độc lập của con người.`};
- const prompt=directReportInstructions(scope),{$schema:_,...schema}=z.toJSONSchema(directReportResponse);
+ const prompt=synthesis?balancedDirectReportInstructions(scope):directReportInstructions(scope),{$schema:_,...schema}=z.toJSONSchema(directReportResponse);
  const request=bindDirectSolWire({model:'gpt-6.1-sol',reasoning:{effort:'low'},max_output_tokens:SOL_SIZE_POLICY.max_output_tokens,
   input:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(packet)}],
   text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}},packet,wire);
  return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
-export async function prepareDirectReport(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding){
+export async function prepareDirectReport(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION){
+ if(synthesisVersion!==undefined&&synthesisVersion!==DIRECT_SYNTHESIS_VERSION)throw Error('DIRECT_REPORT_SYNTHESIS_VERSION_INVALID');
  const counts=await verifyDirectReportSources(i,binding);if(!/^[a-f0-9]{40}$/.test(code_commit))throw Error('DIRECT_REPORT_CODE_PROVENANCE_REQUIRED');
- const candidates=await directReportCandidates(i),selected=selectDirectEvidence(candidates),groups=await directReportLunaGroups(selected);
+ const candidates=await directReportCandidates(i),selected=selectDirectEvidence(candidates,!!synthesisVersion),groups=await directReportLunaGroups(selected);
+ const originals=selected.map(e=>e.review_id).filter((id,n,a)=>a.indexOf(id)===n).sort().map(review_id=>{
+  const r=i.snapshot.body.reviews.find(r=>r.id===review_id)!,d=i.dataset.body.reviews.find(r=>r.review_id===review_id)!;
+  return {review_id,original_text:r.original_text,original_text_sha256:r.original_text_sha256,analysis_text_sha256:d.analysis_text_sha256,
+   translation_source:d.translation_source,translation_provenance:structuredClone(d.translation_provenance)};
+ });
+ const synthesis:DirectSynthesis|undefined=synthesisVersion?{version:synthesisVersion,configuration_sha256:await directHash(DIRECT_SYNTHESIS_POLICY),
+  originals,originals_sha256:await directHash(originals)}:undefined;
+ const configuration=synthesis?{...DIRECT_REPORT_POLICY,synthesis_version:synthesis.version,synthesis_configuration_sha256:synthesis.configuration_sha256}:DIRECT_REPORT_POLICY;
  const stars=(rows:SnapshotReview[])=>Object.fromEntries([1,2,3,4,5].map(s=>[s,rows.filter(r=>r.rating===s).length]));
  const statistics={scope:{source_reviews:binding?.source_reviews??100,analysed_text_reviews:binding?.text_reviews??80,textless_statistics_only:(binding?.source_reviews??100)-(binding?.text_reviews??80)},counts,
   star_distribution_all:stars(i.snapshot.body.reviews),star_distribution_analysed:stars(i.snapshot.body.reviews.filter(r=>r.analysis_text)),
   categories:DIRECT_DEFINITIONS,uncertainty_preserved:true,frequency_unit:'distinct_review_per_category_not_specific_incident'};
- const statistics_sha256=await directHash(statistics),conditional_sol=solDraft(statistics,statistics_sha256,selected,true),
+ const statistics_sha256=await directHash(statistics),flow=directEvidenceFlow(candidates,selected),
+  conditional_sol=solDraft(statistics,statistics_sha256,selected,true,localHybridTokens,undefined,synthesis,flow),
   compatibility=await directLunaCompatibility(groups,i.prior_luna_requests,i.dataset.organization_id);
- const body={version:DIRECT_REPORT_VERSION,format_version:DIRECT_REPORT_FORMAT,code_commit,organization_id:i.dataset.organization_id,
+ const body={version:synthesisVersion??DIRECT_REPORT_VERSION,...(synthesis?{synthesis}:{}),format_version:DIRECT_REPORT_FORMAT,code_commit,organization_id:i.dataset.organization_id,
   establishment_id:i.dataset.body.reviews[0].establishment_id,language:'vi',source_archive:{id:i.dataset.id,sha256:i.dataset.sha256},
   source_snapshot:{id:i.snapshot.id,sha256:i.snapshot.sha256,reviews_sha256:i.snapshot.body.source_reviews_sha256},
-  configuration:DIRECT_REPORT_POLICY,configuration_sha256:await directHash(DIRECT_REPORT_POLICY),
+  configuration,configuration_sha256:await directHash(configuration),
   selection:{algorithm:'existing_selectBalancedEvidence',algorithm_sha256:await balancedSelectorHash(),policy:BALANCED_POLICY,
+   ...(synthesis?{association_policy:DIRECT_SYNTHESIS_POLICY,flow}:{}),
    quotation:'complete_frozen_review_exact; no 25-theme lexical pass; all are unverified candidates',
    specificity:'bounded_text_length_for_diversity_only_not_semantic_confidence',candidates,selected,
    coverage:DIRECT_CATEGORY_KEYS.map(category=>({category,positive:selected.filter(e=>e.category===category&&e.polarity==='positive').length,
@@ -224,10 +279,21 @@ export async function directAcceptedSol(p:DirectReportPreparation,results:Direct
   decisions.push(...r.decisions);
  }
  const accepted=p.body.selection.selected.filter(e=>decisions.find(d=>d.evidence_id===e.evidence_id)?.status==='ACCEPTED');
+ const synthesis=p.body.synthesis;
+ if((p.body.version===DIRECT_SYNTHESIS_VERSION)!==!!synthesis)throw Error('DIRECT_REPORT_SYNTHESIS_VERSION_INVALID');
+ if(synthesis){
+  if(synthesis.version!==DIRECT_SYNTHESIS_VERSION||synthesis.configuration_sha256!==await directHash(DIRECT_SYNTHESIS_POLICY)||
+   synthesis.originals_sha256!==await directHash(synthesis.originals)||
+   new Set(synthesis.originals.map(r=>r.review_id)).size!==synthesis.originals.length||
+   synthesis.originals.length!==new Set(p.body.selection.selected.map(e=>e.review_id)).size)throw Error('DIRECT_REPORT_ORIGINAL_CONTEXT_CHANGED');
+  for(const r of synthesis.originals)if(await analysisTextSha256(r.original_text)!==r.original_text_sha256||
+   !p.body.selection.selected.some(e=>e.review_id===r.review_id&&e.analysis_text_sha256===r.analysis_text_sha256))throw Error('DIRECT_REPORT_ORIGINAL_CONTEXT_CHANGED');
+ }
  const gate={...contractEvidenceGate({selected:p.body.selection.selected.map(e=>({...e,axis:e.category==='ambiance'?'atmosphere':e.category}))},accepted.map(e=>e.evidence_id)),
   policy:DIRECT_REPORT_POLICY.sol_sufficiency,human_validated:false};
- const draft=gate.passed?solDraft(p.body.statistics,p.body.statistics_sha256,accepted,false,count,wire):null;
- return {gate,accepted,decisions,draft};
+ const flow=directEvidenceFlow(p.body.selection.candidates??p.body.selection.selected,p.body.selection.selected,decisions);
+ const draft=gate.passed?solDraft(p.body.statistics,p.body.statistics_sha256,accepted,false,count,wire,synthesis,flow):null;
+ return {gate,accepted,decisions,draft,...(synthesis?{flow}: {})};
 }
 export async function validateDirectReport(raw:unknown,p:DirectReportPreparation,results:DirectLunaResult[],count=localHybridTokens,wire?:string){
  const branch=await directAcceptedSol(p,results,count,wire);if(!branch.gate.passed)throw Error('DIRECT_REPORT_EVIDENCE_INSUFFICIENT');
