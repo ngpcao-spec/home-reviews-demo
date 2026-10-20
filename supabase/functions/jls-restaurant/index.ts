@@ -30,7 +30,8 @@ Deno.serve(async r=>{
    const p=await pq.order('created_at',{ascending:false}).limit(1).maybeSingle();if(p.error)throw Error('JLS_READ_FAILED');
    if(!p.data)return json({protocol:null,run:null,read_only:true,new_provider_calls:0});
    const run=await c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at')
-    .eq('protocol_id',p.data.id).eq('organization_id',er.data.organization_id).maybeSingle();if(run.error)throw Error('JLS_READ_FAILED');
+    .eq('protocol_id',p.data.id).eq('organization_id',er.data.organization_id)
+    .neq('consent->>consent_source','technical_qualification_no_spending').maybeSingle();if(run.error)throw Error('JLS_READ_FAILED');
    if(!run.data)return json(direct4ReadView(p.data,null,[],[],null));
    const [tasks,artifacts,op,continuation]=await Promise.all([
     c.client.from('analysis_jls_restaurant_tasks').select('*').eq('run_id',run.data.id).eq('organization_id',er.data.organization_id),
