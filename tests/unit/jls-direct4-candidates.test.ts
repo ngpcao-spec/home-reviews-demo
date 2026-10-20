@@ -1,4 +1,5 @@
 import {beforeAll,it,expect,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
 import {prepareCandidateOnly,verifyCandidateProtocol,candidateReadyContract,candidateMockResponse,type CandidateInput,type CandidateProtocol} from '../../supabase/functions/_shared/jls-direct4-candidates';
 import {DIRECT_CANDIDATE_EMPTY,validateDirectReportEvidence} from '../../supabase/functions/_shared/jev-direct-report-preparation';
 import {prepareHistoricalDirect4} from '../../supabase/functions/_shared/jls-direct4-historical';
@@ -9,6 +10,9 @@ import {directHash,directCanonical,DIRECT_CATEGORY_KEYS} from '../../supabase/fu
 import {snapshotReadyMock} from '../../supabase/functions/_shared/jls-snapshot-v2-probe';
 import {processReadySol,type ReadyState} from '../../supabase/functions/_shared/jls-sol-ready-worker';
 let input:CandidateInput,p:CandidateProtocol;
+it('keeps the candidate-only comparison out of default current-report reads',()=>{
+ expect(readFileSync('supabase/functions/jls-restaurant/index.ts','utf8')).toContain(".neq('body->>version','jls-direct4-no-luna-candidates-v1')");
+});
 beforeAll(async()=>{
  const texts=['The soup tasted delicious.','The waiter helped us quickly.','The bill had an unexpected charge.','The room was quiet and comfortable.','Coffee was good but arrived late.'];
  const h={id:crypto.randomUUID(),generation_id:crypto.randomUUID(),organization_id:crypto.randomUUID(),establishment_id:crypto.randomUUID(),requested_by:crypto.randomUUID(),status:'completed',language:'vi',created_at:'2026-10-20T00:00:00Z',
@@ -70,7 +74,9 @@ it('rejects a changed frozen source even with a newly calculated outer hash',asy
 it('reuses atomic one-call receipt/validation workers under concurrent and repeated wakes',async()=>{
  const f=await fixture(),http=vi.fn(async()=>new Response(JSON.stringify(candidateMockResponse(p.body))));
  await Promise.all(Array.from({length:8},()=>processReadySol(f.port,f.state.operation.id,'MOCK_ONLY',http,candidateReadyContract)));
- expect(http).toHaveBeenCalledTimes(1);expect(f.state.operation.receipt).toBeTruthy();expect(f.state.operation.result).toBeNull();
+ // A slower concurrent wake may already validate the saved receipt. Both
+ // schedules are valid; neither may create a second supplier request.
+ expect(http).toHaveBeenCalledTimes(1);expect(f.state.operation.receipt).toBeTruthy();
  await processReadySol(f.port,f.state.operation.id,'MOCK_ONLY',http,candidateReadyContract);
  expect(f.state.operation.status).toBe('completed');expect(f.state.operation.result?.validated_report).toBeTruthy();
  await processReadySol(f.port,f.state.operation.id,'MOCK_ONLY',http,candidateReadyContract);expect(http).toHaveBeenCalledTimes(1);

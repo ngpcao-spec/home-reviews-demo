@@ -93,6 +93,7 @@ Deno.serve(async r=>{
    .neq('body->>version','jls-direct4-historical-v1')
    .neq('body->>version','jls-direct4-frozen-corpus-v1')
    .neq('body->>version','jls-direct4-short-frozen-corpus-v1')
+   .neq('body->>version','jls-direct4-no-luna-candidates-v1')
    .neq('body->>version','jls-direct4-synthesis-comparison-v1')
    .eq("establishment_id",er.data.id).eq("organization_id",er.data.organization_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pr.error)throw Error("JLS_READ_FAILED");
