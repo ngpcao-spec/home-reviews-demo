@@ -25,6 +25,8 @@ import {DIRECT4_COMPARISON} from '../_shared/jls-direct4-comparison.ts';
 import {processDirect4ComparisonRun,direct4ComparisonActiveProbe} from '../_shared/jls-direct4-comparison-server.ts';
 import {persistRestaurantReceiptsOnly,restaurantPersistenceProbe} from '../_shared/jls-task-persistence-server.ts';
 import {restaurantSqlQualification} from '../_shared/jls-sql-qualification.ts';
+import {LUNA_DIRECT4_COMPARE} from '../_shared/luna-direct4-comparison.ts';
+import {processLunaDirect4Comparison,probeLunaDirect4Comparison} from '../_shared/luna-direct4-comparison-server.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -32,6 +34,10 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='luna_direct4_comparison_probe'){
+  try{return json(await probeLunaDirect4Comparison(admin,payload.protocol_id));}
+  catch(e){return json({error:e instanceof Error?e.message:'LUNA_DIRECT4_PROBE_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='restaurant_sql_qualification'){
   // Real PostgREST RPCs and explicit mocks only. Returns before provider keys.
   try{return json(await restaurantSqlQualification(admin,payload));}
@@ -112,6 +118,9 @@ Deno.serve(async r=>{
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
   const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version===LUNA_DIRECT4_COMPARE){
+   await processLunaDirect4Comparison(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
+  }
   if(v?.data?.version===DIRECT4_COMPARISON){
    await processDirect4ComparisonRun(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
   }
