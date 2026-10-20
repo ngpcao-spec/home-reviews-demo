@@ -5,6 +5,8 @@ import {rehearseHistoricalDirect4} from '../../supabase/functions/_shared/jls-di
 import {historicalSnapshotFingerprint,type FrozenHistorical} from '../../supabase/functions/_shared/jls-snapshot-v2';
 import {directHash,directCanonical} from '../../supabase/functions/_shared/jev-direct-categories';
 import {DIRECT_SYNTHESIS_VERSION} from '../../supabase/functions/_shared/jev-direct-report-preparation';
+import {SHORT_FROZEN_DIRECT4,SHORT_CLASSIFIER_CONFIG} from '../../supabase/functions/_shared/jev-direct-short-config';
+import {SHORT_CONFIG,shortJev} from '../../supabase/functions/_shared/direct4-short-comparison';
 const code='a'.repeat(40);
 async function fixture(texts=3,empty=1){
  const h={id:'10000000-0000-4000-8000-000000000001',generation_id:'10000000-0000-4000-8000-000000000002',
@@ -68,3 +70,38 @@ it('does not relax old protocols or allow the new experiment into current-report
  expect(reader).toContain(".neq('body->>version','jls-direct4-frozen-corpus-v1')");
  expect(historicalDirect4Contract().frozenAnalysisSource).toBe(true);
 });
+it('pins the archived short French questions and leaves the existing selector, Luna and synthesis policies intact',async()=>{
+ const input=await fixture(75,60);
+ input.historical.snapshot.reviews[0].original_language='vi';
+ input.historical.snapshot.reviews[0].analysis_language='vi';
+ input.historical.snapshot.reviews[0].analysis_source='original_fallback';
+ input.historical.snapshot.base.source_fingerprint=await historicalSnapshotFingerprint(input.historical.snapshot);
+ input.record_sha256=await directHash(input.historical);
+ await expect(prepareHistoricalDirect4(input,code,FROZEN_CORPUS_DIRECT4)).rejects.toThrow('DIRECT4_FROZEN_ENGLISH_REQUIRED');
+ const p=await prepareHistoricalDirect4(input,code,SHORT_FROZEN_DIRECT4);
+ await expect(verifyHistoricalDirect4(p.body,p.sha256)).resolves.toBeUndefined();
+ expect(p.body.denominators).toEqual({source_reviews:135,analytical_reviews:75,textless_statistics_only:60});
+ expect(p.body.pending).toHaveLength(75);expect(p.body.max_jev_calls).toBe(75);
+ expect(p.body.classification_configuration_sha256).toBe('84e19915b4b01af0bca311790f5a531ae23984b2d4a8cbc7d6340417ff299651');
+ expect(await directHash(SHORT_CONFIG)).toBe(SHORT_CLASSIFIER_CONFIG.common_configuration_sha256);
+ const task=p.body.pending[0],wire=JSON.parse(historicalDirect4Contract().requestWire!({protocol:p} as never,{phase:'jev',request:{...task.payload,questions:SHORT_CLASSIFIER_CONFIG.questions}} as never));
+ expect(wire).toEqual(shortJev(task.payload.state));
+ expect(wire).not.toHaveProperty('rating');expect(wire).not.toHaveProperty('jev_result');
+ expect(p.body.configuration.synthesis_version).toBe('jls-direct4-balanced-synthesis-v1.1');
+ const bad=structuredClone(p.body);bad.source_snapshot.reviews[0].analysis_language='en';
+ await expect(verifyHistoricalDirect4(bad,await directHash(bad))).rejects.toThrow();
+});
+it('runs the short multilingual transport through existing receipt and validation workers with no provider network',async()=>{
+ const input=await fixture(10,2),r=input.historical.snapshot.reviews[0];
+ r.analysis_text=r.original_text='Đồ ăn ngon nhưng phục vụ chậm.';r.analysis_language=r.original_language='vi';r.analysis_source='original_fallback';
+ input.historical.snapshot.base.source_fingerprint=await historicalSnapshotFingerprint(input.historical.snapshot);input.record_sha256=await directHash(input.historical);
+ const network=vi.spyOn(globalThis,'fetch').mockImplementation(()=>{throw Error('PROVIDER_NETWORK_FORBIDDEN');});
+ try{
+  const p=await prepareHistoricalDirect4(input,code,SHORT_FROZEN_DIRECT4);
+  const result=await rehearseHistoricalDirect4({...p,id:'EXPLICIT_MOCK_PROTOCOL'});
+  expect(result.qualification.report_saved).toBe(true);expect(result.qualification.zero_retries).toBe(true);
+  expect(result.qualification.provider_calls).toBe(0);expect(network).not.toHaveBeenCalled();
+  const native={model:'unexpected-model',answers:{}};
+  await expect(historicalDirect4Contract().parseJev!({protocol:p} as never,{} as never,native)).rejects.toThrow();
+ }finally{network.mockRestore();}
+},30000);
