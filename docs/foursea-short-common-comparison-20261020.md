@@ -21,3 +21,9 @@ Aucun lancement depuis migration, déploiement ou GET.
 
 Livraison : comparaison appariée de 348 cellules ; tous les désaccords avec textes ; changements de chaque modèle par rapport à son ancien prompt ; comptages natifs et mixtes dédupliqués ; usage/durée par requête ; archive complète.
 Accord ≠ justesse ; désaccord ≠ erreur attribuée. Pas d’audit qualitatif ni activation commerciale.
+
+## Qualification avant lancement
+
+Protocole : `c592870c-ee7e-410c-897e-4a9544d3f7da`. SHA256 : `a59dc19e248249a9ef96792316556b160d875cc28fc0d356a929dbb5838bdee3`.
+Le test SQL transactionnel effectue 174 réservations / intentions / reçus / finalisations simulés puis annule toutes ses écritures : 87 par phase, pas de Sol, refus des doubles intentions et des appels sans GO. Durée par réservation mesurée : 21,398 à 41,923 ms.
+Le rejeu Deno sans réseau utilise les 87 textes figés, 174 requêtes simulées, puis vérifie la comparaison et la sauvegarde ainsi que les réveils répétés et concurrents. Les réponses simulées ne démontrent pas une qualité réelle des modèles.
