@@ -14,7 +14,7 @@ export function solReadyPort(admin:SupabaseClient,continuation=false):ReadyPort 
   const a=await admin.from("analysis_jls_sol_ready_artifacts").select("body,sha256").eq("id",op.data.artifact_id).eq("organization_id",op.data.organization_id).single();
   if(a.error)throw Error("JLS_SOL_READY_ARTIFACT_MISSING");
   let protocol;
-  if(op.data.mode==="mock"&&!continuation)protocol={id:op.data.id,body:op.data.protocol_body,sha256:op.data.protocol_sha256};
+  if(op.data.mode==="mock"&&!continuation&&!op.data.run_id)protocol={id:op.data.id,body:op.data.protocol_body,sha256:op.data.protocol_sha256};
   else {const p=await admin.from("analysis_jls_restaurant_protocols").select("id,body,sha256").eq("id",op.data.protocol_id).eq("organization_id",op.data.organization_id).single();if(p.error)throw Error("FORBIDDEN");protocol=p.data;}
   if(protocol.body.organization_id!==op.data.organization_id||protocol.sha256!==op.data.protocol_sha256)throw Error("JLS_READY_ORGANIZATION_CHANGED");
   return {operation:op.data,protocol,ready:a.data} as ReadyState;

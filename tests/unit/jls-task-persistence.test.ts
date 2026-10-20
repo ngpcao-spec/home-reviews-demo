@@ -59,6 +59,36 @@ it('an unknown reserved attempt with no receipt is never claimed again',async()=
  await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},f.http,f.contract);
  expect(f.calls()).toBe(0);expect(f.receipts.size).toBe(0);expect(await f.port.finishReceipt!('task_0')).toBe(false);
 });
+it('a sixth reservation failure sends none of the five already reserved tasks',async()=>{
+ const f=await fixture(),claim=f.port.claim;let n=0;
+ f.port.claim=async(r,w)=>{if(++n===6)throw Error('JLS_DATABASE_FAILED');return claim(r,w);};
+ await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},f.http,f.contract);
+ expect(f.state.tasks.filter(t=>t.request_count===1)).toHaveLength(5);
+ expect(f.calls()).toBe(0);expect(f.receipts.size).toBe(0);expect(f.state.run.status).toBe('blocked');
+});
+it('records a dispatch intent before transport and fails closed on a lost acknowledgement',async()=>{
+ const f=await fixture(),seen=new Set<string>();
+ f.port.beginProvider=async t=>{seen.add(t.id);throw Error('JLS_DISPATCH_INTENT_ACK_LOST');};
+ await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},f.http,f.contract);
+ expect(seen.size).toBe(8);expect(f.calls()).toBe(0);
+ expect([...f.receipts.values()].every(o=>o.body.provider_fetch_invoked===false)).toBe(true);
+ await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},f.http,f.contract);
+ expect(f.calls()).toBe(0);
+});
+it('keeps reservation, transport invocation and received response distinct',async()=>{
+ const f=await fixture(),intent=new Set<string>(),http=f.http;
+ f.port.beginProvider=async t=>{expect(t.request_count).toBe(1);intent.add(t.id);return true;};
+ f.http=async(...a)=>{expect(intent.size).toBeGreaterThan(0);return http(...a);};
+ await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},f.http,f.contract);
+ expect(f.calls()).toBe(8);expect(intent.size).toBe(8);
+ expect([...f.receipts.values()].every(o=>o.body.provider_fetch_invoked===true&&o.body.provider_response_received===true)).toBe(true);
+});
+it('does not dispatch a technical SQL fixture through an ordinary supplier contract',async()=>{
+ const f=await fixture();f.state.run.consent={consent_source:'technical_qualification_no_spending'};
+ await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},f.http,f.contract);
+ expect(f.calls()).toBe(0);
+ expect([...f.receipts.values()].every(o=>o.body.error_code==='JLS_MOCK_TRANSPORT_REQUIRED')).toBe(true);
+});
 it('invalid provider output keeps its original raw bytes and one attempt only',async()=>{
  const f=await fixture();let calls=0;const http:typeof fetch=async()=>{calls++;return new Response('INVALID_EXPLICIT_MOCK');};
  await processRestaurant(f.port,f.state.run.id,{jev:'mock',openai:''},http,f.contract);
