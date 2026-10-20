@@ -315,21 +315,31 @@ export async function directAcceptedSol(p:DirectReportPreparation,results:Direct
 }
 export async function validateDirectReport(raw:unknown,p:DirectReportPreparation,results:DirectLunaResult[],count=localHybridTokens,wire?:string){
  const branch=await directAcceptedSol(p,results,count,wire);if(!branch.gate.passed)throw Error('DIRECT_REPORT_EVIDENCE_INSUFFICIENT');
+ const parsed=await validateDirectReportEvidence(raw,p.body.statistics_sha256,branch.accepted);
+ return {...parsed,server_statistics:p.body.statistics,methodology_vi:branch.draft!.packet.methodology_vi,
+  validator_version:DIRECT_REPORT_FORMAT+'-bindings-v1',technical_checks_passed:true,human_validated:false,semantic_correctness_guaranteed:false};
+}
+// Shared technical reference checks. Candidate-only experiments may omit an
+// association after reading it; this option never creates a Luna verdict.
+export const DIRECT_CANDIDATE_EMPTY='Chưa đủ căn cứ từ các ý kiến được cung cấp cho nhóm này.';
+export async function validateDirectReportEvidence(raw:unknown,statistics_sha256:string,evidence:DirectReportEvidence[],candidateOnly=false){
  const parsed=directReportResponse.parse(raw),report=parsed.report;
- if(parsed.statistics_sha256!==p.body.statistics_sha256||new Set(report.categories.map(c=>c.category)).size!==4)throw Error('DIRECT_REPORT_STATISTICS_OR_CATEGORIES_CHANGED');
+ if(parsed.statistics_sha256!==statistics_sha256||new Set(report.categories.map(c=>c.category)).size!==4)throw Error('DIRECT_REPORT_STATISTICS_OR_CATEGORIES_CHANGED');
  const check=(refs:string[],category?:DirectCategory,polarity?:string)=>{
-  if(!refs.length||new Set(refs).size!==refs.length||refs.some(id=>!branch.accepted.some(e=>e.evidence_id===id&&
+  if(!refs.length||new Set(refs).size!==refs.length||refs.some(id=>!evidence.some(e=>e.evidence_id===id&&
    (!category||e.category===category)&&(!polarity||e.polarity===polarity))))throw Error('DIRECT_REPORT_UNACCEPTED_OR_MISMATCHED_EVIDENCE');
  };
  for(const c of report.categories){if(c.evidence_ids.length)check(c.evidence_ids,c.category);
-  else if(branch.accepted.some(e=>e.category===c.category)||c.text!=='Chưa đủ bằng chứng được chấp nhận cho nhóm này.')throw Error('DIRECT_REPORT_UNSUPPORTED_CATEGORY_PROSE');}
+  else if(candidateOnly?c.text!==DIRECT_CANDIDATE_EMPTY:evidence.some(e=>e.category===c.category)||c.text!=='Chưa đủ bằng chứng được chấp nhận cho nhóm này.')throw Error('DIRECT_REPORT_UNSUPPORTED_CATEGORY_PROSE');}
  for(const a of report.positive_aspects)check(a.evidence_ids,a.category,'positive');
- for(const a of report.negative_aspects)check(a.evidence_ids,a.category,'negative');check(report.conclusion.evidence_ids);
+ for(const a of report.negative_aspects)check(a.evidence_ids,a.category,'negative');
+ if(candidateOnly&&!report.conclusion.evidence_ids.length){
+  if(report.conclusion.text!==DIRECT_CANDIDATE_EMPTY||report.positive_aspects.length||report.negative_aspects.length||report.recommendations.length||report.categories.some(c=>c.evidence_ids.length))throw Error('DIRECT_REPORT_UNSUPPORTED_CATEGORY_PROSE');
+ }else check(report.conclusion.evidence_ids);
  for(const rec of report.recommendations){check(rec.evidence_ids,rec.category);
   if(directCanonical([...rec.evidence_ids].sort())!==directCanonical([...new Set(rec.observations.map(o=>o.evidence_id))].sort()))throw Error('DIRECT_REPORT_OBSERVATION_LINK_MISSING');
-  for(const o of rec.observations){const e=branch.accepted.find(e=>e.evidence_id===o.evidence_id)!;
+  for(const o of rec.observations){const e=evidence.find(e=>e.evidence_id===o.evidence_id)!;
    if(o.quote!==e.quote||o.quote_sha256!==e.quote_sha256||await analysisTextSha256(o.quote)!==o.quote_sha256)throw Error('DIRECT_REPORT_QUOTE_CHANGED');}
  }
- return {...parsed,server_statistics:p.body.statistics,methodology_vi:branch.draft!.packet.methodology_vi,
-  validator_version:DIRECT_REPORT_FORMAT+'-bindings-v1',technical_checks_passed:true,human_validated:false,semantic_correctness_guaranteed:false};
+ return parsed;
 }
