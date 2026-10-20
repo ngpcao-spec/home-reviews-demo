@@ -68,6 +68,7 @@ it('does not relax old protocols or allow the new experiment into current-report
  expect(sql).not.toMatch(/create table|insert into public.analysis_jls_restaurant_runs|select public.authorize_/i);
  const reader=readFileSync('supabase/functions/jls-restaurant/index.ts','utf8');
  expect(reader).toContain(".neq('body->>version','jls-direct4-frozen-corpus-v1')");
+ expect(reader).toContain(".neq('consent->>consent_source','technical_qualification_no_spending')");
  expect(historicalDirect4Contract().frozenAnalysisSource).toBe(true);
 });
 it('pins the archived short French questions and leaves the existing selector, Luna and synthesis policies intact',async()=>{
