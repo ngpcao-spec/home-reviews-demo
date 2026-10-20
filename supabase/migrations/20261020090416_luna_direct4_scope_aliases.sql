@@ -1,0 +1,5 @@
+do $$declare d text;f regprocedure;begin foreach f in array array['public.claim_jls_restaurant_task(uuid,text)'::regprocedure,'public.stage_jls_restaurant(uuid,text,text,jsonb)'::regprocedure] loop
+d=pg_get_functiondef(f);
+if position('from public.analysis_jls_restaurant_runs r join public.analysis_jls_restaurant_protocols p on p.id=r.protocol_id where r.id=p_run and p.body->>''version''=''luna-direct4-classification-comparison-v1''' in d)=0 then raise exception 'LUNA_SCOPE_ROUTE_MISSING';end if;
+execute replace(d,'from public.analysis_jls_restaurant_runs r join public.analysis_jls_restaurant_protocols p on p.id=r.protocol_id where r.id=p_run and p.body->>''version''=''luna-direct4-classification-comparison-v1''',
+'from public.analysis_jls_restaurant_runs luna_scope_run join public.analysis_jls_restaurant_protocols luna_scope_protocol on luna_scope_protocol.id=luna_scope_run.protocol_id where luna_scope_run.id=p_run and luna_scope_protocol.body->>''version''=''luna-direct4-classification-comparison-v1''');end loop;end $$;
