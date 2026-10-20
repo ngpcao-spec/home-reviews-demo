@@ -23,6 +23,7 @@ import {HISTORICAL_DIRECT4,FROZEN_CORPUS_DIRECT4} from "../_shared/jls-direct4-h
 import {processHistoricalDirect4Run,historicalDirect4ActiveProbe} from "../_shared/jls-direct4-historical-server.ts";
 import {DIRECT4_COMPARISON} from '../_shared/jls-direct4-comparison.ts';
 import {processDirect4ComparisonRun,direct4ComparisonActiveProbe} from '../_shared/jls-direct4-comparison-server.ts';
+import {persistRestaurantReceiptsOnly,restaurantPersistenceProbe} from '../_shared/jls-task-persistence-server.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -30,6 +31,12 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='restaurant_persistence_only'||payload?.mode==='restaurant_persistence_probe'){
+  // Save/confirm existing responses only. Exits before loading any provider key.
+  try{return json(payload.mode==='restaurant_persistence_only'?
+   await persistRestaurantReceiptsOnly(admin,payload.run_id):await restaurantPersistenceProbe(admin,payload));}
+  catch(e){return json({error:e instanceof Error?e.message:'JLS_PERSISTENCE_FAILED',provider_calls:0,new_attempts:0},409);}
+ }
  if(payload?.mode==='direct4_comparison_probe'){
   // Authenticated free qualification; exits before loading any provider key.
   try{return json(await direct4ComparisonActiveProbe(admin,payload));}
