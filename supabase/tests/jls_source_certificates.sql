@@ -9,6 +9,7 @@ do $$declare q uuid;rid uuid;w text='EXPLICIT_SQL_MOCK';t jsonb;v jsonb;b jsonb;
  q=public.start_jls_sql_qualification(pid,'rollback_sql_regression');
  if public.start_jls_sql_qualification(pid,'rollback_sql_regression')<>q then raise exception 'QUALIFICATION_NOT_IDEMPOTENT';end if;
  select run_id into rid from public.analysis_jls_sql_qualifications where id=q;
+ if public.claim_jls_restaurant_task(rid,null) is not null or public.claim_jls_restaurant_task(rid,w) is not null then raise exception 'NO_LEASE_ACCEPTED';end if;
  if not public.jls_restaurant_valid(rid) or public.wake_jls_restaurant(rid) is not null then raise exception 'MOCK_PAID_WAKE';end if;
  if not public.claim_jls_restaurant_tick(rid,w) or public.claim_jls_restaurant_tick(rid,'OTHER') then raise exception 'LEASE_NOT_EXCLUSIVE';end if;
  for i in 1..51 loop
