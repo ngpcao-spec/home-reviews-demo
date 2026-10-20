@@ -33,6 +33,7 @@ export function restaurantPort(admin:SupabaseClient):RestaurantPort {
    .eq("establishment_id",p.establishment_id).eq("configuration_id","v12_economy_1pass_v1").in("review_id",p.english_review_ids);
   if(r.error)throw Error("JLS_CACHE_READ_FAILED");return r.data;
  },claim:async(id,worker)=>await rpc("claim_jls_restaurant_task",{p_run:id,p_worker:worker}),
+ beginProvider:async t=>await rpc('begin_jls_restaurant_dispatch',{p_task:t.id,p_worker:t.worker,p_request_sha:t.request_sha256})===true,
  artifact:async(id,worker,kind,body,sha)=>await rpc("save_jls_restaurant_artifact",{p_run:id,p_worker:worker,p_kind:kind,p_body:body,p_sha:sha})===true,
  finish:async(id,worker,status,body,sha)=>await rpc("finish_jls_restaurant_task",{p_task:id,p_worker:worker,p_status:status,p_body:body,p_sha:sha})===true,
  retainReceipt:async(state,task,outcome)=>{const r=await taskReceiptWire(state,task,outcome);return await rpc('save_jls_restaurant_receipt',{

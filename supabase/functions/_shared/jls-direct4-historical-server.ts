@@ -13,6 +13,7 @@ import {runHistoricalDirect4Probe} from './jls-direct4-historical-probe.ts';
 import {directHash} from './jev-direct-categories.ts';
 export async function processHistoricalDirect4Run(client:SupabaseClient,id:string,keys:{jev:string;openai:string},http:typeof fetch){
  const port=restaurantPort(client),s=await port.load(id);
+ if(s.run.consent?.consent_source==='technical_qualification_no_spending')return {phase:'technical_mock_excluded_from_paid_route',provider_calls:0};
  if(!['queued','running'].includes(s.run.status))return {phase:'already_saved',provider_calls:0};
  if(['prepare_evidence','prepare_sol'].includes(s.run.stage))return {phase:'awaiting_authenticated_free_compilation',provider_calls:0};
  if(s.run.stage==='sol'||String(s.run.stage)==='validate_sol'){

@@ -13,7 +13,7 @@ import {databasePersistenceRetry,type RestaurantOutcome} from './jls-task-persis
 export interface RestaurantTask {id:string;run_id:string;organization_id:string;phase:"jev"|"luna"|"sol";review_id:string|null;
  request:unknown;request_sha256:string;identity:{expected_served_model:string}|null;status:string;request_count:number;worker:string;}
 export interface RestaurantState {protocol:{id:string;body:RestaurantProtocol;sha256:string};
- run:{id:string;stage:"jev"|"luna"|"prepare_evidence"|"prepare_sol"|"sol";status:string};tasks:(RestaurantTask&{cache_id:string|null})[];
+ run:{id:string;stage:"jev"|"luna"|"prepare_evidence"|"prepare_sol"|"sol";status:string;consent?:{consent_source?:string}};tasks:(RestaurantTask&{cache_id:string|null})[];
  artifacts:{kind:string;body:Record<string,unknown>;sha256:string}[];}
 export interface RestaurantPort {
  tick(run:string,worker:string):Promise<boolean>;load(run:string):Promise<RestaurantState>;
@@ -21,6 +21,7 @@ export interface RestaurantPort {
  prepared?(p:RestaurantProtocol):Promise<PreparedRestaurantRow>;
  cacheCompatible?(protocolId:string):Promise<boolean>;
  claim(run:string,worker:string):Promise<RestaurantTask|null>;
+ beginProvider?(task:RestaurantTask):Promise<boolean>;
  artifact(run:string,worker:string,kind:string,body:unknown,sha:string):Promise<boolean>;
  finish(task:string,worker:string,status:string,body:unknown,sha:string):Promise<boolean>;
  retainReceipt?(state:RestaurantState,task:RestaurantTask,outcome:RestaurantOutcome):Promise<boolean>;
@@ -35,7 +36,7 @@ const artifact=<T>(state:RestaurantState,key:string):T|null=>{
  const x=state.artifacts.find(x=>x.kind===key);return x?x.body as T:null;
 };
 // A raw single fetch after transactional reservation. No SDK retry/fallback.
-export async function restaurantAttempt(task:RestaurantTask,state:RestaurantState,key:string,http:typeof fetch,contract?:RestaurantExecutionContract) {
+export async function restaurantAttempt(task:RestaurantTask,state:RestaurantState,key:string,http:typeof fetch,contract?:RestaurantExecutionContract,beforeDispatch?:()=>Promise<boolean>) {
  const p=state.protocol.body,start=Date.now();let status="billing_uncertain",sent=false,wire=JSON.stringify(task.request);
  const out:Record<string,unknown>={phase:task.phase,request_sha256:task.request_sha256,raw_response_text:null,
   raw_response_sha256:null,response:null,response_sha256:null,input_tokens:null,output_tokens:null,cost_usd:null,
@@ -64,6 +65,9 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
    }
    if(p.sol_size_policy)solRequestSize(JSON.parse(wire),p.sol_size_policy,plan?planTokenMemo(plan)?.count:undefined);
   }
+  if(state.run.consent?.consent_source==='technical_qualification_no_spending'&&
+   (!contract?.technicalMockTransport||key!=='EXPLICIT_MOCK_NO_PROVIDER'))throw Error('JLS_MOCK_TRANSPORT_REQUIRED');
+  if(beforeDispatch&&!await beforeDispatch())throw Error('JLS_DISPATCH_INTENT_UNCERTAIN_NO_RETRY');
   sent=true;
   const response=await http(task.phase==="jev"?JEV_ENDPOINT:task.phase==="luna"?"https://api.openai.com/v1/decisions":"https://api.openai.com/v1/responses",
    {method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},body:wire,
@@ -102,9 +106,12 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
   }
   if(status!=="needs_review")status="completed";
  }catch(e){if(!sent)status="blocked";out.error_code=fail(e);}
+ out.provider_fetch_invoked=sent;
+ out.provider_response_received=out.raw_response_text!==null;
  out.duration_ms=Date.now()-start;return {status,body:out,sha256:await hybridHash(out)};
 }
 export interface RestaurantExecutionContract {
+ technicalMockTransport?:true;
  verify(p:RestaurantProtocol,sha:string):Promise<void>;
  completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
  frozenAnalysisSource?:true;
@@ -143,7 +150,7 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
   const tasks=[];
   for(let i=0;i<(state.run.stage==="sol"?1:8);i++){const t=await port.claim(run,worker);if(!t)break;tasks.push(t);}
   const outcomes=await Promise.allSettled(tasks.map(async t=>{
-   const outcome=await restaurantAttempt(t,state,key,http,contract);
+   const outcome=await restaurantAttempt(t,state,key,http,contract,port.beginProvider?()=>port.beginProvider!(t):undefined);
    // Keep a complete immutable receipt before attempting task finalization. Each
    // retry below sends only the same database write, never the provider request.
    if(t.phase!=='sol'&&port.retainReceipt&&!await databasePersistenceRetry(()=>port.retainReceipt!(state,t,outcome)))throw Error('JLS_RECEIPT_SAVE_UNCERTAIN_NO_RETRY');

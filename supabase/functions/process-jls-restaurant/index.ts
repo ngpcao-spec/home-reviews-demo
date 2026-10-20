@@ -24,6 +24,7 @@ import {processHistoricalDirect4Run,historicalDirect4ActiveProbe} from "../_shar
 import {DIRECT4_COMPARISON} from '../_shared/jls-direct4-comparison.ts';
 import {processDirect4ComparisonRun,direct4ComparisonActiveProbe} from '../_shared/jls-direct4-comparison-server.ts';
 import {persistRestaurantReceiptsOnly,restaurantPersistenceProbe} from '../_shared/jls-task-persistence-server.ts';
+import {restaurantSqlQualification} from '../_shared/jls-sql-qualification.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
  if(r.method!=="POST")return json({error:"METHOD_NOT_ALLOWED"},405);
@@ -31,6 +32,11 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='restaurant_sql_qualification'){
+  // Real PostgREST RPCs and explicit mocks only. Returns before provider keys.
+  try{return json(await restaurantSqlQualification(admin,payload));}
+  catch(e){return json({error:e instanceof Error?e.message:'JLS_SQL_QUALIFICATION_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='restaurant_persistence_only'||payload?.mode==='restaurant_persistence_probe'){
   // Save/confirm existing responses only. Exits before loading any provider key.
   try{return json(payload.mode==='restaurant_persistence_only'?
@@ -94,7 +100,8 @@ Deno.serve(async r=>{
  const continuations=await admin.from('analysis_jls_direct4_continuations').select('id').eq('mode','paid')
   .in('status',['queued','received','dispatched','validating']).limit(1);
  if(continuations.error)return json({error:'JLS_DATABASE_FAILED'},409);
- const {data:runs,error}=await admin.from("analysis_jls_restaurant_runs").select("id").in("status",["queued","running"]);
+ const {data:runs,error}=await admin.from("analysis_jls_restaurant_runs").select("id").in("status",["queued","running"])
+  .neq('consent->>consent_source','technical_qualification_no_spending');
  if(error)return json({error:"JLS_DATABASE_FAILED"},409);
  const next=await admin.from("analysis_jls_contract_v2_operations").select("id").eq("mode","paid").in("status",["queued","received","dispatched","validating"]).limit(1);
  if(next.error)return json({error:"JLS_DATABASE_FAILED"},409);
