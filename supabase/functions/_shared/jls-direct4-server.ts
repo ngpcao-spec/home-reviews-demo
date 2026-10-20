@@ -73,6 +73,6 @@ export async function direct4ActiveProbe(client:SupabaseClient,request:{protocol
  if(saved.error)throw Error('DIRECT4_PROBE_SAVE_FAILED');return {archive_id:saved.data,...body};
 }
 export function direct4ReadView(protocol:{id:string;body:{version:string};sha256:string},run:unknown,tasks:unknown[],artifacts:unknown[],operation:unknown){
- if(![DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1','jls-direct4-synthesis-comparison-v1','jls-direct4-frozen-corpus-v1'].includes(protocol.body.version))throw Error('DIRECT4_READ_VERSION_CHANGED');
+ if(![DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1','jls-direct4-synthesis-comparison-v1','jls-direct4-frozen-corpus-v1','jls-direct4-short-frozen-corpus-v1'].includes(protocol.body.version))throw Error('DIRECT4_READ_VERSION_CHANGED');
  return {version:DIRECT4_WORKER_VERSION,protocol,run,tasks,artifacts,sol_operation:operation,new_provider_calls:0,read_only:true,production_enabled:false};
 }

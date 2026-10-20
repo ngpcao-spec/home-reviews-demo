@@ -1,3 +1,4 @@
+import {SHORT_FROZEN_DIRECT4} from '../_shared/jev-direct-short-config.ts';
 import {restaurantCpuProbe} from "../_shared/jls-restaurant-cpu-probe.ts";
 import {processTargeted9} from "../_shared/jev-targeted9-worker.ts";
 import {targeted9Port} from "../_shared/jev-targeted9-store.ts";
@@ -134,7 +135,7 @@ Deno.serve(async r=>{
   if(v?.data?.version===DIRECT4_COMPARISON){
    await processDirect4ComparisonRun(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
   }
-  if([HISTORICAL_DIRECT4,FROZEN_CORPUS_DIRECT4].includes(v?.data?.version??'')){
+  if([HISTORICAL_DIRECT4,FROZEN_CORPUS_DIRECT4,SHORT_FROZEN_DIRECT4].includes(v?.data?.version??'')){
    await processHistoricalDirect4Run(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
   }
   if(v?.data?.version===DIRECT4_PROTOCOL_VERSION){

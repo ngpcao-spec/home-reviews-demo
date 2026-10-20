@@ -25,7 +25,7 @@ Deno.serve(async r=>{
    const selectedProtocol=new URL(r.url).searchParams.get('protocol_id');
    let pq=c.client.from('analysis_jls_restaurant_protocols').select('id,body,sha256')
     .eq('organization_id',er.data.organization_id).eq('establishment_id',er.data.id).in('body->>version',selectedProtocol?
-     [DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1','jls-direct4-synthesis-comparison-v1','jls-direct4-frozen-corpus-v1']:[DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1']);
+     [DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1','jls-direct4-synthesis-comparison-v1','jls-direct4-frozen-corpus-v1','jls-direct4-short-frozen-corpus-v1']:[DIRECT4_PROTOCOL_VERSION,'jls-direct4-historical-v1']);
    if(selectedProtocol)pq=pq.eq('id',selectedProtocol);
    const p=await pq.order('created_at',{ascending:false}).limit(1).maybeSingle();if(p.error)throw Error('JLS_READ_FAILED');
    if(!p.data)return json({protocol:null,run:null,read_only:true,new_provider_calls:0});
@@ -91,6 +91,7 @@ Deno.serve(async r=>{
    .neq('body->>version',DIRECT4_PROTOCOL_VERSION)
    .neq('body->>version','jls-direct4-historical-v1')
    .neq('body->>version','jls-direct4-frozen-corpus-v1')
+   .neq('body->>version','jls-direct4-short-frozen-corpus-v1')
    .neq('body->>version','jls-direct4-synthesis-comparison-v1')
    .eq("establishment_id",er.data.id).eq("organization_id",er.data.organization_id).order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pr.error)throw Error("JLS_READ_FAILED");
