@@ -9,6 +9,7 @@ import { parseThemes } from "./jev-themes.ts";
 import { economicThemeResults } from "./jev-economy-cache.ts";
 import { validateEditorialReport } from "./jls-editorial-validation.ts";
 import { JEV_ENDPOINT } from "./jev.ts";
+import {databasePersistenceRetry,type RestaurantOutcome} from './jls-task-persistence.ts';
 export interface RestaurantTask {id:string;run_id:string;organization_id:string;phase:"jev"|"luna"|"sol";review_id:string|null;
  request:unknown;request_sha256:string;identity:{expected_served_model:string}|null;status:string;request_count:number;worker:string;}
 export interface RestaurantState {protocol:{id:string;body:RestaurantProtocol;sha256:string};
@@ -22,6 +23,8 @@ export interface RestaurantPort {
  claim(run:string,worker:string):Promise<RestaurantTask|null>;
  artifact(run:string,worker:string,kind:string,body:unknown,sha:string):Promise<boolean>;
  finish(task:string,worker:string,status:string,body:unknown,sha:string):Promise<boolean>;
+ retainReceipt?(state:RestaurantState,task:RestaurantTask,outcome:RestaurantOutcome):Promise<boolean>;
+ finishReceipt?(task:string):Promise<boolean>;
  stage(run:string,worker:string,stage:string,tasks:unknown[]):Promise<boolean>;
  release(run:string,worker:string,error:string|null):Promise<void>;
 }
@@ -141,9 +144,26 @@ export async function processRestaurant(port:RestaurantPort,run:string,keys:{jev
   for(let i=0;i<(state.run.stage==="sol"?1:8);i++){const t=await port.claim(run,worker);if(!t)break;tasks.push(t);}
   const outcomes=await Promise.allSettled(tasks.map(async t=>{
    const outcome=await restaurantAttempt(t,state,key,http,contract);
-   if(!await port.finish(t.id,worker,outcome.status,outcome.body,outcome.sha256))throw Error("JLS_RESULT_SAVE_UNCERTAIN_NO_RETRY");
+   // Keep a complete immutable receipt before attempting task finalization. Each
+   // retry below sends only the same database write, never the provider request.
+   if(t.phase!=='sol'&&port.retainReceipt&&!await databasePersistenceRetry(()=>port.retainReceipt!(state,t,outcome)))throw Error('JLS_RECEIPT_SAVE_UNCERTAIN_NO_RETRY');
+   return {task:t,outcome};
   }));
-  const failed=outcomes.find(x=>x.status==="rejected");if(failed?.status==="rejected")throw failed.reason;
+  let persistenceError:unknown=null;
+  // Provider requests stay parallel; finalization is drained in order rather
+  // than bursting eight transactions against the same run. Keep draining known
+  // receipts when a different response could not be retained.
+  for(const saved of outcomes){
+   if(saved.status==='rejected'){persistenceError??=saved.reason;continue;}
+   const {task:t,outcome}=saved.value;
+   try{
+    const finished=t.phase!=='sol'&&port.finishReceipt?
+     await databasePersistenceRetry(()=>port.finishReceipt!(t.id)):
+     await port.finish(t.id,worker,outcome.status,outcome.body,outcome.sha256);
+    if(!finished)throw Error('JLS_RESULT_SAVE_UNCERTAIN_NO_RETRY');
+   }catch(e){persistenceError??=e;}
+  }
+  if(persistenceError)throw persistenceError;
   state=await port.load(run);
   if(!["queued","running"].includes(state.run.status))return;
   if(state.tasks.some(t=>t.phase===state.run.stage&&!["completed","reused"].includes(t.status)))return;
