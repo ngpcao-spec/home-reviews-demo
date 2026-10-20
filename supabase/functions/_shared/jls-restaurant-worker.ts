@@ -46,7 +46,7 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
    task.request_sha256!==await hybridHash(task.request))throw Error("JLS_RESERVED_ATTEMPT_CHANGED");
   if(contract?.requestWire)wire=contract.requestWire(state,task);
   const q=task.request as {model:string};
-  const expected=task.phase==="jev"?"jev-latest":task.phase==="luna"?"gpt-6-luna":"gpt-6.1-sol";
+  const expected=contract?.expectedRequestedModel?.(state,task)??(task.phase==="jev"?"jev-latest":task.phase==="luna"?"gpt-6-luna":"gpt-6.1-sol");
   if(q.model!==expected)throw Error("JLS_REQUEST_MODEL_INVALID");
   if(task.phase==="jev"){
    const t=p.pending.find(t=>t.review_id===task.review_id);
@@ -112,6 +112,7 @@ export async function restaurantAttempt(task:RestaurantTask,state:RestaurantStat
 }
 export interface RestaurantExecutionContract {
  technicalMockTransport?:true;
+ expectedRequestedModel?(state:RestaurantState,task:RestaurantTask):string;
  verify(p:RestaurantProtocol,sha:string):Promise<void>;
  completed(state:RestaurantState,worker:string,port:RestaurantPort):Promise<void>;
  frozenAnalysisSource?:true;
