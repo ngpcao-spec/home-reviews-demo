@@ -30,6 +30,8 @@ import {LUNA_DIRECT4_COMPARE} from '../_shared/luna-direct4-comparison.ts';
 import {processLunaDirect4Comparison,probeLunaDirect4Comparison} from '../_shared/luna-direct4-comparison-server.ts';
 import {SHORT_COMPARE} from '../_shared/direct4-short-comparison.ts';
 import {processShortComparison,probeShortComparison} from '../_shared/direct4-short-comparison-server.ts';
+import {DIRECT4_CANDIDATES,candidateReadyContract} from '../_shared/jls-direct4-candidates.ts';
+import {probeCandidateOperation} from '../_shared/jls-direct4-candidates-server.ts';
 
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
@@ -38,6 +40,10 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='direct4_candidates_probe'){
+  try{return json(await probeCandidateOperation(admin,payload.operation_id));}
+  catch(e){return json({error:e instanceof Error?e.message:'DIRECT_CANDIDATES_PROBE_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='short_common_comparison_probe'){
   try{return json(await probeShortComparison(admin,payload.protocol_id));}
   catch(e){return json({error:e instanceof Error?e.message:'SHORT_COMPARISON_PROBE_FAILED',provider_calls:0},409);}
@@ -126,6 +132,11 @@ Deno.serve(async r=>{
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
   const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version===DIRECT4_CANDIDATES){
+   const op=await admin.from('analysis_jls_sol_ready_operations').select('id').eq('run_id',run.id).eq('mode','paid').single();
+   if(op.error)throw Error('DIRECT_CANDIDATES_OPERATION_MISSING');
+   await processReadySol(solReadyPort(admin),op.data.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,candidateReadyContract);continue;
+  }
   if(v?.data?.version===SHORT_COMPARE){
    await processShortComparison(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
   }
