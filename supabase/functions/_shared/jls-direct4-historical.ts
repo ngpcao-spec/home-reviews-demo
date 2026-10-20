@@ -14,6 +14,16 @@ import type {JlsPlan} from './jev-luna-sol.ts';
 
 export const HISTORICAL_DIRECT4='jls-direct4-historical-v1';
 export const FROZEN_CORPUS_DIRECT4='jls-direct4-frozen-corpus-v1';
+export const PARTIAL_DIRECT4='jls-direct4-partial-continuation-v1';
+export interface Direct4PartialContinuation {
+ version:typeof PARTIAL_DIRECT4;source_protocol_id:string;source_protocol_sha256:string;source_code_provenance:string;
+ original_pending:unknown[];source_run_id:string;source_run_sha256:string;source_tasks_sha256:string;source_artifacts_sha256:string;
+ fix_archive:{id:string;sha256:string};
+ reused:{task_id:string;review_id:string;request_sha256:string;artifact_sha256:string;body:Record<string,unknown>}[];
+ missing:{task_id:string;review_id:string;request_sha256:string;source:unknown;result:null;reason:'reserved_outcome_unknown_no_retry'}[];
+ source_tasks:{task_id:string;review_id:string;request_sha256:string;status:string;request_count:number}[];
+ expected_analysed_reviews:number;technical_missing_reviews:number;new_consent_required:true;
+}
 export const BISTRO='6a53577a-c816-4548-845e-870995fbaed9';
 export const BISTRO_HISTORY='fa55c8a5-f6e3-43df-a792-e9beed974457';
 export const BISTRO_FINGERPRINT='929b2c3d97b83317c391e4b0a418771ea1b8d4c2eb4566375a52e7baac2077e7';
@@ -72,10 +82,11 @@ export async function prepareHistoricalDirect4(input:HistoricalDirect4Input,code
   max_jev_calls:textual.length,max_luna_calls:32,max_sol_calls:1,max_apify_calls:0,sol_size_policy:SOL_SIZE_POLICY,
   automatic_retry:false,production_enabled:false,spending_authorization:null,run_id:null,provider_calls:0,
   code_provenance:code,preparation_is_not_spending_authorization:true};
- return {body,sha256:await directHash(body)};
+ return {body:body as typeof body&{continuation?:Direct4PartialContinuation},sha256:await directHash(body)};
 }
 export type HistoricalDirect4Protocol=Awaited<ReturnType<typeof prepareHistoricalDirect4>>;
 export async function verifyHistoricalDirect4(p:HistoricalDirect4Protocol['body'],sha:string){
+ if(p.continuation){await verifyPartialDirect4(p,sha);return;}
  const generic=p.version===FROZEN_CORPUS_DIRECT4,h=p.frozen_historical,all=p.source_snapshot.reviews,textual=all.filter(r=>r.analysis_text);
  if(!generic&&(p.version!==HISTORICAL_DIRECT4||p.establishment_id!==BISTRO||p.historical.id!==BISTRO_HISTORY||
   p.historical.record_sha256!==BISTRO_HISTORY_SHA||p.historical.source_fingerprint!==BISTRO_FINGERPRINT||p.pending.length!==68))throw Error('DIRECT4_HISTORICAL_PROTOCOL_CHANGED');
@@ -116,6 +127,58 @@ export async function verifyHistoricalDirect4(p:HistoricalDirect4Protocol['body'
    t.identity.requested_model!==DIRECT_CONFIG.requested_model||t.identity.expected_served_model!=='record_native_no_probe'||
    await directHash(request)!==t.request_sha256||await analysisTextSha256(JSON.stringify(request))!==t.request_raw_sha256)throw Error('DIRECT4_HISTORICAL_REQUEST_CHANGED');}
 }
+export async function preparePartialDirect4(source:RestaurantState,fix:{id:string;sha256:string},code:string){
+ const p=protocol(source);await verifyHistoricalDirect4(p,source.protocol.sha256);
+ if(p.version!==FROZEN_CORPUS_DIRECT4||p.continuation||['queued','running','completed'].includes(source.run.status)||
+  source.tasks.some(t=>t.phase!=='jev')||source.tasks.length!==p.pending.length||!/^[a-f0-9]{40}$/.test(code))throw Error('DIRECT4_PARTIAL_SOURCE_INVALID');
+ const tasks=[...source.tasks].sort((a,b)=>a.id.localeCompare(b.id)),artifacts=source.artifacts.map(({kind,body,sha256})=>({kind,body,sha256})).sort((a,b)=>a.kind.localeCompare(b.kind));
+ const reused:Direct4PartialContinuation['reused']=[],missing:Direct4PartialContinuation['missing']=[];
+ for(const task of tasks){
+  const original=p.pending.find(t=>t.review_id===task.review_id),a=artifacts.find(a=>a.kind==='task:'+task.id);
+  if(!original||task.request_sha256!==original.request_sha256||await directHash(task.request)!==task.request_sha256)throw Error('DIRECT4_PARTIAL_TASK_CHANGED');
+  if(task.status==='completed'&&task.request_count===1&&a){
+   if(await directHash(a.body)!==a.sha256||a.body.phase!=='jev'||a.body.request_sha256!==task.request_sha256||
+    typeof a.body.raw_response_text!=='string'||await analysisTextSha256(a.body.raw_response_text)!==a.body.raw_response_sha256||
+    directCanonical(parseDirectCategoriesRounded(JSON.parse(a.body.raw_response_text)))!==directCanonical(a.body.direct4_result))throw Error('DIRECT4_PARTIAL_RESULT_CHANGED');
+   reused.push({task_id:task.id,review_id:task.review_id!,request_sha256:task.request_sha256,artifact_sha256:a.sha256,body:structuredClone(a.body)});
+  }else if(task.status==='running'&&task.request_count===1&&!a){
+   missing.push({task_id:task.id,review_id:task.review_id!,request_sha256:task.request_sha256,source:structuredClone(p.source_snapshot.reviews.find(r=>r.id===task.review_id)),result:null,reason:'reserved_outcome_unknown_no_retry'});
+  }else if(task.status!=='pending'||task.request_count!==0||a)throw Error('DIRECT4_PARTIAL_UNKNOWN_TASK_STATUS');
+ }
+ const pending=p.pending.filter(t=>tasks.some(x=>x.review_id===t.review_id&&x.status==='pending'&&x.request_count===0));
+ const continuation:Direct4PartialContinuation={version:PARTIAL_DIRECT4,source_protocol_id:source.protocol.id,source_protocol_sha256:source.protocol.sha256,
+  source_code_provenance:p.code_provenance,original_pending:structuredClone(p.pending),source_run_id:source.run.id,source_run_sha256:await directHash(source.run),
+  source_tasks_sha256:await directHash(tasks),source_artifacts_sha256:await directHash(artifacts),fix_archive:fix,reused,missing,
+  source_tasks:tasks.map(t=>({task_id:t.id,review_id:t.review_id!,request_sha256:t.request_sha256,status:t.status,request_count:t.request_count})),
+  expected_analysed_reviews:reused.length+pending.length,technical_missing_reviews:missing.length,new_consent_required:true};
+ const body={...structuredClone(p),pending,pending_sha256:await directHash(pending),max_jev_calls:pending.length,code_provenance:code,continuation};
+ const sha256=await directHash(body);await verifyPartialDirect4(body,sha256);return {body,sha256};
+}
+async function verifyPartialDirect4(p:HistoricalDirect4Protocol['body'],sha:string){
+ const c=p.continuation!;
+ const {continuation:_,...base}=p;
+ const original={...base,pending:c.original_pending,pending_sha256:await directHash(c.original_pending),max_jev_calls:c.original_pending.length,code_provenance:c.source_code_provenance} as HistoricalDirect4Protocol['body'];
+ await verifyHistoricalDirect4(original,c.source_protocol_sha256);
+ if(await directHash(p)!==sha||p.version!==FROZEN_CORPUS_DIRECT4||c.version!==PARTIAL_DIRECT4||c.new_consent_required!==true||
+  !/^[a-f0-9]{40}$/.test(p.code_provenance)||c.source_tasks.length!==original.pending.length||
+  new Set(c.source_tasks.map(t=>t.task_id)).size!==c.source_tasks.length||new Set(c.source_tasks.map(t=>t.review_id)).size!==c.source_tasks.length||
+  c.expected_analysed_reviews!==c.reused.length+p.pending.length||c.technical_missing_reviews!==c.missing.length||
+  c.expected_analysed_reviews+c.missing.length!==p.denominators.analytical_reviews||p.max_jev_calls!==p.pending.length||p.pending_sha256!==await directHash(p.pending))throw Error('DIRECT4_PARTIAL_MANIFEST_CHANGED');
+ const ids=[...p.pending.map(t=>t.review_id),...c.reused.map(t=>t.review_id),...c.missing.map(t=>t.review_id)];
+ if(new Set(ids).size!==original.pending.length||ids.some(id=>!original.pending.some(t=>t.review_id===id)))throw Error('DIRECT4_PARTIAL_PARTITION_CHANGED');
+ for(const t of p.pending)if(directCanonical(t)!==directCanonical(original.pending.find(o=>o.review_id===t.review_id))||
+  !c.source_tasks.some(s=>s.review_id===t.review_id&&s.status==='pending'&&s.request_count===0&&s.request_sha256===t.request_sha256))throw Error('DIRECT4_PARTIAL_REDISPATCH_FORBIDDEN');
+ for(const t of c.reused){const source=c.source_tasks.find(s=>s.task_id===t.task_id),o=original.pending.find(o=>o.review_id===t.review_id),b=t.body;
+  if(!source||source.review_id!==t.review_id||source.status!=='completed'||source.request_count!==1||source.request_sha256!==t.request_sha256||
+   o?.request_sha256!==t.request_sha256||await directHash(b)!==t.artifact_sha256||b.phase!=='jev'||b.request_sha256!==t.request_sha256||
+   typeof b.raw_response_text!=='string'||await analysisTextSha256(b.raw_response_text)!==b.raw_response_sha256||
+   directCanonical(parseDirectCategoriesRounded(JSON.parse(b.raw_response_text)))!==directCanonical(b.direct4_result))throw Error('DIRECT4_PARTIAL_REUSED_CHANGED');
+ }
+ for(const t of c.missing){const s=c.source_tasks.find(s=>s.task_id===t.task_id);
+  if(!s||s.review_id!==t.review_id||s.status!=='running'||s.request_count!==1||s.request_sha256!==t.request_sha256||
+   t.result!==null||t.reason!=='reserved_outcome_unknown_no_retry'||directCanonical(t.source)!==directCanonical(p.source_snapshot.reviews.find(r=>r.id===t.review_id)))throw Error('DIRECT4_PARTIAL_MISSING_CHANGED');
+ }
+}
 const protocol=(s:RestaurantState)=>s.protocol.body as unknown as HistoricalDirect4Protocol['body'];
 export function historicalDirect4Contract(preparation?:DirectReportPreparation):RestaurantExecutionContract{return {
  frozenAnalysisSource:true,verify:async(p,sha)=>verifyHistoricalDirect4(p as unknown as HistoricalDirect4Protocol['body'],sha),
@@ -138,12 +201,15 @@ export function historicalDirect4Contract(preparation?:DirectReportPreparation):
 export async function compileHistoricalDirect4Evidence(s:RestaurantState){
  const p=protocol(s);await verifyHistoricalDirect4(p,s.protocol.sha256);
  const rows=[];
- for(const t of p.pending){const source=p.source_snapshot.reviews.find(r=>r.id===t.review_id)!,task=s.tasks.find(x=>x.phase==='jev'&&x.review_id===t.review_id),
-  a=s.artifacts.find(x=>x.kind==='task:'+task?.id);
+ const jevSources:{task_id:string;request_sha256:string;artifact_sha256:string;source_run_id?:string}[]=[];
+ const expected=p.continuation?(p.continuation.original_pending as typeof p.pending).filter(t=>!p.continuation!.missing.some(m=>m.review_id===t.review_id)):p.pending;
+ for(const t of expected){const source=p.source_snapshot.reviews.find(r=>r.id===t.review_id)!,reused=p.continuation?.reused.find(r=>r.review_id===t.review_id),task=reused?{id:reused.task_id,status:'completed',request_count:1,request_sha256:reused.request_sha256}:s.tasks.find(x=>x.phase==='jev'&&x.review_id===t.review_id),
+  a=reused?{body:reused.body,sha256:reused.artifact_sha256}:s.artifacts.find(x=>x.kind==='task:'+task?.id);
   if(!task||task.status!=='completed'||task.request_count!==1||!a||await directHash(a.body)!==a.sha256||task.request_sha256!==t.request_sha256||
    typeof a.body.raw_response_text!=='string'||await analysisTextSha256(a.body.raw_response_text)!==a.body.raw_response_sha256)throw Error('DIRECT4_HISTORICAL_JEV_INCOMPLETE');
   const result=parseDirectCategoriesRounded(JSON.parse(a.body.raw_response_text));
   if(directCanonical(result)!==directCanonical(a.body.direct4_result))throw Error('DIRECT4_HISTORICAL_JEV_RESULT_CHANGED');
+  jevSources.push({task_id:task.id,request_sha256:t.request_sha256,artifact_sha256:a.sha256,...(reused?{source_run_id:p.continuation!.source_run_id}:{})});
   rows.push({review_id:t.review_id,analysis_text:source.analysis_text!,analysis_text_sha256:source.analysis_text_sha256!,
    analysis_language:source.analysis_language??'und',organization_id:p.organization_id,establishment_id:p.establishment_id,
    result,result_sha256:await directHash(result),raw_response_text:a.body.raw_response_text,response_raw_sha256:String(a.body.raw_response_sha256),
@@ -153,10 +219,11 @@ export async function compileHistoricalDirect4Evidence(s:RestaurantState){
   reviews:rows,counts:directCategoryCounts(rows.map(r=>r.review_id),rows)};
  const dataset={id:s.run.id,protocol_id:s.protocol.id,organization_id:p.organization_id,body:datasetBody,sha256:await directHash(datasetBody)},
  snapshot={id:s.protocol.id,protocol_id:s.protocol.id,organization_id:p.organization_id,body:p.source_snapshot,sha256:p.source_snapshot_sha256};
- const binding:DirectReportSourceBinding={dataset_id:dataset.id,dataset_sha256:dataset.sha256,snapshot_id:snapshot.id,snapshot_sha256:snapshot.sha256,source_reviews:p.denominators.source_reviews,text_reviews:p.denominators.analytical_reviews};
+ const binding:DirectReportSourceBinding={dataset_id:dataset.id,dataset_sha256:dataset.sha256,snapshot_id:snapshot.id,snapshot_sha256:snapshot.sha256,source_reviews:p.denominators.source_reviews,text_reviews:rows.length,
+  ...(p.continuation?{technical_missing_review_ids:p.continuation.missing.map(m=>m.review_id)}:{})};
  const prepared=await prepareDirectReport({dataset,snapshot,prior_luna_requests:[]} as DirectReportInput,p.code_provenance,binding,p.version===FROZEN_CORPUS_DIRECT4?DIRECT_SYNTHESIS_VERSION:undefined);
- return {dataset,preparation:prepared,binding,jev_source_tasks:s.tasks.filter(t=>t.phase==='jev').map(t=>({task_id:t.id,request_sha256:t.request_sha256,
-  artifact_sha256:s.artifacts.find(a=>a.kind==='task:'+t.id)!.sha256})),protocol_sha256:s.protocol.sha256};
+ return {dataset,preparation:prepared,binding,jev_source_tasks:jevSources,protocol_sha256:s.protocol.sha256,
+  ...(p.continuation?{database_prevalidation_rpc:'save_jls_direct4_partial_evidence_certificate' as const}:{})};
 }
 export type HistoricalDirectEvidence=Awaited<ReturnType<typeof compileHistoricalDirect4Evidence>>;
 export async function historicalLunaResults(s:RestaurantState,p:DirectReportPreparation){
@@ -189,7 +256,7 @@ export async function verifyHistoricalDirect4Ready(s:ReadyState){
  if(a.sha256!==await directHash(b)||b.source_protocol_sha256!==s.protocol.sha256||prep.sha256!==await directHash(prep.body)||
   prep.body.source_snapshot.sha256!==p.source_snapshot_sha256||prep.body.source_snapshot.id!==s.protocol.id||
   prep.body.organization_id!==p.organization_id||prep.body.establishment_id!==p.establishment_id||
-  prep.body.statistics.scope.analysed_text_reviews!==p.denominators.analytical_reviews||prep.body.statistics.scope.source_reviews!==p.denominators.source_reviews||
+  prep.body.statistics.scope.analysed_text_reviews!==(p.continuation?.expected_analysed_reviews??p.denominators.analytical_reviews)||prep.body.statistics.scope.source_reviews!==p.denominators.source_reviews||
   p.version===FROZEN_CORPUS_DIRECT4&&prep.body.version!==DIRECT_SYNTHESIS_VERSION||
   await analysisTextSha256(b.request_json)!==b.request_raw_sha256||await directHash(JSON.parse(b.request_json))!==b.request_sha256||
   await directHash(b.results)!==b.results_sha256||await directHash(b.token_certificate)!==b.token_certificate_sha256)throw Error('DIRECT4_HISTORICAL_READY_CHANGED');
