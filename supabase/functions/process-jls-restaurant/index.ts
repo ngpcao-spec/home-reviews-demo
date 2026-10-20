@@ -19,7 +19,7 @@ import {processDirect4Run,direct4ActiveProbe} from "../_shared/jls-direct4-serve
 import {DIRECT4_PROTOCOL_VERSION} from "../_shared/jls-direct4-execution.ts";
 import {direct4ReadyContract} from "../_shared/jls-direct4-execution.ts";
 import {inspectDirect4Continuation,probeDirect4Continuation} from "../_shared/jls-direct4-continuation.ts";
-import {HISTORICAL_DIRECT4} from "../_shared/jls-direct4-historical.ts";
+import {HISTORICAL_DIRECT4,FROZEN_CORPUS_DIRECT4} from "../_shared/jls-direct4-historical.ts";
 import {processHistoricalDirect4Run,historicalDirect4ActiveProbe} from "../_shared/jls-direct4-historical-server.ts";
 import {DIRECT4_COMPARISON} from '../_shared/jls-direct4-comparison.ts';
 import {processDirect4ComparisonRun,direct4ComparisonActiveProbe} from '../_shared/jls-direct4-comparison-server.ts';
@@ -101,7 +101,7 @@ Deno.serve(async r=>{
   if(v?.data?.version===DIRECT4_COMPARISON){
    await processDirect4ComparisonRun(admin,run.id,Deno.env.get('OPENAI_API_KEY')??'',fetch);continue;
   }
-  if(v?.data?.version===HISTORICAL_DIRECT4){
+  if([HISTORICAL_DIRECT4,FROZEN_CORPUS_DIRECT4].includes(v?.data?.version??'')){
    await processHistoricalDirect4Run(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
   }
   if(v?.data?.version===DIRECT4_PROTOCOL_VERSION){

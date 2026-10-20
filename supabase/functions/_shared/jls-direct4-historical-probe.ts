@@ -36,8 +36,9 @@ export async function rehearseHistoricalDirect4(p:HistoricalDirect4Protocol&{id:
   tasks:p.body.pending.map((t,n)=>({id:'EXPLICIT_MOCK_JEV_'+n,run_id:'EXPLICIT_MOCK_RUN',organization_id:p.body.organization_id,phase:'jev',review_id:t.review_id,
    request:{...t.payload,questions:p.body.configuration.jev.questions},request_sha256:t.request_sha256,identity:t.identity,status:'pending',request_count:0,worker:'',cache_id:null}))};
  const f=directMockPort(state),calls:string[]=[],http=historicalMockHttp(f.state,calls),fixtures:Record<string,unknown>={};
- for(let i=0;i<9;i++){if(i===8)fixtures.jev={state:structuredClone(f.state)};await processRestaurant(f.port,f.state.run.id,{jev:'EXPLICIT_MOCK',openai:'EXPLICIT_MOCK'},http,historicalDirect4Contract());}
- if(f.state.run.stage!=='prepare_evidence'||calls.length!==68)throw Error('MOCK_JEV_INCOMPLETE');
+ const wakes=Math.ceil(p.body.pending.length/8);
+ for(let i=0;i<wakes;i++){if(i===wakes-1)fixtures.jev={state:structuredClone(f.state)};await processRestaurant(f.port,f.state.run.id,{jev:'EXPLICIT_MOCK',openai:'EXPLICIT_MOCK'},http,historicalDirect4Contract());}
+ if(f.state.run.stage!=='prepare_evidence'||calls.length!==p.body.pending.length)throw Error('MOCK_JEV_INCOMPLETE');
  const evidence=await compileHistoricalDirect4Evidence(f.state),prep=evidence.preparation;
  f.state.artifacts.push({kind:'direct4_report_preparation',body:prep as unknown as Record<string,unknown>,sha256:await directHash(prep)},
   {kind:'direct4_evidence_bundle',body:evidence as unknown as Record<string,unknown>,sha256:await directHash(evidence)},
@@ -56,8 +57,8 @@ export async function rehearseHistoricalDirect4(p:HistoricalDirect4Protocol&{id:
  await processReadySol(sol.port,sol.state.operation.id,'EXPLICIT_MOCK',solHttp,historicalDirect4ReadyContract);
  if(sol.state.operation.status!=='completed'||!sol.state.operation.result?.validated_report||solCalls.length!==1)throw Error('MOCK_SOL_NOT_SAVED');
  await processReadySol(sol.port,sol.state.operation.id,'EXPLICIT_MOCK',solHttp,historicalDirect4ReadyContract);
- return {fixtures,qualification:{version:'jls-direct4-historical-v1',explicit_technical_mock:true,provider_calls:0,
-  simulated_jev:68,simulated_luna:prep.body.luna_groups.length,simulated_sol:solCalls.length,request_measurement:ready.body.measurement,
+ return {fixtures,qualification:{version:p.body.version,explicit_technical_mock:true,provider_calls:0,
+  simulated_jev:p.body.pending.length,simulated_luna:prep.body.luna_groups.length,simulated_sol:solCalls.length,request_measurement:ready.body.measurement,
   recommendations:(sol.state.operation.result.validated_report as unknown as ReturnType<typeof direct4MockReport>).report.recommendations.length,
   receipt_saved:true,report_saved:true,zero_retries:true,denominators:p.body.denominators,configuration_sha256:p.body.classification_configuration_sha256}};
 }

@@ -42,7 +42,7 @@ export async function historicalDirect4ActiveProbe(client:SupabaseClient,request
  }
  if(typeof input!=='string')throw Error('DIRECT4_HISTORICAL_PROBE_INPUT_CHANGED');
  const at=performance.now(),result=await runHistoricalDirect4Probe(request.phase,JSON.parse(input));
- const b={version:'jls-direct4-historical-v1',phase:request.phase,protocol_sha256:q.data.sha256,result,provider_calls:0,
+ const b={version:q.data.body.version,phase:request.phase,protocol_sha256:q.data.sha256,result,provider_calls:0,
   explicit_technical_mock:true,wall_ms:performance.now()-at,memory:Deno.memoryUsage(),execution_id:Deno.env.get('SB_EXECUTION_ID')??null};
  const saved=await client.rpc('save_jls_snapshot_preparation',{p_protocol:q.data.id,p_kind:'historical_direct4_deployed_'+request.phase,p_body:b,p_sha:await directHash(b)});
  if(saved.error)throw Error('DIRECT4_HISTORICAL_PROBE_SAVE_FAILED');return {archive_id:saved.data,...b};
