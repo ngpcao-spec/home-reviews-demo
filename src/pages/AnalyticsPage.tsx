@@ -8,6 +8,7 @@ import { useApp } from '../app/AppContext'
 import { ReputationReport } from '../components/ReputationReport'
 import { FindingAuditEntry } from './V9FindingAuditPage'
 import { ConsultantReport } from '../components/ConsultantReport'
+import { ParallelReports } from '../components/ParallelReports'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
@@ -163,7 +164,7 @@ export function AnalyticsPage() {
     {loading && <section className="weekly-report-state card" data-testid="analytics-initial-loading" aria-live="polite"><span className="weekly-report-spinner"/><p>{messages.reputation.loadingReport}</p></section>}
     {visibleError && <section className="weekly-report-state card" role="alert"><AlertTriangle/><p>{visibleError}</p><button className="secondary-button" onClick={() => setRequestVersion((value) => value + 1)}>{messages.common.retry}</button></section>}
 
-    {selected && periodMode === 'historical' && <div className="weekly-report historical-report">
+    {selected && periodMode === 'historical' && <ParallelReports key={`${currentUser.id??currentUser.email}:${selected.id}:${preferredLanguage}`} current={visibleHistoricalReport} account={currentUser.id??currentUser.email} enabled={!demoMode&&!!supabase}><div className="weekly-report historical-report">
       <section className="weekly-report-hero card">
         {!visibleHistoricalReport?.consultant && <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />}
         <div>
@@ -200,7 +201,7 @@ export function AnalyticsPage() {
 
       {visibleHistoricalReport && (visibleHistoricalReport.consultant ? <><ConsultantReport report={visibleHistoricalReport.consultant}/>{visibleHistoricalReport.consultant.version===9&&visibleHistoricalReport.consultant.analysis_pipeline?.source_generation_id==='307025ef-05b1-401e-8f6d-e48ca5677553'&&<FindingAuditEntry/>}</> : <ReputationReport report={visibleHistoricalReport} />)}
 
-    </div>}
+    </div></ParallelReports>}
 
     {selected && periodMode !== 'historical' && visibleReport && <div className="weekly-report">
       <section className="weekly-report-hero card">

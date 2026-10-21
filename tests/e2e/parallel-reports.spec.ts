@@ -1,0 +1,18 @@
+import {test,expect} from '@playwright/test'
+for(const language of ['fr','vi'])test(`parallel reports ${language}: isolated tabs, sources, reload, iPhone/iPad`,async({page})=>{
+ if(test.info().project.name==='desktop')await page.setViewportSize({width:768,height:1024})
+ const network:string[]=[];page.on('request',r=>{if(r.method()==='POST'||/api\.openai|typesafe\.ai|apify/.test(r.url()))network.push(r.url())})
+ await page.goto(`/tests/e2e/fixtures/parallel-reports.html?language=${language}`)
+ await expect(page.getByText('CURRENT MOCK REPORT PRESERVED')).toBeVisible()
+ await page.getByText('CURRENT GENERATE MOCK').click();await expect(page.getByText('CURRENT GENERATE MOCK')).toHaveAttribute('data-clicked','yes')
+ await page.getByRole('tab',{name:language==='fr'?'Rapport expérimental':'Báo cáo thử nghiệm'}).click()
+ await expect(page.getByText('CURRENT MOCK REPORT PRESERVED')).not.toBeVisible()
+ await expect(page.getByRole('button',{name:language==='fr'?'Générer le rapport expérimental':'Tạo báo cáo thử nghiệm'})).toBeDisabled()
+ await page.getByText(language==='fr'?'Consulter les avis sources':'Xem đánh giá nguồn',{exact:true}).first().click()
+ await expect(page.getByText('EXPLICIT SYNTHETIC CUSTOMER TEXT: Good food, staff, prices and room.',{exact:true}).first()).toBeVisible()
+ await page.getByText(language==='fr'?'Avis complet et original':'Toàn bộ đánh giá và bản gốc',{exact:true}).first().click()
+ await expect(page.getByText('EXPLICIT ORIGINAL SYNTHETIC TEXT',{exact:true}).first()).toBeVisible()
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false)
+ await page.screenshot({path:`test-results/parallel-${language}-${test.info().project.name}.png`,fullPage:true})
+ await page.reload();await expect(page.getByText('CURRENT MOCK REPORT PRESERVED')).toBeVisible();expect(network).toEqual([])
+})

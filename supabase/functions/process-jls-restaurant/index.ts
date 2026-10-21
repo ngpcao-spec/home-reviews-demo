@@ -32,6 +32,10 @@ import {SHORT_COMPARE} from '../_shared/direct4-short-comparison.ts';
 import {processShortComparison,probeShortComparison} from '../_shared/direct4-short-comparison-server.ts';
 import {DIRECT4_CANDIDATES,candidateReadyContract} from '../_shared/jls-direct4-candidates.ts';
 import {probeCandidateOperation} from '../_shared/jls-direct4-candidates-server.ts';
+import {PARALLEL_REPORT} from '../_shared/parallel-report.ts';
+import {processParallelReport} from '../_shared/parallel-report-server.ts';
+import {parallelProtocol,type ParallelCurrent,type ParallelHistory} from '../_shared/parallel-report.ts';
+import {rehearseParallel} from '../_shared/parallel-report-probe.ts';
 
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
@@ -40,6 +44,19 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
+ if(payload?.mode==='parallel_report_capability')return json({version:PARALLEL_REPORT,worker_revision:'parallel-current-experimental-v1',stages:['jev','prepare_evidence','sol','validate_sol'],max_luna_calls:0,max_sol_calls:1,provider_calls:0});
+ if(payload?.mode==='parallel_report_probe'){
+  // Deployed-path rehearsal with explicit injected suppliers, no durable run,
+  // authorization, reservation or database write. Returns before provider keys.
+  try{
+   const q=await admin.from('historical_establishment_reports').select('*').eq('id',payload.report_id).single();if(q.error)throw Error('FORBIDDEN');
+   const h=await admin.from('historical_report_runs').select('*').eq('generation_id',q.data.generation_id).eq('organization_id',q.data.organization_id).eq('establishment_id',q.data.establishment_id).eq('status','completed').single();if(h.error)throw Error('PARALLEL_CORPUS_UNAVAILABLE');
+   const p=await parallelProtocol(q.data as ParallelCurrent,h.data as ParallelHistory,h.data.requested_by,'a'.repeat(40));
+   const result=await rehearseParallel({...p,id:crypto.randomUUID()});
+   return json({version:PARALLEL_REPORT,worker_revision:'parallel-current-experimental-v1',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,
+    corpus:p.body.denominators,mock_jev:result.mock_jev,mock_luna:result.mock_luna,mock_sol:result.mock_sol,status:result.status,measurement:result.request_measurement,wall_ms:result.wall_ms,memory:Deno.memoryUsage()});
+  }catch(e){return json({error:e instanceof Error?e.message:'PARALLEL_PROBE_FAILED',provider_calls:0},409);}
+ }
  if(payload?.mode==='direct4_candidates_probe'){
   try{return json(await probeCandidateOperation(admin,payload.operation_id));}
   catch(e){return json({error:e instanceof Error?e.message:'DIRECT_CANDIDATES_PROBE_FAILED',provider_calls:0},409);}
@@ -132,6 +149,9 @@ Deno.serve(async r=>{
   for(const run of runs??[])try{
   const p=await admin.from("analysis_jls_restaurant_runs").select("protocol_id").eq("id",run.id).single();
   const v=p.data?await admin.from("analysis_jls_restaurant_protocols").select("body->>version").eq("id",p.data.protocol_id).single():null;
+  if(v?.data?.version===PARALLEL_REPORT){
+   await processParallelReport(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
+  }
   if(v?.data?.version===DIRECT4_CANDIDATES){
    const op=await admin.from('analysis_jls_sol_ready_operations').select('id').eq('run_id',run.id).eq('mode','paid').single();
    if(op.error)throw Error('DIRECT_CANDIDATES_OPERATION_MISSING');
