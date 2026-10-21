@@ -19,7 +19,7 @@ Deno.serve(async request=>{
    if(body.confirmed!==true||body.generation_id!==report.generation_id)throw Error('PARALLEL_EXPLICIT_CURRENT_BUTTON_REQUIRED');
    if(!pair.data){
     if(!reusable)throw Error('PARALLEL_CORPUS_UNAVAILABLE');
-    const p=await parallelProtocol(report as ParallelCurrent,history.data as ParallelHistory,c.user.id,'__PARALLEL_BUILD_COMMIT__');
+    const p=await parallelProtocol(report as ParallelCurrent,history.data as ParallelHistory,c.user.id,'04177449f1596ff2a4b2d7575868360ea232ee90');
     if(!p.body.pending.length)throw Error('PARALLEL_NO_TEXT');
     const start=await c.admin.rpc('start_parallel_report',{p_body:p.body,p_sha:p.sha256,p_user:c.user.id});if(start.error)throw Error('PARALLEL_START_REFUSED');
    }
