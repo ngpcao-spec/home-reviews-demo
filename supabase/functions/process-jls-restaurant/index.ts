@@ -35,7 +35,9 @@ import {probeCandidateOperation} from '../_shared/jls-direct4-candidates-server.
 import {PARALLEL_REPORT} from '../_shared/parallel-report.ts';
 import {processParallelReport} from '../_shared/parallel-report-server.ts';
 import {parallelProtocol,type ParallelCurrent,type ParallelHistory} from '../_shared/parallel-report.ts';
-import {rehearseParallel} from '../_shared/parallel-report-probe.ts';
+import {boundedParallelFixture,boundedParallelJevProbe,boundedParallelSolProbe} from '../_shared/parallel-report-probe.ts';
+import {compileParallelSol} from '../_shared/parallel-report.ts';
+import {directHash} from '../_shared/jev-direct-categories.ts';
 
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
@@ -49,12 +51,25 @@ Deno.serve(async r=>{
   // Deployed-path rehearsal with explicit injected suppliers, no durable run,
   // authorization, reservation or database write. Returns before provider keys.
   try{
+   const at=performance.now();
+   if(payload.phase==='sol'){
+    const a=await admin.from('analysis_jls_snapshot_preparations').select('body,sha256').eq('id',payload.prepared_archive_id).eq('kind','parallel_bounded_mock_ready').single();
+    if(a.error||await directHash(a.data.body)!==a.data.sha256||a.data.body.explicit_technical_mock!==true)throw Error('PROBE_SOURCE_CHANGED');
+    const result=await boundedParallelSolProbe(a.data.body.protocol,a.data.body.ready);
+    return json({version:PARALLEL_REPORT,phase:'sol',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,...result,wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
+   }
+   if(!['jev','compile'].includes(payload.phase))throw Error('BOUNDED_PROBE_PHASE_REQUIRED');
    const q=await admin.from('historical_establishment_reports').select('*').eq('id',payload.report_id).single();if(q.error)throw Error('FORBIDDEN');
    const h=await admin.from('historical_report_runs').select('*').eq('generation_id',q.data.generation_id).eq('organization_id',q.data.organization_id).eq('establishment_id',q.data.establishment_id).eq('status','completed').single();if(h.error)throw Error('PARALLEL_CORPUS_UNAVAILABLE');
    const p=await parallelProtocol(q.data as ParallelCurrent,h.data as ParallelHistory,h.data.requested_by,'a'.repeat(40));
-   const result=await rehearseParallel({...p,id:crypto.randomUUID()});
-   return json({version:PARALLEL_REPORT,worker_revision:'parallel-current-experimental-v1',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,
-    corpus:p.body.denominators,mock_jev:result.mock_jev,mock_luna:result.mock_luna,mock_sol:result.mock_sol,status:result.status,measurement:result.request_measurement,wall_ms:result.wall_ms,memory:Deno.memoryUsage()});
+   const source=await admin.from('analysis_jls_snapshot_preparations').select('organization_id,protocol_id,establishment_id:body->>establishment_id,dataset:body->source_input->dataset').eq('id',payload.source_archive_id).single();
+   const dataset=source.data?.dataset as unknown as {body:{configuration_sha256:string;reviews:{review_id:string;analysis_text_sha256:string;raw_response_text:string}[]}}|null;
+   if(source.error||!dataset?.body||!Array.isArray(dataset.body.reviews)||source.data.organization_id!==p.body.organization_id||source.data.establishment_id!==p.body.establishment_id||dataset.body.configuration_sha256!==p.body.classification_configuration_sha256)throw Error('PROBE_SOURCE_CHANGED');
+   const protocol={...p,id:crypto.randomUUID()},state=await boundedParallelFixture(protocol,dataset.body.reviews);
+   if(payload.phase==='jev')return json({version:PARALLEL_REPORT,phase:'jev',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,...await boundedParallelJevProbe(state,dataset.body.reviews),wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
+   const ready=await compileParallelSol(state),body={protocol,ready,explicit_technical_mock:true};
+   const saved=await admin.rpc('save_jls_snapshot_preparation',{p_protocol:source.data.protocol_id,p_kind:'parallel_bounded_mock_ready',p_body:body,p_sha:await directHash(body)});if(saved.error)throw Error('PROBE_PERSISTENCE_FAILED');
+   return json({version:PARALLEL_REPORT,phase:'compile',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,prepared_archive_id:saved.data,measurement:ready.body.measurement,wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
   }catch(e){return json({error:e instanceof Error?e.message:'PARALLEL_PROBE_FAILED',provider_calls:0},409);}
  }
  if(payload?.mode==='direct4_candidates_probe'){
