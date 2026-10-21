@@ -9,10 +9,22 @@ Deno.serve(async request=>{
   const c=await requireUser(request),body=await request.json();
   if(!['read','start'].includes(body.action)||typeof body.report_id!=='string')return json({error:'INVALID_REQUEST'},400);
   const q=await c.client.from('historical_establishment_reports').select('*').eq('id',body.report_id).single();
-  if(q.error||!q.data)throw Error('FORBIDDEN');const report=q.data;
+  if(q.error||!q.data)throw Error('FORBIDDEN');let report=q.data;
   await assertMembership(c.client,c.user.id,report.organization_id,body.action==='start'?['owner','admin','manager']:undefined);
+  const establishment=await c.client.from('establishments').select('organization_id').eq('id',report.establishment_id).single();
+  if(establishment.error||establishment.data.organization_id!==report.organization_id)throw Error('FORBIDDEN');
+  let archived=null;
+  if(body.comparison_id){
+   if(body.action!=='read'||typeof body.comparison_id!=='string')throw Error('PARALLEL_ARCHIVE_READ_ONLY');
+   const old=await c.client.from('analysis_parallel_reports').select('*').eq('id',body.comparison_id).eq('organization_id',report.organization_id).eq('establishment_id',report.establishment_id).single();
+   if(old.error)throw Error('FORBIDDEN');archived=old.data;report=old.data.source_report;
+  }
   const history=await c.admin.from('historical_report_runs').select('*').eq('generation_id',report.generation_id).eq('organization_id',report.organization_id).eq('establishment_id',report.establishment_id).eq('status','completed').maybeSingle();
-  const pair=await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).maybeSingle();
+  const pair=archived?{data:archived,error:null}:await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).maybeSingle();
+  const versions=await c.client.from('analysis_parallel_reports').select('id,reference_generation_id,created_at,generated_at,state,run_id').eq('organization_id',report.organization_id).eq('establishment_id',report.establishment_id).eq('language',report.preferred_language).order('created_at',{ascending:false});
+  if(versions.error)throw Error('PARALLEL_READ_FAILED');
+  const versionRuns=versions.data.filter(v=>v.run_id).map(v=>v.run_id);
+  if(versionRuns.length){const states=await c.client.from('analysis_jls_restaurant_runs').select('id,status').eq('organization_id',report.organization_id).in('id',versionRuns);if(states.error)throw Error('PARALLEL_READ_FAILED');for(const v of versions.data)v.state=states.data.find(r=>r.id===v.run_id)?.status??v.state;}
   if(pair.error||history.error)throw Error('PARALLEL_READ_FAILED');
   const reusable=!!history.data?.snapshot?.reviews?.length&&history.data.snapshot.reviews.length===report.stored_reviews_count&&report.ai_status==='completed';
   if(body.action==='start'){
@@ -34,9 +46,9 @@ Deno.serve(async request=>{
     c.client.from('analysis_jls_sol_ready_operations').select('id,status,result,receipt,request_count').eq('run_id',row.data.run_id).maybeSingle()]);
    if(r.error||t.error||o.error)throw Error('PARALLEL_READ_FAILED');run=r.data;tasks=t.data;operation=o.data;
   }
-  const reviews=history.data?.snapshot?.reviews??[],textual=reviews.filter((r:{analysis_text?:string})=>r.analysis_text?.trim()).length;
+  const reviews=history.data?.snapshot?.reviews??archived?.source_reviews??[],textual=reviews.filter((r:{analysis_text?:string})=>r.analysis_text?.trim()).length;
   return json({current:{id:report.id,generation_id:report.generation_id,generated_at:report.generated_at,state:report.ai_status,source_reviews:report.stored_reviews_count,text_reviews:textual,source_fingerprint:report.source_fingerprint},
    corpus_reusable:reusable,unavailable_reason:reusable?null:'PARALLEL_CORPUS_UNAVAILABLE',experimental:row.data,run,tasks,operation,
-   new_provider_calls:0,provider_calls_only_after_explicit_button:true});
+   reference_report:archived?report:null,versions:versions.data,new_provider_calls:0,provider_calls_only_after_explicit_button:true});
  }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'PARALLEL_REQUEST_FAILED';return json({error:code},code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:409);}
 });

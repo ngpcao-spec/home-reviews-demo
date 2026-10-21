@@ -82,6 +82,7 @@ export function AnalyticsPage() {
     cache.setSelection(nextSelection)
     const next=new URLSearchParams(searchParams)
     next.set('establishment',nextSelection.establishmentId);next.set('mode',nextSelection.mode)
+    if(patch.establishmentId)next.delete('comparison')
     setSearchParams(next)
   }
   const demoReport = useMemo(() => selected && preferredLanguage && demoMode

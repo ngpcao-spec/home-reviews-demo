@@ -31,6 +31,10 @@ coalesce concurrent starts. Reopening, reading, polling or deploying cannot
 create a consent or run. Each current production generation has at most one
 experimental run for this version; terminal or uncertain outcomes are read-only.
 The existing minute scheduler continues work after the browser closes.
+When a new production generation changes the current corpus, the corpus selector
+keeps earlier pairs consultable. The current tab then reads the frozen production
+reference of the selected pair, not the newer report. Archive selection is
+read-only and remains scoped to the current organization and establishment.
 
 Raw Sol receipt, original parsed report, link-only derived report, changes and
 validation results are separate. Derivation deduplicates IDs, removes unused
