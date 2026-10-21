@@ -26,7 +26,10 @@ Deno.serve(async request=>{
   const versionRuns=versions.data.filter(v=>v.run_id).map(v=>v.run_id);
   if(versionRuns.length){const states=await c.client.from('analysis_jls_restaurant_runs').select('id,status').eq('organization_id',report.organization_id).in('id',versionRuns);if(states.error)throw Error('PARALLEL_READ_FAILED');for(const v of versions.data)v.state=states.data.find(r=>r.id===v.run_id)?.status??v.state;}
   if(pair.error||history.error)throw Error('PARALLEL_READ_FAILED');
-  const reusable=!!history.data?.snapshot?.reviews?.length&&history.data.snapshot.reviews.length===report.stored_reviews_count&&report.ai_status==='completed';
+  const frozen=history.data?.snapshot,sourceRows=frozen?.reviews as Record<string,unknown>[]|undefined;
+  const reusable=!!sourceRows?.length&&sourceRows.length===report.stored_reviews_count&&report.ai_status==='completed'&&frozen.base?.source_fingerprint===report.source_fingerprint&&
+   new Set(sourceRows.map(r=>r.id)).size===sourceRows.length&&sourceRows.every(r=>typeof r.id==='string'&&typeof r.analysis_text==='string'&&(r.original_text===null||typeof r.original_text==='string')&&
+    ['analysis_source','analysis_language','original_language','published_at','review_context','review_detailed_rating'].every(k=>r[k]!==undefined)&&!!String(r.original_text??'').trim()===!!r.analysis_text.trim());
   if(body.action==='start'){
    if(body.confirmed!==true||body.generation_id!==report.generation_id)throw Error('PARALLEL_EXPLICIT_CURRENT_BUTTON_REQUIRED');
    if(!pair.data){
