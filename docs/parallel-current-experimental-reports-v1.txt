@@ -1,0 +1,69 @@
+Parallel historical reports — jls-direct4-parallel-no-luna-v1
+
+The historical analysis page retains the existing current-report generator.
+A separate tab and explicit button enqueue an experimental report over exactly
+the completed production generation's frozen reviews, original text, analytical
+text, translations, ratings and structured context. No import or alternate
+production report is initiated when that corpus is unavailable.
+
+The experimental adapter reuses processRestaurant, restaurantPort, durable
+reservation/dispatch intents/receipts, processReadySol and solReadyPort.
+The archived short French classifier (97380a66-200d-4b9f-90d2-5039fb6c3ddc)
+and its four questions/six native choices remain unchanged. JEV served model
+is strictly jev-1.13.0. Cache identity binds organization, establishment, review,
+analytical text SHA256, complete classifier configuration SHA256 and model.
+Completed compatible historical receipts can seed this cache; technical mocks
+are excluded. An unknown prior supplier outcome blocks a new dispatch.
+
+Statistics and balanced evidence selection use the existing source verifier,
+directCategoryCounts and selectBalancedEvidence. The shared free selector was
+extracted without changing its historical output. The new adapter omits unused
+Luna grouping and the old conditional Sol tokenization. Sol-ready stores a
+manifest bound to immutable classifier receipts, not redundant full copies of
+all raw classifications on every Sol wake. The original texts accompany the
+selected quotations. No Luna task is permitted. At most one Sol dispatch can
+be reserved. The complete wire is measured before dispatch under the existing
+32,768 input / 9,500 output policy and sealed token certificate.
+
+An authenticated button creates a specific 24-hour user_in_app_button consent.
+SQL advisory locks plus unique corpus/version and protocol/run constraints
+coalesce concurrent starts. Reopening, reading, polling or deploying cannot
+create a consent or run. Each current production generation has at most one
+experimental run for this version; terminal or uncertain outcomes are read-only.
+The existing minute scheduler continues work after the browser closes.
+When a new production generation changes the current corpus, the corpus selector
+keeps earlier pairs consultable. The current tab then reads the frozen production
+reference of the selected pair, not the newer report. Archive selection is
+read-only and remains scoped to the current organization and establishment.
+
+Raw Sol receipt, original parsed report, link-only derived report, changes and
+validation results are separate. Derivation deduplicates IDs, removes unused
+recommendation IDs only when existing observations remain exactly linked, and
+removes a polarity-incompatible supplemental aspect reference only when a
+retained reference from the same review has identical quotation and context.
+No text, quotation, observation, JEV choice or statistic is rewritten. Other
+unsupported sections are flagged for review. These binding checks are neither
+independent human validation nor a guarantee of free-text semantic accuracy.
+
+analysis_parallel_reports stores the frozen current reference and independent
+experimental state/result. analysis_parallel_jev_cache stores exact-compatible
+classifier receipts. Existing restaurant protocols/runs/tasks/artifacts and
+Sol-ready receipt/operation tables remain the execution/history stores.
+Only service_role writes; authenticated reads are organization-scoped by RLS.
+The production report table is never written by this experimental adapter.
+An atomic publication trigger saves the experimental view when Sol validation
+finishes. Historical current, V12, Luna and other experimental routes keep their
+existing behavior; default legacy JLS reads exclude the new application variant.
+
+Qualification: tests/unit/parallel-report.test.ts; src/components/ParallelReports.test.tsx;
+explicit Deno entry supabase/functions/_shared/parallel-report-deno.ts with --deny-net;
+tests/supabase/parallel-reports.sql exercises the deployed RPCs with an injected
+real frozen fixture and explicit mock receipts. Its inner transaction always
+rolls back all consent/run/task/cache/result writes. Mobile Playwright fixtures
+are explicitly synthetic and do not claim real-model semantic quality.
+
+The existing Nha Trang xua derivative is imported only after its manifest,
+original archive, report hash, provenance, current generation and entire common
+corpus pass verification. Missing or changed local data blocks import, never
+regeneration. Import creates no authorization or execution and leaves its
+historical invalid_output run and raw response unchanged.

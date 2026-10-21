@@ -573,3 +573,7 @@ verify_jwt = false
 
 [functions.process-jev-luna-sol-hybrid]
 verify_jwt = false
+
+# Authenticated explicitly by requireUser/getUser and organization membership.
+[functions.parallel-reports]
+verify_jwt = false

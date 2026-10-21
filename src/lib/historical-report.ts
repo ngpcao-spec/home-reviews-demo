@@ -32,6 +32,7 @@ export interface ReputationData {
 }
 
 export interface HistoricalReport {
+  generationId?: string
   consultant?: ConsultantReportData
   reputation?: ReputationData
   id: string
@@ -55,6 +56,7 @@ export interface HistoricalReport {
 }
 
 export interface HistoricalReportRow extends Partial<ReputationData> {
+  generation_id?: string
   consultant_report?: ConsultantReportData | null
   id: string
   organization_id: string
@@ -82,6 +84,7 @@ export interface HistoricalReportRow extends Partial<ReputationData> {
 
 export function mapHistoricalReport(row: HistoricalReportRow): HistoricalReport {
   return {
+    generationId: row.generation_id,
     consultant: (row.analysis_version === 3 || row.analysis_version === 4 || row.analysis_version === 5 || row.analysis_version === 6 || row.analysis_version === 7 || row.analysis_version === 8 || row.analysis_version === 9 || row.analysis_version === 10 || row.analysis_version === 11) && row.consultant_report?.version === row.analysis_version ? row.consultant_report : undefined,
     reputation: row.analysis_version === 2 ? row as HistoricalReportRow & ReputationData : undefined,
     id: row.id,

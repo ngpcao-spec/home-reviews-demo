@@ -240,7 +240,7 @@ function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectRep
   text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}},packet,wire);
  return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
-export async function prepareDirectReport(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION,comparisonIds?:string[]){
+export async function selectDirectReportSources(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION,comparisonIds?:string[]){
  if(synthesisVersion!==undefined&&synthesisVersion!==DIRECT_SYNTHESIS_VERSION)throw Error('DIRECT_REPORT_SYNTHESIS_VERSION_INVALID');
  const counts=await verifyDirectReportSources(i,binding);if(!/^[a-f0-9]{40}$/.test(code_commit))throw Error('DIRECT_REPORT_CODE_PROVENANCE_REQUIRED');
  const candidates=await directReportCandidates(i);
@@ -248,7 +248,6 @@ export async function prepareDirectReport(i:DirectReportInput,code_commit:string
   new Set(comparisonIds).size!==comparisonIds.length||comparisonIds.some(id=>!candidates.some(e=>e.evidence_id===id))))throw Error('DIRECT_COMPARISON_SELECTION_INVALID');
  const selected=comparisonIds?comparisonIds.map(id=>candidates.find(e=>e.evidence_id===id)!):selectDirectEvidence(candidates,!!synthesisVersion);
  if(comparisonIds&&selected.some(e=>selected.filter(s=>s.review_id===e.review_id).length>DIRECT_COMPARISON_SELECTION.max_per_review))throw Error('DIRECT_COMPARISON_SELECTION_INVALID');
- const groups=await directReportLunaGroups(selected);
  const originals=selected.map(e=>e.review_id).filter((id,n,a)=>a.indexOf(id)===n).sort().map(review_id=>{
   const r=i.snapshot.body.reviews.find(r=>r.id===review_id)!,d=i.dataset.body.reviews.find(r=>r.review_id===review_id)!;
   return {review_id,original_text:r.original_text,original_text_sha256:r.original_text_sha256,analysis_text_sha256:d.analysis_text_sha256,
@@ -264,20 +263,23 @@ export async function prepareDirectReport(i:DirectReportInput,code_commit:string
   ...(technicalMissing?{technical_missing_reviews:technicalMissing,textual_source_reviews:(binding?.text_reviews??80)+technicalMissing}:{})},counts,
   star_distribution_all:stars(i.snapshot.body.reviews),star_distribution_analysed:stars(i.snapshot.body.reviews.filter(r=>i.dataset.body.reviews.some(d=>d.review_id===r.id))),
   categories:DIRECT_DEFINITIONS,uncertainty_preserved:true,frequency_unit:'distinct_review_per_category_not_specific_incident'};
- const statistics_sha256=await directHash(statistics),flow=directEvidenceFlow(candidates,selected),
+ const statistics_sha256=await directHash(statistics),flow=directEvidenceFlow(candidates,selected);
+ const selection={algorithm:comparisonIds?DIRECT_COMPARISON_SELECTION.version:'existing_selectBalancedEvidence',algorithm_sha256:await balancedSelectorHash(),policy:BALANCED_POLICY,
+   ...(comparisonIds?{comparison_policy:DIRECT_COMPARISON_SELECTION}:{}),...(synthesis?{association_policy:DIRECT_SYNTHESIS_POLICY,flow}:{}),
+   quotation:'complete_frozen_review_exact; no 25-theme lexical pass; all are unverified candidates',specificity:'bounded_text_length_for_diversity_only_not_semantic_confidence',candidates,selected,
+   coverage:DIRECT_CATEGORY_KEYS.map(category=>({category,positive:selected.filter(e=>e.category===category&&e.polarity==='positive').length,negative:selected.filter(e=>e.category===category&&e.polarity==='negative').length})),distinct_selected_reviews:new Set(selected.map(e=>e.review_id)).size};
+ return {statistics,statistics_sha256,selection,configuration,synthesis,flow};
+}
+export async function prepareDirectReport(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION,comparisonIds?:string[]){
+ const {statistics,statistics_sha256,selection,configuration,synthesis,flow}=await selectDirectReportSources(i,code_commit,binding,synthesisVersion,comparisonIds);
+ const {selected}=selection,groups=await directReportLunaGroups(selected),
   conditional_sol=solDraft(statistics,statistics_sha256,selected,true,localHybridTokens,undefined,synthesis,flow),
   compatibility=await directLunaCompatibility(groups,i.prior_luna_requests,i.dataset.organization_id);
  const body={version:synthesisVersion??DIRECT_REPORT_VERSION,...(synthesis?{synthesis}:{}),format_version:DIRECT_REPORT_FORMAT,code_commit,organization_id:i.dataset.organization_id,
   establishment_id:i.dataset.body.reviews[0].establishment_id,language:'vi',source_archive:{id:i.dataset.id,sha256:i.dataset.sha256},
   source_snapshot:{id:i.snapshot.id,sha256:i.snapshot.sha256,reviews_sha256:i.snapshot.body.source_reviews_sha256},
   configuration,configuration_sha256:await directHash(configuration),
-  selection:{algorithm:comparisonIds?DIRECT_COMPARISON_SELECTION.version:'existing_selectBalancedEvidence',algorithm_sha256:await balancedSelectorHash(),policy:BALANCED_POLICY,
-   ...(comparisonIds?{comparison_policy:DIRECT_COMPARISON_SELECTION}:{}),
-   ...(synthesis?{association_policy:DIRECT_SYNTHESIS_POLICY,flow}:{}),
-   quotation:'complete_frozen_review_exact; no 25-theme lexical pass; all are unverified candidates',
-   specificity:'bounded_text_length_for_diversity_only_not_semantic_confidence',candidates,selected,
-   coverage:DIRECT_CATEGORY_KEYS.map(category=>({category,positive:selected.filter(e=>e.category===category&&e.polarity==='positive').length,
-    negative:selected.filter(e=>e.category===category&&e.polarity==='negative').length})),distinct_selected_reviews:new Set(selected.map(e=>e.review_id)).size},
+  selection,
   statistics,statistics_sha256,luna_groups:groups,luna_groups_sha256:await directHash(groups),compatibility,
   conditional_sol:{...conditional_sol,prompt_sha256:await analysisTextSha256(conditional_sol.prompt),schema_sha256:await directHash(conditional_sol.schema),
    dossier_sha256:await directHash(conditional_sol.packet),request_sha256:await directHash(conditional_sol.request),not_dispatchable_until_luna_complete:true},
