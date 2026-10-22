@@ -6,6 +6,20 @@ import {processReadySol,type ReadyState} from './jls-sol-ready-worker.ts';
 import {DIRECT_CATEGORY_KEYS,directHash,parseDirectCategoriesRounded} from './jev-direct-categories.ts';
 import {DIRECT_CANDIDATE_EMPTY} from './jev-direct-report-preparation.ts';
 import {analysisTextSha256} from './analysis-text.ts';
+import {COMPACT_SOL_WIRE} from './parallel-sol-wire.ts';
+function mockParallelResponse(ready:Awaited<ReturnType<typeof compileParallelSol>>){
+ const e=ready.body.evidence,manifest=ready.body.compact_wire;
+ if(manifest)return {format_version:COMPACT_SOL_WIRE,report:{categories:DIRECT_CATEGORY_KEYS.map(category=>({category,
+  text:e.some(e=>e.category===category)?'EXPLICIT TECHNICAL MOCK, NOT A NEW QUALITY EVALUATION.':DIRECT_CANDIDATE_EMPTY,
+  refs:manifest.associations.filter(e=>e.category===category).slice(0,1).map(e=>e.ref)})),positive_aspects:[],negative_aspects:[],
+  conclusion:{text:'EXPLICIT TECHNICAL MOCK.',refs:[manifest.associations[0].ref]},recommendations:[{title:'EXPLICIT TECHNICAL MOCK CHECK',category:manifest.associations[0].category,
+   refs:[manifest.associations[0].ref],observations:[{text:'EXPLICIT TECHNICAL MOCK OBSERVATION',ref:manifest.associations[0].ref}],
+   proposed_action:'EXPLICIT TECHNICAL MOCK ACTION',priority_reason:'EXPLICIT TECHNICAL MOCK PRIORITY'}]}};
+ return {format_version:'jls-direct-categories4-report-v1',statistics_sha256:ready.body.statistics_sha256,report:{categories:DIRECT_CATEGORY_KEYS.map(category=>({category,
+  text:e.some(e=>e.category===category)?'EXPLICIT TECHNICAL MOCK, NOT A NEW QUALITY EVALUATION.':DIRECT_CANDIDATE_EMPTY,
+  evidence_ids:e.filter(e=>e.category===category).slice(0,1).map(e=>e.evidence_id)})),positive_aspects:[],negative_aspects:[],
+  conclusion:{text:'EXPLICIT TECHNICAL MOCK.',evidence_ids:[e[0].evidence_id]},recommendations:[]}};
+}
 export async function rehearseParallel(protocol:{id:string;body:ParallelProtocol;sha256:string},saved?:{review_id:string;raw_response_text:string}[]){
  const at=performance.now(),run=crypto.randomUUID();
  const initial={protocol,run:{id:run,stage:'jev',status:'queued'},artifacts:[],tasks:protocol.body.pending.map(p=>({id:crypto.randomUUID(),run_id:run,organization_id:protocol.body.organization_id,
@@ -22,8 +36,7 @@ export async function rehearseParallel(protocol:{id:string;body:ParallelProtocol
  };
  for(let i=0;i<Math.ceil(protocol.body.pending.length/8)+2&&f.state.run.stage==='jev';i++)await processRestaurant(f.port,run,{jev:'EXPLICIT_MOCK',openai:''},http,parallelExecutionContract);
  if(f.state.run.stage!=='prepare_evidence'||jev!==protocol.body.pending.length)throw Error('MOCK_JEV_PATH_FAILED');
- const ready=await compileParallelSol(f.state),e=ready.body.evidence;
- const response={format_version:'jls-direct-categories4-report-v1',statistics_sha256:ready.body.statistics_sha256,report:{categories:DIRECT_CATEGORY_KEYS.map(category=>({category,text:e.some(e=>e.category===category)?'EXPLICIT TECHNICAL MOCK, NOT A NEW QUALITY EVALUATION.':DIRECT_CANDIDATE_EMPTY,evidence_ids:e.filter(e=>e.category===category).slice(0,1).map(e=>e.evidence_id)})),positive_aspects:[],negative_aspects:[],conclusion:{text:'EXPLICIT TECHNICAL MOCK.',evidence_ids:[e[0].evidence_id]},recommendations:[]}};
+ const ready=await compileParallelSol(f.state),response=mockParallelResponse(ready);
  const state={protocol,ready,operation:{id:crypto.randomUUID(),organization_id:protocol.body.organization_id,mode:'mock',run_id:run,status:'queued',phase:'sol',request_count:0,worker:null,receipt:null,receipt_sha256:null,result:null}} as unknown as ReadyState;
  const memory=snapshotReadyMock(state),solHttp:typeof fetch=(_url,options)=>{if(options?.body!==ready.body.request_json)throw Error('MOCK_SOL_WIRE_CHANGED');sol++;return Promise.resolve(new Response(JSON.stringify({id:'EXPLICIT_MOCK_NOT_PROVIDER',model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:1,output_tokens:1,total_tokens:2},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(response)}]}]})));};
  await Promise.all(Array.from({length:6},()=>processReadySol(memory.port,memory.state.operation.id,'EXPLICIT_MOCK',solHttp,parallelReadyContract)));
@@ -51,7 +64,7 @@ export async function boundedParallelJevProbe(state:RestaurantState,saved:{revie
  if(f.state.run.stage!=='prepare_evidence'||calls!==pending.length)throw Error('BOUNDED_JEV_PROBE_FAILED');return {mock_jev:calls,status:f.state.run.status};
 }
 export async function boundedParallelSolProbe(protocol:{id:string;body:ParallelProtocol;sha256:string},ready:Awaited<ReturnType<typeof compileParallelSol>>){
- const evidence=ready.body.evidence,response={format_version:'jls-direct-categories4-report-v1',statistics_sha256:ready.body.statistics_sha256,report:{categories:DIRECT_CATEGORY_KEYS.map(category=>({category,text:evidence.some(e=>e.category===category)?'EXPLICIT MOCK — NOT A MODEL QUALITY EVALUATION.':DIRECT_CANDIDATE_EMPTY,evidence_ids:evidence.filter(e=>e.category===category).slice(0,1).map(e=>e.evidence_id)})),positive_aspects:[],negative_aspects:[],conclusion:{text:'EXPLICIT MOCK.',evidence_ids:[evidence[0].evidence_id]},recommendations:[]}};
+ const response=mockParallelResponse(ready);
  const state={protocol,ready,operation:{id:crypto.randomUUID(),organization_id:protocol.body.organization_id,mode:'mock',run_id:ready.body.source_run_id,status:'queued',phase:'sol',request_count:0,worker:null,receipt:null,receipt_sha256:null,result:null}} as unknown as ReadyState;
  const f=snapshotReadyMock(state);let calls=0;const http:typeof fetch=()=>{calls++;return Promise.resolve(new Response(JSON.stringify({id:'EXPLICIT_MOCK_NOT_PROVIDER',model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:1,output_tokens:1,total_tokens:2},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(response)}]}]})));};
  await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',http,parallelReadyContract);await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',http,parallelReadyContract);await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',http,parallelReadyContract);

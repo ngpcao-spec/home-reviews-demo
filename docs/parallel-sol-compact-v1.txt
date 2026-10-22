@@ -1,0 +1,92 @@
+Experimental JEV -> Sol transport: jls-direct4-compact-sol-v1
+
+Scope: future app experimental preparations only. The parallel protocol keeps
+its existing execution/storage version and adds configuration.sol_wire_version,
+which is included in its configuration/protocol hashes and future consent.
+Previously sealed protocols without this field retain the exact old request
+and response format. Unsupported versions fail closed. Classification inputs,
+JEV configuration/cache identity, native choices, selector and statistics are
+unchanged. The commercial Sol-only pipeline and UI are unchanged.
+
+Each selected full frozen analysis text appears once in packet.reviews with a
+short r-reference. Only a strictly different original is included alongside it,
+with available analysis/original languages and translation source. Equality is
+exact, not normalized; no new translation is performed. Distinct reviews are
+never merged because their contents happen to match. Every existing association
+is retained separately under an e-reference, category, polarity and r-reference.
+Reference allocation sorts immutable review IDs and evidence IDs, independently
+of JSONB or input ordering. The current selector's complete-review quotation is
+required; a future partial quotation is blocked rather than silently expanded.
+
+UUIDs, long evidence IDs, SHA256s, character positions, source provenance and the
+complete binding manifest remain in immutable server artifacts. The manifest
+binds organization, establishment, frozen snapshot, statistics and all evidence.
+The sealed request and token certificate use the exact compact wire. The worker
+checks that manifest/packet against its actual immutable protocol and sources
+before the existing atomic one-call reservation. No retry, timeout, supplier,
+consent, RLS or database procedure is altered. No migration is required.
+
+The compact strict response schema asks for e-references and observation prose,
+not copied quotations, hashes or statistical fingerprints. Before the existing
+validator, the server resolves each reference in the current job's manifest,
+checks review/category/polarity compatibility, and reconstructs exact frozen
+quotations, hashes and long IDs. Unknown/incompatible references fail; there is
+no guessed replacement. Existing reference-only derivation and source/count
+validation then run normally. The raw compact response remains in the supplier
+receipt; compact_response and source_reconstruction provenance are also saved
+in the validated result. original_report in this path is the reconstructed
+schema-compatible original, not an additional Sol response. Generated prose is
+never rewritten by this transport conversion. The UI still consumes the same
+expanded report structure and shows all existing history.
+
+The shorter prompt retains source fidelity, mixed opinions, later resolution,
+dominant corpus sentiment, precise isolated complaints, incident-vs-category
+frequency, proportional priorities/actions and no invented cause/responsibility.
+Customer texts remain untrusted data. Statistics remain automatic JEV counts,
+not validated by Sol or human reference data. There is no Luna call here.
+Model gpt-6.1-sol, reasoning low, output reserve 9,500, input budget 32,768 and
+12% + 256 token margin remain unchanged.
+
+Offline real-source qualification, Nha Trang xua:
+  archive e7276002-c8b9-4b71-9d99-ce8d1bc82b2b
+  SHA256 224cebf5d139d0f89dadfcb5d5e5fe3736f954aace543a8c714809087121c729
+  request SHA256 870b40f60f82820aafd5514761aff5af749a2c044ad87c99eea8b25380ad4ad0
+  23 distinct reviews and all 32 associations retained; 9 repeated review
+  occurrences and 18 identical originals removed; 5 differing originals kept.
+  All 32 exact quotations reconstruct; original source/archive remains unchanged.
+  User dossier: 47,651 -> 15,113 characters.
+  System prompt: 5,084 -> 2,938 characters.
+  Complete serialized request: 64,989 -> 25,049 UTF-8 bytes.
+  Local o200k_base input estimate, including instructions/schema:
+    18,941 -> 5,919 tokens (-68.75%).
+  With existing safety margin: 21,470 -> 6,886 tokens.
+  Schema counted separately as well: 596 -> 599 tokens, already INCLUDED above.
+
+For identical SAVED derived narrative only, encoding the old/compact output
+shapes gives 3,471 -> 1,436 visible-JSON tokens (-58.63%), with exact round-trip
+back to derived report SHA256
+  d7604057b59cdb394283bbf34d77ffb48b5fad0c6599414bce4fff8e63315fd1.
+This is a structural measurement, NOT a future-output-length forecast, billed
+usage, new report, new AI judgment or evidence of real drafting quality.
+The model alias may tokenize differently from local o200k_base. No provider
+token-count endpoint or generation was called. Future real usage/quality must
+be observed separately; reasoning tokens are not estimated by the output test.
+
+Reproduction (Deno, private exports remain outside Git):
+  deno run --allow-read --allow-write --deny-net
+    scripts/measure-parallel-sol-wire.ts
+    <source-archive-immutable.json> <expected-archive-body-sha256>
+    <new-measurements.json> <saved-rapport-derive.json>
+The script verifies the archived request/receipt and source hash, blocks fetch,
+checks every quotation mapping and the saved-report round-trip, and writes only
+a distinct local measurements file. It never creates a run, consent or report.
+
+Tests include mixed/multilingual sources, deterministic references, unchanged
+counts, missing/unknown/wrong-category/wrong-polarity references, altered sources
+and manifests, organization/establishment isolation, exact quote/hash recovery,
+strict output fields, the shared receipt/validation/persistence path, concurrent
+wakes, one attempt only and compatibility with old sealed requests.
+
+Official format/counting references (consulted 2026-10-22):
+https://developers.openai.com/api/docs/guides/structured-outputs
+https://developers.openai.com/api/docs/guides/token-counting
