@@ -44,7 +44,7 @@ export function ParallelReports({current,account,enabled,children}:{current:Hist
  const states:Record<string,string>=fr?{queued:'En attente',running:'En cours',completed:'Terminé',needs_review:'À réexaminer',invalid_output:'Sortie invalide',blocked:'Bloqué',billing_uncertain:'Issue incertaine',authorization_expired:'Autorisation expirée',generating:'En cours',failed:'Échec'}:{queued:'Đang chờ',running:'Đang xử lý',completed:'Hoàn tất',needs_review:'Cần xem lại',invalid_output:'Kết quả không hợp lệ',blocked:'Bị chặn',billing_uncertain:'Chưa rõ kết quả',authorization_expired:'Ủy quyền hết hạn',generating:'Đang xử lý',failed:'Thất bại'}
  const data=q.data,row=data?.experimental,active=data?.run&&['queued','running'].includes(data.run.status),stats=row?.statistics
  const reference=data?.reference_report?mapHistoricalReport(data.reference_report):null
- const older=data?.versions?.filter(v=>v.reference_generation_id!==current?.generationId)??[]
+ const older=data?.versions?.filter(v=>v.id!==row?.id)??[]
  const analysed=stats?.scope.analysed_text_reviews??data?.tasks.filter(x=>x.phase==='jev'&&['completed','reused'].includes(x.status)).length??0
  const state=data?.run?.status??row?.state
  const meta=<dl className="parallel-metadata"><div><dt>{t.date}</dt><dd>{date(row?.generated_at)}</dd></div><div><dt>{t.scope}</dt><dd>{stats?.scope.source_reviews??data?.current.source_reviews??current?.storedReviewsCount??'—'}</dd></div><div><dt>{t.text}</dt><dd>{analysed} / {data?.current.text_reviews??'—'}</dd></div><div><dt>{t.status}</dt><dd>{state?states[state]??state:t.missing}</dd></div></dl>
