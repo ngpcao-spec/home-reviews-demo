@@ -77,16 +77,6 @@ Deno.serve(async r=>{
   try{return json(await probeCandidateOperation(admin,payload.operation_id));}
   catch(e){return json({error:e instanceof Error?e.message:'DIRECT_CANDIDATES_PROBE_FAILED',provider_calls:0},409);}
  }
- if(payload?.mode==='compact_comparison_execute'){
-  // Explicit scheduler-authenticated wake for one previously authorized job.
-  // The shared SQL claim reserves its sole Sol attempt before transport.
-  const port=solReadyPort(admin),s=await port.load(payload.operation_id);
-  const p=s.protocol.body as unknown as {version:string;configuration:{sol_wire_version?:string}};
-  if(s.operation.mode!=='paid'||p.version!==DIRECT4_CANDIDATES||p.configuration.sol_wire_version!==COMPACT_SOL_WIRE)return json({error:'COMPACT_COMPARISON_SCOPE_REQUIRED'},409);
-  EdgeRuntime.waitUntil(processReadySol(port,s.operation.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,candidateExecutionContract)
-   .catch(()=>console.error('COMPACT_COMPARISON_STOPPED_NO_RETRY')));
-  return json({accepted_background:true,operation_id:s.operation.id,automatic_retry:false},202);
- }
  if(payload?.mode==='short_common_comparison_probe'){
   try{return json(await probeShortComparison(admin,payload.protocol_id));}
   catch(e){return json({error:e instanceof Error?e.message:'SHORT_COMPARISON_PROBE_FAILED',provider_calls:0},409);}
@@ -150,6 +140,16 @@ Deno.serve(async r=>{
   // This route never loads provider keys, claims a task or authorizes a run.
   EdgeRuntime.waitUntil(restaurantCpuProbe(admin,payload).catch(e=>{console.error("JLS_CPU_PROBE_FAILED",e instanceof Error?e.message:"UNKNOWN");}));
   return json({accepted_free_probe:true,provider_calls:0,nonce:payload.nonce},202);
+ }
+ if(payload?.mode==='compact_comparison_execute'){
+  // Explicit scheduler-authenticated wake for one previously authorized job.
+  // The shared SQL claim reserves its sole Sol attempt before transport.
+  const port=solReadyPort(admin),s=await port.load(payload.operation_id);
+  const p=s.protocol.body as unknown as {version:string;configuration:{sol_wire_version?:string}};
+  if(s.operation.mode!=='paid'||p.version!==DIRECT4_CANDIDATES||p.configuration.sol_wire_version!==COMPACT_SOL_WIRE)return json({error:'COMPACT_COMPARISON_SCOPE_REQUIRED'},409);
+  EdgeRuntime.waitUntil(processReadySol(port,s.operation.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,candidateExecutionContract)
+   .catch(()=>console.error('COMPACT_COMPARISON_STOPPED_NO_RETRY')));
+  return json({accepted_background:true,operation_id:s.operation.id,automatic_retry:false},202);
  }
  if(payload?.mode==="contract_v2_operation"){
   const op=await admin.from("analysis_jls_contract_v2_operations").select("mode").eq("id",payload.operation_id).single();
