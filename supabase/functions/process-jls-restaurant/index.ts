@@ -30,8 +30,8 @@ import {LUNA_DIRECT4_COMPARE} from '../_shared/luna-direct4-comparison.ts';
 import {processLunaDirect4Comparison,probeLunaDirect4Comparison} from '../_shared/luna-direct4-comparison-server.ts';
 import {SHORT_COMPARE} from '../_shared/direct4-short-comparison.ts';
 import {processShortComparison,probeShortComparison} from '../_shared/direct4-short-comparison-server.ts';
-import {DIRECT4_CANDIDATES,candidateReadyContract} from '../_shared/jls-direct4-candidates.ts';
-import {probeCandidateOperation} from '../_shared/jls-direct4-candidates-server.ts';
+import {DIRECT4_CANDIDATES} from '../_shared/jls-direct4-candidates.ts';
+import {probeCandidateOperation,candidateExecutionContract} from '../_shared/jls-direct4-candidates-server.ts';
 import {PARALLEL_REPORT} from '../_shared/parallel-report.ts';
 import {processParallelReport} from '../_shared/parallel-report-server.ts';
 import {parallelProtocol,type ParallelCurrent,type ParallelHistory} from '../_shared/parallel-report.ts';
@@ -76,6 +76,16 @@ Deno.serve(async r=>{
  if(payload?.mode==='direct4_candidates_probe'){
   try{return json(await probeCandidateOperation(admin,payload.operation_id));}
   catch(e){return json({error:e instanceof Error?e.message:'DIRECT_CANDIDATES_PROBE_FAILED',provider_calls:0},409);}
+ }
+ if(payload?.mode==='compact_comparison_execute'){
+  // Explicit scheduler-authenticated wake for one previously authorized job.
+  // The shared SQL claim reserves its sole Sol attempt before transport.
+  const port=solReadyPort(admin),s=await port.load(payload.operation_id);
+  const p=s.protocol.body as unknown as {version:string;configuration:{sol_wire_version?:string}};
+  if(s.operation.mode!=='paid'||p.version!==DIRECT4_CANDIDATES||p.configuration.sol_wire_version!==COMPACT_SOL_WIRE)return json({error:'COMPACT_COMPARISON_SCOPE_REQUIRED'},409);
+  EdgeRuntime.waitUntil(processReadySol(port,s.operation.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,candidateExecutionContract)
+   .catch(()=>console.error('COMPACT_COMPARISON_STOPPED_NO_RETRY')));
+  return json({accepted_background:true,operation_id:s.operation.id,automatic_retry:false},202);
  }
  if(payload?.mode==='short_common_comparison_probe'){
   try{return json(await probeShortComparison(admin,payload.protocol_id));}
@@ -171,7 +181,7 @@ Deno.serve(async r=>{
   if(v?.data?.version===DIRECT4_CANDIDATES){
    const op=await admin.from('analysis_jls_sol_ready_operations').select('id').eq('run_id',run.id).eq('mode','paid').single();
    if(op.error)throw Error('DIRECT_CANDIDATES_OPERATION_MISSING');
-   await processReadySol(solReadyPort(admin),op.data.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,candidateReadyContract);continue;
+   await processReadySol(solReadyPort(admin),op.data.id,Deno.env.get('OPENAI_API_KEY')??'',fetch,candidateExecutionContract);continue;
   }
   if(v?.data?.version===SHORT_COMPARE){
    await processShortComparison(admin,run.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch);continue;
