@@ -58,11 +58,14 @@ function candidateDraft(s:CandidateSource,count:(v:string)=>number,wire?:string)
 }
 export async function verifyCandidateSource(s:CandidateSource){
  const reused=s.source_binding,b=reused?.dataset_binding,missing=b?.technical_missing_review_ids??[],scope=s.statistics.scope;
+ const reusedConfig=b?.classification_configuration;
+ const supportedConfig=!!reusedConfig&&((reusedConfig.id===SHORT_CONFIG.id&&reusedConfig.sha256===await directHash(SHORT_CONFIG))||
+  (reusedConfig.id===SHORT_CLASSIFIER_CONFIG.id&&reusedConfig.sha256===await directHash(SHORT_CLASSIFIER_CONFIG)));
  if(reused&&(reused.version!==COMPACT_REUSED_SOURCE||!b||b.snapshot_id!==s.source_protocol_id||b.dataset_sha256!==s.dataset_sha256||
-  b.classification_configuration?.id!==SHORT_CONFIG.id||b.classification_configuration.sha256!==await directHash(SHORT_CONFIG)||
+  !supportedConfig||
   reused.analysed_review_ids.length!==b.text_reviews||new Set(reused.analysed_review_ids).size!==b.text_reviews||new Set(missing).size!==missing.length||
   missing.some(id=>reused.analysed_review_ids.includes(id))||s.sources.some(r=>!!r.analysis_text!==reused.analysed_review_ids.includes(r.id)&&!missing.includes(r.id))||
-  missing.some(id=>!s.sources.some(r=>r.id===id&&r.analysis_text))||s.selected.some(e=>!reused.analysed_review_ids.includes(e.review_id)||e.jev_configuration!==SHORT_CONFIG.id)||
+  missing.some(id=>!s.sources.some(r=>r.id===id&&r.analysis_text))||s.selected.some(e=>!reused.analysed_review_ids.includes(e.review_id)||e.jev_configuration!==reusedConfig!.id)||
   (scope.technical_missing_reviews??0)!==missing.length||(scope.textual_source_reviews??b.text_reviews)!==b.text_reviews+missing.length))throw Error('COMPACT_REUSED_SCOPE_CHANGED');
  const sourceCount=b?.source_reviews??135,textCount=b?.text_reviews??75;
  if(s.synthesis!==DIRECT_SYNTHESIS_VERSION||s.sources.length!==sourceCount||new Set(s.sources.map(r=>r.id)).size!==sourceCount||

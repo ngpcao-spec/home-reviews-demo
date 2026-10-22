@@ -40,3 +40,11 @@ it.each(['source','metadata','request','scope'])('blocks changed %s before any d
  const http=vi.fn(async()=>new Response('{}'));await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',http,candidateExecutionContract);expect(http).not.toHaveBeenCalled();
 });
 it('honors an access refusal before reservation or transport',async()=>{const f=await state();f.port.active=()=>Promise.reject(Error('FORBIDDEN'));const http=vi.fn(async()=>new Response('{}'));await processReadySol(f.port,f.state.operation.id,'EXPLICIT_MOCK',http,candidateExecutionContract);expect(http).not.toHaveBeenCalled();expect(f.state.operation.request_count).toBe(0);});
+it('reuses the application short configuration on a 100/68 corpus without changing model, prompt, thresholds or call limits',async()=>{
+ const f=await compactComparisonFixture('parallel'),p=f.protocol;await verifyCompactComparison(p.body,p.sha256);
+ expect(p.body.source.statistics.scope).toEqual({source_reviews:100,analysed_text_reviews:68,textless_statistics_only:32});
+ expect(p.body.review_metadata).toHaveLength(68);expect(p.body.source.source_binding?.dataset_binding.classification_configuration?.id).toBe('jev_categories4_short_common_1pass_v1');
+ expect(p.body.ready_template.draft.prompt).toBe(compactSolInstructions('vi'));expect([p.body.max_jev_calls,p.body.max_luna_calls,p.body.max_sol_calls]).toEqual([0,0,1]);
+ const bad=structuredClone(f.archive);bad.body.protocol.body.source.source_binding!.dataset_binding.classification_configuration!.sha256='0'.repeat(64);bad.sha256=await directHash(bad.body);
+ await expect(prepareCompactComparison(bad,'a'.repeat(40))).rejects.toThrow('COMPACT_REUSED_SCOPE_CHANGED');
+});
