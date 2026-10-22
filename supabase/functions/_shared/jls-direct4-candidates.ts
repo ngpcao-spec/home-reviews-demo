@@ -5,9 +5,10 @@ import {z} from 'npm:zod@4.6.5';
 import {directHash,directCanonical,DIRECT_CATEGORY_KEYS} from './jev-direct-categories.ts';
 import {analysisTextSha256} from './analysis-text.ts';
 import {SHORT_CLASSIFIER_CONFIG} from './jev-direct-short-config.ts';
+import {SHORT_CONFIG} from './direct4-short-comparison.ts';
 import {balancedDirectReportInstructions,directSynthesisStatistics,directReportResponse,bindDirectSolWire,
  verifyDirectReportSources,validateDirectReportEvidence,DIRECT_CANDIDATE_EMPTY,DIRECT_SYNTHESIS_VERSION,
- type DirectReportInput,type DirectReportPreparation,type DirectReportEvidence} from './jev-direct-report-preparation.ts';
+ type DirectReportInput,type DirectReportPreparation,type DirectReportEvidence,type DirectReportSourceBinding} from './jev-direct-report-preparation.ts';
 import {SOL_SIZE_POLICY,solRequestSize} from './jls-sol-size.ts';
 import {attachPlanTokenMemo,tokenCertificate,planTokenMemo} from './jls-token-memo.ts';
 import type {ReadyContract,ReadyState} from './jls-sol-ready-worker.ts';
@@ -20,7 +21,10 @@ export interface CandidateInput {
  statistics:DirectReportPreparation['body']['statistics'];statistics_sha256:string;selected:DirectReportEvidence[];
  originals:NonNullable<DirectReportPreparation['body']['synthesis']>['originals'];synthesis:string;
 }
-export type CandidateSource=Omit<CandidateInput,'dataset'>&{dataset_sha256:string};
+export const COMPACT_REUSED_SOURCE='jls-direct4-compact-reused-source-v1';
+export interface ReusedShortBinding {version:typeof COMPACT_REUSED_SOURCE;dataset_binding:DirectReportSourceBinding;analysed_review_ids:string[];
+ corpus_archive:{id:string;sha256:string};classification_archive:{id:string;sha256:string};classification_protocol:{id:string;sha256:string};}
+export type CandidateSource=Omit<CandidateInput,'dataset'>&{dataset_sha256:string;source_binding?:ReusedShortBinding};
 export function candidateInstructions(scope:CandidateInput['statistics']['scope']){
  return balancedDirectReportInstructions(scope)
  .replace('must link accepted evidence_ids of its category','must link candidate evidence_ids of its category that your examination of the supplied text supports')
@@ -53,9 +57,17 @@ function candidateDraft(s:CandidateSource,count:(v:string)=>number,wire?:string)
  return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
 export async function verifyCandidateSource(s:CandidateSource){
- if(s.synthesis!==DIRECT_SYNTHESIS_VERSION||s.sources.length!==135||new Set(s.sources.map(r=>r.id)).size!==135||
-  s.sources.filter(r=>r.analysis_text).length!==75||s.selected.length!==32||new Set(s.selected.map(e=>e.evidence_id)).size!==32||
-  await directHash(s.statistics)!==s.statistics_sha256||s.statistics.scope.source_reviews!==135||s.statistics.scope.analysed_text_reviews!==75||s.statistics.scope.textless_statistics_only!==60)
+ const reused=s.source_binding,b=reused?.dataset_binding,missing=b?.technical_missing_review_ids??[],scope=s.statistics.scope;
+ if(reused&&(reused.version!==COMPACT_REUSED_SOURCE||!b||b.snapshot_id!==s.source_protocol_id||b.dataset_sha256!==s.dataset_sha256||
+  b.classification_configuration?.id!==SHORT_CONFIG.id||b.classification_configuration.sha256!==await directHash(SHORT_CONFIG)||
+  reused.analysed_review_ids.length!==b.text_reviews||new Set(reused.analysed_review_ids).size!==b.text_reviews||new Set(missing).size!==missing.length||
+  missing.some(id=>reused.analysed_review_ids.includes(id))||s.sources.some(r=>!!r.analysis_text!==reused.analysed_review_ids.includes(r.id)&&!missing.includes(r.id))||
+  missing.some(id=>!s.sources.some(r=>r.id===id&&r.analysis_text))||s.selected.some(e=>!reused.analysed_review_ids.includes(e.review_id)||e.jev_configuration!==SHORT_CONFIG.id)||
+  (scope.technical_missing_reviews??0)!==missing.length||(scope.textual_source_reviews??b.text_reviews)!==b.text_reviews+missing.length))throw Error('COMPACT_REUSED_SCOPE_CHANGED');
+ const sourceCount=b?.source_reviews??135,textCount=b?.text_reviews??75;
+ if(s.synthesis!==DIRECT_SYNTHESIS_VERSION||s.sources.length!==sourceCount||new Set(s.sources.map(r=>r.id)).size!==sourceCount||
+  s.sources.filter(r=>r.analysis_text).length!==textCount+missing.length||s.selected.length<1||s.selected.length>32||(!reused&&s.selected.length!==32)||new Set(s.selected.map(e=>e.evidence_id)).size!==s.selected.length||
+  await directHash(s.statistics)!==s.statistics_sha256||scope.source_reviews!==sourceCount||scope.analysed_text_reviews!==textCount||scope.textless_statistics_only!==sourceCount-textCount-missing.length)
   throw Error('DIRECT_CANDIDATES_SOURCE_CHANGED');
  for(const e of s.selected){const r=s.sources.find(r=>r.id===e.review_id),o=s.originals.find(o=>o.review_id===e.review_id);
   if(!r?.analysis_text||!o||r.organization_id!==s.organization_id||r.establishment_id!==s.establishment_id||

@@ -1,4 +1,5 @@
 import {SHORT_CLASSIFIER_CONFIG} from './jev-direct-short-config.ts';
+import {SHORT_CONFIG} from './direct4-short-comparison.ts';
 // Free contract adapter, not an execution engine. No credentials, fetch, jobs or consent.
 // deno-lint-ignore no-import-prefix
 import {z} from 'npm:zod@4.6.5';
@@ -61,7 +62,8 @@ export async function verifyDirectReportSources(i:DirectReportInput,binding?:Dir
  const scope=binding??{dataset_id:DIRECT_REPORT_DATASET_ID,dataset_sha256:DIRECT_REPORT_DATASET_SHA,snapshot_id:DIRECT_SOURCE_ID,snapshot_sha256:DIRECT_SOURCE_SHA256,source_reviews:100,text_reviews:80};
  const missing=binding?.technical_missing_review_ids??[];
  const classification=binding?.classification_configuration;
- if(classification&&(classification.id!==SHORT_CLASSIFIER_CONFIG.id||classification.sha256!==await directHash(SHORT_CLASSIFIER_CONFIG)))throw Error('DIRECT_REPORT_CLASSIFIER_CHANGED');
+ if(classification&&!((classification.id===SHORT_CLASSIFIER_CONFIG.id&&classification.sha256===await directHash(SHORT_CLASSIFIER_CONFIG))||
+  (classification.id===SHORT_CONFIG.id&&classification.sha256===await directHash(SHORT_CONFIG))))throw Error('DIRECT_REPORT_CLASSIFIER_CHANGED');
  if(new Set(missing).size!==missing.length||missing.some(id=>rows.some(r=>r.review_id===id)||!s.body.reviews.some(r=>r.id===id&&r.analysis_text)))throw Error('DIRECT_REPORT_TECHNICAL_MISSING_CHANGED');
  if(d.id!==scope.dataset_id||d.sha256!==scope.dataset_sha256||d.sha256!==await directHash(d.body)||
   d.body.version!==(binding?'jev-direct-categories4-dataset-v1':'jev-direct-categories4-rounding-replay-v1')||d.body.configuration_id!==(classification?.id??DIRECT_CONFIG.id)||
