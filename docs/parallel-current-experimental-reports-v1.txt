@@ -67,3 +67,17 @@ original archive, report hash, provenance, current generation and entire common
 corpus pass verification. Missing or changed local data blocks import, never
 regeneration. Import creates no authorization or execution and leaves its
 historical invalid_output run and raw response unchanged.
+
+Presentation alignment (2026-10-22): ConsultantReportLayout, ConsultantSection
+and ConsultantQuickGrid now render both the current V5–V11 report and the
+experimental read-only projection. Existing production markup, section order,
+styles, translations and optional cross-rating sections remain unchanged.
+Experimental native counts (including mixed) use their saved text denominator;
+Google ratings/context are shown only from the matching frozen reference.
+Missing diagnostic scores, statuses or recurrence assessments are not fabricated.
+All original narrative passages and actions remain unchanged. Per-category
+actions retain their observations, priority reasons and source associations.
+Sources, raw/derived output, corrections and methodology share one collapsed
+audit panel. Existing masking decisions still apply to the main reading view;
+the stored passages remain available in the audit. No backend, classifier,
+generation/authorization path, stored report or supplier call is changed.
