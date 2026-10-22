@@ -8,6 +8,7 @@ import type {HistoricalReport} from '../lib/historical-report'
 import {mapHistoricalReport,type HistoricalReportRow} from '../lib/historical-report'
 import {ConsultantReport} from './ConsultantReport'
 import {ReputationReport} from './ReputationReport'
+import {ExperimentalReport} from './ExperimentalReport'
 import './parallel-reports.css'
 type Section={category?:string;text:string;evidence_ids:string[]}
 type Recommendation={title:string;category:string;evidence_ids:string[];observations:{text:string;evidence_id:string;quote:string}[];proposed_action:string;priority_reason:string}
@@ -17,7 +18,8 @@ export interface ParallelView {
  current:{id:string;generation_id:string;state:string;generated_at:string|null;source_reviews:number;text_reviews:number;source_fingerprint:string}
  corpus_reusable:boolean;unavailable_reason:string|null
  experimental:null|{id:string;state:string;error_code:string|null;generated_at:string|null;created_at:string;derived_report:ExperimentalResult|null;original_report:unknown;raw_response:unknown;corrections:unknown;
-  source_reviews:{id:string;original_text:string;analysis_text:string|null}[];statistics:{scope:{source_reviews:number;analysed_text_reviews:number;textless_statistics_only:number};counts:{categories:Record<string,{positive_reviews:number;negative_reviews:number;distinct_mentioned_reviews:number}>}}|null;
+ source_report?:HistoricalReportRow;reference_generation_id?:string;
+ source_reviews:{id:string;original_text:string;analysis_text:string|null}[];statistics:{scope:{source_reviews:number;analysed_text_reviews:number;textless_statistics_only:number};counts:{categories:Record<string,{positive_reviews?:number;negative_reviews?:number;positive_including_mixed?:number;negative_including_mixed?:number;distinct_mentioned_reviews:number;denominator_reviews?:number;exclusive?:Record<string,number>}>}}|null;
   controls:{technical_checks_passed?:boolean;section_issues?:{path:string;reason:string}[];evidence?:{evidence_id:string;review_id:string;quote:string}[]}|null;usage:unknown;imported_derivative_id?:string}
  run:null|{id:string;status:string;stage:string;error_code:string|null};tasks:{id:string;phase:string;status:string;request_count:number}[];operation:unknown
 }
@@ -66,24 +68,7 @@ export function ParallelReports({current,account,enabled,children}:{current:Hist
    {!row&&data&&data.corpus_reusable&&<p>{t.missing}</p>}
    {row&&(row.error_code||data?.run?.error_code)&&<p role="alert" className="parallel-audit-id">{row.error_code??data?.run?.error_code}</p>}
    {row&&analysed<(data?.current.text_reviews??analysed)&&<p role="status">{fr?'Couverture partielle : les résultats manquants ne sont pas classés comme neutres ou non mentionnés.':'Phạm vi phân tích chưa đầy đủ: kết quả còn thiếu không được tính là trung lập hoặc không đề cập.'}</p>}
-   {row?.derived_report&&<ExperimentalContent row={row} fr={fr}/>}
-   <aside className="card parallel-methodology">{t.note}{row?.imported_derivative_id&&<p>{fr?'Version dérivée importée ; le résultat historique invalid_output reste conservé.':'Phiên bản dẫn xuất được nhập; kết quả invalid_output cũ vẫn được giữ nguyên.'}</p>}</aside>
-   {row&&<details className="card"><summary>{fr?'Traçabilité et réponse originale':'Nguồn gốc và phản hồi gốc'}</summary><p className="parallel-audit-id">{row.id}</p><details><summary>{fr?'Réponse originale et corrections':'Phản hồi gốc và chỉnh sửa liên kết'}</summary><pre>{JSON.stringify({raw_response:row.raw_response,original_report:row.original_report,corrections:row.corrections,controls:row.controls,usage:row.usage,operation:data?.operation},null,2)}</pre></details></details>}
+   {row&&<ExperimentalReport row={row} operation={data?.operation} methodology={t.note}/>}
   </section>
- </>
-}
-function ExperimentalContent({row,fr}:{row:NonNullable<ParallelView['experimental']>;fr:boolean}){
- const r=row.derived_report!.report,names:Record<string,string>=fr?{service:'Service',price:'Prix',quality:'Qualité des plats et boissons',ambiance:'Ambiance'}:{service:'Dịch vụ',price:'Giá cả',quality:'Chất lượng món ăn và đồ uống',ambiance:'Không gian'}
- const issue=(path:string)=>row.controls?.section_issues?.some(i=>i.path===path)
- const proofs=(ids:string[])=> <details><summary>{fr?'Consulter les avis sources':'Xem đánh giá nguồn'}</summary>{ids.map(id=>{const e=row.controls?.evidence?.find(e=>e.evidence_id===id),s=row.source_reviews.find(s=>s.id===e?.review_id);return <article key={id}><blockquote>{e?.quote??(fr?'Citation à réexaminer':'Cần xem lại trích dẫn')}</blockquote>{s&&<details><summary>{fr?'Avis complet et original':'Toàn bộ đánh giá và bản gốc'}</summary><p>{s.analysis_text}</p><p>{s.original_text}</p></details>}</article>})}</details>
- const section=(s:Section,path:string)=><article className="card parallel-section" key={path}>{s.category&&<h3>{names[s.category]}</h3>}{issue(path)?<p>{fr?'À réexaminer : couverture des preuves insuffisante.':'Cần xem lại: chưa đủ căn cứ.'}</p>:<p>{s.text}</p>}{proofs(s.evidence_ids)}</article>
- return <>
-  {row.controls?.technical_checks_passed===false&&<p role="alert">{fr?'Certains contrôles restent non satisfaits. Les sections concernées sont signalées.':'Một số kiểm tra chưa đạt. Các phần liên quan được đánh dấu.'}</p>}
-  {row.statistics&&<details className="card"><summary>{fr?'Comptages JEV sur les avis analysés':'Số liệu JEV trên các đánh giá đã phân tích'}</summary><p>{fr?'Un avis mixte contribue aux deux polarités mais reste un seul avis distinct. Ces nombres ne mesurent pas la fréquence d’un incident précis.':'Đánh giá hỗn hợp được tính ở cả hai chiều nhưng vẫn chỉ là một đánh giá riêng biệt. Các số liệu này không phải tần suất của một sự cố cụ thể.'}</p><pre>{JSON.stringify(row.statistics.counts.categories,null,2)}</pre></details>}
-  {r.categories.map((s,i)=>section(s,`categories[${i}]`))}
-  <h3>{fr?'Aspects positifs':'Điểm tích cực'}</h3>{r.positive_aspects.map((s,i)=>section(s,`positive_aspects[${i}]`))}
-  <h3>{fr?'Points d’amélioration':'Điểm cần cải thiện'}</h3>{r.negative_aspects.map((s,i)=>section(s,`negative_aspects[${i}]`))}
-  <h3>{fr?'Conclusion':'Kết luận'}</h3>{section(r.conclusion,'conclusion')}
-  <h3>{fr?'Recommandations':'Khuyến nghị'}</h3>{r.recommendations.map((s,i)=><article className="card parallel-section" key={i}><h4>{s.title}</h4>{issue(`recommendations[${i}]`)?<p>{fr?'À réexaminer : rattachement des preuves insuffisant.':'Cần xem lại: liên kết căn cứ chưa đầy đủ.'}</p>:<>{s.observations.map((o,j)=><p key={j}><strong>{fr?'Constat rapporté : ':'Nhận xét của khách: '}</strong>{o.text}</p>)}<p><strong>{fr?'Action proposée : ':'Hành động đề xuất: '}</strong>{s.proposed_action}</p><p>{s.priority_reason}</p></>}{proofs(s.evidence_ids)}</article>)}
  </>
 }
