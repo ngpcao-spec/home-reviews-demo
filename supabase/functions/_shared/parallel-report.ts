@@ -12,6 +12,7 @@ import {attachPlanTokenMemo,tokenCertificate} from './jls-token-memo.ts';
 import {SOL_SIZE_POLICY,solRequestSize} from './jls-sol-size.ts';
 import type {RestaurantState,RestaurantExecutionContract} from './jls-restaurant-worker.ts';
 import type {ReadyContract,ReadyState} from './jls-sol-ready-worker.ts';
+import {COMPACT_SOL_WIRE,prepareCompactSolWire,verifyCompactSolWire,reconstructCompactSolResponse,compactSolResponse} from './parallel-sol-wire.ts';
 export const PARALLEL_REPORT='jls-direct4-parallel-no-luna-v1';
 export const REFERENCE_DERIVATION='jls-direct4-reference-links-v1';
 type SourceReview=DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown};
@@ -36,7 +37,7 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
   review_id:r.id,payload,request_sha256:await directHash(payload),request_raw_sha256:await analysisTextSha256(JSON.stringify(payload)),
   identity:{configuration_id:config.id,configuration_sha256:configHash,analysis_text_sha256:r.analysis_text_sha256,requested_model:'jev-1.13.0',expected_served_model:'jev-1.13.0'}};}));
  const source_snapshot={reviews,source_reviews_sha256:await directHash(reviews)};
- const configuration={version:PARALLEL_REPORT,jev:config,synthesis:DIRECT_SYNTHESIS_VERSION,reference_derivation:REFERENCE_DERIVATION,language:report.preferred_language,
+ const configuration={version:PARALLEL_REPORT,jev:config,synthesis:DIRECT_SYNTHESIS_VERSION,reference_derivation:REFERENCE_DERIVATION,language:report.preferred_language,sol_wire_version:COMPACT_SOL_WIRE,
   policy:{provider_client_retries:0,automatic_retry:false,apify_calls:0,luna_calls:0}};
  const body={version:PARALLEL_REPORT,organization_id:report.organization_id,establishment_id:report.establishment_id,authority_user_id:user,language:report.preferred_language,
   reference:{report_id:report.id,generation_id:report.generation_id,historical_run_id:history.id,source_fingerprint:report.source_fingerprint,report_sha256:await directHash(report)},
@@ -48,6 +49,7 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
 }
 export type ParallelProtocol=Awaited<ReturnType<typeof parallelProtocol>>['body'];
 export async function verifyParallelProtocol(p:ParallelProtocol,sha:string){
+ if(p.configuration.sol_wire_version!==undefined&&p.configuration.sol_wire_version!==COMPACT_SOL_WIRE)throw Error('PARALLEL_SOL_WIRE_VERSION_CHANGED');
  if(p.version!==PARALLEL_REPORT||await directHash(p)!==sha||p.configuration_sha256!==await directHash(p.configuration)||p.source_snapshot_sha256!==await directHash(p.source_snapshot)||
   p.classification_configuration_sha256!==await directHash(SHORT_CLASSIFIER_CONFIG)||directCanonical(p.configuration.jev)!==directCanonical(SHORT_CLASSIFIER_CONFIG)||
   p.pending_sha256!==await directHash(p.pending)||p.max_jev_calls!==p.pending.length||p.max_luna_calls!==0||p.max_sol_calls!==1||p.max_apify_calls!==0||p.automatic_retry!==false||p.production_enabled!==false||
@@ -85,14 +87,17 @@ export async function compileParallelSol(s:RestaurantState){
   source_reviews:p.denominators.source_reviews,text_reviews:rows.length,classification_configuration:{id:SHORT_CLASSIFIER_CONFIG.id,sha256:p.classification_configuration_sha256}},DIRECT_SYNTHESIS_VERSION);
  const evidence=b.selection.selected;
  if(!evidence.length)throw Error('PARALLEL_EVIDENCE_INSUFFICIENT');
- const packet={format_version:'jls-direct-categories4-report-v1',language:p.language,synthesis_version:DIRECT_SYNTHESIS_VERSION,
+ const legacyPacket={format_version:'jls-direct-categories4-report-v1',language:p.language,synthesis_version:DIRECT_SYNTHESIS_VERSION,
   statistics:directSynthesisStatistics(b.statistics),statistics_sha256:b.statistics_sha256,statistics_provenance:'automatic_jev_not_validated_by_sol',
   evidence:evidence.map(e=>({evidence_id:e.evidence_id,review_id:e.review_id,category:e.category,polarity:e.polarity,quote:e.quote,quote_sha256:e.quote_sha256,context_same_as_quote:e.context===e.quote,...(e.context===e.quote?{}:{context:e.context}),
    analysis_text_sha256:e.analysis_text_sha256,translation_source:e.translation_source,quote_start:e.quote_start,quote_end:e.quote_end,context_start:e.context_start,context_end:e.context_end})),
   original_reviews:b.synthesis!.originals,coverage:b.selection.coverage,scope:'UNVERIFIED_CUSTOMER_CANDIDATES_SOL_SELF_REVIEW'};
- const prompt=p.language==='fr'?candidateInstructions(b.statistics.scope).replaceAll('in Vietnamese','in French')+'\nWrite all restaurateur-facing prose in French. Keep schema keys unchanged.':candidateInstructions(b.statistics.scope);
- const {$schema:_,...schema}=z.toJSONSchema(directReportResponse);
- const request={model:'gpt-6.1-sol',reasoning:{effort:'low'},max_output_tokens:SOL_SIZE_POLICY.max_output_tokens,input:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(packet)}],text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}};
+ const compact=p.configuration.sol_wire_version===COMPACT_SOL_WIRE?await prepareCompactSolWire({organization_id:p.organization_id,establishment_id:p.establishment_id,
+  source_snapshot_sha256:p.source_snapshot_sha256,statistics:b.statistics,statistics_sha256:b.statistics_sha256,evidence,reviews:p.source_snapshot.reviews},p.language as 'fr'|'vi'):null;
+ const packet=compact?.packet??legacyPacket;
+ const prompt=compact?.prompt??(p.language==='fr'?candidateInstructions(b.statistics.scope).replaceAll('in Vietnamese','in French')+'\nWrite all restaurateur-facing prose in French. Keep schema keys unchanged.':candidateInstructions(b.statistics.scope));
+ const {$schema:_,...schema}=z.toJSONSchema(compact?compactSolResponse:directReportResponse);
+ const request={model:'gpt-6.1-sol',reasoning:{effort:'low'},max_output_tokens:SOL_SIZE_POLICY.max_output_tokens,input:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(packet)}],text:{format:{type:'json_schema',name:compact?'jls_direct4_compact_sol_v1':'jls_direct_categories4_report_v1',strict:true,schema}}};
  const memo=await attachPlanTokenMemo(packet),measurement=solRequestSize(request,SOL_SIZE_POLICY,memo.count),cert=await tokenCertificate(packet),request_json=JSON.stringify(request);
  const classification_sources=s.tasks.filter(t=>t.phase==='jev').map(t=>{const a=s.artifacts.find(a=>a.kind==='task:'+t.id)!;return {task_id:t.id,review_id:t.review_id,artifact_sha256:a.sha256,result_sha256:rows.find(r=>r.review_id===t.review_id)!.result_sha256,reused:t.status==='reused'};});
  // Raw classifications already live in immutable task receipts. Bind their
@@ -100,7 +105,7 @@ export async function compileParallelSol(s:RestaurantState){
  const dataset_manifest={id:dataset.id,protocol_id:dataset.protocol_id,organization_id:dataset.organization_id,sha256:dataset.sha256,configuration_sha256:p.classification_configuration_sha256,review_count:rows.length};
  const selection={algorithm:b.selection.algorithm,algorithm_sha256:b.selection.algorithm_sha256,candidate_ids:b.selection.candidates.map(e=>e.evidence_id),coverage:b.selection.coverage,distinct_selected_reviews:b.selection.distinct_selected_reviews};
  const body={version:PARALLEL_REPORT,source_protocol_id:s.protocol.id,source_protocol_sha256:s.protocol.sha256,source_run_id:s.run.id,dataset:dataset_manifest,classification_sources,classification_sources_sha256:await directHash(classification_sources),statistics:b.statistics,statistics_sha256:b.statistics_sha256,
-  evidence,selection,packet,prompt_sha256:await analysisTextSha256(prompt),schema_sha256:await directHash(schema),request_json,
+  evidence,selection,packet,...(compact?{compact_wire:compact.manifest,compact_wire_sha256:compact.manifest_sha256}:{}),prompt_sha256:await analysisTextSha256(prompt),schema_sha256:await directHash(schema),request_json,
   request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json),measurement,token_certificate:cert,token_certificate_sha256:await directHash(cert)};
  return {body,sha256:await directHash(body)};
 }
@@ -150,10 +155,21 @@ export const parallelReadyContract:ReadyContract={verify:async(s:ReadyState)=>{
   b.classification_sources.length!==b.dataset.review_count||b.classification_sources_sha256!==await directHash(b.classification_sources)||
   await directHash(b.statistics)!==b.statistics_sha256||await directHash(JSON.parse(b.request_json))!==b.request_sha256||await analysisTextSha256(b.request_json)!==b.request_raw_sha256||
   await directHash(b.token_certificate)!==b.token_certificate_sha256)throw Error('PARALLEL_SOL_READY_CHANGED');
- const request=JSON.parse(b.request_json);if(request.model!=='gpt-6.1-sol'||directCanonical(JSON.parse(request.input[1].content))!==directCanonical(b.packet)||await analysisTextSha256(request.input[0].content)!==b.prompt_sha256||await directHash(request.text.format.schema)!==b.schema_sha256)throw Error('PARALLEL_SOL_REQUEST_CHANGED');
+ const request=JSON.parse(b.request_json);if(request.model!=='gpt-6.1-sol'||request.reasoning?.effort!=='low'||directCanonical(JSON.parse(request.input[1].content))!==directCanonical(b.packet)||await analysisTextSha256(request.input[0].content)!==b.prompt_sha256||await directHash(request.text.format.schema)!==b.schema_sha256)throw Error('PARALLEL_SOL_REQUEST_CHANGED');
  const memo=await attachPlanTokenMemo(b.packet,b.token_certificate,true);solRequestSize(request,SOL_SIZE_POLICY,memo.count);
  for(const e of b.evidence){const r=p.source_snapshot.reviews.find(r=>r.id===e.review_id);if(!r?.analysis_text||r.analysis_text_sha256!==e.analysis_text_sha256||r.analysis_text.slice(e.quote_start,e.quote_end)!==e.quote||r.analysis_text.slice(e.context_start,e.context_end)!==e.context||await analysisTextSha256(e.quote)!==e.quote_sha256)throw Error('PARALLEL_EVIDENCE_CHANGED');}
+ if(p.configuration.sol_wire_version===COMPACT_SOL_WIRE){
+  if(!b.compact_wire||!b.compact_wire_sha256)throw Error('COMPACT_SOL_BINDINGS_CHANGED');
+  await verifyCompactSolWire({organization_id:p.organization_id,establishment_id:p.establishment_id,source_snapshot_sha256:p.source_snapshot_sha256,
+   statistics:b.statistics,statistics_sha256:b.statistics_sha256,evidence:b.evidence,reviews:p.source_snapshot.reviews},p.language as 'fr'|'vi',b.compact_wire,b.compact_wire_sha256,b.packet);
+ }else if(b.compact_wire)throw Error('COMPACT_SOL_BINDINGS_CHANGED');
  return b.packet as unknown as Awaited<ReturnType<ReadyContract['verify']>>;
-},validate:async(raw,s)=>await validateParallelReport(raw,s.ready.body as unknown as ParallelReady['body']) as unknown as Awaited<ReturnType<ReadyContract['validate']>>,
+},validate:async(raw,s)=>{
+ const ready=s.ready.body as unknown as ParallelReady['body'];
+ const reconstructed=ready.compact_wire?reconstructCompactSolResponse(raw,ready.compact_wire,ready.evidence):raw;
+ const result=await validateParallelReport(reconstructed,ready);
+ return {...result,...(ready.compact_wire?{response_format_version:COMPACT_SOL_WIRE,compact_response:raw,
+  source_reconstruction:{version:COMPACT_SOL_WIRE,manifest_sha256:ready.compact_wire_sha256,generated_text_changed:false}}:{})} as unknown as Awaited<ReturnType<ReadyContract['validate']>>;
+},
  reportItems:value=>{const r=value as {technical_checks_passed:boolean};return r.technical_checks_passed?[]:[{status:'review_needed'}];}};
 export type ParallelReport=Report;
