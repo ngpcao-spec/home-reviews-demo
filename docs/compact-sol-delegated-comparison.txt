@@ -1,0 +1,51 @@
+Compact Sol-only delegated comparison — jls-direct4-compact-comparison-v1
+
+Reuses the existing candidate-only protocol family, protocol/run/task tables,
+Sol-ready operations, authenticated scheduler, atomic claim, raw receipt,
+separate validation wake, RLS and immutable preparation archives. No new engine,
+screen, model prompt, classification, selector or report publication is added.
+
+The immutable previous no-Luna archive is the trial key. The existing unique
+candidate comparison index on source.reference_archive.id prevents two protocols
+for this trial. save_jls_compact_comparison also takes a transaction advisory lock
+and returns an existing exact-source/request protocol, including when only code
+provenance differs. A different source/request fails closed. The paid-run row is
+unique per protocol through the existing protocol lock; an existing attempt is
+followed, never replaced. A request_count already consumed is never reset.
+
+The preparation verifies the entire frozen archive and all native JEV receipts
+offline, then retains exactly its classifications, counts and selected evidence.
+The source archive remains immutable and separately consultable. SQL binds the
+source, analytical-language metadata, packet, alias map, hashes and call limits
+back to that archive. Compact instructions, model, reasoning and schema are
+imported unchanged from jls-direct4-compact-sol-v1. The request hash must match
+the prepared compact request before authorization.
+
+authorize_jls_compact_comparison is service_role-only. It requires the two saved
+deployed mock probes, the exact protocol/request/scope, a real current GO with
+its directive hash and an expiring administrative delegation record. It calls
+the existing authorize_jls_restaurant_pre_ready and bind_jls_candidates_ready.
+There is no simulated app click or fabricated human session. Authority account
+activity and organization membership are checked by the existing server adapter.
+
+The scheduler-authenticated compact_comparison_execute wake is scoped to one
+already authorized paid compact operation. It uses processReadySol and the same
+claim/receive/finish RPCs as the old candidate run. Scheduled or concurrent wakes
+may follow the job; only one can consume the Sol reservation. Timeout, lost
+response, model/usage/output error or uncertain saving never triggers a resend.
+
+The raw response is saved before reconstruction/validation in a separate wake.
+References resolve only within the frozen alias manifest; exact source quotes
+and hashes are restored by the existing compact adapter, then the existing
+parallel-report validator/limited reference derivation runs. These are technical
+checks, not independent human validation or a guarantee of narrative accuracy.
+
+All new results are separate from the old production/experimental pair. This
+comparison does not replace the current pair or change its UI. The complete
+result and sources are archived through save_jls_snapshot_preparation for audit.
+
+Qualification: tests/unit/compact-sol-comparison.test.ts; Deno
+supabase/tests/compact_comparison_deno.ts with --deny-net; real-source offline
+rehearsal; tests/supabase/compact-comparison.sql exercises actual deployed RPCs
+as service_role and rolls back all mock writes; two authenticated deployed Edge
+probes with injected mock transport are mandatory before the one paid run.

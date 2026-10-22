@@ -20,7 +20,7 @@ export interface CandidateInput {
  statistics:DirectReportPreparation['body']['statistics'];statistics_sha256:string;selected:DirectReportEvidence[];
  originals:NonNullable<DirectReportPreparation['body']['synthesis']>['originals'];synthesis:string;
 }
-type CandidateSource=Omit<CandidateInput,'dataset'>&{dataset_sha256:string};
+export type CandidateSource=Omit<CandidateInput,'dataset'>&{dataset_sha256:string};
 export function candidateInstructions(scope:CandidateInput['statistics']['scope']){
  return balancedDirectReportInstructions(scope)
  .replace('must link accepted evidence_ids of its category','must link candidate evidence_ids of its category that your examination of the supplied text supports')
@@ -52,7 +52,7 @@ function candidateDraft(s:CandidateSource,count:(v:string)=>number,wire?:string)
   text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}},packet,wire);
  return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
-async function verifyCandidateSource(s:CandidateSource){
+export async function verifyCandidateSource(s:CandidateSource){
  if(s.synthesis!==DIRECT_SYNTHESIS_VERSION||s.sources.length!==135||new Set(s.sources.map(r=>r.id)).size!==135||
   s.sources.filter(r=>r.analysis_text).length!==75||s.selected.length!==32||new Set(s.selected.map(e=>e.evidence_id)).size!==32||
   await directHash(s.statistics)!==s.statistics_sha256||s.statistics.scope.source_reviews!==135||s.statistics.scope.analysed_text_reviews!==75||s.statistics.scope.textless_statistics_only!==60)
