@@ -20,7 +20,7 @@ Deno.serve(async request=>{
    if(old.error)throw Error('FORBIDDEN');archived=old.data;report=old.data.source_report;
   }
   const history=await c.admin.from('historical_report_runs').select('*').eq('generation_id',report.generation_id).eq('organization_id',report.organization_id).eq('establishment_id',report.establishment_id).eq('status','completed').maybeSingle();
-  const pair=archived?{data:archived,error:null}:await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).maybeSingle();
+  const pair=archived?{data:archived,error:null}:await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle();
   const versions=await c.client.from('analysis_parallel_reports').select('id,reference_generation_id,created_at,generated_at,state,run_id').eq('organization_id',report.organization_id).eq('establishment_id',report.establishment_id).eq('language',report.preferred_language).order('created_at',{ascending:false});
   if(versions.error)throw Error('PARALLEL_READ_FAILED');
   const versionRuns=versions.data.filter(v=>v.run_id).map(v=>v.run_id);
@@ -39,7 +39,7 @@ Deno.serve(async request=>{
     const start=await c.admin.rpc('start_parallel_report',{p_body:p.body,p_sha:p.sha256,p_user:c.user.id});if(start.error)throw Error('PARALLEL_START_REFUSED');
    }
   }
-  const row=body.action==='read'?pair:await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).single();
+  const row=body.action==='read'?pair:await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).single();
   if(row.error)throw Error('PARALLEL_READ_FAILED');
   let run=null,tasks:unknown[]=[],operation=null;
   if(row.data?.run_id){
