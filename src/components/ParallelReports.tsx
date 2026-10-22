@@ -19,7 +19,7 @@ export interface ParallelView {
  corpus_reusable:boolean;unavailable_reason:string|null
  experimental:null|{id:string;state:string;error_code:string|null;generated_at:string|null;created_at:string;derived_report:ExperimentalResult|null;original_report:unknown;raw_response:unknown;corrections:unknown;
  source_report?:HistoricalReportRow;reference_generation_id?:string;
- source_reviews:{id:string;original_text:string;analysis_text:string|null}[];statistics:{scope:{source_reviews:number;analysed_text_reviews:number;textless_statistics_only:number};counts:{categories:Record<string,{positive_reviews?:number;negative_reviews?:number;positive_including_mixed?:number;negative_including_mixed?:number;distinct_mentioned_reviews:number;denominator_reviews?:number;exclusive?:Record<string,number>}>}}|null;
+ source_reviews:{id:string;original_text:string;analysis_text:string|null;rating?:number|null;published_at?:string|null;analysis_language?:string|null;original_language?:string|null;translation_provenance?:{original_language?:string|null}}[];statistics:{scope:{source_reviews:number;analysed_text_reviews:number;textless_statistics_only:number};counts:{categories:Record<string,{positive_reviews?:number;negative_reviews?:number;positive_including_mixed?:number;negative_including_mixed?:number;positive_review_ids?:string[];negative_review_ids?:string[];distinct_mentioned_reviews:number;denominator_reviews?:number;exclusive?:Record<string,number>}>}}|null;
   controls:{technical_checks_passed?:boolean;section_issues?:{path:string;reason:string}[];evidence?:{evidence_id:string;review_id:string;quote:string}[]}|null;usage:unknown;imported_derivative_id?:string}
  run:null|{id:string;status:string;stage:string;error_code:string|null};tasks:{id:string;phase:string;status:string;request_count:number}[];operation:unknown
 }
@@ -68,7 +68,7 @@ export function ParallelReports({current,account,enabled,children}:{current:Hist
    {!row&&data&&data.corpus_reusable&&<p>{t.missing}</p>}
    {row&&(row.error_code||data?.run?.error_code)&&<p role="alert" className="parallel-audit-id">{row.error_code??data?.run?.error_code}</p>}
    {row&&analysed<(data?.current.text_reviews??analysed)&&<p role="status">{fr?'Couverture partielle : les résultats manquants ne sont pas classés comme neutres ou non mentionnés.':'Phạm vi phân tích chưa đầy đủ: kết quả còn thiếu không được tính là trung lập hoặc không đề cập.'}</p>}
-   {row&&<ExperimentalReport row={row} operation={data?.operation} methodology={t.note}/>}
+   {row&&<ExperimentalReport key={row.id} row={row} operation={data?.operation} methodology={t.note}/>}
   </section>
  </>
 }

@@ -81,3 +81,14 @@ Sources, raw/derived output, corrections and methodology share one collapsed
 audit panel. Existing masking decisions still apply to the main reading view;
 the stored passages remain available in the audit. No backend, classifier,
 generation/authorization path, stored report or supplier call is changed.
+
+Negative-review consultation (2026-10-22): nonzero per-category negative/mixed
+counts open a local, read-only dialog over all frozen source reviews. The saved
+directCategoryCounts negative_review_ids list contains native negative+mixed;
+its intersection with positive_review_ids identifies native mixed. This does
+not use selected quotation IDs, star ratings, Luna or a new classification.
+IDs and sources are deduplicated. Missing classification lists, source rows,
+text, dates, ratings and distinct translations are indicated without fetching
+replacement data. The native dialog restores focus and report scroll on close.
+Per-axis source links are removed; the secondary audit retains every original
+quotation and recommendation reference. No backend or data change is required.
