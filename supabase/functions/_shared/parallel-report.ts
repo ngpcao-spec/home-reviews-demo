@@ -13,6 +13,7 @@ import {SOL_SIZE_POLICY,solRequestSize} from './jls-sol-size.ts';
 import type {RestaurantState,RestaurantExecutionContract} from './jls-restaurant-worker.ts';
 import type {ReadyContract,ReadyState} from './jls-sol-ready-worker.ts';
 import {COMPACT_SOL_WIRE,prepareCompactSolWire,verifyCompactSolWire,reconstructCompactSolResponse,compactSolResponse} from './parallel-sol-wire.ts';
+import {DIRECT_COVERAGE_VERSION,directCoverageSelectorHash} from './jev-direct-evidence-selection.ts';
 export const PARALLEL_REPORT='jls-direct4-parallel-no-luna-v1';
 export const REFERENCE_DERIVATION='jls-direct4-reference-links-v1';
 type SourceReview=DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown};
@@ -38,6 +39,7 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
   identity:{configuration_id:config.id,configuration_sha256:configHash,analysis_text_sha256:r.analysis_text_sha256,requested_model:'jev-1.13.0',expected_served_model:'jev-1.13.0'}};}));
  const source_snapshot={reviews,source_reviews_sha256:await directHash(reviews)};
  const configuration={version:PARALLEL_REPORT,jev:config,synthesis:DIRECT_SYNTHESIS_VERSION,reference_derivation:REFERENCE_DERIVATION,language:report.preferred_language,sol_wire_version:COMPACT_SOL_WIRE,
+  evidence_selector:{version:DIRECT_COVERAGE_VERSION,sha256:await directCoverageSelectorHash()} as {version:typeof DIRECT_COVERAGE_VERSION;sha256:string}|undefined,
   policy:{provider_client_retries:0,automatic_retry:false,apify_calls:0,luna_calls:0}};
  const body={version:PARALLEL_REPORT,organization_id:report.organization_id,establishment_id:report.establishment_id,authority_user_id:user,language:report.preferred_language,
   reference:{report_id:report.id,generation_id:report.generation_id,historical_run_id:history.id,source_fingerprint:report.source_fingerprint,report_sha256:await directHash(report)},
@@ -49,6 +51,8 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
 }
 export type ParallelProtocol=Awaited<ReturnType<typeof parallelProtocol>>['body'];
 export async function verifyParallelProtocol(p:ParallelProtocol,sha:string){
+ if(p.configuration.evidence_selector!==undefined&&(p.configuration.evidence_selector.version!==DIRECT_COVERAGE_VERSION||
+  p.configuration.evidence_selector.sha256!==await directCoverageSelectorHash()))throw Error('PARALLEL_EVIDENCE_SELECTOR_CHANGED');
  if(p.configuration.sol_wire_version!==undefined&&p.configuration.sol_wire_version!==COMPACT_SOL_WIRE)throw Error('PARALLEL_SOL_WIRE_VERSION_CHANGED');
  if(p.version!==PARALLEL_REPORT||await directHash(p)!==sha||p.configuration_sha256!==await directHash(p.configuration)||p.source_snapshot_sha256!==await directHash(p.source_snapshot)||
   p.classification_configuration_sha256!==await directHash(SHORT_CLASSIFIER_CONFIG)||directCanonical(p.configuration.jev)!==directCanonical(SHORT_CLASSIFIER_CONFIG)||
@@ -84,7 +88,7 @@ export async function compileParallelSol(s:RestaurantState){
  const dataset={id:s.run.id,protocol_id:s.protocol.id,organization_id:p.organization_id,body:datasetBody,sha256:await directHash(datasetBody)};
  const snapshot={id:s.protocol.id,protocol_id:s.protocol.id,organization_id:p.organization_id,body:p.source_snapshot,sha256:p.source_snapshot_sha256};
  const b=await selectDirectReportSources({dataset,snapshot,prior_luna_requests:[]},p.code_provenance,{dataset_id:dataset.id,dataset_sha256:dataset.sha256,snapshot_id:snapshot.id,snapshot_sha256:snapshot.sha256,
-  source_reviews:p.denominators.source_reviews,text_reviews:rows.length,classification_configuration:{id:SHORT_CLASSIFIER_CONFIG.id,sha256:p.classification_configuration_sha256}},DIRECT_SYNTHESIS_VERSION);
+  source_reviews:p.denominators.source_reviews,text_reviews:rows.length,classification_configuration:{id:SHORT_CLASSIFIER_CONFIG.id,sha256:p.classification_configuration_sha256}},DIRECT_SYNTHESIS_VERSION,undefined,p.configuration.evidence_selector?.version);
  const evidence=b.selection.selected;
  if(!evidence.length)throw Error('PARALLEL_EVIDENCE_INSUFFICIENT');
  const legacyPacket={format_version:'jls-direct-categories4-report-v1',language:p.language,synthesis_version:DIRECT_SYNTHESIS_VERSION,
@@ -103,7 +107,8 @@ export async function compileParallelSol(s:RestaurantState){
  // Raw classifications already live in immutable task receipts. Bind their
  // manifest instead of copying all 75/100/500 raw answers into each Sol wake.
  const dataset_manifest={id:dataset.id,protocol_id:dataset.protocol_id,organization_id:dataset.organization_id,sha256:dataset.sha256,configuration_sha256:p.classification_configuration_sha256,review_count:rows.length};
- const selection={algorithm:b.selection.algorithm,algorithm_sha256:b.selection.algorithm_sha256,candidate_ids:b.selection.candidates.map(e=>e.evidence_id),coverage:b.selection.coverage,distinct_selected_reviews:b.selection.distinct_selected_reviews};
+ const selection={algorithm:b.selection.algorithm,algorithm_sha256:b.selection.algorithm_sha256,candidate_ids:b.selection.candidates.map(e=>e.evidence_id),coverage:b.selection.coverage,distinct_selected_reviews:b.selection.distinct_selected_reviews,
+  ...(b.selection.coverage_diagnostics?{coverage_diagnostics:b.selection.coverage_diagnostics}:{})};
  const body={version:PARALLEL_REPORT,source_protocol_id:s.protocol.id,source_protocol_sha256:s.protocol.sha256,source_run_id:s.run.id,dataset:dataset_manifest,classification_sources,classification_sources_sha256:await directHash(classification_sources),statistics:b.statistics,statistics_sha256:b.statistics_sha256,
   evidence,selection,packet,...(compact?{compact_wire:compact.manifest,compact_wire_sha256:compact.manifest_sha256}:{}),prompt_sha256:await analysisTextSha256(prompt),schema_sha256:await directHash(schema),request_json,
   request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json),measurement,token_certificate:cert,token_certificate_sha256:await directHash(cert)};
@@ -155,6 +160,8 @@ export const parallelReadyContract:ReadyContract={verify:async(s:ReadyState)=>{
   b.classification_sources.length!==b.dataset.review_count||b.classification_sources_sha256!==await directHash(b.classification_sources)||
   await directHash(b.statistics)!==b.statistics_sha256||await directHash(JSON.parse(b.request_json))!==b.request_sha256||await analysisTextSha256(b.request_json)!==b.request_raw_sha256||
   await directHash(b.token_certificate)!==b.token_certificate_sha256)throw Error('PARALLEL_SOL_READY_CHANGED');
+ if(p.configuration.evidence_selector&&(b.selection.algorithm!==p.configuration.evidence_selector.version||
+  b.selection.algorithm_sha256!==p.configuration.evidence_selector.sha256))throw Error('PARALLEL_EVIDENCE_SELECTOR_CHANGED');
  const request=JSON.parse(b.request_json);if(request.model!=='gpt-6.1-sol'||request.reasoning?.effort!=='low'||directCanonical(JSON.parse(request.input[1].content))!==directCanonical(b.packet)||await analysisTextSha256(request.input[0].content)!==b.prompt_sha256||await directHash(request.text.format.schema)!==b.schema_sha256)throw Error('PARALLEL_SOL_REQUEST_CHANGED');
  const memo=await attachPlanTokenMemo(b.packet,b.token_certificate,true);solRequestSize(request,SOL_SIZE_POLICY,memo.count);
  for(const e of b.evidence){const r=p.source_snapshot.reviews.find(r=>r.id===e.review_id);if(!r?.analysis_text||r.analysis_text_sha256!==e.analysis_text_sha256||r.analysis_text.slice(e.quote_start,e.quote_end)!==e.quote||r.analysis_text.slice(e.context_start,e.context_end)!==e.context||await analysisTextSha256(e.quote)!==e.quote_sha256)throw Error('PARALLEL_EVIDENCE_CHANGED');}

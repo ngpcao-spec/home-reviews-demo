@@ -34,3 +34,12 @@ it('deduplicates and removes only unobserved links and the redundant wrong polar
 it('does not remove a mismatched-polarity source when preserved passage coverage is not established',async()=>{const {raw,evidence}=await links();evidence[1].review_id='different';const d=deriveReferenceLinks(raw,evidence);expect(d.issues).toContainEqual({path:'negative_aspects[0]',reason:'remaining_passage_coverage_not_established'});expect(d.derived.report.negative_aspects[0].evidence_ids).toEqual(['negative','positive']);});
 it('does not invent missing observations or alter quotations and still rejects modified statistics',async()=>{const {raw,evidence}=await links();raw.report.recommendations[0].observations[0].quote='invented';expect(deriveReferenceLinks(raw,evidence).issues[0].reason).toBe('observation_coverage_not_established');await expect(validateParallelReport(raw,{evidence,statistics_sha256:'a'.repeat(64)} as never)).rejects.toThrow('DIRECT_REPORT_QUOTE_CHANGED');raw.statistics_sha256='b'.repeat(64);await expect(validateParallelReport(raw,{evidence,statistics_sha256:'a'.repeat(64)} as never)).rejects.toThrow('DIRECT_REPORT_STATISTICS_OR_CATEGORIES_CHANGED');});
 it('keeps the new protocol separate from production versions',()=>expect(PARALLEL_REPORT).toBe('jls-direct4-parallel-no-luna-v1'));
+it('binds the future selector to the protocol while preserving pre-coverage preparations',async()=>{
+ const {p}=await fixture();expect(p.body.configuration.evidence_selector?.version).toBe('jls-direct4-negative-mixed-coverage-v1');
+ const hash=p.body.configuration.evidence_selector!.sha256;p.body.configuration.evidence_selector!.sha256='0'.repeat(64);
+ p.body.configuration_sha256=await directHash(p.body.configuration);await expect(verifyParallelProtocol(p.body,await directHash(p.body))).rejects.toThrow('PARALLEL_EVIDENCE_SELECTOR_CHANGED');
+ p.body.configuration.evidence_selector!.sha256=hash;
+ delete p.body.configuration.evidence_selector;p.body.configuration_sha256=await directHash(p.body.configuration);p.sha256=await directHash(p.body);
+ const r=await rehearseParallel({...p,id:id()});expect(r.ready.body.selection.algorithm).toBe('existing_selectBalancedEvidence');
+ expect(r.ready.body.selection).not.toHaveProperty('coverage_diagnostics');
+});
