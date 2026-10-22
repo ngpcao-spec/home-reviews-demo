@@ -39,6 +39,7 @@ import {boundedParallelFixture,boundedParallelJevProbe,boundedParallelSolProbe} 
 import {compileParallelSol} from '../_shared/parallel-report.ts';
 import {COMPACT_SOL_WIRE} from '../_shared/parallel-sol-wire.ts';
 import {directHash} from '../_shared/jev-direct-categories.ts';
+import {DIRECT_COVERAGE_VERSION,directCoverageSelectorHash} from '../_shared/jev-direct-evidence-selection.ts';
 
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
@@ -47,15 +48,16 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
- if(payload?.mode==='parallel_report_capability')return json({version:PARALLEL_REPORT,worker_revision:'parallel-compact-sol-v1',sol_wire_version:COMPACT_SOL_WIRE,stages:['jev','prepare_evidence','sol','validate_sol'],max_luna_calls:0,max_sol_calls:1,provider_calls:0});
+ if(payload?.mode==='parallel_report_capability')return json({version:PARALLEL_REPORT,worker_revision:DIRECT_COVERAGE_VERSION,evidence_selector_sha256:await directCoverageSelectorHash(),sol_wire_version:COMPACT_SOL_WIRE,stages:['jev','prepare_evidence','sol','validate_sol'],max_luna_calls:0,max_sol_calls:1,provider_calls:0});
  if(payload?.mode==='parallel_report_probe'){
   // Deployed-path rehearsal with explicit injected suppliers, no durable run,
   // authorization, reservation or database write. Returns before provider keys.
   try{
    const at=performance.now();
    if(payload.phase==='sol'){
-    const a=await admin.from('analysis_jls_snapshot_preparations').select('body,sha256').eq('id',payload.prepared_archive_id).eq('kind','parallel_bounded_mock_ready').single();
-    if(a.error||await directHash(a.data.body)!==a.data.sha256||a.data.body.explicit_technical_mock!==true)throw Error('PROBE_SOURCE_CHANGED');
+    const a=await admin.from('analysis_jls_snapshot_preparations').select('body,sha256,kind').eq('id',payload.prepared_archive_id).single();
+    if(a.error||!['parallel_bounded_mock_ready','parallel_bounded_mock_ready_coverage_v1'].includes(a.data.kind)||
+     await directHash(a.data.body)!==a.data.sha256||a.data.body.explicit_technical_mock!==true)throw Error('PROBE_SOURCE_CHANGED');
     const result=await boundedParallelSolProbe(a.data.body.protocol,a.data.body.ready);
     return json({version:PARALLEL_REPORT,phase:'sol',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,...result,wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
    }
@@ -69,8 +71,8 @@ Deno.serve(async r=>{
    const protocol={...p,id:crypto.randomUUID()},state=await boundedParallelFixture(protocol,dataset.body.reviews);
    if(payload.phase==='jev')return json({version:PARALLEL_REPORT,phase:'jev',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,...await boundedParallelJevProbe(state,dataset.body.reviews),wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
    const ready=await compileParallelSol(state),body={protocol,ready,explicit_technical_mock:true};
-   const saved=await admin.rpc('save_jls_snapshot_preparation',{p_protocol:source.data.protocol_id,p_kind:'parallel_bounded_mock_ready',p_body:body,p_sha:await directHash(body)});if(saved.error)throw Error('PROBE_PERSISTENCE_FAILED');
-   return json({version:PARALLEL_REPORT,phase:'compile',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,prepared_archive_id:saved.data,measurement:ready.body.measurement,wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
+   const saved=await admin.rpc('save_jls_snapshot_preparation',{p_protocol:source.data.protocol_id,p_kind:'parallel_bounded_mock_ready_coverage_v1',p_body:body,p_sha:await directHash(body)});if(saved.error)throw Error('PROBE_PERSISTENCE_FAILED');
+   return json({version:PARALLEL_REPORT,phase:'compile',explicit_technical_mock:true,provider_calls:0,new_runs:0,new_consents:0,prepared_archive_id:saved.data,selection:ready.body.selection,measurement:ready.body.measurement,wall_ms:performance.now()-at,memory:Deno.memoryUsage()});
   }catch(e){return json({error:e instanceof Error?e.message:'PARALLEL_PROBE_FAILED',provider_calls:0},409);}
  }
  if(payload?.mode==='direct4_candidates_probe'){
