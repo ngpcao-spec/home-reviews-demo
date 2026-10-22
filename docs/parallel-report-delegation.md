@@ -13,6 +13,8 @@ transactionnel, cache exact, file de tâches, publication et protection contre
 les doubles lancements. Aucun moteur, écran ou transport supplémentaire.
 Les nouvelles fonctions sont réservées au rôle serveur ; aucune politique
 RLS n'est modifiée. Une préparation ou un déploiement ne crée aucune exécution.
+Le réveil authentifié `parallel_report_execute` cible uniquement le run indiqué
+et ne réveille pas les autres expériences en attente.
 
 Le worker compact existant traite JEV → sélection automatique → un appel Sol,
 sans Luna ni Apify. Le prompt court, les six choix natifs, le sélecteur, les
