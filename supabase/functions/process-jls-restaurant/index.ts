@@ -141,6 +141,16 @@ Deno.serve(async r=>{
   EdgeRuntime.waitUntil(restaurantCpuProbe(admin,payload).catch(e=>{console.error("JLS_CPU_PROBE_FAILED",e instanceof Error?e.message:"UNKNOWN");}));
   return json({accepted_free_probe:true,provider_calls:0,nonce:payload.nonce},202);
  }
+ if(payload?.mode==='parallel_report_execute'){
+  // Wake only this authorized application job, never unrelated queued runs.
+  const q=await admin.from('analysis_jls_restaurant_runs').select('id,protocol_id,consent').eq('id',payload.run_id).single();
+  if(q.error||q.data.consent?.consent_source==='technical_qualification_no_spending')return json({error:'FORBIDDEN'},403);
+  const p=await admin.from('analysis_jls_restaurant_protocols').select('body->>version').eq('id',q.data.protocol_id).single();
+  if(p.error||p.data.version!==PARALLEL_REPORT)return json({error:'PARALLEL_SCOPE_REQUIRED'},409);
+  EdgeRuntime.waitUntil(processParallelReport(admin,q.data.id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',openai:Deno.env.get('OPENAI_API_KEY')??''},fetch)
+   .catch(()=>console.error('PARALLEL_SCOPED_WAKE_STOPPED_NO_RETRY')));
+  return json({accepted_background:true,run_id:q.data.id,automatic_retry:false},202);
+ }
  if(payload?.mode==='compact_comparison_execute'){
   // Explicit scheduler-authenticated wake for one previously authorized job.
   // The shared SQL claim reserves its sole Sol attempt before transport.
