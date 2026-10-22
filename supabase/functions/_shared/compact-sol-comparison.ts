@@ -33,14 +33,14 @@ async function draft(s:CandidateSource,metadata:Metadata[],count:(s:string)=>num
 }
 export async function prepareCompactComparison(a:CompactComparisonArchive,code:string){
  if(await directHash(a.body)!==a.sha256||!/^[a-f0-9]{40}$/.test(code))throw Error('COMPACT_COMPARISON_ARCHIVE_CHANGED');
- const original=a.body.protocol.body,source={...original.source,reference_archive:{id:a.id,sha256:a.sha256}},dataset=a.body.source_input.dataset;
+ const original=a.body.protocol.body,source:CandidateSource={...original.source,reference_archive:{id:a.id,sha256:a.sha256}},dataset=a.body.source_input.dataset;
  if(source.organization_id!==a.body.organization_id||source.establishment_id!==a.body.establishment_id||dataset.sha256!==source.dataset_sha256)throw Error('COMPACT_COMPARISON_SCOPE_CHANGED');
  await verifyCandidateSource(source);
  const snapshotBody={reviews:source.sources,source_reviews_sha256:await directHash(source.sources)};
  const counts=await verifyDirectReportSources({dataset,snapshot:{id:source.source_protocol_id,protocol_id:dataset.protocol_id,organization_id:source.organization_id,
   body:snapshotBody,sha256:await directHash(snapshotBody)},prior_luna_requests:[]},{dataset_id:dataset.id,dataset_sha256:dataset.sha256,
   snapshot_id:source.source_protocol_id,snapshot_sha256:await directHash(snapshotBody),source_reviews:source.sources.length,text_reviews:dataset.body.reviews.length,
-  classification_configuration:{id:SHORT_CLASSIFIER_CONFIG.id,sha256:await directHash(SHORT_CLASSIFIER_CONFIG)}});
+  classification_configuration:{id:SHORT_CLASSIFIER_CONFIG.id,sha256:await directHash(SHORT_CLASSIFIER_CONFIG)},...source.source_binding?.dataset_binding});
  if(directCanonical(counts)!==directCanonical(source.statistics.counts))throw Error('COMPACT_COMPARISON_COUNTS_CHANGED');
  const review_metadata=dataset.body.reviews.map(r=>({review_id:r.review_id,analysis_language:r.analysis_language,translation_source:r.translation_source,translation_provenance:r.translation_provenance})).sort((a,b)=>a.review_id<b.review_id?-1:1);
  const memo=await attachPlanTokenMemo(source),d=await draft(source,review_metadata,memo.count),cert=await tokenCertificate(source),request_json=JSON.stringify(d.request);
