@@ -123,4 +123,8 @@ describe('durable worker without any frontend process',()=>{
     expect(historicalRetry(new Error('REPORT_INVALID_FINDINGS'),1).status).toBe('failed')
     expect(historicalRetry(new DOMException('timeout','TimeoutError'),1).status).toBe('retry')
   })
+  it('new manual rollback intent never retries a possibly billed legacy call',async()=>{
+    const h=harness();h.patch({request_id:'a1000000-0000-4000-8000-000000000003'});ai.extract.mockRejectedValueOnce(new DOMException('lost response','TimeoutError'))
+    expect(await h.tick()).toMatchObject({status:'failed',error:'REPORT_BILLING_UNCERTAIN_NO_RETRY'});await h.tick();expect(ai.extract).toHaveBeenCalledTimes(1)
+  })
 })

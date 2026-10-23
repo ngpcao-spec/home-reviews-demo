@@ -1,5 +1,6 @@
 /** Client observer only. The server owns scheduling, steps, retries and completion. */
 export interface HistoricalRun {
+  request_id?:string;engine?:'sol_legacy'|'jev_sol_v2';comparison_id?:string|null;stage?:string
   establishment_id: string
   preferred_language: string
   generation_id: string
@@ -22,7 +23,8 @@ interface Dependencies<T> {
   establishmentId: string
   language: string
   readStatus: () => Promise<HistoricalRun | null>
-  enqueue: (body: { establishment_id: string; preferred_language: string; force: true }) => Promise<GenerationReply<T>>
+  enqueue: (body: { establishment_id: string; preferred_language: string; force: true;request_id?:string }) => Promise<GenerationReply<T>>
+  intent?:{read:()=>string|null;write:(id:string|null)=>void}
   readReport: () => Promise<void>
   saveReport: (report: T) => void
   persist: (run: HistoricalRun | null) => void
@@ -37,7 +39,9 @@ export class HistoricalGeneration<T> {
   private busy = false
   private lastWake = 0
   private timer?: ReturnType<typeof setTimeout>
+  private intent:string|null=null
   constructor(private deps: Dependencies<T>, saved?: HistoricalRun) {
+    this.intent=deps.intent?.read()??null
     const run = saved?.establishment_id === deps.establishmentId && saved.preferred_language === deps.language ? saved : null
     // Local storage is a hint, never evidence of server failure or authority to generate.
     this.state = { phase: activeHistoricalRun(run) ? 'paused' : 'idle', run, feedback: null }
@@ -74,6 +78,7 @@ export class HistoricalGeneration<T> {
   start = () => this.execute(true)
   private async observe(run: HistoricalRun | null) {
     if (this.retired) return
+    if(run?.request_id&&run.request_id===this.intent){this.intent=null;this.deps.intent?.write(null)}
     this.emit({ run, phase: run?.status === 'failed' ? 'failed' : activeHistoricalRun(run)
       ? this.canRun() ? 'generating' : 'paused' : 'idle', feedback: run?.status==='failed' && run.error_code==='NO_REVIEWS_AVAILABLE'?'empty':null })
     if (run?.status === 'completed') await this.deps.readReport()
@@ -94,7 +99,8 @@ export class HistoricalGeneration<T> {
       if (!manual) return
       this.emit({ ...this.state, phase: 'generating', feedback: null })
       // The ONLY mutating client request: an explicit user's click, never a timer/foreground return.
-      const result = await this.deps.enqueue({ establishment_id: this.deps.establishmentId, preferred_language: this.deps.language, force: true })
+      if(this.deps.intent&&!this.intent){this.intent=crypto.randomUUID();this.deps.intent.write(this.intent)}
+      const result = await this.deps.enqueue({ establishment_id: this.deps.establishmentId, preferred_language: this.deps.language, force: true,...(this.intent?{request_id:this.intent}:{}) })
       if (this.retired) return
       if (result.report) {
         this.deps.saveReport(result.report)

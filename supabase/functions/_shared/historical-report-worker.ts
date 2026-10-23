@@ -15,6 +15,7 @@ import {freshEnglishAnalysisInputs} from './analysis-text-overrides-server.ts'
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
 type InputReview = ReputationReview & { review_translations?:ProviderTranslation[];review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
 export interface HistoricalJob {
+  engine?:'sol_legacy'|'jev_sol_v2';request_id?:string;requested_by?:string;v2_report_id?:string|null;
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
@@ -33,7 +34,7 @@ export function historicalNarrativeVersion(run:HistoricalJob):3|4|5|6|7|8 {
   if(run.snapshot.base && run.snapshot.base.analysis_version!==version) throw new Error('REPORT_VERSION_CHANGED')
   return version
 }
-async function prepareSnapshot(admin:SupabaseClient, run:HistoricalJob) {
+export async function prepareHistoricalSnapshot(admin:SupabaseClient, run:HistoricalJob) {
   const ANALYSIS_VERSION=historicalNarrativeVersion(run)
   const id=run.establishment_id, language=run.language, end=run.created_at
   const {data:e,error} = await admin.from('establishments').select('id,organization_id,name,rating,total_reviews,created_at').eq('id',id).eq('organization_id',run.organization_id).single()
@@ -96,7 +97,7 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
   try {
     if(!run.model?.trim()) throw new Error('REPORT_MODEL_MISSING')
     if(!run.snapshot.reviews || !run.snapshot.base) {
-      const prepared=await prepareSnapshot(admin,run)
+      const prepared=await prepareHistoricalSnapshot(admin,run)
       await updateRun({...prepared,attempt_count:0,locked_by:null,lease_until:null,error_code:null,last_error:null})
       return {generation_id:run.generation_id,status:'running',cursor:run.cursor}
     }
@@ -156,7 +157,9 @@ export async function processHistoricalRun(admin:SupabaseClient, run:HistoricalJ
     return await publish(row)
   } catch(error) {
     if(error instanceof Error && error.message==='REPORT_LEASE_LOST') return {generation_id:run.generation_id,status:'lease_lost'}
-    const policy=historicalRetry(error,run.attempt_count)
+    // A newly requested rollback generation must not repeat a potentially paid
+    // legacy call after a timeout/lost response. Historical runs keep their policy.
+    const policy=run.request_id&&!usageRecorded?{status:'failed',code:'REPORT_BILLING_UNCERTAIN_NO_RETRY',delay:0}:historicalRetry(error,run.attempt_count)
     try {
       await updateRun({status:policy.status,last_error:policy.code,error_code:policy.code,
         next_retry_at:policy.status==='retry'?new Date(Date.now()+policy.delay*1000).toISOString():null,

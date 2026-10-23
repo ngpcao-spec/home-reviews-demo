@@ -1,6 +1,7 @@
 import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json as baseJson, corsHeaders } from '../_shared/cors.ts'
 import { historicalRunStatus } from '../_shared/historical-run-status.ts'
+import {currentHistoricalStatus} from '../_shared/current-report-status.ts'
 import {compareHistoricalRuns,runSummary} from '../_shared/historical-comparison.ts'
 import { FIRST_V8_SOURCE,FIRST_V8_ESTABLISHMENT } from '../_shared/historical-v8.ts'
 import {FIRST_V9_SOURCE,FIRST_V9_ESTABLISHMENT,v9Costs,type V9Usage} from '../_shared/historical-v9-core.ts'
@@ -62,7 +63,7 @@ Deno.serve(async request => {
       .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).maybeSingle()
     if (runError) throw new Error('REPORT_RUN_READ_FAILED')
     if (!run) return json({ run: null,...(eligibility?{eligibility}:{}) })
-    if(![7,8,9,10,11].includes(Number(body.analysis_version)))return json({ run: historicalRunStatus(run) })
+    if(![7,8,9,10,11].includes(Number(body.analysis_version)))return json({ run: await currentHistoricalStatus(context.admin,run) })
     const rate=(key:string,fallback:number)=>{const value=Number(Deno.env.get(key)??fallback);return Number.isFinite(value)&&value>=0?value:fallback}
     const inputRate=rate('SOL_INPUT_USD_PER_MILLION',2),outputRate=rate('SOL_OUTPUT_USD_PER_MILLION',10)
     if(Number(body.analysis_version)===11){const {data:m,error:me}=await context.admin.from('historical_jev_v11_run_metrics').select('*').eq('run_id',run.id).eq('organization_id',establishment.organization_id).single();if(me)throw new Error('REPORT_RUN_READ_FAILED');return json({eligibility,run:{...historicalRunStatus(run),analysis_version:11,summary:runSummary(run,inputRate,outputRate),usage:v11Costs(m as V11Usage,run.started_at&&run.completed_at?Date.parse(run.completed_at)-Date.parse(run.started_at):null),report:run.status==='completed'?run.snapshot?.publication?.consultant_report??null:null}})}

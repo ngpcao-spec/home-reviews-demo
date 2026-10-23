@@ -117,7 +117,7 @@ describe('manual historical report generation', () => {
     expect(await screen.findByText('Phân tích theo nhóm: 1 / 3')).toBeVisible()
     const calls=mocks.invoke.mock.calls.filter(([name])=>name==='generate-historical-report')
     expect(calls).toHaveLength(1)
-    expect(calls[0][1].body).toEqual({establishment_id:'est-1',preferred_language:'vi',force:true})
+    expect(calls[0][1].body).toEqual({establishment_id:'est-1',preferred_language:'vi',force:true,request_id:expect.stringMatching(/^[a-f0-9-]{36}$/)})
   })
 
   it('restores Artisan/historical and the cached V2 immediately after visiting another tab',async()=>{

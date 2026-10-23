@@ -86,4 +86,16 @@ describe('server-owned historical generation observer',()=>{
     expect(deps.saveReport).not.toHaveBeenCalled()
     expect(controller.getSnapshot().run?.status).toBe('queued');controller.dispose()
   })
+  it('persists a lost-response intent across cold boot, never resends on wake, and reuses it only on a new click',async()=>{
+    let stored:string|null=null
+    const first=setup();const intent={read:()=>stored,write:(id:string|null)=>{stored=id}}
+    first.controller.dispose();const a=new HistoricalGeneration({...first.deps,intent});first.deps.enqueue.mockRejectedValue(Error('lost response'))
+    a.attach();await flush();await a.start();const original=stored
+    expect(original).toMatch(/^[a-f0-9-]{36}$/);a.dispose()
+    const next=setup();next.controller.dispose();const b=new HistoricalGeneration({...next.deps,intent})
+    b.attach();await flush();await vi.advanceTimersByTimeAsync(15_000)
+    expect(next.deps.enqueue).not.toHaveBeenCalled()
+    next.deps.enqueue.mockResolvedValue({run:running({request_id:original!,status:'completed'})})
+    await b.start();expect(next.deps.enqueue).toHaveBeenCalledWith(expect.objectContaining({request_id:original}));expect(stored).toBeNull();b.dispose()
+  })
 })

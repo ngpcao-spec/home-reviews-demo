@@ -13,6 +13,7 @@ export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: st
       establishmentId, language: language ?? '',
       visible: () => document.visibilityState === 'visible' && navigator.onLine,
       persist: run => saveUiState(userId, storageKey, run),
+      intent:{read:()=>readUiState<string>(userId,storageKey+':intent')??null,write:id=>saveUiState(userId,storageKey+':intent',id)},
       readStatus: async () => {
         if (!supabase) throw new Error('SUPABASE_UNAVAILABLE')
         const { data, error } = await supabase.functions.invoke<{ run: HistoricalRun | null }>('get-historical-report-status', {
@@ -34,8 +35,10 @@ export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: st
         if (!supabase) throw new Error('SUPABASE_UNAVAILABLE')
         const { data, error } = await supabase.from('historical_establishment_reports').select('*')
           .eq('establishment_id', establishmentId).eq('preferred_language', language).maybeSingle()
-        if (error || !data) throw new Error('REPORT_READ_UNAVAILABLE')
-        cache.put(key, mapHistoricalReport(data as HistoricalReportRow), data.updated_at ?? data.generated_at ?? '')
+        if (error) throw new Error('REPORT_READ_UNAVAILABLE')
+        // V2 publishes separately; CurrentReports reads it through the same
+        // protected server projection. A first V2 report has no legacy row.
+        if(data)cache.put(key, mapHistoricalReport(data as HistoricalReportRow), data.updated_at ?? data.generated_at ?? '')
       },
     }, readUiState<HistoricalRun>(userId, storageKey)))
   }, [cache, userId, establishmentId, language])

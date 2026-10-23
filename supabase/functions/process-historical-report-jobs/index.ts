@@ -2,6 +2,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
 import { processHistoricalRun, type HistoricalJob } from '../_shared/historical-report-worker.ts'
 import { HISTORICAL_REPORT_CONCURRENCY } from '../_shared/historical-report-policy.ts'
+import {processCurrentReportPreparation,currentReportProtocol,CURRENT_REPORT_CODE} from '../_shared/current-report-v2.ts'
+import {CURRENT_V2,verifyParallelProtocol} from '../_shared/parallel-report.ts'
 
 Deno.serve(async request => {
   if (request.method !== 'POST') return json({error:'METHOD_NOT_ALLOWED'},405)
@@ -10,9 +12,25 @@ Deno.serve(async request => {
     p_token:request.headers.get('x-home-reviews-scheduler') ?? '',
   })
   if (authError || authorized !== true) return json({error:'UNAUTHORIZED'},401)
+  const payload=await request.json().catch(()=>null)
+  // Explicit read-only deployment probes return before claiming any job.
+  if(payload?.mode==='current_report_capability'){
+    const r=await admin.from('report_pipeline_settings').select('engine,updated_at').eq('id',true).single()
+    return json({version:CURRENT_V2,code:CURRENT_REPORT_CODE,routing:r.data,provider_calls:0,new_runs:0})
+  }
+  if(payload?.mode==='current_report_probe'){
+    const at=performance.now(),r=await admin.from('historical_report_runs').select('*').eq('id',payload.source_run_id).eq('status','completed').single()
+    if(r.error)return json({error:'SOURCE_NOT_AVAILABLE',provider_calls:0},409)
+    const p=await currentReportProtocol({...r.data,engine:'jev_sol_v2',request_id:crypto.randomUUID()} as HistoricalJob)
+    await verifyParallelProtocol(p.body,p.sha256)
+    return json({version:CURRENT_V2,code:CURRENT_REPORT_CODE,provider_calls:0,new_runs:0,new_consents:0,denominators:p.body.denominators,configuration_sha256:p.body.classification_configuration_sha256,selector:p.body.configuration.evidence_selector,wire:p.body.configuration.sol_wire_version,max_luna_calls:p.body.max_luna_calls,max_sol_calls:p.body.max_sol_calls,wall_ms:performance.now()-at,memory:Deno.memoryUsage()})
+  }
   const worker = crypto.randomUUID()
   const {data:jobs,error} = await admin.rpc('claim_historical_report_jobs',{p_worker_id:worker,p_limit:HISTORICAL_REPORT_CONCURRENCY})
   if (error) { console.error('HISTORICAL_CLAIM_FAILED'); return json({error:'HISTORICAL_CLAIM_FAILED'},500) }
-  const results = await Promise.all((jobs as HistoricalJob[] ?? []).map(run=>processHistoricalRun(admin,run,worker)))
+  const list=jobs as HistoricalJob[]??[];
+  const bindings=list.length?await admin.from('report_generation_requests').select('id,source_run_id,engine,comparison_id').in('source_run_id',list.map(r=>r.id)):{data:[],error:null};
+  if(bindings.error)return json({error:'CURRENT_REPORT_BINDING_UNAVAILABLE'},500);
+  const results = await Promise.all(list.map(run=>{const b=bindings.data?.find(b=>b.source_run_id===run.id);return b?.engine==='jev_sol_v2'?processCurrentReportPreparation(admin,{...run,engine:b.engine,request_id:b.id,v2_report_id:b.comparison_id},worker):processHistoricalRun(admin,{...run,...(b?{request_id:b.id}:{} )},worker)}))
   return json({claimed:results.length,results})
 })
