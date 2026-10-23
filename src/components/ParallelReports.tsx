@@ -13,6 +13,13 @@ import './parallel-reports.css'
 type Section={category?:string;text:string;evidence_ids:string[]}
 type Recommendation={title:string;category:string;evidence_ids:string[];observations:{text:string;evidence_id:string;quote:string}[];proposed_action:string;priority_reason:string}
 interface ExperimentalResult {format_version:string;report:{categories:Section[];positive_aspects:Section[];negative_aspects:Section[];conclusion:Section;recommendations:Recommendation[]}}
+async function launchError(data:unknown,error:unknown){
+ let body=data as {error?:string;stage?:string;request_id?:string}|null;
+ const context=(error as {context?:unknown}|null)?.context;
+ if(!body?.error&&context instanceof Response){try{body=await context.clone().json()}catch{/* A lost response stays uncertain. */}}
+ const code=body?.error&&/^[A-Z_0-9]+$/.test(body.error)?body.error:'PARALLEL_START_UNCERTAIN';
+ return Object.assign(Error(code),{stage:body?.stage,requestId:body?.request_id});
+}
 export interface ParallelView {
  reference_report?:HistoricalReportRow|null;versions?:{id:string;reference_generation_id:string;created_at:string;generated_at:string|null;state:string}[]
  current:{id:string;generation_id:string;state:string;generated_at:string|null;source_reviews:number;text_reviews:number;source_fingerprint:string}
@@ -31,7 +38,7 @@ export function ParallelReports({current,account,enabled,children}:{current:Hist
  const launched=useRef(new Set<string>()),launchScope=key.join(':')
  const q=useQuery({queryKey:key,enabled:enabled&&!!current?.generationId,retry:false,refetchInterval:query=>query.state.data?.run&&['queued','running'].includes(query.state.data.run.status)?4000:false,
   queryFn:async()=>{const r=await supabase!.functions.invoke<ParallelView>('parallel-reports',{body:{action:'read',report_id:current!.id,...(comparison?{comparison_id:comparison}:{})}});if(r.error||!r.data||'error' in r.data)throw Error('PARALLEL_READ_FAILED');return r.data}})
- const start=useMutation({retry:false,mutationFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'start',report_id:current!.id,generation_id:current!.generationId,confirmed:true}});if(r.error||r.data?.error)throw Error(r.data?.error??'PARALLEL_START_UNCERTAIN');return r.data as ParallelView},
+ const start=useMutation({retry:false,mutationFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'start',report_id:current!.id,generation_id:current!.generationId,confirmed:true}});if(r.error||r.data?.error)throw await launchError(r.data,r.error);return r.data as ParallelView},
   onSuccess:data=>{client.setQueryData(key,data)},onError:()=>{void client.invalidateQueries({queryKey:key})}})
  const choose=(value:string)=>{const next=new URLSearchParams(params);next.set('variant',value);setParams(next)}
  const t={current:fr?'Rapport actuel':'Báo cáo hiện tại',experimental:fr?'Rapport expérimental':'Báo cáo thử nghiệm',generate:fr?'Générer le rapport expérimental':'Tạo báo cáo thử nghiệm',
@@ -47,6 +54,8 @@ export function ParallelReports({current,account,enabled,children}:{current:Hist
  const older=data?.versions?.filter(v=>v.id!==row?.id)??[]
  const analysed=stats?.scope.analysed_text_reviews??data?.tasks.filter(x=>x.phase==='jev'&&['completed','reused'].includes(x.status)).length??0
  const state=data?.run?.status??row?.state
+ const startFailed=start.isError&&!row&&!data?.run
+ const stages:Record<string,string>=fr?{jev:'Classification JEV',prepare_evidence:'Préparation des preuves',sol:'Rédaction Sol',validate_sol:'Contrôles et sauvegarde'}:{jev:'Phân loại JEV',prepare_evidence:'Chuẩn bị bằng chứng',sol:'Soạn báo cáo Sol',validate_sol:'Kiểm tra và lưu'}
  const meta=<dl className="parallel-metadata"><div><dt>{t.date}</dt><dd>{date(row?.generated_at)}</dd></div><div><dt>{t.scope}</dt><dd>{stats?.scope.source_reviews??data?.current.source_reviews??current?.storedReviewsCount??'—'}</dd></div><div><dt>{t.text}</dt><dd>{analysed} / {data?.current.text_reviews??'—'}</dd></div><div><dt>{t.status}</dt><dd>{state?states[state]??state:t.missing}</dd></div></dl>
  return <>
   {(older.length>0||comparison)&&<label className="parallel-corpus-label">{fr?'Corpus comparé':'Bộ đánh giá được so sánh'}<select value={comparison} onChange={e=>{const next=new URLSearchParams(params);if(e.target.value)next.set('comparison',e.target.value);else next.delete('comparison');setParams(next)}}><option value="">{fr?'Dernier rapport actuel':'Báo cáo hiện tại mới nhất'}</option>{comparison&&!data?.versions?.some(v=>v.id===comparison)&&<option value={comparison} disabled>{fr?'Archive indisponible':'Bản lưu chưa khả dụng'}</option>}{(data?.versions??[]).map(v=><option key={v.id} value={v.id}>{date(v.generated_at??v.created_at)} — {states[v.state]??v.state}</option>)}</select></label>}
@@ -60,12 +69,16 @@ export function ParallelReports({current,account,enabled,children}:{current:Hist
   </div>
   <section id="experimental-report-panel" role="tabpanel" aria-labelledby="experimental-report-tab" hidden={!experimental} className="parallel-experimental">
    <h2>{t.experimental}</h2>{meta}
-   <button className="primary-button full-width" disabled={!enabled||!data?.corpus_reusable||!!row||start.isPending||start.isError} onClick={()=>{if(!start.isPending&&!row&&!launched.current.has(launchScope)){launched.current.add(launchScope);start.mutate()}}}>{start.isPending||active?(fr?'Traitement en cours':'Đang xử lý'):t.generate}</button>
+   <button className="primary-button full-width" disabled={!enabled||!data?.corpus_reusable||!!row||!!data?.run||start.isPending||start.isError} onClick={()=>{if(!start.isPending&&!row&&!launched.current.has(launchScope)){launched.current.add(launchScope);start.mutate()}}}>{start.isPending?(fr?'Préparation du lancement…':'Đang chuẩn bị khởi chạy…'):active?(fr?'Traitement en cours':'Đang xử lý'):t.generate}</button>
    {(!current?.generationId||data&&!data.corpus_reusable)&&<p role="status">{t.unavailable}</p>}
    {q.isPending&&enabled&&current?.generationId&&<p role="status">{fr?'Chargement…':'Đang tải…'}</p>}
-   {(q.isError||start.isError)&&<p role="alert">{t.error}</p>}
-   {active&&<p role="status">{t.background}</p>}
-   {!row&&data&&data.corpus_reusable&&<p>{t.missing}</p>}
+   {start.isPending&&<p role="status">{fr?'Vérification et enregistrement du corpus avant la mise en file.':'Đang kiểm tra và lưu bộ đánh giá trước khi đưa vào hàng đợi.'}</p>}
+   {q.isError&&<p role="alert">{fr?'Impossible de lire l’état enregistré.':'Không thể đọc trạng thái đã lưu.'}</p>}
+   {startFailed&&<p role="alert">{start.error.message==='PARALLEL_START_UNCERTAIN'?t.error:fr?'Le lancement a échoué lors de la préparation ou de la mise en file.':'Khởi chạy thất bại trong bước chuẩn bị hoặc đưa vào hàng đợi.'} <span className="parallel-audit-id">{start.error.message}</span></p>}
+   {(q.isError||startFailed)&&<button onClick={()=>void q.refetch()}>{fr?'Vérifier l’état enregistré (sans nouvel appel IA)':'Kiểm tra trạng thái đã lưu (không gọi AI mới)'}</button>}
+   {active&&<p role="status">{stages[data!.run!.stage]??(fr?'Traitement serveur':'Máy chủ đang xử lý')} — {analysed} / {data?.current.text_reviews}. {t.background}</p>}
+   {data?.run&&<p className="parallel-audit-id">{fr?'Lancement':'Lượt chạy'} : {data.run.id}</p>}
+   {!row&&!data?.run&&!start.isPending&&!startFailed&&data&&data.corpus_reusable&&<p>{t.missing}</p>}
    {row&&(row.error_code||data?.run?.error_code)&&<p role="alert" className="parallel-audit-id">{row.error_code??data?.run?.error_code}</p>}
    {row&&analysed<(data?.current.text_reviews??analysed)&&<p role="status">{fr?'Couverture partielle : les résultats manquants ne sont pas classés comme neutres ou non mentionnés.':'Phạm vi phân tích chưa đầy đủ: kết quả còn thiếu không được tính là trung lập hoặc không đề cập.'}</p>}
    {row&&<ExperimentalReport key={row.id} row={row} operation={data?.operation} methodology={t.note}/>}
