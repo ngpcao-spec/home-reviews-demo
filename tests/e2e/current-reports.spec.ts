@@ -21,5 +21,3 @@ for(const language of ['fr','vi'])test(`current V2 ${language}: archived Sol, ne
  await page.getByRole('button',{name:'NORMAL GENERATE MOCK'}).click();await expect(page.getByRole('button',{name:'NORMAL GENERATE MOCK'})).toHaveAttribute('data-clicked','yes')
  await page.reload();await expect(tab).toHaveAttribute('aria-selected','true');expect(mutations).toEqual([])
 })
-
-

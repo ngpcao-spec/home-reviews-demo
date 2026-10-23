@@ -71,6 +71,3 @@ begin
 end $test$;
 select current_setting('home_reviews.current_sql_result')::jsonb result;
 rollback;
-
-
-

@@ -4,7 +4,7 @@
 import type {SupabaseClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {prepareHistoricalSnapshot,type HistoricalJob} from './historical-report-worker.ts';
 import {parallelProtocol,CURRENT_V2,type ParallelCurrent,type ParallelHistory} from './parallel-report.ts';
-export const CURRENT_REPORT_CODE='a39d549139b401f287a1620591b0d9dce215e269';
+export const CURRENT_REPORT_CODE='bdbc5d541968adf8810cdea90fdd24f26cb1ca97';
 export async function currentReportProtocol(run:HistoricalJob){
  const base=run.snapshot.base,reviews=run.snapshot.reviews;
  if(run.engine!=='jev_sol_v2'||!run.request_id||!run.requested_by||!base||!reviews?.length||base.organization_id!==run.organization_id||base.establishment_id!==run.establishment_id)throw Error('CURRENT_V2_SOURCE_MISSING');
