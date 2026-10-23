@@ -1,5 +1,6 @@
 import {it,expect,vi} from 'vitest';
-import {parallelProtocol,verifyParallelProtocol,deriveReferenceLinks,validateParallelReport,parallelExecutionContract,PARALLEL_REPORT} from '../../supabase/functions/_shared/parallel-report';
+import {parallelProtocol,verifyParallelProtocol,deriveReferenceLinks,validateParallelReport,parallelExecutionContract,PARALLEL_REPORT,parallelSolEnvelope,measureParallelSolEnvelope} from '../../supabase/functions/_shared/parallel-report';
+import {directCanonical} from '../../supabase/functions/_shared/jev-direct-categories';
 import {shortJev} from '../../supabase/functions/_shared/direct4-short-comparison';
 import {directHash} from '../../supabase/functions/_shared/jev-direct-categories';
 import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
@@ -24,6 +25,24 @@ it('persists the native compact response separately and reconstructs exact sourc
  const o=out.report.recommendations[0].observations[0],e=r.ready.body.evidence.find(e=>e.evidence_id===o.evidence_id)!;
  expect(o.quote).toBe(e.quote);expect(o.quote_sha256).toBe(e.quote_sha256);expect(out.source_reconstruction).toMatchObject({generated_text_changed:false,manifest_sha256:r.ready.body.compact_wire_sha256});
  expect(JSON.stringify(out.compact_response)).not.toContain('quote_sha256');expect(r.operation.request_count).toBe(1);
+});
+it('persists the free envelope before tokenization without changing any final request bytes or controls',async()=>{
+ const {p}=await fixture(),r=await rehearseParallel({...p,id:id()}),envelope=await parallelSolEnvelope(r.state);
+ expect(envelope.body).not.toHaveProperty('measurement');expect(envelope.body).not.toHaveProperty('token_certificate');
+ const persisted={body:JSON.parse(directCanonical(envelope.body)),sha256:envelope.sha256},ready=await measureParallelSolEnvelope(persisted);
+ expect(ready.body.request_json).toBe(r.ready.body.request_json);expect(directCanonical(ready.body)).toBe(directCanonical(r.ready.body));
+ persisted.body.request_json+=' ';await expect(measureParallelSolEnvelope(persisted)).rejects.toThrow('PARALLEL_SOL_ENVELOPE_CHANGED');
+});
+it('uses the sealed server certificate without removing raw-response, source or native-result checks',async()=>{
+ const {p}=await fixture(),r=await rehearseParallel({...p,id:id()}),s=r.state,body={version:'parallel-runtime-certificate-v1',protocol_id:s.protocol.id,protocol_sha256:s.protocol.sha256,
+  organization_id:p.body.organization_id,establishment_id:p.body.establishment_id,authority_user_id:p.body.authority_user_id,
+  source_snapshot_sha256:p.body.source_snapshot_sha256,configuration_sha256:p.body.configuration_sha256,pending_sha256:p.body.pending_sha256};
+ const c={...body,body,sha256:await directHash(body)};
+ const envelope=await parallelSolEnvelope(s,c);expect(directCanonical(envelope)).toBe(directCanonical(await parallelSolEnvelope(s)));
+ await expect(parallelSolEnvelope(s,{...c,organization_id:id()})).rejects.toThrow('PARALLEL_RUNTIME_CERTIFICATE_CHANGED');
+ const changed=structuredClone(s),a=changed.artifacts.find(a=>a.kind.startsWith('task:'))!,native=a.body.direct4_result as {categories:{service:{classification:string;native_choice:string}}};
+ native.categories.service.classification='negative';native.categories.service.native_choice='negative';a.sha256=await directHash(a.body);
+ await expect(parallelSolEnvelope(changed,c)).rejects.toThrow('JEV_DIRECT_RESULT_CHANGED');
 });
 it.each(['timeout','429','500','invalid'])('keeps one shared supplier attempt on %s, never fallback/retry',async kind=>{const {p}=await fixture(),pending=p.body.pending[0],task={id:id(),run_id:id(),organization_id:p.body.organization_id,phase:'jev',review_id:pending.review_id,request:pending.payload,request_sha256:pending.request_sha256,identity:pending.identity,status:'running',request_count:1} as RestaurantTask;
  const state={protocol:{id:id(),body:p.body,sha256:p.sha256},run:{id:task.run_id},artifacts:[]} as unknown as RestaurantState;

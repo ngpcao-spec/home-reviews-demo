@@ -47,3 +47,39 @@ as a separate administrative SQL operation; maximum individual SQL claim was
 
 JEV short instructions, category choices, selector, compact Sol prompt,
 thresholds, production reports and Sol call limit remain unchanged.
+
+The next continuation retained another 40 complete responses (318 distinct
+responses total), then stopped before the next reservation. The deployed SQL
+log identified the prior-attempt lookup, not dispatch: its generic plan joined
+historical large protocol JSON before filtering a review. An indexed,
+materialized candidate lookup now performs bounded primary-key probes instead.
+With force_generic_plan, all 208 remaining SQL reservations completed in a
+rollback test, maximum 49.719 ms. An injected unknown reservation was refused;
+no dispatch occurred and the source run hash was unchanged. Eight concurrent
+deployed PostgREST checks returned without error (maximum 221.7 ms including
+network). Test archive: 86290357-102c-45fa-9ea7-dc7b7b711f8e.
+
+Full-size qualification also exposed an Edge CPU limit during free Sol
+preparation (2,580 ms, CPUTime). The free envelope and its token measurement
+are now separate durable wakes. The server loads the immutable source
+certificate itself; runtime still hashes the entire protocol and checks each
+actual response, source text and native result, without repeating the sealed
+per-request preparation checks. The selector memoizes only normalized word
+sets within one invocation. On 526 frozen reviews / 1,438 candidate
+associations, baseline and optimized selections and diagnostics were exactly
+equal (32 associations, unchanged selector hash). Local selector CPU fell
+from 1.359 s to 0.437 s; this is not a semantic quality assessment.
+
+Deployed worker v48 qualified the same 610/526 source size through the actual
+RPCs with explicit technical mock transport and zero supplier calls:
+- envelope: archive 807c822c-68cb-4c16-b41e-5e91920da8d5, 1,929 ms Edge CPU,
+  58,647,751 bytes recorded memory, normal EarlyDrop shutdown;
+- token measurement/persistence: 12cced42-8690-4080-95d2-3e0ec256f63d,
+  1,195 ms Edge CPU, 110,821,539 bytes memory; prepare RPC 3,772 ms wall;
+- mock Sol receipt: 3e575665-d164-4fb5-b101-d6af481d247c;
+- validation and final save: 4ee3cc47-af57-4856-a84c-7315efde21d9,
+  technical_checks_passed true, one mock reservation, zero supplier calls.
+
+The qualification run is excluded from paid caches and publication. Repeated
+terminal wakes cannot dispatch a second mock call. These tests establish the
+deployed technical path, not future supplier success or report truthfulness.

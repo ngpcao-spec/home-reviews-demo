@@ -19,7 +19,7 @@ import {
 } from "./jev-pilot-core.ts";
 import type { EconomyCache } from "./jev-economy-cache.ts";
 import { parseReviewV3 } from "./pilot-evidence-v3.ts";
-import { nearDuplicate } from "./pilot-evidence-v3-audit.ts";
+import { nearDuplicateMemo } from "./pilot-evidence-v3-audit.ts";
 import { negativeHash } from "./negative-validation-core.ts";
 import { canonicalJson } from "./jev-exploratory-core.ts";
 import type { ThemeKey } from "./jev-themes.ts";
@@ -288,7 +288,7 @@ export function selectBalancedEvidence<T extends BalancedSelectionInput>(
     eligible = candidates.filter((c) =>
       c.quality.eligible && c.status !== "explicitly_contested"
     );
-  const duplicates = new Map<string, boolean>();
+  const duplicates = new Map<string, boolean>(),nearDuplicate=nearDuplicateMemo();
   const sameQuote = (a: T, b: T) => {
     const key = [a.evidence_id, b.evidence_id].sort().join(":");
     if (!duplicates.has(key)) {

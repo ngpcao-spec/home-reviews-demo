@@ -13,8 +13,10 @@ import type {Direct4Ready} from './jls-direct4-execution.ts';
 import type {DirectReportPreparation} from './jev-direct-report-preparation.ts';
 import {directHash} from './jev-direct-categories.ts';
 import {assertEvidence40ActiveUser} from './decisions-evidence40-auth.ts';
-import {PARALLEL_REPORT,parallelExecutionContract} from './parallel-report.ts';
-export async function restaurantSqlQualification(admin:SupabaseClient,input:{qualification_id:string;phase:string}){
+import {PARALLEL_REPORT,parallelExecutionContract,compileParallelSol,parallelReadyContract} from './parallel-report.ts';
+import {mockParallelResponse} from './parallel-report-probe.ts';
+import {prepareParallelSolStep} from './parallel-report-server.ts';
+export async function restaurantSqlQualification(admin:SupabaseClient,input:{qualification_id:string;phase:string;source_run_id?:string}){
  const q=await admin.from('analysis_jls_sql_qualifications').select('*').eq('id',input.qualification_id).single();
  if(q.error||Date.parse(q.data.expires_at)<=Date.now())throw Error('JLS_SQL_QUALIFICATION_INVALID');
  const p=await admin.from('analysis_jls_restaurant_protocols').select('authority_user_id').eq('id',q.data.protocol_id).single();
@@ -27,6 +29,17 @@ export async function restaurantSqlQualification(admin:SupabaseClient,input:{qua
   };
   const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;
  }});
+ if(input.phase==='compile_parallel'){
+  const scope=await measured.rpc('is_jls_sql_qualification',{p_run:q.data.run_id});if(scope.error||scope.data!==true)throw Error('JLS_SQL_QUALIFICATION_NOT_MOCK');
+  const result=await prepareParallelSolStep(measured,q.data.run_id);if(result.error)throw Error(result.error);
+  const [run,tasks]=await Promise.all([measured.from('analysis_jls_restaurant_runs').select('status,stage').eq('id',q.data.run_id).single(),measured.from('analysis_jls_restaurant_tasks').select('status,request_count').eq('run_id',q.data.run_id)]);
+  if(run.error||tasks.error)throw Error('JLS_SQL_QUALIFICATION_READ_FAILED');
+  const body={version:'jls-sql-rpc-qualification-v1',qualification_id:q.data.id,run_id:q.data.run_id,phase:input.phase,step:result.phase,protocol_sha256:q.data.protocol_sha256,
+   provider_calls:0,explicit_technical_mock:true,metrics,run_status:run.data.status,stage:run.data.stage,completed_tasks:tasks.data.filter(t=>t.status==='completed').length,
+   request_count:tasks.data.reduce((n,t)=>n+t.request_count,0),execution_id:Deno.env.get('SB_EXECUTION_ID')??null};
+  const saved=await admin.rpc('save_jls_snapshot_preparation',{p_protocol:q.data.protocol_id,p_kind:'sql_qualification_'+q.data.nonce+'_'+input.phase+'_'+body.request_count+'_'+body.stage,p_body:body,p_sha:await directHash(body)});
+  if(saved.error)throw Error('JLS_SQL_QUALIFICATION_METRIC_SAVE_FAILED');return {archive_id:saved.data,...body};
+ }
  const port=restaurantPort(measured),state=await port.load(q.data.run_id),calls:string[]=[];
  if(state.run.consent?.consent_source!=='technical_qualification_no_spending')throw Error('JLS_SQL_QUALIFICATION_NOT_MOCK');
  const prep=state.artifacts.find(a=>a.kind==='direct4_report_preparation')?.body as unknown as DirectReportPreparation|undefined;
@@ -34,7 +47,19 @@ export async function restaurantSqlQualification(admin:SupabaseClient,input:{qua
  const contract:RestaurantExecutionContract={...(parallel?parallelExecutionContract:historicalDirect4Contract(prep)),technicalMockTransport:true};
  const mock:typeof fetch=parallel?()=>{calls.push('EXPLICIT_TECHNICAL_MOCK_JEV');return Promise.resolve(new Response(JSON.stringify({model:'jev-1.13.0',usage:{input_tokens:1,output_tokens:1,total_tokens:2},answers:Object.fromEntries(['service','price','quality','ambiance'].map(k=>[k,{type:'choice',choice:'positive'}]))})));}:historicalMockHttp(state,calls),key='EXPLICIT_MOCK_NO_PROVIDER';
  let lock_observation:unknown=null;
- if(input.phase==='bind_evidence'){
+ if(input.phase==='prior_scan'){
+  if(!parallel||!input.source_run_id)throw Error('PARALLEL_PRIOR_PROBE_SCOPE_REQUIRED');
+  const r=await measured.from('analysis_jls_restaurant_runs').select('protocol_id,organization_id').eq('id',input.source_run_id).single();
+  if(r.error||r.data.organization_id!==q.data.organization_id)throw Error('FORBIDDEN');
+  const p=await measured.from('analysis_jls_restaurant_protocols').select('body->>source_snapshot_sha256,body->>classification_configuration_sha256,establishment_id').eq('id',r.data.protocol_id).single();
+  const frozen=state.protocol.body as unknown as {source_snapshot_sha256:string;classification_configuration_sha256:string};
+  if(p.error||p.data.source_snapshot_sha256!==frozen.source_snapshot_sha256||p.data.classification_configuration_sha256!==frozen.classification_configuration_sha256||p.data.establishment_id!==state.protocol.body.establishment_id)throw Error('PARALLEL_PRIOR_PROBE_SOURCE_CHANGED');
+  const tasks=await measured.from('analysis_jls_restaurant_tasks').select('id').eq('run_id',input.source_run_id).eq('status','pending').order('task_key').limit(8);
+  if(tasks.error||!tasks.data.length)throw Error('PARALLEL_PRIOR_PROBE_TASKS_MISSING');
+  const scans=await Promise.all(tasks.data.map(t=>measured.rpc('parallel_prior_attempt_conflict',{p_run:input.source_run_id,p_task:t.id})));
+  if(scans.some(s=>s.error||s.data!==false))throw Error('PARALLEL_PRIOR_PROBE_CONFLICT');
+  lock_observation={source_run_id:input.source_run_id,concurrent_read_only_checks:scans.length,conflicts:0};
+ }else if(input.phase==='bind_evidence'){
   const fixture=await measured.from('analysis_jls_snapshot_preparations').select('body,sha256')
    .eq('protocol_id',q.data.protocol_id).eq('kind','sql_fixture_evidence_'+q.data.id).single();
   if(fixture.error)throw Error('JLS_SQL_EVIDENCE_FIXTURE_MISSING');
@@ -87,9 +112,9 @@ export async function restaurantSqlQualification(admin:SupabaseClient,input:{qua
   const sp=solReadyPort(measured),s=await sp.load(op.data.id);
   const http:typeof fetch=async(url,options)=>{
    if(String(url)!=='https://api.openai.com/v1/responses'||options?.body!==s.ready.body.request_json)throw Error('JLS_SQL_MOCK_WIRE_CHANGED');
-   calls.push('EXPLICIT_MOCK_SOL');return new Response(JSON.stringify(direct4MockSolResponse(s.ready as unknown as Direct4Ready)));
+   calls.push('EXPLICIT_MOCK_SOL');return new Response(JSON.stringify(parallel?{id:'EXPLICIT_TECHNICAL_MOCK',model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:1,output_tokens:1,total_tokens:2},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(mockParallelResponse(s.ready as unknown as Awaited<ReturnType<typeof compileParallelSol>>))}]}]}:direct4MockSolResponse(s.ready as unknown as Direct4Ready)));
   };
-  await processReadySol(sp,op.data.id,key,http,historicalDirect4ReadyContract);
+  await processReadySol(sp,op.data.id,key,http,parallel?parallelReadyContract:historicalDirect4ReadyContract);
  }else throw Error('JLS_SQL_QUALIFICATION_PHASE_INVALID');
  const after=await port.load(state.run.id);
  const body={version:'jls-sql-rpc-qualification-v1',qualification_id:q.data.id,run_id:state.run.id,phase:input.phase,

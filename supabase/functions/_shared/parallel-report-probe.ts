@@ -7,7 +7,7 @@ import {DIRECT_CATEGORY_KEYS,directHash,parseDirectCategoriesRounded} from './je
 import {DIRECT_CANDIDATE_EMPTY} from './jev-direct-report-preparation.ts';
 import {analysisTextSha256} from './analysis-text.ts';
 import {COMPACT_SOL_WIRE} from './parallel-sol-wire.ts';
-function mockParallelResponse(ready:Awaited<ReturnType<typeof compileParallelSol>>){
+export function mockParallelResponse(ready:Awaited<ReturnType<typeof compileParallelSol>>){
  const e=ready.body.evidence,manifest=ready.body.compact_wire;
  if(manifest)return {format_version:COMPACT_SOL_WIRE,report:{categories:DIRECT_CATEGORY_KEYS.map(category=>({category,
   text:e.some(e=>e.category===category)?'EXPLICIT TECHNICAL MOCK, NOT A NEW QUALITY EVALUATION.':DIRECT_CANDIDATE_EMPTY,
