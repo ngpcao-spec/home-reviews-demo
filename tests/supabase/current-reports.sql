@@ -34,6 +34,14 @@ begin
  assert exists(select 1 from public.report_generation_requests where id=req and comparison_id=pair),'binding missing';tests=tests+1;
  assert (select count(*) from public.analysis_jls_restaurant_tasks where run_id=rid and phase='jev')=(p->>'max_jev_calls')::int,'wrong task count';tests=tests+1;
  assert not exists(select 1 from public.analysis_jls_restaurant_tasks where run_id=rid and phase='luna'),'Luna queued';tests=tests+1;
+ -- Full-cache regression: known immutable receipts are reused, even when an
+ -- older independent reservation is uncertain. No supplier may be reserved.
+ assert public.claim_jls_restaurant_tick(rid,'EXPLICIT_SQL_CACHE_MOCK'),'cache lease failed';step=clock_timestamp();
+ while exists(select 1 from public.analysis_jls_restaurant_tasks where run_id=rid and status='pending') loop
+  assert public.claim_jls_restaurant_task(rid,'EXPLICIT_SQL_CACHE_MOCK') is null,'unexpected supplier reservation';
+ end loop;
+ timings=timings||jsonb_build_object('all_cache_claim_ms',extract(epoch from clock_timestamp()-step)*1000);
+ assert (select count(*) from public.analysis_jls_restaurant_tasks where run_id=rid and status='reused')=(p->>'max_jev_calls')::int,'cache reuse incomplete';tests=tests+2;
  assert not has_function_privilege('authenticated','public.enqueue_current_report(uuid,uuid,uuid,text,uuid,text,integer)','EXECUTE'),'client can forge scope';tests=tests+1;
  assert not has_table_privilege('authenticated','public.report_generation_requests','INSERT'),'client can write intents';tests=tests+1;
  perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);set local role authenticated;
