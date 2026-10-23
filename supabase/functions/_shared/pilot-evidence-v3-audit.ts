@@ -170,6 +170,14 @@ export function nearDuplicate(a: string, b: string) {
     inter = [...x].filter((w) => y.has(w)).length;
   return inter / Math.max(1, x.size + y.size - inter) >= 0.85;
 }
+// Invocation-local acceleration only: same words, Jaccard formula and threshold.
+// Historical audit callers keep using nearDuplicate above unchanged.
+export function nearDuplicateMemo(){
+ const words=new Map<string,Set<string>>();
+ const get=(text:string)=>{let value=words.get(text);if(!value){value=normalizedWords(text);words.set(text,value)}return value;};
+ return (a:string,b:string)=>{const x=get(a),y=get(b);let inter=0;for(const word of x)if(y.has(word))inter++;
+  return inter/Math.max(1,x.size+y.size-inter)>=0.85;};
+}
 export function selectV3Proofs(checks: V3Binding[]) {
   const supported = checks.filter((c) =>
       c.status === "supported_by_rule" && c.statement?.actionable

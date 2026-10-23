@@ -1,7 +1,7 @@
 // Future direct-four selections only. Native classifications and source evidence
 // are inputs, never rewritten. The historical selector remains unchanged.
 import {selectBalancedEvidence,balancedSelectorHash} from './jev-hybrid-balanced.ts';
-import {nearDuplicate} from './pilot-evidence-v3-audit.ts';
+import {nearDuplicateMemo} from './pilot-evidence-v3-audit.ts';
 import {DIRECT_CATEGORY_KEYS,directHash} from './jev-direct-categories.ts';
 import type {DirectReportEvidence} from './jev-direct-report-preparation.ts';
 
@@ -17,6 +17,7 @@ export async function directCoverageSelectorHash(){return directHash({policy:DIR
  base_selector_sha256:await balancedSelectorHash(),algorithm:'negative_categories_then_atomic_mixed_bundles_in_legacy_order_then_stable_remaining_v1'});}
 
 export function selectDirectCoverage(candidates:DirectReportEvidence[],max=32){
+ const nearDuplicate=nearDuplicateMemo();
  if(!Number.isInteger(max)||max<0||max>DIRECT_COVERAGE_POLICY.max_evidence)throw Error('DIRECT_SELECTION_BUDGET_INVALID');
  const seen=new Set<string>(),keys=new Set<string>();
  for(const e of candidates){const key=[e.review_id,e.category,e.polarity].join(':');

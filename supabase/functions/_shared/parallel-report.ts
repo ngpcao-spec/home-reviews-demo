@@ -50,6 +50,19 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
  return {body,sha256:await directHash(body)};
 }
 export type ParallelProtocol=Awaited<ReturnType<typeof parallelProtocol>>['body'];
+export interface ParallelRuntimeCertificate {protocol_id:string;protocol_sha256:string;organization_id:string;establishment_id:string;authority_user_id:string;body:Record<string,unknown>;sha256:string}
+// The server loads this immutable certificate itself; it is never client input.
+// It attests the full source/request checks at sealing. Keep checking the whole
+// protocol hash and every actual task payload/receipt in the shared worker.
+export async function verifyParallelRuntime(p:ParallelProtocol,sha:string,protocolId:string,c:ParallelRuntimeCertificate){
+ if(c.protocol_id!==protocolId||c.protocol_sha256!==sha||c.organization_id!==p.organization_id||c.establishment_id!==p.establishment_id||c.authority_user_id!==p.authority_user_id||
+  c.body.version!=='parallel-runtime-certificate-v1'||c.body.protocol_id!==protocolId||c.body.protocol_sha256!==sha||c.body.organization_id!==p.organization_id||c.body.establishment_id!==p.establishment_id||c.body.authority_user_id!==p.authority_user_id||
+  c.body.source_snapshot_sha256!==p.source_snapshot_sha256||c.body.configuration_sha256!==p.configuration_sha256||c.body.pending_sha256!==p.pending_sha256||c.sha256!==await directHash(c.body))throw Error('PARALLEL_RUNTIME_CERTIFICATE_CHANGED');
+ if(await directHash(p)!==sha||p.version!==PARALLEL_REPORT||p.classification_configuration_sha256!==await directHash(SHORT_CLASSIFIER_CONFIG)||
+  p.max_luna_calls!==0||p.max_sol_calls!==1||p.max_apify_calls!==0||p.automatic_retry!==false||p.production_enabled!==false||
+  p.configuration.sol_wire_version!==undefined&&p.configuration.sol_wire_version!==COMPACT_SOL_WIRE||p.configuration.evidence_selector!==undefined&&(p.configuration.evidence_selector.version!==DIRECT_COVERAGE_VERSION||p.configuration.evidence_selector.sha256!==await directCoverageSelectorHash())||
+  await directHash(p.sol_size_policy)!==await directHash(SOL_SIZE_POLICY))throw Error('PARALLEL_PROTOCOL_CHANGED');
+}
 export async function verifyParallelProtocol(p:ParallelProtocol,sha:string){
  if(p.configuration.evidence_selector!==undefined&&(p.configuration.evidence_selector.version!==DIRECT_COVERAGE_VERSION||
   p.configuration.evidence_selector.sha256!==await directCoverageSelectorHash()))throw Error('PARALLEL_EVIDENCE_SELECTOR_CHANGED');
@@ -71,14 +84,16 @@ export const parallelExecutionContract:RestaurantExecutionContract={frozenAnalys
  verify:(p,sha)=>verifyParallelProtocol(p as unknown as ParallelProtocol,sha),
  parseJev:(_s,_t,raw)=>{const result=parseDirectCategoriesRounded(raw);if(result.model!=='jev-1.13.0')throw Error('PARALLEL_SERVED_MODEL_CHANGED');return Promise.resolve({direct4_result:result});},
  completed:async(s,w,port)=>{if(s.run.stage!=='jev'||!await port.stage(s.run.id,w,'prepare_evidence',[]))throw Error('PARALLEL_STAGE_CHANGED');}};
-export async function compileParallelSol(s:RestaurantState){
- const p=asParallel(s);await verifyParallelProtocol(p,s.protocol.sha256);
+export async function parallelSolEnvelope(s:RestaurantState,runtime?:ParallelRuntimeCertificate){
+ const p=asParallel(s);if(runtime)await verifyParallelRuntime(p,s.protocol.sha256,s.protocol.id,runtime);else await verifyParallelProtocol(p,s.protocol.sha256);
  const rows:DirectReportInput['dataset']['body']['reviews']=[];
  for(const t of s.tasks.filter(t=>t.phase==='jev')){
   const r=p.source_snapshot.reviews.find(r=>r.id===t.review_id),a=s.artifacts.find(a=>a.kind==='task:'+t.id);
-  if(!r?.analysis_text||!['completed','reused'].includes(t.status)||!a||a.sha256!==await directHash(a.body)||typeof a.body.raw_response_text!=='string'||await analysisTextSha256(a.body.raw_response_text)!==a.body.raw_response_sha256)throw Error('PARALLEL_JEV_INCOMPLETE');
-  const result=parseDirectCategoriesRounded(JSON.parse(a.body.raw_response_text));
-  if(result.model!=='jev-1.13.0'||directCanonical(result)!==directCanonical(a.body.direct4_result))throw Error('PARALLEL_JEV_RESULT_CHANGED');
+  if(!r?.analysis_text||!['completed','reused'].includes(t.status)||!a||a.sha256!==await directHash(a.body)||typeof a.body.raw_response_text!=='string')throw Error('PARALLEL_JEV_INCOMPLETE');
+  const result=a.body.direct4_result as ReturnType<typeof parseDirectCategoriesRounded>;
+  if(!result||result.model!=='jev-1.13.0')throw Error('PARALLEL_JEV_RESULT_CHANGED');
+  // verifyDirectReportSources below parses the raw response, checks its hash,
+  // compares the complete native result and checks every frozen text. Do it once.
   rows.push({review_id:r.id,organization_id:p.organization_id,establishment_id:p.establishment_id,analysis_text:r.analysis_text,analysis_text_sha256:r.analysis_text_sha256!,analysis_language:r.analysis_language??'und',
    result,result_sha256:await directHash(result),raw_response_text:a.body.raw_response_text,response_raw_sha256:String(a.body.raw_response_sha256),translation_source:r.analysis_source,
    translation_provenance:r.translation_provenance,receipt_id:t.id});
@@ -102,7 +117,7 @@ export async function compileParallelSol(s:RestaurantState){
  const prompt=compact?.prompt??(p.language==='fr'?candidateInstructions(b.statistics.scope).replaceAll('in Vietnamese','in French')+'\nWrite all restaurateur-facing prose in French. Keep schema keys unchanged.':candidateInstructions(b.statistics.scope));
  const {$schema:_,...schema}=z.toJSONSchema(compact?compactSolResponse:directReportResponse);
  const request={model:'gpt-6.1-sol',reasoning:{effort:'low'},max_output_tokens:SOL_SIZE_POLICY.max_output_tokens,input:[{role:'system',content:prompt},{role:'user',content:JSON.stringify(packet)}],text:{format:{type:'json_schema',name:compact?'jls_direct4_compact_sol_v1':'jls_direct_categories4_report_v1',strict:true,schema}}};
- const memo=await attachPlanTokenMemo(packet),measurement=solRequestSize(request,SOL_SIZE_POLICY,memo.count),cert=await tokenCertificate(packet),request_json=JSON.stringify(request);
+ const request_json=JSON.stringify(request);
  const classification_sources=s.tasks.filter(t=>t.phase==='jev').map(t=>{const a=s.artifacts.find(a=>a.kind==='task:'+t.id)!;return {task_id:t.id,review_id:t.review_id,artifact_sha256:a.sha256,result_sha256:rows.find(r=>r.review_id===t.review_id)!.result_sha256,reused:t.status==='reused'};});
  // Raw classifications already live in immutable task receipts. Bind their
  // manifest instead of copying all 75/100/500 raw answers into each Sol wake.
@@ -111,9 +126,17 @@ export async function compileParallelSol(s:RestaurantState){
   ...(b.selection.coverage_diagnostics?{coverage_diagnostics:b.selection.coverage_diagnostics}:{})};
  const body={version:PARALLEL_REPORT,source_protocol_id:s.protocol.id,source_protocol_sha256:s.protocol.sha256,source_run_id:s.run.id,dataset:dataset_manifest,classification_sources,classification_sources_sha256:await directHash(classification_sources),statistics:b.statistics,statistics_sha256:b.statistics_sha256,
   evidence,selection,packet,...(compact?{compact_wire:compact.manifest,compact_wire_sha256:compact.manifest_sha256}:{}),prompt_sha256:await analysisTextSha256(prompt),schema_sha256:await directHash(schema),request_json,
-  request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json),measurement,token_certificate:cert,token_certificate_sha256:await directHash(cert)};
+  request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json)};
  return {body,sha256:await directHash(body)};
 }
+export async function measureParallelSolEnvelope(envelope:Awaited<ReturnType<typeof parallelSolEnvelope>>){
+ const b=envelope.body,request=JSON.parse(b.request_json);
+ if(b.version!==PARALLEL_REPORT||envelope.sha256!==await directHash(b)||b.request_raw_sha256!==await analysisTextSha256(b.request_json)||b.request_sha256!==await directHash(request))throw Error('PARALLEL_SOL_ENVELOPE_CHANGED');
+ const memo=await attachPlanTokenMemo(b.packet),measurement=solRequestSize(request,SOL_SIZE_POLICY,memo.count),cert=await tokenCertificate(b.packet);
+ const body={...b,measurement,token_certificate:cert,token_certificate_sha256:await directHash(cert)};
+ return {body,sha256:await directHash(body)};
+}
+export async function compileParallelSol(s:RestaurantState){return await measureParallelSolEnvelope(await parallelSolEnvelope(s));}
 export type ParallelReady=Awaited<ReturnType<typeof compileParallelSol>>;
 type Report=ReturnType<typeof directReportResponse.parse>;
 // Conservative link-only derivation: no free-text rewriting or replacement IDs.
