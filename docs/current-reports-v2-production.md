@@ -30,7 +30,7 @@ La transaction de mise en file reconnaît exclusivement ce certificat serveur
 immuable exact ; elle ne supprime aucun contrôle de compatibilité. Les tableaux
 et protocoles candidats du cache sont matérialisés pour éviter leurs lectures
 répétées. Sur 610 avis /526 textes réels : préparation SQL mesurée entre 6,7 et
-9,8 secondes ; mise en file entre 7,3 et 7,9 secondes après correction (10,3
+9,8 secondes ; mise en file entre 7,3 et 15,3 secondes selon la charge (10,3
 secondes avant). Ces deux RPC gratuits ont une limite locale de 20 secondes,
 sans modification des délais globaux. Leurs transactions n'appellent aucun IA.
 
@@ -93,3 +93,18 @@ sur erreur vers un autre fournisseur ou vers l'ancien moteur.
 Les mocks vérifient les raccordements et contrôles techniques ; ils ne constituent
 pas une nouvelle évaluation de la qualité rédactionnelle ou sémantique de Sol.
 Aucune génération payante n'est nécessaire pour cette mise en production.
+
+## Réutilisation des reçus déjà sauvegardés
+
+La réservation lit d'abord un cache achevé exact. Si son ancienne ligne de cache
+est restée réservée, elle peut réutiliser un reçu fournisseur immuable déjà
+sauvegardé dans une tâche terminée ou réutilisée, avec identité/requête exactes,
+modèle servi, SHA256, télémétrie de réponse réelle et exclusion des mocks.
+L'ancienne réservation incertaine reste intacte. Sans reçu compatible, la garde
+d'issue incertaine empêche toujours tout nouvel envoi.
+
+Le manifeste est indexé une fois par réservation SQL ; les réutilisations sont
+traitées par tranches bornées de 64, avec reprise gratuite au réveil suivant.
+Test SQL réel annulé : 526 reçus réutilisés, zéro nouvelle réservation fournisseur,
+16 assertions, environ 12 secondes cumulées pour toutes les tranches. Les
+classifications et rapports historiques n'ont pas été modifiés.
