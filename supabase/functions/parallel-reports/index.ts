@@ -3,6 +3,7 @@ import {json,preflight} from '../_shared/cors.ts';
 import {parallelProtocol,type ParallelCurrent,type ParallelHistory} from '../_shared/parallel-report.ts';
 // POST read is side-effect free. Only an explicit start action can create a run.
 Deno.serve(async request=>{
+ const requestId=crypto.randomUUID();let stage='read';
  const early=preflight(request);if(early)return early;
  if(request.method!=='POST')return json({error:'METHOD_NOT_ALLOWED'},405);
  try{
@@ -34,9 +35,17 @@ Deno.serve(async request=>{
    if(body.confirmed!==true||body.generation_id!==report.generation_id)throw Error('PARALLEL_EXPLICIT_CURRENT_BUTTON_REQUIRED');
    if(!pair.data){
     if(!reusable)throw Error('PARALLEL_CORPUS_UNAVAILABLE');
+    stage='preparing';
     const p=await parallelProtocol(report as ParallelCurrent,history.data as ParallelHistory,c.user.id,'86d2130e32387e3982619c1a666bb43c7fac006a');
     if(!p.body.pending.length)throw Error('PARALLEL_NO_TEXT');
-    const start=await c.admin.rpc('start_parallel_report',{p_body:p.body,p_sha:p.sha256,p_user:c.user.id});if(start.error)throw Error('PARALLEL_START_REFUSED');
+    // Both RPCs are supplier-free. The immutable certificate prevents repeating
+    // source/request certification inside the atomic queue transaction.
+    const args={p_body:p.body,p_sha:p.sha256,p_user:c.user.id};
+    const prepared=await c.admin.rpc('prepare_parallel_report',args);
+    if(prepared.error){console.error(JSON.stringify({request_id:requestId,stage,sqlstate:prepared.error.code}));throw Error(prepared.error.code==='57014'?'PARALLEL_PREPARATION_TIMEOUT':'PARALLEL_PREPARATION_REFUSED');}
+    stage='starting';
+    const start=await c.admin.rpc('start_parallel_report',args);
+    if(start.error){console.error(JSON.stringify({request_id:requestId,stage,sqlstate:start.error.code}));throw Error(start.error.code==='57014'?'PARALLEL_START_TIMEOUT':'PARALLEL_START_REFUSED');}
    }
   }
   const row=body.action==='read'?pair:await c.client.from('analysis_parallel_reports').select('*').eq('reference_report_id',report.id).eq('reference_generation_id',report.generation_id).eq('language',report.preferred_language).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(1).single();
@@ -53,5 +62,5 @@ Deno.serve(async request=>{
   return json({current:{id:report.id,generation_id:report.generation_id,generated_at:report.generated_at,state:report.ai_status,source_reviews:report.stored_reviews_count,text_reviews:textual,source_fingerprint:report.source_fingerprint},
    corpus_reusable:reusable,unavailable_reason:reusable?null:'PARALLEL_CORPUS_UNAVAILABLE',experimental:row.data,run,tasks,operation,
    reference_report:archived?report:null,versions:versions.data,new_provider_calls:0,provider_calls_only_after_explicit_button:true});
- }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'PARALLEL_REQUEST_FAILED';return json({error:code},code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:409);}
+ }catch(e){const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'PARALLEL_REQUEST_FAILED';return json({error:code,stage,request_id:requestId},code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:409);}
 });
