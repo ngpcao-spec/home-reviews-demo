@@ -1,6 +1,7 @@
 import {requireUser,assertMembership} from '../_shared/auth.ts';
 import {json,preflight} from '../_shared/cors.ts';
 import {parallelProtocol,type ParallelCurrent,type ParallelHistory} from '../_shared/parallel-report.ts';
+import {readCurrentReports} from '../_shared/current-report-read.ts';
 // POST read is side-effect free. Only an explicit start action can create a run.
 Deno.serve(async request=>{
  const requestId=crypto.randomUUID();let stage='read';
@@ -8,6 +9,7 @@ Deno.serve(async request=>{
  if(request.method!=='POST')return json({error:'METHOD_NOT_ALLOWED'},405);
  try{
   const c=await requireUser(request),body=await request.json();
+  if(body.action==='read_current'&&typeof body.establishment_id==='string')return json(await readCurrentReports(c,body));
   if(!['read','start'].includes(body.action)||typeof body.report_id!=='string')return json({error:'INVALID_REQUEST'},400);
   const q=await c.client.from('historical_establishment_reports').select('*').eq('id',body.report_id).single();
   if(q.error||!q.data)throw Error('FORBIDDEN');let report=q.data;

@@ -8,6 +8,7 @@ import { FIRST_V8_SOURCE,FIRST_V8_ESTABLISHMENT } from '../_shared/historical-v8
 import {FIRST_V9_SOURCE,FIRST_V9_ESTABLISHMENT} from '../_shared/historical-v9-core.ts'
 import {FIRST_V10_SOURCE,FIRST_V10_ESTABLISHMENT,FIRST_V10_AUDIT,V10_CONFIG} from '../_shared/historical-v10-core.ts'
 import {FIRST_V11_SOURCE,FIRST_V11_ESTABLISHMENT,FIRST_V11_AUDIT,V11_CONFIG} from '../_shared/historical-v11-core.ts'
+import {currentHistoricalStatus} from '../_shared/current-report-status.ts'
 
 // This endpoint only enqueues. No provider/AI call and no review pagination.
 Deno.serve(async request => {
@@ -26,12 +27,18 @@ Deno.serve(async request => {
     await assertMembership(context.client,context.user.id,e.organization_id,['owner','admin','manager'])
     if(pe || !['fr','vi'].includes(profile?.preferred_language)) return json({error:'PREFERRED_LANGUAGE_REQUIRED'},400)
     if(body.preferred_language && body.preferred_language!==profile.preferred_language) return json({error:'REPORT_LANGUAGE_CHANGED'},409)
+    if(body.action==='capability'){
+      const c=await context.client.from('report_pipeline_settings').select('engine,updated_at').eq('id',true).single();if(c.error)throw Error('REPORT_ROUTING_UNAVAILABLE');
+      return json({routing:c.data,v2:'jev-short-sol-compact-v2',provider_calls:0});
+    }
     // Older clients may still send continuation calls: they become read-only.
     if(body.generation_id) {
       const {data:run,error}=await context.admin.from('historical_report_runs').select('*').eq('organization_id',e.organization_id)
         .eq('establishment_id',e.id).eq('language',profile.preferred_language).eq('generation_id',body.generation_id).maybeSingle()
       if(error) throw new Error('REPORT_RUN_READ_FAILED')
       if(!run) return json({error:'REPORT_GENERATION_CHANGED'},409)
+      const projection=await currentHistoricalStatus(context.admin,run);
+      if('engine' in projection&&projection.engine==='jev_sol_v2')return json({pending:['queued','running','retry'].includes(run.status),run:projection});
       if(run.status==='completed') {
         const {data:report,error:re}=await context.client.from('historical_establishment_reports').select('*').eq('establishment_id',e.id).eq('preferred_language',profile.preferred_language).maybeSingle()
         if(re) throw new Error('REPORT_READ_FAILED')
@@ -78,11 +85,12 @@ Deno.serve(async request => {
       if(error || !run){const code=['ENGLISH_COVERAGE_REQUIRED','REPORT_OTHER_VERSION_RUNNING','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}
       return json({pending:run.status!=='completed',run:historicalRunStatus(run)},run.status==='completed'?200:202)
     }
-    const {data:run,error}=await context.admin.rpc('enqueue_historical_report',{
-      p_establishment_id:e.id,p_organization_id:e.organization_id,p_user_id:context.user.id,p_language:profile.preferred_language,p_model:newHistoricalModel(),p_analysis_version:CONSULTANT_VERSION,
+    if(typeof body.request_id!=='string'||!/^[a-f0-9-]{36}$/.test(body.request_id))return json({error:'REPORT_CLIENT_UPDATE_REQUIRED'},409)
+    const {data:run,error}=await context.admin.rpc('enqueue_current_report',{
+      p_establishment:e.id,p_organization:e.organization_id,p_user:context.user.id,p_language:profile.preferred_language,p_request:body.request_id,p_legacy_model:newHistoricalModel(),p_legacy_version:CONSULTANT_VERSION,
     })
-    if(error || !run) throw new Error('REPORT_ENQUEUE_FAILED')
-    return json({pending:true,...historicalRunStatus(run),run:historicalRunStatus(run)},202)
+    if(error || !run){const code=['REPORT_PREVIOUS_OUTCOME_UNCERTAIN','REPORT_BILLING_UNCERTAIN_NO_RETRY','REPORT_OTHER_PIPELINE_RUNNING','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}
+    return json({pending:['queued','running','retry'].includes(run.status),run:await currentHistoricalStatus(context.admin,run)},202)
   } catch(error) {
     const code=error instanceof Error && /^[A-Z0-9_]+$/.test(error.message)?error.message:'REPORT_ENQUEUE_FAILED'
     console.warn('HISTORICAL_ENQUEUE_FAILED',{code})

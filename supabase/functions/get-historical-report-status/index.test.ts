@@ -44,7 +44,7 @@ describe('read-only historical run status', () => {
     const body = await response.json()
     expect(body.run).toEqual({establishment_id:'est',preferred_language:'vi',generation_id:'existing-id',status:'running',progress:3,total_steps:5,resumable:false,error_code:null})
     expect(JSON.stringify(body)).not.toContain('Private review text')
-    expect(h.reads.at(-1)).toEqual({table:'historical_report_runs',filters:{organization_id:'org',establishment_id:'est',language:'vi'}})
+    expect(h.reads.find(r=>r.table==='historical_report_runs')).toEqual({table:'historical_report_runs',filters:{organization_id:'org',establishment_id:'est',language:'vi'}})
     expect(mocks.assertMembership).toHaveBeenCalledWith(expect.anything(),'user','org',['owner','admin','manager'])
   })
   it.each([['locked',false],['expired',false],['completed',false],['failed',false]] as const)('reports %s without starting any step', async (mode, resumable) => {

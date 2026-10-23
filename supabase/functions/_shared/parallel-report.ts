@@ -19,15 +19,23 @@ export const REFERENCE_DERIVATION='jls-direct4-reference-links-v1';
 type SourceReview=DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown};
 export type ParallelHistory={id:string;organization_id:string;establishment_id:string;generation_id:string;status:string;snapshot:{reviews:Record<string,unknown>[];base:Record<string,unknown>}};
 export type ParallelCurrent={id:string;organization_id:string;establishment_id:string;generation_id:string;preferred_language:string;stored_reviews_count:number;source_fingerprint:string;[key:string]:unknown};
-export async function parallelProtocol(report:ParallelCurrent,history:ParallelHistory,user:string,code:string){
- if(history.status!=='completed'||history.generation_id!==report.generation_id||history.organization_id!==report.organization_id||history.establishment_id!==report.establishment_id||
+export const CURRENT_V2='jev-short-sol-compact-v2';
+export interface CurrentDelivery {version:typeof CURRENT_V2;source_run_id:string;generation_id:string;request_id:string}
+export function validParallelDelivery(p:{production_enabled:boolean;current_delivery?:CurrentDelivery;reference:{historical_run_id:string;generation_id:string};frozen_report:{[key:string]:unknown}}){
+ const d=p.current_delivery;
+ return d? p.production_enabled===true&&d.version===CURRENT_V2&&d.source_run_id===p.reference.historical_run_id&&d.generation_id===p.reference.generation_id&&
+ /^[a-f0-9-]{36}$/.test(d.request_id)&&p.frozen_report.ai_status==='source_frozen':p.production_enabled===false;
+}
+export async function parallelProtocol(report:ParallelCurrent,history:ParallelHistory,user:string,code:string,delivery?:CurrentDelivery){
+ if(history.status!==(delivery?'source_frozen':'completed')||delivery&&(delivery.source_run_id!==history.id||delivery.generation_id!==history.generation_id||delivery.version!==CURRENT_V2)||history.generation_id!==report.generation_id||history.organization_id!==report.organization_id||history.establishment_id!==report.establishment_id||
   !Array.isArray(history.snapshot.reviews)||history.snapshot.reviews.length!==report.stored_reviews_count||!history.snapshot.reviews.length||
   history.snapshot.base.source_fingerprint!==report.source_fingerprint||!['fr','vi'].includes(report.preferred_language)||!/^[a-f0-9]{40}$/.test(code))throw Error('PARALLEL_CORPUS_UNAVAILABLE');
  const reviews=await Promise.all(history.snapshot.reviews.map(async r=>{
-  if(typeof r.id!=='string'||typeof r.analysis_text!=='string'||r.original_text!==null&&typeof r.original_text!=='string'||
-   !!String(r.original_text??'').trim()!==!!r.analysis_text.trim())throw Error('PARALLEL_SOURCE_TEXT_UNAVAILABLE');
+  const original=delivery?(r.original_text??r.text??''):r.original_text??'';
+  if(typeof r.id!=='string'||typeof r.analysis_text!=='string'||typeof original!=='string'||
+   !!String(original).trim()!==!!r.analysis_text.trim())throw Error('PARALLEL_SOURCE_TEXT_UNAVAILABLE');
   return {id:r.id,organization_id:report.organization_id,establishment_id:report.establishment_id,rating:r.rating,
-   original_text:r.original_text??'',original_text_sha256:await analysisTextSha256(String(r.original_text??'')),
+   original_text:original,original_text_sha256:await analysisTextSha256(String(original)),
    analysis_text:r.analysis_text.trim()?r.analysis_text:null,analysis_text_sha256:r.analysis_text.trim()?await analysisTextSha256(r.analysis_text):null,
    analysis_language:r.analysis_language,analysis_source:r.analysis_source,translation_provenance:{historical_run_id:history.id,source:r.analysis_source,original_language:r.original_language,frozen:true,provider_translation_id:null},
    review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,published_at:r.published_at} as SourceReview;
@@ -46,7 +54,7 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
   frozen_report:report,source_snapshot,source_snapshot_sha256:await directHash(source_snapshot),configuration,configuration_sha256:await directHash(configuration),
   classification_configuration_sha256:configHash,pending,pending_sha256:await directHash(pending),cache:[],cache_sha256:await directHash([]),
   denominators:{source_reviews:reviews.length,analytical_reviews:textual.length,textless_statistics_only:reviews.length-textual.length},
-  max_jev_calls:pending.length,max_luna_calls:0,max_sol_calls:1,max_apify_calls:0,automatic_retry:false,production_enabled:false,sol_size_policy:SOL_SIZE_POLICY,code_provenance:code};
+  max_jev_calls:pending.length,max_luna_calls:0,max_sol_calls:1,max_apify_calls:0,automatic_retry:false,production_enabled:!!delivery,...(delivery?{current_delivery:delivery}:{}),sol_size_policy:SOL_SIZE_POLICY,code_provenance:code};
  return {body,sha256:await directHash(body)};
 }
 export type ParallelProtocol=Awaited<ReturnType<typeof parallelProtocol>>['body'];
@@ -59,7 +67,7 @@ export async function verifyParallelRuntime(p:ParallelProtocol,sha:string,protoc
   c.body.version!=='parallel-runtime-certificate-v1'||c.body.protocol_id!==protocolId||c.body.protocol_sha256!==sha||c.body.organization_id!==p.organization_id||c.body.establishment_id!==p.establishment_id||c.body.authority_user_id!==p.authority_user_id||
   c.body.source_snapshot_sha256!==p.source_snapshot_sha256||c.body.configuration_sha256!==p.configuration_sha256||c.body.pending_sha256!==p.pending_sha256||c.sha256!==await directHash(c.body))throw Error('PARALLEL_RUNTIME_CERTIFICATE_CHANGED');
  if(await directHash(p)!==sha||p.version!==PARALLEL_REPORT||p.classification_configuration_sha256!==await directHash(SHORT_CLASSIFIER_CONFIG)||
-  p.max_luna_calls!==0||p.max_sol_calls!==1||p.max_apify_calls!==0||p.automatic_retry!==false||p.production_enabled!==false||
+  p.max_luna_calls!==0||p.max_sol_calls!==1||p.max_apify_calls!==0||p.automatic_retry!==false||!validParallelDelivery(p)||
   p.configuration.sol_wire_version!==undefined&&p.configuration.sol_wire_version!==COMPACT_SOL_WIRE||p.configuration.evidence_selector!==undefined&&(p.configuration.evidence_selector.version!==DIRECT_COVERAGE_VERSION||p.configuration.evidence_selector.sha256!==await directCoverageSelectorHash())||
   await directHash(p.sol_size_policy)!==await directHash(SOL_SIZE_POLICY))throw Error('PARALLEL_PROTOCOL_CHANGED');
 }
@@ -69,7 +77,7 @@ export async function verifyParallelProtocol(p:ParallelProtocol,sha:string){
  if(p.configuration.sol_wire_version!==undefined&&p.configuration.sol_wire_version!==COMPACT_SOL_WIRE)throw Error('PARALLEL_SOL_WIRE_VERSION_CHANGED');
  if(p.version!==PARALLEL_REPORT||await directHash(p)!==sha||p.configuration_sha256!==await directHash(p.configuration)||p.source_snapshot_sha256!==await directHash(p.source_snapshot)||
   p.classification_configuration_sha256!==await directHash(SHORT_CLASSIFIER_CONFIG)||directCanonical(p.configuration.jev)!==directCanonical(SHORT_CLASSIFIER_CONFIG)||
-  p.pending_sha256!==await directHash(p.pending)||p.max_jev_calls!==p.pending.length||p.max_luna_calls!==0||p.max_sol_calls!==1||p.max_apify_calls!==0||p.automatic_retry!==false||p.production_enabled!==false||
+  p.pending_sha256!==await directHash(p.pending)||p.max_jev_calls!==p.pending.length||p.max_luna_calls!==0||p.max_sol_calls!==1||p.max_apify_calls!==0||p.automatic_retry!==false||!validParallelDelivery(p)||
   p.source_snapshot.source_reviews_sha256!==await directHash(p.source_snapshot.reviews)||p.reference.report_sha256!==await directHash(p.frozen_report)||
   p.denominators.source_reviews!==p.source_snapshot.reviews.length||p.denominators.analytical_reviews!==p.source_snapshot.reviews.filter(r=>r.analysis_text).length||
   p.denominators.textless_statistics_only+p.denominators.analytical_reviews!==p.denominators.source_reviews||new Set(p.pending.map(t=>t.review_id)).size!==p.pending.length||

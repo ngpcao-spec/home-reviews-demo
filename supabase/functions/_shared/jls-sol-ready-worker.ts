@@ -36,6 +36,8 @@ export async function validateReadyReceipt(s:ReadyState,op:ReadyOperation,plan:i
    served_model:null,input_tokens:null,output_tokens:null,usage:null,cost_usd:null,duration_ms:receipt.duration_ms,error_code:null,
    raw_saved_before_validation:true,calculated_not_verified_invoice:true,human_validated:false,production_enabled:false};
   let status="invalid_output";
+  // Only a server-sealed promoted delivery marks a new result as current.
+  out.production_enabled=(s.protocol.body as unknown as {current_delivery?:{version:string}}).current_delivery?.version==='jev-short-sol-compact-v2';
   try{
    if(receipt.error_code)throw Error(receipt.error_code);
    const raw=JSON.parse(receipt.raw_response_text);

@@ -8,7 +8,7 @@ import { useApp } from '../app/AppContext'
 import { ReputationReport } from '../components/ReputationReport'
 import { FindingAuditEntry } from './V9FindingAuditPage'
 import { ConsultantReport } from '../components/ConsultantReport'
-import { ParallelReports } from '../components/ParallelReports'
+import { CurrentReports } from '../components/CurrentReports'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
@@ -142,6 +142,19 @@ export function AnalyticsPage() {
   const periodLabel = visibleReport ? formatWeeklyPeriod(visibleReport.periodStart, visibleReport.periodEnd, language) : ''
   const number = new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'fr-FR')
 
+  const historicalAction=(<div className="historical-report-action">
+        <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
+          {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
+          <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
+        </button>
+        {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
+        {historicalGenerating && <small role="status">{language === 'vi' ? 'Bạn có thể đóng ứng dụng. Máy chủ sẽ tiếp tục phân tích.' : 'Vous pouvez fermer l’application. L’analyse continue côté serveur.'}</small>}
+        {visibleHistoricalReport?.generatedAt && <small>{language==='vi'?'Báo cáo Sol trước đây tạo lúc':'Rapport Sol précédent généré le'}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
+        {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
+        {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
+        {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
+      </div>)
+
   return <>
     <BrandHeader />
     <section className="reference-intro analytics-intro">
@@ -165,7 +178,7 @@ export function AnalyticsPage() {
     {loading && <section className="weekly-report-state card" data-testid="analytics-initial-loading" aria-live="polite"><span className="weekly-report-spinner"/><p>{messages.reputation.loadingReport}</p></section>}
     {visibleError && <section className="weekly-report-state card" role="alert"><AlertTriangle/><p>{visibleError}</p><button className="secondary-button" onClick={() => setRequestVersion((value) => value + 1)}>{messages.common.retry}</button></section>}
 
-    {selected && periodMode === 'historical' && <ParallelReports key={`${currentUser.id??currentUser.email}:${selected.id}:${preferredLanguage}`} current={visibleHistoricalReport} account={currentUser.id??currentUser.email} enabled={!demoMode&&!!supabase}><div className="weekly-report historical-report">
+    {selected && periodMode === 'historical' && <CurrentReports key={`${currentUser.id??currentUser.email}:${selected.id}:${preferredLanguage}`} current={visibleHistoricalReport} account={currentUser.id??currentUser.email} establishmentId={selected.id} languageKey={preferredLanguage} generating={historicalGenerating} generationRevision={`${generation.phase}:${generation.run?.generation_id??""}`} generationAction={historicalAction} enabled={!demoMode&&!!supabase}><div className="weekly-report historical-report">
       <section className="weekly-report-hero card">
         {!visibleHistoricalReport?.consultant && <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />}
         <div>
@@ -187,22 +200,10 @@ export function AnalyticsPage() {
         </div>
       </section>
 
-      <div className="historical-report-action">
-        <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
-          {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
-          <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
-        </button>
-        {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
-        {historicalGenerating && <small role="status">{language === 'vi' ? 'Bạn có thể đóng ứng dụng. Máy chủ sẽ tiếp tục phân tích.' : 'Vous pouvez fermer l’application. L’analyse continue côté serveur.'}</small>}
-        {visibleHistoricalReport?.generatedAt && <small>{messages.reputation.lastUpdated}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
-        {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
-        {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
-        {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
-      </div>
 
       {visibleHistoricalReport && (visibleHistoricalReport.consultant ? <><ConsultantReport report={visibleHistoricalReport.consultant}/>{visibleHistoricalReport.consultant.version===9&&visibleHistoricalReport.consultant.analysis_pipeline?.source_generation_id==='307025ef-05b1-401e-8f6d-e48ca5677553'&&<FindingAuditEntry/>}</> : <ReputationReport report={visibleHistoricalReport} />)}
 
-    </div></ParallelReports>}
+    </div></CurrentReports>}
 
     {selected && periodMode !== 'historical' && visibleReport && <div className="weekly-report">
       <section className="weekly-report-hero card">

@@ -14,7 +14,7 @@ async function harness(mode='normal'){
   let handler!:(r:Request)=>Promise<Response>
   vi.stubGlobal('Deno',{env:{get:()=> 'gpt-6.1-sol'},serve:(fn:typeof handler)=>{handler=fn}})
   vi.resetModules();await import('./index.ts')
-  return {rpc,database,call:(body:object={establishment_id:'place',preferred_language:'vi'})=>handler(new Request('https://example.test',{method:'POST',body:JSON.stringify(body)}))}
+  return {rpc,database,call:(body:object={establishment_id:'place',preferred_language:'vi',request_id:'a1000000-0000-4000-8000-000000000003'})=>handler(new Request('https://example.test',{method:'POST',body:JSON.stringify(body)}))}
 }
 describe('enqueue-only user endpoint',()=>{
   it('explicit first V7 uses the coverage-checked idempotent RPC and never starts an AI/provider call',async()=>{
@@ -27,7 +27,7 @@ describe('enqueue-only user endpoint',()=>{
     const replies=await Promise.all([h.call(),h.call()])
     expect(replies.map(r=>r.status)).toEqual([202,202])
     for(const reply of replies)expect(await reply.json()).toMatchObject({run:{generation_id:'one-generation',status:'queued'}})
-    expect(h.rpc).toHaveBeenCalledWith('enqueue_historical_report',{p_establishment_id:'place',p_organization_id:'org',p_user_id:'user',p_language:'vi',p_model:'gpt-6.1-sol',p_analysis_version:7})
+    expect(h.rpc).toHaveBeenCalledWith('enqueue_current_report',{p_establishment:'place',p_organization:'org',p_user:'user',p_language:'vi',p_request:'a1000000-0000-4000-8000-000000000003',p_legacy_model:'gpt-6.1-sol',p_legacy_version:7})
     expect(h.database.from.mock.calls.map(call=>call[0])).not.toContain('reviews')
   })
   it.each([['unauthorized',401],['forbidden',403]])('rejects %s without enqueuing',async(mode,status)=>{
@@ -41,5 +41,8 @@ describe('enqueue-only user endpoint',()=>{
   it('rejects a stale interface language instead of analyzing another language',async()=>{
     const h=await harness();expect((await h.call({establishment_id:'place',preferred_language:'fr'})).status).toBe(409)
     expect(h.rpc).not.toHaveBeenCalled()
+  })
+  it('refuses an old client without a stable explicit intent, with no fallback or enqueue',async()=>{
+    const h=await harness();expect((await h.call({establishment_id:'place',preferred_language:'vi'})).status).toBe(409);expect(h.rpc).not.toHaveBeenCalled()
   })
 })
