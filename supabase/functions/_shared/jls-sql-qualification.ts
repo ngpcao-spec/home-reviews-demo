@@ -13,6 +13,7 @@ import type {Direct4Ready} from './jls-direct4-execution.ts';
 import type {DirectReportPreparation} from './jev-direct-report-preparation.ts';
 import {directHash} from './jev-direct-categories.ts';
 import {assertEvidence40ActiveUser} from './decisions-evidence40-auth.ts';
+import {PARALLEL_REPORT,parallelExecutionContract} from './parallel-report.ts';
 export async function restaurantSqlQualification(admin:SupabaseClient,input:{qualification_id:string;phase:string}){
  const q=await admin.from('analysis_jls_sql_qualifications').select('*').eq('id',input.qualification_id).single();
  if(q.error||Date.parse(q.data.expires_at)<=Date.now())throw Error('JLS_SQL_QUALIFICATION_INVALID');
@@ -29,8 +30,9 @@ export async function restaurantSqlQualification(admin:SupabaseClient,input:{qua
  const port=restaurantPort(measured),state=await port.load(q.data.run_id),calls:string[]=[];
  if(state.run.consent?.consent_source!=='technical_qualification_no_spending')throw Error('JLS_SQL_QUALIFICATION_NOT_MOCK');
  const prep=state.artifacts.find(a=>a.kind==='direct4_report_preparation')?.body as unknown as DirectReportPreparation|undefined;
- const contract:RestaurantExecutionContract={...historicalDirect4Contract(prep),technicalMockTransport:true};
- const mock=historicalMockHttp(state,calls),key='EXPLICIT_MOCK_NO_PROVIDER';
+ const parallel=state.protocol.body.version===PARALLEL_REPORT;
+ const contract:RestaurantExecutionContract={...(parallel?parallelExecutionContract:historicalDirect4Contract(prep)),technicalMockTransport:true};
+ const mock:typeof fetch=parallel?()=>{calls.push('EXPLICIT_TECHNICAL_MOCK_JEV');return Promise.resolve(new Response(JSON.stringify({model:'jev-1.13.0',usage:{input_tokens:1,output_tokens:1,total_tokens:2},answers:Object.fromEntries(['service','price','quality','ambiance'].map(k=>[k,{type:'choice',choice:'positive'}]))})));}:historicalMockHttp(state,calls),key='EXPLICIT_MOCK_NO_PROVIDER';
  let lock_observation:unknown=null;
  if(input.phase==='bind_evidence'){
   const fixture=await measured.from('analysis_jls_snapshot_preparations').select('body,sha256')
