@@ -7,6 +7,7 @@ import {INITIAL_BATCH_CONTRACT} from '../_shared/jev-review-batches.ts';
 import {CURRENT_BATCH_VERSION} from '../_shared/current-batch-report.ts';
 import {DIRECT_COVERAGE_VERSION} from '../_shared/jev-direct-evidence-selection.ts';
 import {rehearseCurrentBatches} from '../_shared/current-batch-probe.ts';
+import {saveBatchReceipt} from '../_shared/jev-batch-receipt.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async request=>{
  const early=preflight(request);if(early)return early;
@@ -32,7 +33,7 @@ Deno.serve(async request=>{
   const port:BatchExperimentPort={
    load:async id=>{const [r,t]=await Promise.all([admin.from('analysis_jev_batch_runs').select('*').eq('id',id).single(),admin.from('analysis_jev_batch_tasks').select('*').eq('run_id',id).order('number')]);if(r.error||t.error)throw Error('BATCH_LOAD_FAILED');return {run:r.data,tasks:t.data};},
    claim:(id,w)=>rpc('jev_batch_claim',{p_run:id,p_worker:w}),
-   receive:(t,w,b,s)=>rpc('jev_batch_receive',{p_task:t,p_worker:w,p_receipt:b,p_sha:s}),
+   receive:(t,w,b,s)=>saveBatchReceipt(rpc,t,w,b,s),
    project:(t,w,b,s,e)=>rpc('jev_batch_save_projection',{p_task:t,p_worker:w,p_body:b,p_sha:s,p_error:e??null}),
    draft:(id,b,s)=>rpc('jev_batch_save_draft',{p_run:id,p_body:b,p_sha:s}),
    envelope:(id,b,s)=>rpc('jev_batch_save_envelope',{p_run:id,p_body:b,p_sha:s}),

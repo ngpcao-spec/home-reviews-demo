@@ -33,7 +33,15 @@ export async function processCurrentReportPreparation(admin:SupabaseClient,run:H
    const sealed=await admin.from('analysis_parallel_launch_preparations').select('body,sha256').eq('current_source_run_id',run.id).maybeSingle();
    if(sealed.error)throw Error('CURRENT_BATCH_CERTIFICATE_READ_FAILED');
    const p=sealed.data??await currentReportProtocol(run);
-   if(!sealed.data){const certified=await admin.rpc('prepare_current_v2_protocol',{p_source:run.id,p_body:p.body,p_sha:p.sha256});if(certified.error)throw Error('CURRENT_BATCH_CERTIFICATION_FAILED');}
+   if(!sealed.data){
+    const certified=await admin.rpc('prepare_current_v2_protocol',{p_source:run.id,p_body:p.body,p_sha:p.sha256});if(certified.error)throw Error('CURRENT_BATCH_CERTIFICATION_FAILED');
+    // The certificate is durable. Give tokenization its own CPU budget instead
+    // of combining it with protocol construction in the same Edge request.
+    await save({attempt_count:0,locked_by:null,lease_until:null});
+    const wake=await admin.rpc('wake_current_jev_preparation',{p_source:run.id});
+    if(wake.error)console.warn('CURRENT_BATCH_PREPARATION_WAKE_FAILED_CRON_RECOVERY');
+    return {phase:'protocol_certified',provider_calls:0};
+   }
    const manifest=await currentBatchManifest(p,localHybridTokens);
    const r=await admin.rpc('jev_batch_create_current',{p_source:run.id,p_manifest:manifest.body,p_sha:manifest.sha256});
    if(r.error||!r.data)throw Error('CURRENT_BATCH_QUEUE_FAILED');
