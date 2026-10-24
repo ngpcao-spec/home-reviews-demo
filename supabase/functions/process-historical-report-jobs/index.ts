@@ -6,6 +6,7 @@ import {processCurrentReportPreparation,currentReportProtocol,CURRENT_REPORT_COD
 import {CURRENT_V2,verifyParallelProtocol} from '../_shared/parallel-report.ts'
 import {currentBatchManifest,CURRENT_BATCH_VERSION} from '../_shared/current-batch-report.ts'
 import {localHybridTokens} from '../_shared/jev-hybrid-evidence.ts'
+import {currentHistoricalStatus} from '../_shared/current-report-status.ts'
 
 Deno.serve(async request => {
   if (request.method !== 'POST') return json({error:'METHOD_NOT_ALLOWED'},405)
@@ -19,6 +20,11 @@ Deno.serve(async request => {
   if(payload?.mode==='current_report_capability'){
     const r=await admin.from('report_pipeline_settings').select('engine,jev_transport,updated_at').eq('id',true).single()
     return json({version:CURRENT_V2,batch_version:CURRENT_BATCH_VERSION,code:CURRENT_REPORT_CODE,routing:r.data,provider_calls:0,new_runs:0})
+  }
+  if(payload?.mode==='current_report_status_probe'){
+    const r=await admin.from('historical_report_runs').select('*').eq('id',payload.source_run_id).single()
+    if(r.error)return json({error:'SOURCE_NOT_AVAILABLE',provider_calls:0},409)
+    return json({run:await currentHistoricalStatus(admin,r.data),provider_calls:0,new_runs:0})
   }
   if(payload?.mode==='current_report_probe'){
     const at=performance.now(),r=await admin.from('historical_report_runs').select('*').eq('id',payload.source_run_id).eq('status','completed').single()

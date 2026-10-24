@@ -13,6 +13,20 @@ function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',i
  mock.invoke.mockResolvedValue({data,error:null});const generate=vi.fn();
  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[initial]}><I18nProvider language={language}><CurrentReports establishmentId="est" account="account" languageKey={language} enabled current={null} generating={false} generationAction={<button onClick={generate}>NORMAL GENERATE</button>}><p>LEGACY SOL PRESERVED</p></CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);return {generate,data}
 }
+it('keeps a completed available report separate from a newer request and attaches progress to that request',async()=>{
+ const row=parallelPresentationRow('fr');row.current_source_run_id='old-source';row.state='completed';
+ const data={routing:{engine:'jev_sol_v2',jev_transport:'batch_initial_v1',updated_at:'2026-10-24'},legacy_report:null,versions:[],experimental:row,
+  request_run:{request_id:'new-request',source_run_id:'new-source',establishment_id:'est',preferred_language:'fr',generation_id:'new-generation',status:'running',stage:'jev',progress:1,total_steps:9,progress_unit:'jev_batches',batch_run_id:'new-batches',completed_reviews:50,total_reviews:441,resumable:false,error_code:null,created_at:'2026-10-24T10:05:00Z'},
+  run:{id:'old-batches',status:'completed',stage:'validate_sol',error_code:null},tasks:[],operation:null,
+  batch_progress:{run_id:'old-batches',completed_batches:9,total_batches:9,completed_reviews:441,total_reviews:441,unknown_batches:0,can_resume:false,sol_attempts:1}} satisfies CurrentReportsView;
+ mock.invoke.mockResolvedValue({data,error:null});
+ render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language="fr"><CurrentReports establishmentId="est" account="account" languageKey="fr" enabled current={null} generating generationAction={<button disabled>Analyse en cours</button>}>OLD</CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);
+ expect(await screen.findByText(/Rapport précédent disponible/)).toBeVisible();
+ const progress=screen.getByText(/1 \/ 9 lots · 50 \/ 441 avis/).closest('[data-request-id]');expect(progress).toHaveAttribute('data-request-id','new-request');
+ expect(progress).toHaveAttribute('data-batch-run-id','new-batches');expect(screen.queryByText(/9 \/ 9 lots/)).not.toBeInTheDocument();
+ expect(screen.getByText('Terminé')).toBeVisible();expect(screen.getByText(/Demande new-requ/)).toHaveTextContent('En cours');
+ expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
+});
 it('shows batch progress and resumes only the selected experiment without changing normal generation',async()=>{
  const row=parallelPresentationRow('fr');row.current_source_run_id=null;
  const data={routing:{engine:'jev_sol_v2',updated_at:'2026-10-24'},legacy_report:null,

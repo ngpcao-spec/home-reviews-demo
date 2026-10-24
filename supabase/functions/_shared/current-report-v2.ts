@@ -22,6 +22,10 @@ export async function processCurrentReportPreparation(admin:SupabaseClient,run:H
   if(!run.snapshot.reviews||!run.snapshot.base){
    const prepared=await prepareHistoricalSnapshot(admin,run);
    await save({...prepared,total_steps:null,attempt_count:0,locked_by:null,lease_until:null});
+   if(run.jev_transport===BATCH_TRANSPORT){
+    const wake=await admin.rpc('wake_current_jev_preparation',{p_source:run.id});
+    if(wake.error)console.warn('CURRENT_BATCH_PREPARATION_WAKE_FAILED_CRON_RECOVERY');
+   }
    return {phase:'source_frozen',provider_calls:0};
   }
   if(run.jev_transport===BATCH_TRANSPORT){

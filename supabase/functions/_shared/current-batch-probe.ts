@@ -66,6 +66,7 @@ export class BatchMemory {
     t.status=error?'invalid_output':'completed';this.leases.delete(t.id);this.events.push('project:'+t.number);
     if(this.tasks.every(t=>t.status==='completed'))this.run.stage='prepare_evidence';return true;
    },
+   draft:async(_id,body,sha)=>{if(this.run.draft)return this.run.draft_sha256===sha;this.run.draft=structuredClone(body);this.run.draft_sha256=sha;this.run.stage='measure_sol';return true;},
    envelope:async(_id,body,sha)=>{if(this.run.envelope)return this.run.envelope_sha256===sha;this.run.envelope=structuredClone(body);this.run.envelope_sha256=sha;this.run.stage='sol';return true;},
    claimSol:async()=>{if(this.run.sol_request_count||!this.run.armed||this.run.status!=='running')return false;this.run.sol_request_count=1;return true;},
    receiveSol:async(_id,_w,body,sha)=>{if(this.run.sol_receipt)return this.run.sol_receipt_sha256===sha;this.run.sol_receipt=structuredClone(body) as Record<string,unknown>;this.run.sol_receipt_sha256=sha;this.run.stage='validate_sol';return true;},

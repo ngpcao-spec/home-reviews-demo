@@ -20,6 +20,19 @@ async function fixture(n=51){
  return {...f,m,http,step,finish,calls:()=>({jev,sol})};
 }
 describe('current batch transport — source and execution contract',()=>{
+ it('checkpoints the unchanged dossier before tokenization and resumes that local stage without repeating providers',async()=>{
+  const f=await fixture(3);await f.step();await f.step();expect(f.m.run.stage).toBe('prepare_evidence');
+  await f.step();expect(f.m.run.stage).toBe('measure_sol');const draft=structuredClone(f.m.run.draft);
+  const save=f.m.port.envelope;f.m.port.envelope=async()=>{throw Error('INTERRUPTED_LOCAL_MEASUREMENT_SAVE');};
+  await expect(f.step()).rejects.toThrow('INTERRUPTED_LOCAL_MEASUREMENT_SAVE');expect(f.calls()).toEqual({jev:1,sol:0});
+  f.m.port.envelope=save;await f.step();expect(f.m.run.envelope!.request_sha256).toBe(draft!.request_sha256);
+  expect(f.m.run.draft).toEqual(draft);await f.finish();expect(f.calls()).toEqual({jev:1,sol:1});
+ });
+ it('rejects a changed saved draft before any Sol reservation',async()=>{
+  const f=await fixture(3);await f.step();await f.step();await f.step();
+  f.m.run.draft!.request_json+=' ';await expect(f.step()).rejects.toThrow('BATCH_SOL_DRAFT_CHANGED');
+  expect(f.calls()).toEqual({jev:1,sol:0});expect(f.m.run.sol_request_count).toBe(0);
+ });
  it('completes a general current request through two real multi-review payloads and one simulated compact Sol response',async()=>{
   const f=await fixture();await f.finish();expect(f.calls()).toEqual({jev:2,sol:1});expect(f.m.run.status).toBe('completed');
   expect(f.m.tasks.map(t=>t.reviews)).toEqual([50,1]);expect(f.m.tasks.every(t=>t.request_count===1&&t.receipt&&t.projection)).toBe(true);

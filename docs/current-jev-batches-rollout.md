@@ -32,6 +32,10 @@ Chaque reçu sauvegarde les tokens réellement retournés, y compris si les rép
 
 Quand tous les lots sont complets, le worker reconstruit les compteurs et leurs listes d'identifiants, applique le sélecteur actuel puis prépare Sol compact. Sol conserve sa réservation séparée à tentative unique. Un résultat Sol inconnu reste consommé et bloque toute réémission.
 
+La construction du dossier et son contrôle de taille sont deux étapes locales distinctes, liées par un draft immuable et ses empreintes. Cela sépare le calcul des preuves de l'initialisation du tokenizer sous la limite CPU Edge. Le draft est sauvegardé avant `measure_sol` ; Sol ne peut être réservé qu'après la sauvegarde de l'enveloppe mesurée. Les prompts, le sélecteur et les références ne changent pas. Après gel du snapshot, un wake privé poursuit immédiatement la préparation courante ; le cron reste une récupération.
+
+Le statut du bouton normal lit le transport capturé de la demande, puis les vraies tâches correspondantes. Il ne calcule plus un ancien plan Sol quand la demande V2 n'a pas encore de lots. La demande courante et le rapport disponible sont exposés séparément ; une archive terminée ne peut pas fournir la progression d'une nouvelle demande. Le [diagnostic Artisan du 24 octobre](artisan-generation-progress-20261024.md) documente la cause, les horaires et les limites des mesures.
+
 Le rapport se publie dans `analysis_parallel_reports` avec `current_source_run_id` et le `comparison_id` de la demande. Le cycle V2 normal publie son état. Les totaux facturés nouveaux (JEV + Sol) alimentent la génération courante ; les usages historiques restent séparés. L'interface affiche la progression lots/avis dans l'onglet courant, les compteurs et les avis négatifs/mixtes complets du snapshot. Leur liste provient des identifiants de classement, indépendamment des 32 preuves retenues.
 
 Les rapports historiques, caches individuels et expériences antérieures ne sont ni réécrits ni supprimés.

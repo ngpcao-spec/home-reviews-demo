@@ -1,6 +1,8 @@
 /** Client observer only. The server owns scheduling, steps, retries and completion. */
 export interface HistoricalRun {
   request_id?:string;engine?:'sol_legacy'|'jev_sol_v2';comparison_id?:string|null;stage?:string
+  source_run_id?:string;jev_transport?:'individual'|'batch_initial_v1';created_at?:string;completed_at?:string|null
+  progress_unit?:'jev_batches'|'steps';completed_reviews?:number;total_reviews?:number;batch_run_id?:string;unknown_batches?:number;sol_attempts?:number;can_resume?:boolean
   establishment_id: string
   preferred_language: string
   generation_id: string
@@ -81,7 +83,11 @@ export class HistoricalGeneration<T> {
     if(run?.request_id&&run.request_id===this.intent){this.intent=null;this.deps.intent?.write(null)}
     this.emit({ run, phase: run?.status === 'failed' ? 'failed' : activeHistoricalRun(run)
       ? this.canRun() ? 'generating' : 'paused' : 'idle', feedback: run?.status==='failed' && run.error_code==='NO_REVIEWS_AVAILABLE'?'empty':null })
-    if (run?.status === 'completed') await this.deps.readReport()
+    if (run?.status === 'completed') {
+      // A report refresh failure cannot turn a confirmed finished request back
+      // into a loading indicator. The report panel reconciles independently.
+      try { await this.deps.readReport() } catch { console.info('Completed report refresh unavailable; generation remains completed') }
+    }
   }
   private async execute(manual: boolean) {
     if (this.busy || !this.canRun()) return
