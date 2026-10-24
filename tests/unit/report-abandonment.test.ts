@@ -15,6 +15,7 @@ beforeAll(async()=>{
  await db.exec(`
  create schema auth;create table auth.users(id uuid primary key);create table public.organizations(id uuid primary key);
  alter role service_role bypassrls;
+ alter default privileges in schema public grant all on tables to service_role;
  alter table public.analysis_jev_batch_runs add column armed boolean default false;
  alter table public.analysis_parallel_reports add column state text default 'blocked';
  alter table public.analysis_jev_batch_tasks add column lease_until timestamptz;
@@ -23,6 +24,8 @@ beforeAll(async()=>{
  await db.exec(readFileSync('supabase/migrations/20261024130430_wake_current_batch_initial_queue.sql','utf8'));
  const migration=readdirSync('supabase/migrations').find(n=>n.endsWith('_abandon_failed_current_report.sql'))!;
  await db.exec(readFileSync('supabase/migrations/'+migration,'utf8'));
+ const privilegeMigration=readdirSync('supabase/migrations').find(n=>n.endsWith('_restrict_report_abandonment_service_privileges.sql'))!;
+ await db.exec(readFileSync('supabase/migrations/'+privilegeMigration,'utf8'));
 },30000);
 beforeEach(async()=>{
  await db.exec('begin;set local role service_role');
