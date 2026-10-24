@@ -9,19 +9,29 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  const [routing,legacy,versions,request]=await Promise.all([
   c.client.from('report_pipeline_settings').select('engine,updated_at').eq('id',true).single(),
   c.client.from('historical_establishment_reports').select('*').eq('organization_id',org).eq('establishment_id',e.data.id).eq('preferred_language',language).maybeSingle(),
-  c.client.from('analysis_parallel_reports').select('id,reference_generation_id,created_at,generated_at,state,run_id,current_source_run_id').eq('organization_id',org).eq('establishment_id',e.data.id).eq('language',language).order('created_at',{ascending:false}),
+  c.client.from('analysis_parallel_reports').select('id,reference_generation_id,created_at,generated_at,state,run_id,current_source_run_id,configuration_version').eq('organization_id',org).eq('establishment_id',e.data.id).eq('language',language).order('created_at',{ascending:false}),
   c.client.from('report_generation_requests').select('id,source_run_id,comparison_id,engine').eq('organization_id',org).eq('establishment_id',e.data.id).eq('language',language).order('created_at',{ascending:false}).limit(1).maybeSingle()]);
  if(routing.error||legacy.error||versions.error||request.error)throw Error('CURRENT_REPORT_READ_FAILED');
  const versionRuns=versions.data.filter(v=>v.run_id).map(v=>v.run_id);
  if(versionRuns.length){const r=await c.client.from('analysis_jls_restaurant_runs').select('id,status').eq('organization_id',org).in('id',versionRuns);if(r.error)throw Error('CURRENT_REPORT_READ_FAILED');for(const v of versions.data)v.state=r.data.find(r=>r.id===v.run_id)?.status??v.state;}
- const chosen=input.comparison_id??(request.data?.engine==='jev_sol_v2'?request.data.comparison_id:versions.data[0]?.id);
+ const chosen=input.comparison_id??(request.data?.engine==='jev_sol_v2'?request.data.comparison_id:versions.data.find(v=>v.configuration_version!=='jev-multi-review-initial-v1')?.id);
  if(input.comparison_id&&!versions.data.some(v=>v.id===input.comparison_id))throw Error('FORBIDDEN');
- let row=null,run=null,tasks:unknown[]=[],operation=null;
+ let row=null,run=null,tasks:unknown[]=[],operation=null,batch_progress=null;
  if(chosen){
   const p=await c.client.from('analysis_parallel_reports').select('*').eq('id',chosen).eq('organization_id',org).eq('establishment_id',e.data.id).single();if(p.error)throw Error('CURRENT_REPORT_READ_FAILED');row=p.data;
   if(row.run_id){const [r,t,o]=await Promise.all([c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at').eq('id',row.run_id).single(),c.client.from('analysis_jls_restaurant_tasks').select('id,phase,review_id,status,request_count').eq('run_id',row.run_id),c.client.from('analysis_jls_sol_ready_operations').select('id,status,result,receipt,request_count').eq('run_id',row.run_id).maybeSingle()]);if(r.error||t.error||o.error)throw Error('CURRENT_REPORT_READ_FAILED');run=r.data;tasks=t.data;operation=o.data;}
+  if(row.configuration_version==='jev-multi-review-initial-v1'){
+   const b=await c.client.from('analysis_jev_batch_runs').select('id,status,stage,error_code,created_at,sol_request_count,armed,expires_at').eq('report_id',row.id).eq('organization_id',org).single();
+   if(b.error)throw Error('BATCH_READ_FAILED');
+   const t=await c.client.from('analysis_jev_batch_tasks').select('id,number,reviews,status,request_count').eq('run_id',b.data.id).eq('organization_id',org).order('number');
+   if(t.error)throw Error('BATCH_READ_FAILED');run=b.data;
+   batch_progress={run_id:b.data.id,completed_batches:t.data.filter(x=>x.status==='completed').length,total_batches:t.data.length,
+    completed_reviews:t.data.filter(x=>x.status==='completed').reduce((s,x)=>s+x.reviews,0),total_reviews:t.data.reduce((s,x)=>s+x.reviews,0),
+    unknown_batches:t.data.filter(x=>x.status==='unknown').length,can_resume:b.data.status==='running'&&b.data.armed&&Date.parse(b.data.expires_at)>Date.now(),sol_attempts:b.data.sol_request_count};
+  }
  }else if(request.data?.engine==='jev_sol_v2'){
   const r=await c.admin.from('historical_report_runs').select('id,status,error_code,created_at').eq('id',request.data.source_run_id).eq('organization_id',org).single();if(r.error)throw Error('CURRENT_REPORT_READ_FAILED');run={...r.data,stage:'preparing'};
  }
- return {routing:routing.data,legacy_report:legacy.data,versions:versions.data,experimental:row,run,tasks,operation,provider_calls:0};
+ return {routing:routing.data,legacy_report:legacy.data,versions:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
 }
+
