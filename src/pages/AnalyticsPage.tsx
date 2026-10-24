@@ -9,6 +9,7 @@ import { ReputationReport } from '../components/ReputationReport'
 import { FindingAuditEntry } from './V9FindingAuditPage'
 import { ConsultantReport } from '../components/ConsultantReport'
 import { CurrentReports } from '../components/CurrentReports'
+import { AbandonFailedGeneration } from '../components/AbandonFailedGeneration'
 import { BrandHeader } from '../components/ui/BrandHeader'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
@@ -150,12 +151,14 @@ export function AnalyticsPage() {
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
           <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
         </button>
+        <AbandonFailedGeneration run={generation.run} abandon={generation.abandon} onAbandoned={()=>{const next=new URLSearchParams(searchParams);next.delete('comparison');setSearchParams(next,{replace:true});setRequestVersion(v=>v+1)}} />
         {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
         {historicalGenerating && generation.run?.stage && <small role="status">{generationStage[generation.run.stage as keyof typeof generationStage]}</small>}
         {historicalGenerating && <small role="status">{language === 'vi' ? 'Bạn có thể đóng ứng dụng. Máy chủ sẽ tiếp tục phân tích.' : 'Vous pouvez fermer l’application. L’analyse continue côté serveur.'}</small>}
         {visibleHistoricalReport?.generatedAt && <small>{language==='vi'?'Báo cáo Sol trước đây tạo lúc':'Rapport Sol précédent généré le'}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
         {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
+        {historicalFeedback === 'abandoned' && <p className="historical-feedback" role="status">{language==='fr'?'Génération annulée. Vous pouvez créer un nouveau rapport depuis zéro.':'Đã hủy lần tạo báo cáo này. Bạn có thể tạo báo cáo mới từ đầu.'}</p>}
         {historicalFeedback === 'error' && <p className="historical-feedback error" role="alert">{messages.analytics.historicalGenerationFailed}</p>}
       </div>)
 

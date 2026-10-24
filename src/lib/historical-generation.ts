@@ -3,6 +3,7 @@ export interface HistoricalRun {
   request_id?:string;engine?:'sol_legacy'|'jev_sol_v2';comparison_id?:string|null;stage?:string
   source_run_id?:string;jev_transport?:'individual'|'batch_initial_v1';created_at?:string;completed_at?:string|null
   progress_unit?:'jev_batches'|'steps';completed_reviews?:number;total_reviews?:number;batch_run_id?:string;unknown_batches?:number;sol_attempts?:number;can_resume?:boolean
+  abandoned?:boolean;can_abandon?:boolean
   establishment_id: string
   preferred_language: string
   generation_id: string
@@ -19,13 +20,14 @@ export const activeHistoricalRun = (run: HistoricalRun | null) => !!run && ['que
 export interface GenerationState {
   phase: 'idle' | 'generating' | 'paused' | 'failed'
   run: HistoricalRun | null
-  feedback: 'success' | 'empty' | null
+  feedback: 'success' | 'empty' | 'abandoned' | null
 }
 interface Dependencies<T> {
   establishmentId: string
   language: string
   readStatus: () => Promise<HistoricalRun | null>
   enqueue: (body: { establishment_id: string; preferred_language: string; force: true;request_id?:string }) => Promise<GenerationReply<T>>
+  abandon?: (requestId:string) => Promise<void>
   intent?:{read:()=>string|null;write:(id:string|null)=>void}
   readReport: () => Promise<void>
   saveReport: (report: T) => void
@@ -78,8 +80,25 @@ export class HistoricalGeneration<T> {
     return this.execute(false)
   }
   start = () => this.execute(true)
+  abandon = async () => {
+    const run=this.state.run
+    if(this.busy||!this.canRun()||run?.status!=='failed'||!run.request_id||!run.can_abandon||!this.deps.abandon)return false
+    this.busy=true;this.clearTimer()
+    try{
+      await this.deps.abandon(run.request_id)
+      if(this.retired)return false
+      this.intent=null;this.deps.intent?.write(null)
+      this.emit({phase:'idle',run:null,feedback:'abandoned'})
+      return true
+    }catch{
+      // A lost acknowledgment is reconciled by read only, never a new report.
+      try{const latest=await this.deps.readStatus();if(latest?.abandoned){await this.observe(latest);return true}}catch{/* Retain the failed request for an explicit later action. */}
+      return false
+    }finally{this.busy=false}
+  }
   private async observe(run: HistoricalRun | null) {
     if (this.retired) return
+    if(run?.abandoned){this.intent=null;this.deps.intent?.write(null);this.emit({phase:'idle',run:null,feedback:'abandoned'});return}
     if(run?.request_id&&run.request_id===this.intent){this.intent=null;this.deps.intent?.write(null)}
     this.emit({ run, phase: run?.status === 'failed' ? 'failed' : activeHistoricalRun(run)
       ? this.canRun() ? 'generating' : 'paused' : 'idle', feedback: run?.status==='failed' && run.error_code==='NO_REVIEWS_AVAILABLE'?'empty':null })

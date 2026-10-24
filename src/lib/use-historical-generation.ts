@@ -30,6 +30,13 @@ export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: st
         if (error || !data) throw new Error('REPORT_STEP_INTERRUPTED')
         return data
       },
+      abandon: async requestId => {
+        if(!supabase)throw new Error('SUPABASE_UNAVAILABLE')
+        const {data,error}=await supabase.functions.invoke<{abandoned:boolean;request_id:string}>('generate-historical-report',{
+          body:{action:'abandon_failed',establishment_id:establishmentId,preferred_language:language,request_id:requestId,confirmed:true},signal:AbortSignal.timeout(20_000),
+        })
+        if(error||data?.abandoned!==true||data.request_id!==requestId)throw new Error('REPORT_ABANDON_FAILED')
+      },
       saveReport: row => cache.put(key, mapHistoricalReport(row)),
       readReport: async () => {
         if (!supabase) throw new Error('SUPABASE_UNAVAILABLE')
@@ -57,5 +64,5 @@ export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: st
       document.removeEventListener('visibilitychange', refresh)
     }
   }, [controller, enabled, establishmentId, language])
-  return { ...state, start: controller.start }
+  return { ...state, start: controller.start, abandon:controller.abandon }
 }

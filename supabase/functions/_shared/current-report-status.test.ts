@@ -2,12 +2,13 @@ import {describe,it,expect,vi} from 'vitest';
 import {currentHistoricalStatus} from './current-report-status.ts';
 const source={id:'source',establishment_id:'est',language:'vi',generation_id:'generation',status:'running',cursor:0,error_code:null,
  snapshot:{base:{analysis_version:8},reviews:Array.from({length:441},(_,i)=>({id:String(i),rating:5,original_text:'old Sol source',analysis_text:'old Sol source'}))}};
-function fixture(options:{published?:boolean;preparing?:boolean;unknown?:boolean;individual?:boolean;foreign?:boolean}={}){
+function fixture(options:{published?:boolean;preparing?:boolean;unknown?:boolean;individual?:boolean;foreign?:boolean;abandoned?:boolean}={}){
  const reads:{table:string;filters:Record<string,unknown>}[]=[];
  const db={from:(table:string)=>{const filters:Record<string,unknown>={};const query={select:()=>query,eq:(key:string,value:unknown)=>{filters[key]=value;return query;},
   then:(resolve:(v:unknown)=>unknown)=>Promise.resolve(result()).then(resolve),single:async()=>result(),maybeSingle:async()=>result()};
   function result(){reads.push({table,filters:{...filters}});if(Object.values(filters).includes(null))throw Error('NULL_INDIVIDUAL_RUN_LOOKUP');
    const data=table==='report_generation_requests'?{id:'request',engine:'jev_sol_v2',jev_transport:options.individual?'individual':'batch_initial_v1',comparison_id:options.preparing?null:'report',created_at:'2026-10-24T10:00:02Z'}
+    :table==='report_generation_abandonments'?(options.abandoned?{abandoned_at:'2026-10-24T12:00:00Z'}:null)
     :table==='analysis_parallel_reports'?{run_id:options.individual?'individual-run':null,current_source_run_id:options.foreign?'other-source':'source',configuration_version:options.individual?'old-v2':'jev-multi-review-initial-v1',state:options.published?'completed':'generating',error_code:null}
     :table==='analysis_jev_batch_runs'?{id:'batch-run',status:options.published?'completed':'running',stage:options.published?'validate_sol':'sol',completed_at:options.published?'2026-10-24T10:04:54Z':null,error_code:null,sol_request_count:1}
     :table==='analysis_jev_batch_tasks'?Array.from({length:9},(_,i)=>({status:options.unknown&&i===0?'unknown':'completed',reviews:i===8?41:50}))
@@ -15,6 +16,11 @@ function fixture(options:{published?:boolean;preparing?:boolean;unknown?:boolean
   return query;}};return {db:db as never,reads};
 }
 describe('normal button status uses the frozen current request transport',()=>{
+ it('projects an acknowledged abandonment without exposing partial results or offering a retry of consumed work',async()=>{
+  const f=fixture({abandoned:true}),status=await currentHistoricalStatus(f.db,{...source,status:'failed'});
+  expect(status).toMatchObject({abandoned:true,can_abandon:false,can_resume:false,resumable:false,progress:0,total_steps:null,error_code:'REPORT_GENERATION_ABANDONED'});
+  expect(f.reads.map(r=>r.table)).toEqual(['report_generation_requests','report_generation_abandonments']);
+ });
  it('reads a completed native batch report with null individual run ID and stops loading at 9/9',async()=>{
   const f=fixture({published:true}),status=await currentHistoricalStatus(f.db,source);
   expect(status).toMatchObject({request_id:'request',source_run_id:'source',comparison_id:'report',batch_run_id:'batch-run',status:'completed',stage:'completed',progress:9,total_steps:9,completed_reviews:441,total_reviews:441,progress_unit:'jev_batches'});
@@ -22,7 +28,7 @@ describe('normal button status uses the frozen current request transport',()=>{
  });
  it('does not invent a legacy 24-step plan while the new request is preparing',async()=>{
   const f=fixture({preparing:true});expect(await currentHistoricalStatus(f.db,source)).toMatchObject({stage:'preparing',status:'running',progress:0,total_steps:null});
-  expect(f.reads).toHaveLength(1);
+  expect(f.reads.map(r=>r.table)).toEqual(['report_generation_requests','report_generation_abandonments']);
  });
  it('keeps JEV 9/9 distinct from the still-running Sol stage',async()=>{
   const f=fixture();expect(await currentHistoricalStatus(f.db,source)).toMatchObject({status:'running',stage:'sol',progress:9,total_steps:9,sol_attempts:1});
