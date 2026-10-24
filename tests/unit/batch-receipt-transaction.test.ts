@@ -33,7 +33,7 @@ beforeAll(async()=>{
  await expect(receive()).rejects.toThrow('SIMULATED_CONTINUATION_TIMEOUT');
  oldReceiptRolledBack=(await db.query<{receipt:unknown}>('select receipt from public.analysis_jev_batch_tasks')).rows[0].receipt===null;
  await db.exec('reset role;truncate public.analysis_jev_batch_tasks,public.analysis_jev_batch_runs');
- await db.exec(readFileSync('supabase/migrations/20261024142100_commit_batch_receipt_before_continuation.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261024142948_commit_batch_receipt_before_continuation.sql','utf8'));
 },30000);
 beforeEach(async()=>{await db.exec('begin;set local role service_role');await seed();});
 afterEach(async()=>{await db.exec('rollback');await db.exec('reset role');await db.exec('truncate public.analysis_jev_batch_tasks,public.analysis_jev_batch_runs');expect(network).not.toHaveBeenCalled();});
