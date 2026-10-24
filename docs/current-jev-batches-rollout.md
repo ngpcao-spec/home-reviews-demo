@@ -2,7 +2,7 @@
 
 ## Contrat livré
 
-Le choix serveur `report_pipeline_settings.jev_transport` est déployé à **`individual`**. L'engine reste `jev_sol_v2`. La migration et le déploiement ne créent aucune demande et ne lancent aucun fournisseur.
+Le choix serveur `report_pipeline_settings.jev_transport` a été livré initialement à **`individual`**, puis activé à **`batch_initial_v1`** le 24 octobre 2026 à 15:37:26 au Vietnam. L'engine reste `jev_sol_v2`. La migration de réveil initial ne change pas ce réglage et ne crée aucune demande.
 
 La demande capture le transport lors de `enqueue_current_report`. Cette valeur devient immuable dans `report_generation_requests` : bascule et retour arrière ne modifient que les demandes suivantes. Le certificat d'une demande en lots ne peut pas alimenter le dispatcher individuel.
 
@@ -25,6 +25,13 @@ Le reçu brut, son hash, le modèle servi, l'identifiant de requête éventuel, 
 Les lots terminés sont conservés. Un reçu déjà sauvegardé est validé sans renvoi. Une réservation expirée sans reçu ou un timeout reste `unknown`, tentative consommée. Les lots non commencés peuvent continuer ; Sol reste bloqué si un lot manque ou est invalide. Aucun fallback individuel ni retry automatique. Une réponse tardive peut être conservée pour le même worker si aucun reçu n'existe ; elle n'autorise aucun nouvel envoi.
 
 Les wakes immédiats poursuivent les étapes après chaque sauvegarde. Un cron de récupération réveille les parcours courants interrompus ; il ne remet jamais une tentative à zéro. Les expirations d'autorisation sont visibles et conservent les reçus. Une tentative inconnue d'une génération courante bloque aussi une nouvelle demande qui contournerait cette issue incertaine.
+
+Le réveil couvre aussi la première préparation, avant tout snapshot : l'insertion
+d'une nouvelle demande courante en lots programme le worker dans la même transaction,
+avec envoi après commit. Le double clic réutilise la source sans nouveau réveil initial.
+Un échec de programmation laisse la demande en file pour le cron de secours.
+Le [diagnostic de l'attente initiale](current-batch-initial-queue-20261024.md)
+sépare les 56 secondes d'alignement cron des coûts de dispatch et de préparation.
 
 ## Comptabilisation et publication
 
