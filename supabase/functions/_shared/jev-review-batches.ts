@@ -32,7 +32,7 @@ function checkCorpus(rows:readonly BatchReview[]){
   }
 }
 function initialCommon(){
-  const questions=SHORT_CLASSIFIER_CONFIG.questions as Record<DirectCategory,{instructions:string;criteria:Record<string,string>}>;
+  const questions=SHORT_CLASSIFIER_CONFIG.questions as unknown as Record<DirectCategory,{instructions:string;criteria:Record<string,string>}>;
   const rules=questions.service.instructions.split('\n').slice(1).join('\n'),definitions=questions.service.criteria;
   check(rules&&DIRECT_CATEGORY_KEYS.every(k=>questions[k].instructions.endsWith('\n'+rules)),'BATCH_COMMON_RULES_CHANGED');
   check(DIRECT_CATEGORY_KEYS.every(k=>directCanonical(questions[k].criteria)===directCanonical(definitions)),'BATCH_CHOICES_CHANGED');
@@ -103,6 +103,10 @@ export async function initialBatchIdentity(batch:InitialBatch){
     request_canonical_sha256:await directHash(batch.payload),
     mapping_sha256:await directHash(batch.mapping),common_sha256};
 }
+export function assertInitialBatchRequest(batch:InitialBatch){
+ const rebuilt=initialBatchPayload(Object.entries(batch.payload.state.avis).map(([alias,text])=>({review_id:alias.replace(/^review_/,''),text})));
+ check(directCanonical(rebuilt)===directCanonical({payload:batch.payload,mapping:batch.mapping}),'BATCH_REQUEST_OR_MAPPING_CHANGED');
+}
 // JSON.parse alone silently accepts duplicate answer keys. Reject them before any mapping.
 export function parseBatchJson(text:string):unknown{
   let i=0;const white=()=>{while(i<text.length&&/\s/.test(text[i]))i++;};
@@ -135,8 +139,7 @@ export function parseInitialBatchResponse(text:string,batch:InitialBatch):{
   const raw=object(parseBatchJson(text)),answers=object(raw.answers),expected=Object.keys(batch.mapping);
   check(raw.model===INITIAL_BATCH_CONTRACT.model,'BATCH_SERVED_MODEL_CHANGED');
   check(directCanonical(Object.keys(batch.payload.questions).sort())===directCanonical(expected.sort()),'BATCH_MAPPING_CHANGED');
-  const rebuilt=initialBatchPayload(Object.entries(batch.payload.state.avis).map(([alias,text])=>({review_id:alias.replace(/^review_/,''),text})));
-  check(directCanonical(rebuilt)===directCanonical({payload:batch.payload,mapping:batch.mapping}),'BATCH_REQUEST_OR_MAPPING_CHANGED');
+  assertInitialBatchRequest(batch);
   const missing=expected.filter(k=>!Object.hasOwn(answers,k)),extra=Object.keys(answers).filter(k=>!Object.hasOwn(batch.mapping,k));
   check(!missing.length&&!extra.length,'BATCH_ANSWER_KEYS_MISMATCH:'+JSON.stringify({missing,extra}));
   const usage=parseUsage(raw.usage);check(usage.input_tokens>0,'BATCH_INVALID_USAGE');

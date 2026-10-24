@@ -1,5 +1,7 @@
 # JEV par lots — préparation et raccordement expérimental
 
+Mise à jour : le raccordement général des nouvelles demandes est désormais livré derrière l'option serveur désactivée `jev_transport=individual`. La création depuis le snapshot courant, la comptabilisation des reçus nouveaux et la publication courante sont décrites dans [la procédure de mise en service](current-jev-batches-rollout.md). Les sections suivantes conservent l'historique de préparation et d'expérience. Le prompt initial et le sélecteur de production restent retenus ; les essais de diversité sont clos hors du parcours actif.
+
 Décision du 24 octobre 2026 : retenir le prompt initial en véritables requêtes multi-avis. Les deux prompts candidats sont écartés. La première préparation hors réseau est décrite ci-dessous ; le raccordement expérimental et le test Sol distinct figurent à la fin. Le parcours de production reste individuel.
 
 ## Livré et vérifié hors réseau

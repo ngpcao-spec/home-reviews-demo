@@ -4,6 +4,8 @@
 import type {SupabaseClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {prepareHistoricalSnapshot,type HistoricalJob} from './historical-report-worker.ts';
 import {parallelProtocol,CURRENT_V2,type ParallelCurrent,type ParallelHistory} from './parallel-report.ts';
+import {currentBatchManifest,BATCH_TRANSPORT} from './current-batch-report.ts';
+import {localHybridTokens} from './jev-hybrid-evidence.ts';
 export const CURRENT_REPORT_CODE='bdbc5d541968adf8810cdea90fdd24f26cb1ca97';
 export async function currentReportProtocol(run:HistoricalJob){
  const base=run.snapshot.base,reviews=run.snapshot.reviews;
@@ -22,6 +24,17 @@ export async function processCurrentReportPreparation(admin:SupabaseClient,run:H
    await save({...prepared,total_steps:null,attempt_count:0,locked_by:null,lease_until:null});
    return {phase:'source_frozen',provider_calls:0};
   }
+  if(run.jev_transport===BATCH_TRANSPORT){
+   // Reuse the existing free source certification, never its individual dispatch.
+   const sealed=await admin.from('analysis_parallel_launch_preparations').select('body,sha256').eq('current_source_run_id',run.id).maybeSingle();
+   if(sealed.error)throw Error('CURRENT_BATCH_CERTIFICATE_READ_FAILED');
+   const p=sealed.data??await currentReportProtocol(run);
+   if(!sealed.data){const certified=await admin.rpc('prepare_current_v2_protocol',{p_source:run.id,p_body:p.body,p_sha:p.sha256});if(certified.error)throw Error('CURRENT_BATCH_CERTIFICATION_FAILED');}
+   const manifest=await currentBatchManifest(p,localHybridTokens);
+   const r=await admin.rpc('jev_batch_create_current',{p_source:run.id,p_manifest:manifest.body,p_sha:manifest.sha256});
+   if(r.error||!r.data)throw Error('CURRENT_BATCH_QUEUE_FAILED');
+   return {phase:'current_batches_queued',batch_run_id:r.data,provider_calls:0};
+  }
   const sealed=await admin.from('analysis_parallel_launch_preparations').select('body,sha256').eq('current_source_run_id',run.id).maybeSingle();if(sealed.error)throw Error('CURRENT_V2_PREPARATION_READ_FAILED');
   if(!sealed.data){
    const p=await currentReportProtocol(run);if(!p.body.pending.length)throw Error('NO_TEXT_REVIEWS_AVAILABLE');
@@ -32,7 +45,8 @@ export async function processCurrentReportPreparation(admin:SupabaseClient,run:H
   if(r.error||!r.data)throw Error('CURRENT_V2_QUEUE_FAILED');
   return {phase:'v2_queued',comparison_id:r.data,provider_calls:0};
  }catch(e){
-  const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'CURRENT_V2_PREPARATION_FAILED';
+  const prefix=e instanceof Error?e.message.split(':')[0]:'';
+  const code=/^[A-Z_0-9]+$/.test(prefix)?prefix:'CURRENT_V2_PREPARATION_FAILED';
   await save({status:'failed',error_code:code,last_error:code,locked_by:null,lease_until:null});
   return {phase:'preparation_failed',error:code,provider_calls:0};
  }
