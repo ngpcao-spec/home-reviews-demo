@@ -27,10 +27,19 @@ Deno.serve(async request => {
     await assertMembership(context.client,context.user.id,e.organization_id,['owner','admin','manager'])
     if(pe || !['fr','vi'].includes(profile?.preferred_language)) return json({error:'PREFERRED_LANGUAGE_REQUIRED'},400)
     if(body.preferred_language && body.preferred_language!==profile.preferred_language) return json({error:'REPORT_LANGUAGE_CHANGED'},409)
+    if(body.action==='abandon_failed'){
+      if(typeof body.request_id!=='string'||!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(body.request_id)||body.confirmed!==true)return json({error:'REPORT_RESTART_ACK_REQUIRED'},409)
+      const q=await context.admin.from('report_generation_requests').select('id').eq('id',body.request_id).eq('organization_id',e.organization_id).eq('establishment_id',e.id).eq('language',profile.preferred_language).maybeSingle()
+      if(q.error||!q.data)return json({error:'FORBIDDEN'},403)
+      const r=await context.admin.rpc('abandon_current_report_request',{p_request:body.request_id,p_user:context.user.id,p_acknowledge_uncertain_cost:true})
+      if(r.error){const code=['FORBIDDEN','REPORT_ABANDON_NOT_ALLOWED','REPORT_RESTART_ACK_REQUIRED'].find(c=>r.error.message.includes(c))??'REPORT_ABANDON_FAILED';return json({error:code},code==='FORBIDDEN'?403:409)}
+      return json(r.data)
+    }
     if(body.action==='capability'){
       const c=await context.client.from('report_pipeline_settings').select('engine,updated_at').eq('id',true).single();if(c.error)throw Error('REPORT_ROUTING_UNAVAILABLE');
       return json({routing:c.data,v2:'jev-short-sol-compact-v2',provider_calls:0});
     }
+    if(body.action!==undefined)return json({error:'REPORT_ACTION_INVALID'},400)
     // Older clients may still send continuation calls: they become read-only.
     if(body.generation_id) {
       const {data:run,error}=await context.admin.from('historical_report_runs').select('*').eq('organization_id',e.organization_id)

@@ -2,6 +2,27 @@ import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
 import { HistoricalGeneration,type GenerationReply,type HistoricalRun } from './historical-generation'
 const running=(patch:Partial<HistoricalRun>={}):HistoricalRun=>({establishment_id:'khouse',preferred_language:'vi',generation_id:'existing-generation',status:'running',progress:3,total_steps:6,resumable:false,error_code:null,...patch})
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve()}
+it('explicit abandonment clears the stale intent and requires another click before a fresh full generation',async()=>{
+ const f=setup(),abandon=vi.fn().mockResolvedValue(undefined);let stored:string|null='old-request';
+ const intent={read:()=>stored,write:(id:string|null)=>{stored=id}}
+ f.controller.dispose();const c=new HistoricalGeneration({...f.deps,abandon,intent})
+ const failed=running({status:'failed',request_id:'old-request',can_abandon:true,unknown_batches:1})
+ f.deps.readStatus.mockResolvedValue(failed);c.attach();await flush()
+ expect(await c.abandon()).toBe(true);expect(abandon).toHaveBeenCalledWith('old-request');expect(stored).toBeNull()
+ expect(c.getSnapshot()).toMatchObject({phase:'idle',run:null,feedback:'abandoned'});expect(f.deps.enqueue).not.toHaveBeenCalled()
+ f.deps.readStatus.mockResolvedValue({...failed,abandoned:true,can_abandon:false})
+ await c.wake(true);expect(f.deps.enqueue).not.toHaveBeenCalled()
+ await c.start();expect(f.deps.enqueue).toHaveBeenCalledOnce()
+ expect(f.deps.enqueue).toHaveBeenCalledWith(expect.objectContaining({request_id:expect.not.stringContaining('old-request')}));c.dispose()
+})
+it('a lost abandonment acknowledgment is reconciled without scheduling or retrying a generation',async()=>{
+ const f=setup(),abandon=vi.fn().mockRejectedValue(Error('ACK_LOST'));f.controller.dispose()
+ const c=new HistoricalGeneration({...f.deps,abandon}),failed=running({status:'failed',request_id:'old',can_abandon:true})
+ f.deps.readStatus.mockResolvedValue(failed);c.attach();await flush()
+ f.deps.readStatus.mockResolvedValue({...failed,abandoned:true})
+ expect(await c.abandon()).toBe(true);expect(abandon).toHaveBeenCalledOnce();expect(f.deps.enqueue).not.toHaveBeenCalled()
+ expect(c.getSnapshot().phase).toBe('idle');c.dispose()
+})
 function setup(saved?:HistoricalRun){
   const deps={establishmentId:'khouse',language:'vi',visible:vi.fn(()=>true),
     readStatus:vi.fn<()=>Promise<HistoricalRun|null>>().mockResolvedValue(null),
