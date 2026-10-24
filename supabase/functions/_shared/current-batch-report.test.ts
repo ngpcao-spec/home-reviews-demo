@@ -98,9 +98,9 @@ describe('current batch transport — source and execution contract',()=>{
  });
  it('uses the captured per-request transport during preparation, without reading a later global switch',async()=>{
   const job=syntheticCurrentBatchJob(3),calls:string[]=[];
-  const admin={from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:null,error:null})})})}),rpc:async(name:string)=>{calls.push(name);return {data:'saved',error:null};}};
-  const result=await processCurrentReportPreparation(admin as never,job,'worker');expect(result).toMatchObject({phase:'current_batches_queued',provider_calls:0});
-  expect(calls).toEqual(['prepare_current_v2_protocol','jev_batch_create_current']);
+  const admin={from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:null,error:null})})})}),rpc:async(name:string)=>{calls.push(name);return {data:name==='checkpoint_historical_report_run'?true:'saved',error:null};}};
+  const result=await processCurrentReportPreparation(admin as never,job,'worker');expect(result).toMatchObject({phase:'protocol_certified',provider_calls:0});
+  expect(calls).toEqual(['prepare_current_v2_protocol','checkpoint_historical_report_run','wake_current_jev_preparation']);
  });
  it('exposes an explicit fixed simulation with zero network calls',async()=>{
   expect(await rehearseCurrentBatches()).toMatchObject({explicit_technical_mock:true,provider_calls:0,new_runs:0,status:'completed',simulated_jev:2,simulated_sol:1,reviews:51,native_classifications:204});
