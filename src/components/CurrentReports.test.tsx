@@ -13,6 +13,21 @@ function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',i
  mock.invoke.mockResolvedValue({data,error:null});const generate=vi.fn();
  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[initial]}><I18nProvider language={language}><CurrentReports establishmentId="est" account="account" languageKey={language} enabled current={null} generating={false} generationAction={<button onClick={generate}>NORMAL GENERATE</button>}><p>LEGACY SOL PRESERVED</p></CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);return {generate,data}
 }
+it('shows batch progress and resumes only the selected experiment without changing normal generation',async()=>{
+ const row=parallelPresentationRow('fr');row.current_source_run_id=null;
+ const data={routing:{engine:'jev_sol_v2',updated_at:'2026-10-24'},legacy_report:null,
+  versions:[{id:row.id,current_source_run_id:null,configuration_version:'jev-multi-review-initial-v1',created_at:'2026-10-24',generated_at:null,state:'running'}],
+  experimental:row,run:{id:'batch-run',status:'running',stage:'jev',error_code:null},tasks:[],operation:null,
+  batch_progress:{run_id:'batch-run',completed_batches:3,total_batches:11,completed_reviews:150,total_reviews:527,unknown_batches:1,can_resume:true,sol_attempts:0}} satisfies CurrentReportsView;
+ mock.invoke.mockResolvedValue({data,error:null});const generate=vi.fn();
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={['/analyses?variant=legacy&comparison='+row.id]}><I18nProvider language="fr"><CurrentReports establishmentId="est" account="account" languageKey="fr" enabled current={null} generating={false} generationAction={<button onClick={generate}>NORMAL GENERATE</button>}>LEGACY</CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);
+ await screen.findByText(/3 \/ 11 lots · 150 \/ 527 avis/);
+ expect(screen.getByText(/résultat inconnu.*sans renvoi automatique/)).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Poursuivre les étapes non commencées'}));
+ await waitFor(()=>expect(mock.invoke).toHaveBeenCalledWith('jev-batch-experiment',{body:{action:'resume',run_id:'batch-run'}}));
+ expect(generate).not.toHaveBeenCalled();
+ expect(mock.invoke.mock.calls.every(c=>c[1].body.action!=='start')).toBe(true);
+});
 it.each(['fr','vi'] as const)('makes V2 current, preserves archived Sol and never generates on read/tab switch (%s)',async language=>{
  const {generate}=draw(language);await screen.findByRole('tab',{name:language==='fr'?'Rapport courant · V2':'Báo cáo hiện tại · V2'});
  expect(screen.getByRole('button',{name:'NORMAL GENERATE'})).toBeVisible();expect(screen.getByText('LEGACY SOL PRESERVED')).not.toBeVisible();
@@ -28,3 +43,4 @@ it('retains negative/mixed review access and omits generic source links in the c
  expect(screen.queryByRole('button',{name:'Xem đánh giá nguồn'})).not.toBeInTheDocument();
  const buttons=screen.getAllByRole('button',{name:/Đánh giá tiêu cực, gồm hỗn hợp/});fireEvent.click(buttons[0]);await screen.findByRole('dialog');fireEvent.click(screen.getByRole('button',{name:'Đóng và quay lại báo cáo'}));await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
+

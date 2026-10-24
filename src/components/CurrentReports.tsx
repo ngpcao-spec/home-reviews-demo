@@ -11,7 +11,8 @@ import {ReputationReport} from './ReputationReport'
 import './parallel-reports.css'
 export interface CurrentReportsView {
  routing:{engine:'jev_sol_v2'|'sol_legacy';updated_at:string};legacy_report:HistoricalReportRow|null;
- versions:{id:string;created_at:string;generated_at:string|null;state:string;current_source_run_id:string|null}[];
+ versions:{id:string;created_at:string;generated_at:string|null;state:string;current_source_run_id:string|null;configuration_version?:string}[];
+ batch_progress?:{run_id:string;completed_batches:number;total_batches:number;completed_reviews:number;total_reviews:number;unknown_batches:number;can_resume:boolean;sol_attempts:number}|null;
  experimental:ParallelView['experimental'];run:ParallelView['run'];tasks:ParallelView['tasks'];operation:unknown
 }
 export function CurrentReports({establishmentId,account,enabled,languageKey,current,generating,generationRevision,generationAction,children}:{
@@ -29,6 +30,8 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
  const stages:Record<string,string>=fr?{preparing:'Préparation du corpus et du lancement',jev:'Classification JEV',prepare_evidence:'Préparation des preuves',sol:'Rédaction Sol',validate_sol:'Contrôles et sauvegarde'}:{preparing:'Chuẩn bị bộ đánh giá và khởi chạy',jev:'Phân loại JEV',prepare_evidence:'Chuẩn bị bằng chứng',sol:'Soạn báo cáo Sol',validate_sol:'Kiểm tra và lưu'};
  const switchTab=(old:boolean)=>{const next=new URLSearchParams(params);next.delete('comparison');next.set('variant',old?'legacy':'current');setParams(next)};
  const choose=(id:string)=>{const next=new URLSearchParams(params);next.set('variant','legacy');if(id)next.set('comparison',id);else next.delete('comparison');setParams(next)};
+ const batch=data?.batch_progress;
+ const batchProgress=batch&&<div role="status"><p>{fr?'Essai JEV par lots · prompt initial':'Thử nghiệm JEV theo nhóm · hướng dẫn ban đầu'} : {batch.completed_batches} / {batch.total_batches} {fr?'lots':'nhóm'} · {batch.completed_reviews} / {batch.total_reviews} {fr?'avis':'đánh giá'}. {data?.run&&stages[data.run.stage]}</p>{batch.unknown_batches>0&&<p>{fr?'Une tentative au résultat inconnu est conservée sans renvoi automatique.':'Lượt gọi chưa rõ kết quả được giữ nguyên, không tự gửi lại.'}</p>}{batch.can_resume&&<button className="secondary-button" onClick={async()=>{await supabase!.functions.invoke('jev-batch-experiment',{body:{action:'resume',run_id:batch.run_id}});void q.refetch()}}>{fr?'Poursuivre les étapes non commencées':'Tiếp tục các bước chưa bắt đầu'}</button>}</div>;
  const method=fr?'JEV (classements automatiques), puis Sol compact, sans Luna. Les contrôles techniques ne constituent pas une validation humaine du contenu.':'JEV phân loại tự động, sau đó Sol với bộ dữ liệu gọn, không qua Luna. Kiểm tra kỹ thuật không phải xác nhận nội dung của con người.';
  const legacyReport=legacy?.consultant?<ConsultantReport report={legacy.consultant}/>:legacy?<ReputationReport report={legacy}/>:children;
  const meta=(source:NonNullable<typeof row>)=><dl className="parallel-metadata"><div><dt>{fr?'Généré le':'Ngày tạo'}</dt><dd>{date(source.generated_at)}</dd></div><div><dt>{fr?'Avis du corpus':'Đánh giá trong bộ dữ liệu'}</dt><dd>{source.statistics?.scope.source_reviews??source.source_reviews.length}</dd></div><div><dt>{fr?'Textes analysés':'Nội dung đã phân tích'}</dt><dd>{source.statistics?.scope.analysed_text_reviews??'—'} / {source.source_reviews.filter(r=>r.analysis_text?.trim()).length}</dd></div><div><dt>{fr?'État':'Trạng thái'}</dt><dd>{statuses[data?.run?.status??source.state]??source.state}</dd></div></dl>;
@@ -54,9 +57,10 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
     </>}
    </section>
    <section id="archive-report-panel" role="tabpanel" aria-labelledby="archive-report-tab" hidden={!archive}>
-    <label className="parallel-corpus-label">{fr?'Version archivée':'Phiên bản đã lưu'}<select aria-label={fr?'Version archivée':'Phiên bản đã lưu'} value={comparison} onChange={e=>choose(e.target.value)}><option value="">{fr?'Ancien rapport · Sol seul':'Báo cáo cũ · chỉ Sol'}</option>{data.versions.map(v=><option value={v.id} key={v.id}>{v.current_source_run_id?'V2':fr?'Essai V2 archivé':'V2 thử nghiệm đã lưu'} — {date(v.generated_at??v.created_at)} — {statuses[v.state]??v.state}</option>)}</select></label>
-    {comparison&&row?<>{meta(row)}<ExperimentalReport key={'archive:'+row.id} row={row} operation={data.operation} methodology={method}/>{!row.current_source_run_id&&row.source_report?.consultant_report&&<details className="card"><summary>{fr?'Rapport Sol de référence du même corpus':'Báo cáo Sol tham chiếu của cùng bộ đánh giá'}</summary><ConsultantReport report={row.source_report.consultant_report}/></details>}</>:<><p className="v5-muted">{fr?'Rapport historique Sol, conservé avec sa provenance.':'Báo cáo Sol cũ được giữ nguyên cùng nguồn gốc.'} {date(legacy?.generatedAt)}</p>{legacyReport}</>}
+    <label className="parallel-corpus-label">{fr?'Version archivée':'Phiên bản đã lưu'}<select aria-label={fr?'Version archivée':'Phiên bản đã lưu'} value={comparison} onChange={e=>choose(e.target.value)}><option value="">{fr?'Ancien rapport · Sol seul':'Báo cáo cũ · chỉ Sol'}</option>{data.versions.map(v=><option value={v.id} key={v.id}>{v.configuration_version==='jev-multi-review-initial-v1'?(fr?'Essai JEV par lots':'Thử nghiệm JEV theo nhóm'):v.current_source_run_id?'V2':fr?'Essai V2 archivé':'V2 thử nghiệm đã lưu'} — {date(v.generated_at??v.created_at)} — {statuses[v.state]??v.state}</option>)}</select></label>
+    {comparison&&row?<>{meta(row)}{batchProgress}<ExperimentalReport key={'archive:'+row.id} row={row} operation={data.operation} methodology={method}/>{!row.current_source_run_id&&row.source_report?.consultant_report&&<details className="card"><summary>{fr?'Rapport Sol de référence du même corpus':'Báo cáo Sol tham chiếu của cùng bộ đánh giá'}</summary><ConsultantReport report={row.source_report.consultant_report}/></details>}</>:<><p className="v5-muted">{fr?'Rapport historique Sol, conservé avec sa provenance.':'Báo cáo Sol cũ được giữ nguyên cùng nguồn gốc.'} {date(legacy?.generatedAt)}</p>{legacyReport}</>}
    </section>
   </>}
  </>
 }
+
