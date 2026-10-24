@@ -1,5 +1,5 @@
-// Experimental adapter. The production restaurant worker and JEV prompt are unchanged.
-import {initialBatchIdentity,parseBatchJson,parseInitialBatchResponse,type InitialBatch} from './jev-review-batches.ts';
+// Shared durable batch execution. Used by saved experiments and opt-in current requests.
+import {initialBatchIdentity,assertInitialBatchRequest,parseBatchJson,parseInitialBatchResponse,type InitialBatch} from './jev-review-batches.ts';
 import {directCanonical,directHash,directCategoryCounts} from './jev-direct-categories.ts';
 import {analysisTextSha256} from './analysis-text.ts';
 import {directReportCandidates,type DirectReportInput} from './jev-direct-report-preparation.ts';
@@ -10,8 +10,8 @@ import {solRequestSize,SOL_SIZE_POLICY} from './jls-sol-size.ts';
 export const BATCH_EXPERIMENT='jev-multi-review-initial-v1';
 export interface BatchTask {id:string;number:number;reviews:number;status:string;request_count:number;request_wire:string;request_sha256:string;
  mapping:InitialBatch['mapping'];receipt:Record<string,unknown>|null;receipt_sha256:string|null;projection?:BatchProjection;historical_source:unknown}
-export interface BatchRun {id:string;organization_id:string;establishment_id:string;report_id:string;baseline_report_id:string;stage:string;status:string;armed:boolean;
- snapshot:DirectReportInput['snapshot']['body'];snapshot_sha256:string;template:Record<string,any>;max_new_jev_calls:number;
+export interface BatchRun {id:string;organization_id:string;establishment_id:string;report_id:string;baseline_report_id:string|null;current_source_run_id?:string|null;stage:string;status:string;armed:boolean;
+ snapshot:Omit<DirectReportInput['snapshot']['body'],'reviews'>&{reviews:(DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown})[]};snapshot_sha256:string;template:Record<string,any>;max_new_jev_calls:number;
  envelope?:BatchEnvelope;envelope_sha256?:string;sol_receipt?:Record<string,any>;sol_receipt_sha256?:string;sol_request_count:number}
 export interface BatchProjection {parent_receipt_sha256:string;question_mapping_sha256:string;rows:ReturnType<typeof parseInitialBatchResponse>['rows'];
  usage:ReturnType<typeof parseInitialBatchResponse>['usage'];usage_is_historical:boolean;native_classifications:number}
@@ -19,7 +19,7 @@ function check(ok:unknown,code:string):asserts ok{if(!ok)throw Error(code);}
 export async function validateBatchTask(run:BatchRun,task:BatchTask):Promise<BatchProjection>{
  check(await analysisTextSha256(task.request_wire)===task.request_sha256,'BATCH_REQUEST_CHANGED');
  const batch={payload:parseBatchJson(task.request_wire) as InitialBatch['payload'],mapping:task.mapping};
- await initialBatchIdentity(batch);
+ await initialBatchIdentity(batch);assertInitialBatchRequest(batch);
  check(Object.keys(batch.payload.state.avis).length===task.reviews,'BATCH_REVIEW_COUNT_CHANGED');
  for(const [alias,text] of Object.entries(batch.payload.state.avis)){
   const r=run.snapshot.reviews.find(r=>r.id===alias.replace(/^review_/,''));
@@ -61,8 +61,9 @@ export async function batchSolEnvelope(run:BatchRun,tasks:BatchTask[]){
  // The candidates keep the batch parent receipt and the native per-review projection.
  // No synthetic individual supplier receipt is registered in the old cache.
  const candidates=await directReportCandidates({dataset:{body:{reviews:rows,configuration_id:'jev_categories4_short_common_1pass_v1'}},
-  snapshot:{body:run.snapshot}} as DirectReportInput);
+  snapshot:{body:run.snapshot}} as unknown as DirectReportInput);
  const selection=selectDirectCoverage(candidates,32),evidence=selection.selected;
+ check(evidence.length>0,'BATCH_EVIDENCE_INSUFFICIENT');
  const compact=await prepareCompactSolWire({organization_id:run.organization_id,establishment_id:run.establishment_id,
   source_snapshot_sha256:run.snapshot_sha256,statistics,statistics_sha256,evidence,reviews:run.snapshot.reviews},run.template.packet.language);
  const request=JSON.parse(run.template.request_json);
@@ -85,7 +86,32 @@ export interface BatchExperimentPort {
  receiveSol(id:string,worker:string,body:unknown,sha:string):Promise<boolean>;
  finish(id:string,status:string,result:unknown,usage:unknown,error?:string):Promise<boolean>;
 }
-const errorCode=(e:unknown)=>e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'BATCH_STEP_FAILED_NO_RETRY';
+const errorCode=(e:unknown)=>{const code=e instanceof Error?e.message.split(':')[0]:'';return /^[A-Z_0-9]+$/.test(code)?code:'BATCH_STEP_FAILED_NO_RETRY';};
+function receiptMetadata(raw:string){
+ try{const r=JSON.parse(raw),u=r.usage;
+  return {served_model:typeof r.model==='string'?r.model:null,usage:u&&Number.isSafeInteger(u.input_tokens)&&u.input_tokens>=0&&Number.isSafeInteger(u.output_tokens)&&u.output_tokens>=0?u:null};
+ }catch{return {served_model:null,usage:null};}
+}
+export function batchJevAccounting(tasks:BatchTask[]){
+ check(new Set(tasks.map(t=>t.id)).size===tasks.length,'BATCH_ACCOUNTING_DUPLICATE_TASK');
+ const sum=(rows:BatchTask[],historical:boolean)=>{
+  let input=0,output=0,duration=0,known=0,unknown=0,attempts=0;
+  for(const t of rows){const attempted=historical?1:t.request_count;attempts+=attempted;if(!attempted)continue;
+   const u=t.projection?.usage??(typeof t.receipt?.raw_response_text==='string'?receiptMetadata(t.receipt.raw_response_text).usage:null);
+   if(u){input+=u.input_tokens;output+=u.output_tokens;known++;}else unknown++;
+   if(typeof t.receipt?.duration_ms==='number')duration+=t.receipt.duration_ms;
+  }
+  return {provider_attempts:attempts,input_tokens:known||!attempts?input:null,output_tokens:known||!attempts?output:null,
+   summed_provider_duration_ms:duration,batches_with_recorded_usage:known,unknown_usage_batches:unknown,usage_complete:unknown===0};
+ };
+ const historical=sum(tasks.filter(t=>t.historical_source!==null),true),fresh=sum(tasks.filter(t=>t.historical_source===null),false);
+ return {historical:fresh.provider_attempts===0,provider_attempts:historical.provider_attempts+fresh.provider_attempts,
+  reused_batches:tasks.filter(t=>t.historical_source!==null).length,new_provider_attempts:fresh.provider_attempts,
+  input_tokens:historical.input_tokens===null||fresh.input_tokens===null?null:historical.input_tokens+fresh.input_tokens,
+  output_tokens:historical.output_tokens===null||fresh.output_tokens===null?null:historical.output_tokens+fresh.output_tokens,
+  summed_provider_duration_ms:historical.summed_provider_duration_ms+fresh.summed_provider_duration_ms,
+  usage_complete:historical.usage_complete&&fresh.usage_complete,historical_usage:historical,new_usage:fresh};
+}
 export async function processBatchExperiment(port:BatchExperimentPort,id:string,keys:{jev:string;sol:string},http:typeof fetch){
  const {run,tasks}=await port.load(id),worker=crypto.randomUUID();let providerCalls=0;
  if(!run.armed||run.status!=='running')return {phase:'saved_or_disarmed',provider_calls:0};
@@ -94,13 +120,15 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   if(t.status==='reserved'){
    check(run.max_new_jev_calls>0&&keys.jev,'BATCH_NEW_JEV_NOT_AUTHORIZED');
    check(await analysisTextSha256(t.request_wire)===t.request_sha256,'BATCH_REQUEST_CHANGED');
-   await initialBatchIdentity({payload:parseBatchJson(t.request_wire) as InitialBatch['payload'],mapping:t.mapping});
+   const batch={payload:parseBatchJson(t.request_wire) as InitialBatch['payload'],mapping:t.mapping};
+   await initialBatchIdentity(batch);assertInitialBatchRequest(batch);
    const at=Date.now();let receipt;
    try{
     providerCalls++;
     const r=await http('https://api.typesafe.ai/v1/systemone',{method:'POST',headers:{Authorization:'Bearer '+keys.jev,'Content-Type':'application/json'},body:t.request_wire,redirect:'error',signal:AbortSignal.timeout(110000)});
     const raw=(await r.text()).replaceAll(keys.jev,'[REDACTED_SECRET]');
-    receipt={request_sha256:t.request_sha256,raw_response_text:raw,raw_response_sha256:await analysisTextSha256(raw),http_status:r.status,duration_ms:Date.now()-at,error:null};
+    receipt={request_sha256:t.request_sha256,raw_response_text:raw,raw_response_sha256:await analysisTextSha256(raw),http_status:r.status,duration_ms:Date.now()-at,
+     ...receiptMetadata(raw),provider_request_id:r.headers.get('x-request-id'),error:null};
    }catch(e){receipt={request_sha256:t.request_sha256,raw_response_text:null,http_status:null,duration_ms:Date.now()-at,error:errorCode(e)};}
    check(await port.receive(t.id,worker,receipt,await directHash(receipt)),'BATCH_RECEIPT_SAVE_UNCERTAIN_NO_RETRY');
    return {phase:'raw_jev_saved',provider_calls:providerCalls};
@@ -133,8 +161,8 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
  check(run.stage==='validate_sol'&&run.sol_receipt&&run.sol_request_count===1,'BATCH_SOL_RECEIPT_REQUIRED');
  const receipt=run.sol_receipt;
  check(await directHash(receipt)===run.sol_receipt_sha256&&receipt.request_sha256===envelope.request_sha256,'BATCH_SOL_RECEIPT_CHANGED');
- const historical=tasks.filter(t=>t.historical_source).reduce((a,t)=>({input_tokens:a.input_tokens+(t.projection?.usage.input_tokens??0),output_tokens:a.output_tokens+(t.projection?.usage.output_tokens??0),summed_provider_duration_ms:a.summed_provider_duration_ms+Number(t.receipt?.duration_ms??0)}),{input_tokens:0,output_tokens:0,summed_provider_duration_ms:0});
- const usage:Record<string,unknown>={jev:{historical:true,provider_attempts:tasks.filter(t=>t.historical_source).length,reused_batches:tasks.filter(t=>t.historical_source).length,new_provider_attempts:tasks.reduce((s,t)=>s+t.request_count,0),...historical},luna_calls:0,apify_calls:0};
+ const jev=batchJevAccounting(tasks);
+ const usage:Record<string,unknown>={jev,luna_calls:0,apify_calls:0};
  let status='invalid_output',error:string|undefined,result:Record<string,unknown>={};
  try{
   if(!receipt.raw_response_text){status='billing_uncertain';throw Error('BATCH_SOL_OUTCOME_UNKNOWN_NO_RETRY');}
@@ -149,9 +177,10 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   const validated=await validateParallelReport(reconstructed,envelope as unknown as Parameters<typeof validateParallelReport>[1]);
   const {report,format_version,statistics_sha256,...controls}=validated;
   result={...result,original_report:validated.original_report,derived_report:{report,format_version,statistics_sha256},corrections:validated.reference_derivation,
-   controls:{...controls,evidence:envelope.evidence,compact_response:compact,response_format_version:envelope.packet.version,batch_experiment:true,new_jev_calls:0}};
+   controls:{...controls,evidence:envelope.evidence,compact_response:compact,response_format_version:envelope.packet.version,
+    batch_experiment:!run.current_source_run_id,jev_transport:BATCH_EXPERIMENT,new_jev_calls:jev.new_provider_attempts}};
   status=validated.technical_checks_passed?'completed':'needs_review';
- }catch(e){error=errorCode(e);result.controls={validation_error:error,batch_experiment:true};}
+ }catch(e){error=errorCode(e);result.controls={validation_error:error,batch_experiment:!run.current_source_run_id,new_jev_calls:jev.new_provider_attempts};}
  check(await port.finish(id,status,result,usage,error),'BATCH_RESULT_SAVE_FAILED');
  return {phase:'sol_validation_saved',provider_calls:0,status,error_code:error};
 }

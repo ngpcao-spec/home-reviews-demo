@@ -28,6 +28,23 @@ it('shows batch progress and resumes only the selected experiment without changi
  expect(generate).not.toHaveBeenCalled();
  expect(mock.invoke.mock.calls.every(c=>c[1].body.action!=='start')).toBe(true);
 });
+it('shows current batch progress and its captured transport after the server option rolls back',async()=>{
+ const row=parallelPresentationRow('fr');row.current_source_run_id='source';
+ const data={routing:{engine:'jev_sol_v2',jev_transport:'individual',updated_at:'2026-10-24'},current_transport:'batch_initial_v1',legacy_report:null,
+  versions:[{id:row.id,current_source_run_id:'source',configuration_version:'jev-multi-review-initial-v1',created_at:'2026-10-24',generated_at:null,state:'running'}],
+  experimental:row,run:{id:'current-batches',status:'running',stage:'jev',error_code:null},tasks:[],operation:null,
+  batch_progress:{run_id:'current-batches',completed_batches:1,total_batches:2,completed_reviews:50,total_reviews:51,unknown_batches:0,can_resume:true,sol_attempts:0}} satisfies CurrentReportsView;
+ mock.invoke.mockResolvedValue({data,error:null});
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={['/analyses']}><I18nProvider language="fr"><CurrentReports establishmentId="est" account="account" languageKey="fr" enabled current={null} generating={false} generationAction={<button>NORMAL GENERATE</button>}>LEGACY PRESERVED</CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);
+ expect(await screen.findByText(/1 \/ 2 lots · 50 \/ 51 avis/)).toBeVisible();
+ expect(screen.getByText(/Parcours V2 de cette demande : JEV par lots/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'NORMAL GENERATE'})).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Poursuivre les étapes non commencées'}));
+ await waitFor(()=>expect(mock.invoke).toHaveBeenCalledWith('jev-batch-experiment',{body:{action:'resume',run_id:'current-batches'}}));
+ expect(mock.invoke.mock.calls.every(c=>['read_current','resume'].includes(c[1].body.action))).toBe(true);
+ const negative=screen.getAllByRole('button',{name:/Avis négatifs, mixtes inclus/});expect(negative.length).toBeGreaterThan(0);
+ fireEvent.click(negative[0]);expect(await screen.findByRole('dialog')).toBeVisible();
+});
 it.each(['fr','vi'] as const)('makes V2 current, preserves archived Sol and never generates on read/tab switch (%s)',async language=>{
  const {generate}=draw(language);await screen.findByRole('tab',{name:language==='fr'?'Rapport courant · V2':'Báo cáo hiện tại · V2'});
  expect(screen.getByRole('button',{name:'NORMAL GENERATE'})).toBeVisible();expect(screen.getByText('LEGACY SOL PRESERVED')).not.toBeVisible();
