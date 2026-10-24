@@ -1,6 +1,7 @@
 // No mutations, queueing or suppliers. Uses the caller's RLS client.
 import type {AuthContext} from './auth.ts';
 import {assertMembership} from './auth.ts';
+import {currentHistoricalStatus} from './current-report-status.ts';
 export async function readCurrentReports(c:AuthContext,input:{establishment_id:string;comparison_id?:string}){
  const e=await c.client.from('establishments').select('id,organization_id').eq('id',input.establishment_id).single();if(e.error)throw Error('FORBIDDEN');
  await assertMembership(c.client,c.user.id,e.data.organization_id);
@@ -14,7 +15,16 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  if(routing.error||legacy.error||versions.error||request.error)throw Error('CURRENT_REPORT_READ_FAILED');
  const versionRuns=versions.data.filter(v=>v.run_id).map(v=>v.run_id);
  if(versionRuns.length){const r=await c.client.from('analysis_jls_restaurant_runs').select('id,status').eq('organization_id',org).in('id',versionRuns);if(r.error)throw Error('CURRENT_REPORT_READ_FAILED');for(const v of versions.data)v.state=r.data.find(r=>r.id===v.run_id)?.status??v.state;}
- const chosen=input.comparison_id??(request.data?.engine==='jev_sol_v2'?request.data.comparison_id:versions.data.find(v=>v.configuration_version!=='jev-multi-review-initial-v1')?.id);
+ let request_run=null;
+ if(request.data?.engine==='jev_sol_v2'){
+  const s=await c.admin.from('historical_report_runs').select('id,generation_id,organization_id,establishment_id,language,status,cursor,total_steps,error_code,created_at,completed_at').eq('id',request.data.source_run_id).eq('organization_id',org).single();
+  if(s.error)throw Error('CURRENT_REPORT_READ_FAILED');request_run=await currentHistoricalStatus(c.admin,s.data);
+ }
+ const requested=versions.data.find(v=>v.id===request.data?.comparison_id);
+ const available=versions.data.find(v=>v.current_source_run_id&&['completed','needs_review'].includes(v.state));
+ const chosen=input.comparison_id??(request.data?.engine==='jev_sol_v2'?
+  (requested&&['completed','needs_review'].includes(requested.state)?requested.id:available?.id??requested?.id):
+  versions.data.find(v=>v.configuration_version!=='jev-multi-review-initial-v1')?.id);
  if(input.comparison_id&&!versions.data.some(v=>v.id===input.comparison_id))throw Error('FORBIDDEN');
  let row=null,run=null,tasks:unknown[]=[],operation=null,batch_progress=null;
  if(chosen){
@@ -32,6 +42,6 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  }else if(request.data?.engine==='jev_sol_v2'){
   const r=await c.admin.from('historical_report_runs').select('id,status,error_code,created_at').eq('id',request.data.source_run_id).eq('organization_id',org).single();if(r.error)throw Error('CURRENT_REPORT_READ_FAILED');run={...r.data,stage:'preparing'};
  }
- return {routing:routing.data,current_transport:request.data?.jev_transport??'individual',legacy_report:legacy.data,versions:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
+ return {routing:routing.data,current_transport:request.data?.jev_transport??'individual',request_run,legacy_report:legacy.data,versions:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
 }
 

@@ -12,7 +12,7 @@ export interface BatchTask {id:string;number:number;reviews:number;status:string
  mapping:InitialBatch['mapping'];receipt:Record<string,unknown>|null;receipt_sha256:string|null;projection?:BatchProjection;historical_source:unknown}
 export interface BatchRun {id:string;organization_id:string;establishment_id:string;report_id:string;baseline_report_id:string|null;current_source_run_id?:string|null;stage:string;status:string;armed:boolean;
  snapshot:Omit<DirectReportInput['snapshot']['body'],'reviews'>&{reviews:(DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown})[]};snapshot_sha256:string;template:Record<string,any>;max_new_jev_calls:number;
- envelope?:BatchEnvelope;envelope_sha256?:string;sol_receipt?:Record<string,any>;sol_receipt_sha256?:string;sol_request_count:number}
+ draft?:BatchDraft;draft_sha256?:string;envelope?:BatchEnvelope;envelope_sha256?:string;sol_receipt?:Record<string,any>;sol_receipt_sha256?:string;sol_request_count:number}
 export interface BatchProjection {parent_receipt_sha256:string;question_mapping_sha256:string;rows:ReturnType<typeof parseInitialBatchResponse>['rows'];
  usage:ReturnType<typeof parseInitialBatchResponse>['usage'];usage_is_historical:boolean;native_classifications:number}
 function check(ok:unknown,code:string):asserts ok{if(!ok)throw Error(code);}
@@ -35,7 +35,7 @@ export async function validateBatchTask(run:BatchRun,task:BatchTask):Promise<Bat
  return {parent_receipt_sha256:task.receipt_sha256!,question_mapping_sha256:await directHash(task.mapping),rows:parsed.rows,
    usage:parsed.usage,usage_is_historical:task.historical_source!==null,native_classifications:parsed.received_classifications};
 }
-export async function batchSolEnvelope(run:BatchRun,tasks:BatchTask[]){
+export async function batchSolDraft(run:BatchRun,tasks:BatchTask[]){
  check(await directHash(run.snapshot)===run.snapshot_sha256,'BATCH_SNAPSHOT_CHANGED');
  const expected=run.snapshot.reviews.filter(r=>r.analysis_text).map(r=>r.id),rows:DirectReportInput['dataset']['body']['reviews']=[];
  const ordered=[...tasks].sort((a,b)=>a.number-b.number),seen=new Set<string>(),classification_sources=[];
@@ -69,18 +69,27 @@ export async function batchSolEnvelope(run:BatchRun,tasks:BatchTask[]){
  const request=JSON.parse(run.template.request_json);
  check(request.model==='gpt-6.1-sol'&&request.reasoning?.effort==='low','BATCH_SOL_PARAMETERS_CHANGED');
  request.input=[{role:'system',content:compact.prompt},{role:'user',content:JSON.stringify(compact.packet)}];
- const measurement=solRequestSize(request),request_json=JSON.stringify(request);
+ const request_json=JSON.stringify(request);
  return {version:BATCH_EXPERIMENT,statistics,statistics_sha256,counts,evidence,selection:selection.diagnostics,
   compact_manifest:compact.manifest,compact_manifest_sha256:compact.manifest_sha256,packet:compact.packet,
   classification_sources,classification_sources_sha256:await directHash(classification_sources),
-  request_json,request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json),measurement};
+  request_json,request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json)};
 }
+export type BatchDraft=Awaited<ReturnType<typeof batchSolDraft>>;
+export async function measureBatchSolDraft(draft:BatchDraft){
+ check(await analysisTextSha256(draft.request_json)===draft.request_raw_sha256&&await directHash(JSON.parse(draft.request_json))===draft.request_sha256,'BATCH_SOL_DRAFT_CHANGED');
+ return {...draft,measurement:solRequestSize(JSON.parse(draft.request_json))};
+}
+// Offline compatibility entry point. The worker uses two durable invocations so
+// selection and tokenizer initialization do not share one Edge CPU allowance.
+export async function batchSolEnvelope(run:BatchRun,tasks:BatchTask[]){return await measureBatchSolDraft(await batchSolDraft(run,tasks));}
 export type BatchEnvelope=Awaited<ReturnType<typeof batchSolEnvelope>>;
 export interface BatchExperimentPort {
  load(id:string):Promise<{run:BatchRun;tasks:BatchTask[]}>;
  claim(id:string,worker:string):Promise<BatchTask|null>;
  receive(task:string,worker:string,receipt:unknown,sha:string):Promise<boolean>;
  project(task:string,worker:string,projection:unknown,sha:string,error?:string):Promise<boolean>;
+ draft(id:string,body:BatchDraft,sha:string):Promise<boolean>;
  envelope(id:string,body:BatchEnvelope,sha:string):Promise<boolean>;
  claimSol(id:string,worker:string):Promise<boolean>;
  receiveSol(id:string,worker:string,body:unknown,sha:string):Promise<boolean>;
@@ -138,13 +147,19 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   return {phase:'saved_jev_reused_and_mapped',provider_calls:0};
  }
  if(run.stage==='prepare_evidence'){
-  const b=await batchSolEnvelope(run,tasks);check(await port.envelope(id,b,await directHash(b)),'BATCH_ENVELOPE_SAVE_FAILED');
+  const b=await batchSolDraft(run,tasks);check(await port.draft(id,b,await directHash(b)),'BATCH_DRAFT_SAVE_FAILED');
+  return {phase:'compact_sol_draft_saved',provider_calls:0};
+ }
+ if(run.stage==='measure_sol'){
+  check(run.draft&&await directHash(run.draft)===run.draft_sha256,'BATCH_SOL_DRAFT_CHANGED');
+  const b=await measureBatchSolDraft(run.draft);check(await port.envelope(id,b,await directHash(b)),'BATCH_ENVELOPE_SAVE_FAILED');
   return {phase:'compact_sol_prepared',provider_calls:0};
  }
  const envelope=run.envelope;
  check(envelope&&await directHash(envelope)===run.envelope_sha256&&await analysisTextSha256(envelope.request_json)===envelope.request_raw_sha256&&
   await directHash(JSON.parse(envelope.request_json))===envelope.request_sha256,'BATCH_SOL_ENVELOPE_CHANGED');
- solRequestSize(JSON.parse(envelope.request_json));
+ check(envelope.measurement.version===SOL_SIZE_POLICY.version&&envelope.measurement.guarded_input_tokens<=SOL_SIZE_POLICY.input_budget_tokens&&
+  envelope.measurement.request_bytes===new TextEncoder().encode(envelope.request_json).length,'BATCH_SOL_MEASUREMENT_CHANGED');
  if(run.stage==='sol'){
   check(keys.sol,'BATCH_SOL_KEY_UNAVAILABLE');
   if(!await port.claimSol(id,worker))return {phase:'sol_concurrent_or_consumed',provider_calls:0};

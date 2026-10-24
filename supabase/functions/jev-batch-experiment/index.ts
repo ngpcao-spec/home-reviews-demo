@@ -1,7 +1,8 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {requireUser,assertMembership} from '../_shared/auth.ts';
 import {json,preflight} from '../_shared/cors.ts';
-import {processBatchExperiment,type BatchExperimentPort} from '../_shared/jev-batch-experiment.ts';
+import {processBatchExperiment,batchSolDraft,measureBatchSolDraft,type BatchExperimentPort} from '../_shared/jev-batch-experiment.ts';
+import {directHash} from '../_shared/jev-direct-categories.ts';
 import {INITIAL_BATCH_CONTRACT} from '../_shared/jev-review-batches.ts';
 import {CURRENT_BATCH_VERSION} from '../_shared/current-batch-report.ts';
 import {DIRECT_COVERAGE_VERSION} from '../_shared/jev-direct-evidence-selection.ts';
@@ -33,18 +34,27 @@ Deno.serve(async request=>{
    claim:(id,w)=>rpc('jev_batch_claim',{p_run:id,p_worker:w}),
    receive:(t,w,b,s)=>rpc('jev_batch_receive',{p_task:t,p_worker:w,p_receipt:b,p_sha:s}),
    project:(t,w,b,s,e)=>rpc('jev_batch_save_projection',{p_task:t,p_worker:w,p_body:b,p_sha:s,p_error:e??null}),
+   draft:(id,b,s)=>rpc('jev_batch_save_draft',{p_run:id,p_body:b,p_sha:s}),
    envelope:(id,b,s)=>rpc('jev_batch_save_envelope',{p_run:id,p_body:b,p_sha:s}),
    claimSol:(id,w)=>rpc('jev_batch_claim_sol',{p_run:id,p_worker:w}),
    receiveSol:(id,w,b,s)=>rpc('jev_batch_receive_sol',{p_run:id,p_worker:w,p_body:b,p_sha:s}),
    finish:(id,s,b,u,e)=>rpc('jev_batch_finish',{p_run:id,p_status:s,p_result:b,p_usage:u,p_error:e??null}),
   };
+  if(body.action==='audit_saved_draft'||body.action==='audit_saved_measure'){
+   const at=performance.now(),{run,tasks}=await port.load(body.run_id);
+   if(run.status!=='completed'||!run.envelope)throw Error('BATCH_COMPLETED_SAVED_SOURCE_REQUIRED');
+   const saved=run.envelope;
+   const result=body.action==='audit_saved_draft'?await batchSolDraft(run,tasks):await measureBatchSolDraft(saved);
+   return json({provider_calls:0,new_runs:0,stage:body.action,request_sha256:result.request_sha256,
+    matches_saved:result.request_sha256===saved.request_sha256&&await directHash(result.evidence)===await directHash(saved.evidence),wall_ms:performance.now()-at});
+  }
   if(body.action==='probe')return json({scope:'experimental_only',new_jev_limit:0,provider_calls:0,default_unchanged:true});
   if(body.action!=='step')throw Error('BATCH_ACTION_INVALID');
   EdgeRuntime.waitUntil(processBatchExperiment(port,body.run_id,{jev:Deno.env.get('TYPESAFE_API_KEY')??'',sol:Deno.env.get('OPENAI_API_KEY')??''},fetch)
    .catch(async e=>{
     const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'BATCH_STEP_FAILED_NO_RETRY';
     const r=await admin.from('analysis_jev_batch_runs').select('stage').eq('id',body.run_id).single();
-    if(r.data?.stage==='prepare_evidence')await rpc('jev_batch_stop',{p_run:body.run_id,p_error:code});
+    if(['prepare_evidence','measure_sol'].includes(r.data?.stage))await rpc('jev_batch_stop',{p_run:body.run_id,p_error:code});
     console.error('BATCH_STEP_STOPPED_RECEIPTS_RETAINED_NO_RETRY',code);
    }));
   return json({accepted:true,automatic_retry:false},202);

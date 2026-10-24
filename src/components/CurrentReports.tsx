@@ -3,6 +3,7 @@ import {useQuery} from '@tanstack/react-query'
 import {useSearchParams} from 'react-router-dom'
 import {useI18n} from '../i18n'
 import {supabase} from '../lib/supabase'
+import type {HistoricalRun} from '../lib/historical-generation'
 import {mapHistoricalReport,type HistoricalReport,type HistoricalReportRow} from '../lib/historical-report'
 import type {ParallelView} from './ParallelReports'
 import {ExperimentalReport} from './ExperimentalReport'
@@ -13,6 +14,7 @@ export interface CurrentReportsView {
  routing:{engine:'jev_sol_v2'|'sol_legacy';jev_transport?:'individual'|'batch_initial_v1';updated_at:string};current_transport?:'individual'|'batch_initial_v1';legacy_report:HistoricalReportRow|null;
  versions:{id:string;created_at:string;generated_at:string|null;state:string;current_source_run_id:string|null;configuration_version?:string}[];
  batch_progress?:{run_id:string;completed_batches:number;total_batches:number;completed_reviews:number;total_reviews:number;unknown_batches:number;can_resume:boolean;sol_attempts:number}|null;
+ request_run?:HistoricalRun|null;
  experimental:ParallelView['experimental'];run:ParallelView['run'];tasks:ParallelView['tasks'];operation:unknown
 }
 export function CurrentReports({establishmentId,account,enabled,languageKey,current,generating,generationRevision,generationAction,children}:{
@@ -21,20 +23,26 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
  const {language}=useI18n(),fr=language==='fr',[params,setParams]=useSearchParams(),comparison=params.get('comparison')??'';
  const archive=params.get('variant')==='legacy'||!!comparison;
  const q=useQuery<CurrentReportsView>({queryKey:['current-reports',account,establishmentId,languageKey,comparison],enabled:enabled&&!!languageKey,retry:false,
-  refetchInterval:query=>generating||query.state.data?.run&&['queued','running','retry'].includes(query.state.data.run.status)?4000:false,
+  refetchInterval:query=>generating||[query.state.data?.request_run,query.state.data?.run].some(r=>r&&['queued','running','retry'].includes(r.status))?4000:false,
   queryFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'read_current',establishment_id:establishmentId,...(comparison?{comparison_id:comparison}:{})}});if(r.error||!r.data||r.data.error)throw Error('CURRENT_REPORT_READ_FAILED');return r.data}})
  useEffect(()=>{if(enabled)void q.refetch()},[enabled,generationRevision]) // eslint-disable-line react-hooks/exhaustive-deps
  const data=q.data,row=data?.experimental,v2=data?.routing.engine==='jev_sol_v2',legacy=data?.legacy_report?mapHistoricalReport(data.legacy_report):current;
  const date=(value:string|null|undefined)=>value?new Date(value).toLocaleString(fr?'fr-FR':'vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'—';
  const statuses:Record<string,string>=fr?{queued:'En attente',running:'En cours',completed:'Terminé',needs_review:'À réexaminer',invalid_output:'Sortie invalide',blocked:'Bloqué',failed:'Échec',billing_uncertain:'Issue incertaine',authorization_expired:'Autorisation expirée'}:{queued:'Đang chờ',running:'Đang xử lý',completed:'Hoàn tất',needs_review:'Cần xem lại',invalid_output:'Kết quả không hợp lệ',blocked:'Bị chặn',failed:'Thất bại',billing_uncertain:'Chưa rõ kết quả',authorization_expired:'Ủy quyền hết hạn'};
- const stages:Record<string,string>=fr?{preparing:'Préparation du corpus et du lancement',jev:'Classification JEV',prepare_evidence:'Préparation des preuves',sol:'Rédaction Sol',validate_sol:'Contrôles et sauvegarde'}:{preparing:'Chuẩn bị bộ đánh giá và khởi chạy',jev:'Phân loại JEV',prepare_evidence:'Chuẩn bị bằng chứng',sol:'Soạn báo cáo Sol',validate_sol:'Kiểm tra và lưu'};
+ const stages:Record<string,string>=fr?{preparing:'Préparation du corpus et du lancement',jev:'Classification JEV',prepare_evidence:'Préparation des preuves',measure_sol:'Préparation du rapport',sol:'Rédaction Sol',validate_sol:'Contrôles et sauvegarde',completed:'Rapport enregistré'}:{preparing:'Chuẩn bị bộ đánh giá và khởi chạy',jev:'Phân loại JEV',prepare_evidence:'Chuẩn bị bằng chứng',measure_sol:'Chuẩn bị báo cáo',sol:'Soạn báo cáo Sol',validate_sol:'Kiểm tra và lưu',completed:'Đã lưu báo cáo'};
  const switchTab=(old:boolean)=>{const next=new URLSearchParams(params);next.delete('comparison');next.set('variant',old?'legacy':'current');setParams(next)};
  const choose=(id:string)=>{const next=new URLSearchParams(params);next.set('variant','legacy');if(id)next.set('comparison',id);else next.delete('comparison');setParams(next)};
- const batch=data?.batch_progress;
- const batchProgress=batch&&<div role="status"><p>{row?.current_source_run_id?(fr?'JEV par lots · prompt initial':'JEV theo nhóm · hướng dẫn ban đầu'):(fr?'Essai JEV par lots · prompt initial':'Thử nghiệm JEV theo nhóm · hướng dẫn ban đầu')} : {batch.completed_batches} / {batch.total_batches} {fr?'lots':'nhóm'} · {batch.completed_reviews} / {batch.total_reviews} {fr?'avis':'đánh giá'}. {data?.run&&stages[data.run.stage]}</p>{batch.unknown_batches>0&&<p>{fr?'Une tentative au résultat inconnu est conservée sans renvoi automatique.':'Lượt gọi chưa rõ kết quả được giữ nguyên, không tự gửi lại.'}</p>}{batch.can_resume&&<button className="secondary-button" onClick={async()=>{await supabase!.functions.invoke('jev-batch-experiment',{body:{action:'resume',run_id:batch.run_id}});void q.refetch()}}>{fr?'Poursuivre les étapes non commencées':'Tiếp tục các bước chưa bắt đầu'}</button>}</div>;
+ const currentRun=data?.request_run??data?.run;
+ const requestRun=data?.request_run;
+ const batch=archive||!requestRun?data?.batch_progress:requestRun.progress_unit==='jev_batches'?{
+  run_id:requestRun.batch_run_id!,completed_batches:requestRun.progress,total_batches:requestRun.total_steps??0,
+  completed_reviews:requestRun.completed_reviews??0,total_reviews:requestRun.total_reviews??0,
+  unknown_batches:requestRun.unknown_batches??0,can_resume:requestRun.can_resume===true,sol_attempts:requestRun.sol_attempts??0}:null;
+ const progressRun=archive?data?.run:currentRun;
+ const batchProgress=batch&&<div role="status" data-request-id={archive?undefined:requestRun?.request_id} data-batch-run-id={batch.run_id}><p>{!archive||row?.current_source_run_id?(fr?'JEV par lots · prompt initial':'JEV theo nhóm · hướng dẫn ban đầu'):(fr?'Essai JEV par lots · prompt initial':'Thử nghiệm JEV theo nhóm · hướng dẫn ban đầu')} : {batch.completed_batches} / {batch.total_batches} {fr?'lots':'nhóm'} · {batch.completed_reviews} / {batch.total_reviews} {fr?'avis':'đánh giá'}. {progressRun?.stage&&stages[progressRun.stage]}</p>{batch.unknown_batches>0&&<p>{fr?'Une tentative au résultat inconnu est conservée sans renvoi automatique.':'Lượt gọi chưa rõ kết quả được giữ nguyên, không tự gửi lại.'}</p>}{batch.can_resume&&<button className="secondary-button" onClick={async()=>{await supabase!.functions.invoke('jev-batch-experiment',{body:{action:'resume',run_id:batch.run_id}});void q.refetch()}}>{fr?'Poursuivre les étapes non commencées':'Tiếp tục các bước chưa bắt đầu'}</button>}</div>;
  const method=fr?'JEV (classements automatiques), puis Sol compact, sans Luna. Les contrôles techniques ne constituent pas une validation humaine du contenu.':'JEV phân loại tự động, sau đó Sol với bộ dữ liệu gọn, không qua Luna. Kiểm tra kỹ thuật không phải xác nhận nội dung của con người.';
  const legacyReport=legacy?.consultant?<ConsultantReport report={legacy.consultant}/>:legacy?<ReputationReport report={legacy}/>:children;
- const meta=(source:NonNullable<typeof row>)=><dl className="parallel-metadata"><div><dt>{fr?'Généré le':'Ngày tạo'}</dt><dd>{date(source.generated_at)}</dd></div><div><dt>{fr?'Avis du corpus':'Đánh giá trong bộ dữ liệu'}</dt><dd>{source.statistics?.scope.source_reviews??source.source_reviews.length}</dd></div><div><dt>{fr?'Textes analysés':'Nội dung đã phân tích'}</dt><dd>{source.statistics?.scope.analysed_text_reviews??'—'} / {source.source_reviews.filter(r=>r.analysis_text?.trim()).length}</dd></div><div><dt>{fr?'État':'Trạng thái'}</dt><dd>{statuses[data?.run?.status??source.state]??source.state}</dd></div></dl>;
+ const meta=(source:NonNullable<typeof row>)=><dl className="parallel-metadata" data-report-id={source.id} data-source-run-id={source.current_source_run_id??undefined}><div><dt>{fr?'Généré le':'Ngày tạo'}</dt><dd>{date(source.generated_at)}</dd></div><div><dt>{fr?'Avis du corpus':'Đánh giá trong bộ dữ liệu'}</dt><dd>{source.statistics?.scope.source_reviews??source.source_reviews.length}</dd></div><div><dt>{fr?'Textes analysés':'Nội dung đã phân tích'}</dt><dd>{source.statistics?.scope.analysed_text_reviews??'—'} / {source.source_reviews.filter(r=>r.analysis_text?.trim()).length}</dd></div><div><dt>{fr?'État du rapport disponible':'Trạng thái báo cáo hiện có'}</dt><dd>{statuses[source.state]??source.state}</dd></div></dl>;
  if(!enabled&&!data)return <>{generationAction}{children}</>;
  return <>
   {generationAction}
@@ -50,10 +58,12 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
    <section id="current-report-panel" role="tabpanel" aria-labelledby="current-report-tab" hidden={archive}>
     {!v2?legacyReport:<>
      {row&&meta(row)}
-     {row?.current_source_run_id&&batchProgress}
-     {data.run&&['queued','running','retry'].includes(data.run.status)&&<p role="status">{stages[data.run.stage]??(fr?'Traitement serveur':'Máy chủ đang xử lý')}. {fr?'Vous pouvez fermer l’application.':'Bạn có thể đóng ứng dụng.'}</p>}
-     {data.run?.error_code&&<p role="alert">{statuses[data.run.status]??data.run.status} : <span className="parallel-audit-id">{data.run.error_code}</span></p>}
-     {!row&&!data.run&&<p>{fr?'Aucun rapport V2 pour cet établissement. Les rapports précédents sont conservés dans l’autre onglet.':'Cơ sở này chưa có báo cáo V2. Báo cáo trước đây vẫn được lưu ở thẻ bên cạnh.'}</p>}
+     {row&&requestRun&&row.current_source_run_id!==requestRun.source_run_id&&<p className="v5-muted">{fr?'Rapport précédent disponible. Il est distinct de la nouvelle demande ci-dessous.':'Báo cáo trước đây vẫn có sẵn, tách biệt với yêu cầu mới bên dưới.'}</p>}
+     {requestRun?.request_id&&<p className="v5-muted" data-current-request-id={requestRun.request_id}>{fr?'Demande':'Yêu cầu'} {requestRun.request_id.slice(0,8)} · {date(requestRun.created_at)} · {statuses[requestRun.status]??requestRun.status}</p>}
+     {!archive&&batchProgress}
+     {currentRun&&['queued','running','retry'].includes(currentRun.status)&&<p role="status">{currentRun.stage&&stages[currentRun.stage]||(fr?'Traitement serveur':'Máy chủ đang xử lý')}. {fr?'Vous pouvez fermer l’application.':'Bạn có thể đóng ứng dụng.'}</p>}
+     {currentRun?.error_code&&<p role="alert">{statuses[currentRun.status]??currentRun.status} : <span className="parallel-audit-id">{currentRun.error_code}</span></p>}
+     {!row&&!currentRun&&<p>{fr?'Aucun rapport V2 pour cet établissement. Les rapports précédents sont conservés dans l’autre onglet.':'Cơ sở này chưa có báo cáo V2. Báo cáo trước đây vẫn được lưu ở thẻ bên cạnh.'}</p>}
      {row&&<><p className="v5-muted">{row.current_source_run_id?(fr?'Génération V2 courante.':'Báo cáo được tạo theo V2 hiện tại.'):(fr?'Génération expérimentale V2 antérieure, conservée sans recalcul.':'Bản V2 thử nghiệm trước đây, giữ nguyên không tính lại.')}</p><ExperimentalReport key={row.id} row={row} operation={data.operation} methodology={method}/></>}
     </>}
    </section>

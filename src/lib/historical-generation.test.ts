@@ -11,6 +11,14 @@ function setup(saved?:HistoricalRun){
 }
 describe('server-owned historical generation observer',()=>{
   beforeEach(()=>vi.useFakeTimers());afterEach(()=>vi.useRealTimers())
+  it('a saved 0/24 spinner stops when the same native batch request is completed, even if the legacy report refresh fails',async()=>{
+    const {deps,controller}=setup(running({progress:0,total_steps:24,request_id:'request'}));
+    deps.readStatus.mockResolvedValue(running({status:'completed',progress:9,total_steps:9,request_id:'request',progress_unit:'jev_batches'}));
+    deps.readReport.mockRejectedValue(Error('LEGACY_REPORT_READ_UNAVAILABLE'));
+    controller.attach();await flush();
+    expect(controller.getSnapshot()).toMatchObject({phase:'idle',run:{status:'completed',progress:9,total_steps:9}});
+    await vi.advanceTimersByTimeAsync(30000);expect(deps.enqueue).not.toHaveBeenCalled();expect(deps.readStatus).toHaveBeenCalledTimes(1);controller.dispose();
+  })
   it('only enqueues on explicit click, once, never sends a generation step',async()=>{
     const {deps,controller}=setup();controller.attach();await flush()
     expect(deps.enqueue).not.toHaveBeenCalled()

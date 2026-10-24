@@ -48,7 +48,9 @@ export function AnalyticsPage() {
     !demoMode && periodMode === 'historical')
   const historicalGenerating = generation.phase === 'generating' || generation.phase === 'paused'
   const historicalFeedback = demoMode ? demoFeedback : generation.feedback === 'empty' ? 'empty' : generation.phase === 'failed' ? 'error' : generation.feedback
-  const historicalProgress = generation.run?.total_steps
+  const historicalProgress = generation.run?.progress_unit==='jev_batches'
+    ? `JEV: ${generation.run.progress} / ${generation.run.total_steps??'—'} ${language==='vi'?'nhóm':'lots'} · ${generation.run.completed_reviews??0} / ${generation.run.total_reviews??0} ${language==='vi'?'đánh giá':'avis'}`
+    : generation.run?.total_steps
     ? messages.reputation.progress.replace('{done}', String(generation.run.progress)).replace('{total}', String(generation.run.total_steps))
     : generation.run ? (language === 'vi' ? `${generation.run.progress} bước đã hoàn tất` : `${generation.run.progress} étapes terminées`) : ''
   const periodStart = useMemo(() => periodMode === 'current'
@@ -142,12 +144,14 @@ export function AnalyticsPage() {
   const periodLabel = visibleReport ? formatWeeklyPeriod(visibleReport.periodStart, visibleReport.periodEnd, language) : ''
   const number = new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'fr-FR')
 
-  const historicalAction=(<div className="historical-report-action">
+  const generationStage=language==='vi'?{preparing:'Chuẩn bị dữ liệu',jev:'Phân loại JEV',prepare_evidence:'Chuẩn bị bằng chứng',measure_sol:'Chuẩn bị báo cáo',sol:'Soạn báo cáo Sol',validate_sol:'Kiểm tra và lưu báo cáo'}:{preparing:'Préparation du corpus',jev:'Classification JEV',prepare_evidence:'Préparation des preuves',measure_sol:'Préparation du rapport',sol:'Rédaction Sol',validate_sol:'Contrôles et sauvegarde'};
+  const historicalAction=(<div className="historical-report-action" data-generation-request-id={generation.run?.request_id}>
         <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
           <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
         </button>
         {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
+        {historicalGenerating && generation.run?.stage && <small role="status">{generationStage[generation.run.stage as keyof typeof generationStage]}</small>}
         {historicalGenerating && <small role="status">{language === 'vi' ? 'Bạn có thể đóng ứng dụng. Máy chủ sẽ tiếp tục phân tích.' : 'Vous pouvez fermer l’application. L’analyse continue côté serveur.'}</small>}
         {visibleHistoricalReport?.generatedAt && <small>{language==='vi'?'Báo cáo Sol trước đây tạo lúc':'Rapport Sol précédent généré le'}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
