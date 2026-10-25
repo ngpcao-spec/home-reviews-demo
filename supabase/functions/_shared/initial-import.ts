@@ -1,9 +1,11 @@
+import {recentReviewCutoff} from './recent-review-policy.ts'
 export const DEFAULT_INITIAL_REVIEWS_LIMIT = 100
 
 export interface InitialImportReview {
   externalReviewId: string
   rating: number
   publishedAt: string | null
+  text?: string
 }
 
 export function initialReviewsLimit(value?: string): number {
@@ -21,15 +23,20 @@ export function prepareInitialReviews<T extends InitialImportReview>(
   const safeLimit = Math.min(DEFAULT_INITIAL_REVIEWS_LIMIT, Math.max(1, Math.floor(limit)))
   const unique = new Map<string, T>()
   for (const review of reviews) {
-    if (!review.externalReviewId || review.rating < 1 || review.rating > 5) continue
-    if (!unique.has(review.externalReviewId)) unique.set(review.externalReviewId, review)
+    if (!review.externalReviewId.trim() || review.rating < 1 || review.rating > 5) continue
+    const id=review.externalReviewId.trim(),prior=unique.get(id);
+    const dates=[prior?.publishedAt,review.publishedAt].filter((v):v is string=>!!v&&Number.isFinite(Date.parse(v))).map(v=>Date.parse(v))
+    const date=dates.length?new Date(Math.min(...dates)).toISOString():null
+    const selected=prior?.text?.trim()&&!review.text?.trim()?prior:review
+    unique.set(id,{...selected,externalReviewId:id,publishedAt:date})
   }
 
   return [...unique.values()]
+    .filter(r=>r.text?.trim()&&r.publishedAt&&Date.parse(r.publishedAt)>=Date.parse(recentReviewCutoff())&&Date.parse(r.publishedAt)<=Date.now())
     .sort((left, right) => {
       const leftTime = left.publishedAt ? Date.parse(left.publishedAt) : 0
       const rightTime = right.publishedAt ? Date.parse(right.publishedAt) : 0
-      return rightTime - leftTime
+      return rightTime - leftTime || (left.externalReviewId<right.externalReviewId?-1:left.externalReviewId>right.externalReviewId?1:0)
     })
     .slice(0, safeLimit)
 }

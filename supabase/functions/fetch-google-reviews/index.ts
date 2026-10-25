@@ -8,6 +8,7 @@ import {
 } from '../_shared/outscraper.ts'
 import { ApifyError, fetchApifyReviews } from '../_shared/apify.ts'
 import { apifyToken, preferredLanguageForUser } from '../_shared/sync-service.ts'
+import {assertIngestionAllowed,recentReviewCutoff} from '../_shared/recent-review-policy.ts'
 
 interface RequestBody {
   query?: unknown
@@ -21,6 +22,7 @@ Deno.serve(async (request) => {
 
   try {
     const { user, admin } = await requireUser(request)
+    await assertIngestionAllowed(admin)
     enforceRateLimit(`fetch-google-reviews:${user.id}`, 10, 60_000)
 
     const body = await request.json() as RequestBody
@@ -41,6 +43,7 @@ Deno.serve(async (request) => {
         language,
         sort: 'newest',
         limit: 20,
+        since:recentReviewCutoff(),
       }))
     }
     if (provider !== 'outscraper') return json({ error: 'REVIEW_PROVIDER_UNSUPPORTED' }, 500)

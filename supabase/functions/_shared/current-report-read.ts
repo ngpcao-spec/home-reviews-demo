@@ -7,6 +7,8 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  await assertMembership(c.client,c.user.id,e.data.organization_id);
  const profile=await c.client.from('profiles').select('preferred_language').eq('user_id',c.user.id).single();if(profile.error||!['fr','vi'].includes(profile.data.preferred_language))throw Error('PREFERRED_LANGUAGE_REQUIRED');
  const org=e.data.organization_id,language=profile.data.preferred_language;
+ const policyRead=await c.client.from('review_corpus_policy').select('version,enabled,paused,epoch').eq('id',true).single();if(policyRead.error)throw Error('REVIEW_POLICY_UNAVAILABLE');
+ const policy=policyRead.data;if(policy.enabled)input={establishment_id:input.establishment_id};
  const [routing,legacy,versions,request,abandoned]=await Promise.all([
   c.client.from('report_pipeline_settings').select('engine,jev_transport,updated_at').eq('id',true).single(),
   c.client.from('historical_establishment_reports').select('*').eq('organization_id',org).eq('establishment_id',e.data.id).eq('preferred_language',language).maybeSingle(),
@@ -46,6 +48,13 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  }else if(request.data?.engine==='jev_sol_v2'){
   const r=await c.admin.from('historical_report_runs').select('id,status,error_code,created_at').eq('id',request.data.source_run_id).eq('organization_id',org).single();if(r.error)throw Error('CURRENT_REPORT_READ_FAILED');run={...r.data,stage:'preparing'};
  }
- return {routing:routing.data,current_transport:request.data?.jev_transport??routing.data.jev_transport??'individual',request_run,legacy_report:legacy.data,versions:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
+ let retention=null;
+ if(policy.enabled){const [state,scope,retired]=await Promise.all([
+  c.client.from('review_corpus_states').select('*').eq('organization_id',org).eq('establishment_id',e.data.id).maybeSingle(),
+  row?.current_source_run_id?c.client.from('report_corpus_scopes').select('*').eq('organization_id',org).eq('source_run_id',row.current_source_run_id).maybeSingle():Promise.resolve({data:null,error:null}),
+  c.admin.rpc('read_retired_report_scope',{p_establishment:e.data.id,p_organization:org,p_language:language})]);
+  if(state.error||scope.error||retired.error)throw Error('REVIEW_SCOPE_READ_FAILED');retention={policy,state:state.data,scope:scope.data,retired:retired.data};
+ }
+ return {retention,routing:routing.data,current_transport:request.data?.jev_transport??routing.data.jev_transport??'individual',request_run,legacy_report:policy.enabled?null:legacy.data,versions:policy.enabled?[]:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
 }
 

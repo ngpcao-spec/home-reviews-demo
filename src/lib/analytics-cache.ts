@@ -37,7 +37,7 @@ export class AnalyticsSessionCache {
     if (this.retired) return
     const first = !this.owner
     this.owner = { userId, organizationIds, establishmentIds, generation: cacheGeneration(userId) }
-    const valid = (key: string, entry: Entry) => entry.report
+    const valid = (key: string, entry: Entry) => first && key.startsWith('historical:') ? false : entry.report
       ? organizationIds.includes(entry.report.organizationId) && establishmentIds.includes(entry.report.establishmentId)
       : establishmentIds.includes(key.split(':')[1])
     const incoming = persisted && typeof persisted === 'object' && 'entries' in persisted

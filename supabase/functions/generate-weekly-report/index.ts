@@ -23,6 +23,7 @@ Deno.serve(async (request) => {
 
   try {
     const context = await requireUser(request)
+    const policy=await context.admin.from('review_corpus_policy').select('enabled').eq('id',true).single();if(policy.error)throw Error('REVIEW_POLICY_UNAVAILABLE');if(policy.data?.enabled)return json({error:'USE_CURRENT_RECENT_TEXT_REPORT'},410)
     adminForFailure = context.admin
     enforceRateLimit(`weekly-report:${context.user.id}`, 30, 3_600_000)
     const body = await request.json() as { establishment_id?: string; period_start?: string; provisional?: boolean }

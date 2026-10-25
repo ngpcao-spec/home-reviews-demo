@@ -98,7 +98,8 @@ Deno.serve(async request => {
     const {data:run,error}=await context.admin.rpc('enqueue_current_report',{
       p_establishment:e.id,p_organization:e.organization_id,p_user:context.user.id,p_language:profile.preferred_language,p_request:body.request_id,p_legacy_model:newHistoricalModel(),p_legacy_version:CONSULTANT_VERSION,
     })
-    if(error || !run){const code=['REPORT_PREVIOUS_OUTCOME_UNCERTAIN','REPORT_BILLING_UNCERTAIN_NO_RETRY','REPORT_OTHER_PIPELINE_RUNNING','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}
+    if(error?.message.includes('NO_RECENT_TEXT_REVIEWS'))return json({error:'NO_REVIEWS_AVAILABLE'});
+    if(error || !run){const code=['RETENTION_TRANSITION_ACTIVE','REPORT_REQUEST_RETIRED','REPORT_PREVIOUS_OUTCOME_UNCERTAIN','REPORT_BILLING_UNCERTAIN_NO_RETRY','REPORT_OTHER_PIPELINE_RUNNING','FORBIDDEN'].find(code=>error?.message.includes(code));return json({error:code??'REPORT_ENQUEUE_FAILED'},code==='FORBIDDEN'?403:code?409:500)}
     return json({pending:['queued','running','retry'].includes(run.status),run:await currentHistoricalStatus(context.admin,run)},202)
   } catch(error) {
     const code=error instanceof Error && /^[A-Z0-9_]+$/.test(error.message)?error.message:'REPORT_ENQUEUE_FAILED'

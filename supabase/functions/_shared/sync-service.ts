@@ -17,6 +17,7 @@ import {
 } from './initial-import.ts'
 import { reviewPersistenceBatches } from './review-persistence.ts'
 import { GOOGLE_REVIEWS_IMPORT_LANGUAGE,translationLanguage,normalizeReviewLanguage } from './review-language.ts'
+import {readReviewPolicy,assertIngestionAllowed,knownReviewKeys,recentReviewCutoff} from './recent-review-policy.ts'
 
 const INCREMENTAL_WINDOW = 20
 const MAX_INCREMENTAL_PAGES = 5
@@ -139,7 +140,7 @@ function reviewRow(
     original_text: review.text,
     original_language: review.language,
     language: review.language,
-    published_at: review.publishedAt,
+    published_at: review.publishedAt&&Number.isFinite(Date.parse(review.publishedAt))?new Date(review.publishedAt).toISOString():null,
     review_url: review.reviewUrl,
     owner_response: review.ownerResponse,
     source_provider: provider,
@@ -172,6 +173,11 @@ export async function insertReviews(
   provider: GoogleReviewsResult['provider'],
 ): Promise<number> {
   if (!reviews.length) return 0
+  const policy=await readReviewPolicy(admin);
+  if(policy.enabled){
+    const bundle=reviewsForPersistence(reviews).map(review=>({row:reviewRow(establishment,review,historicalImport,provider),translations:translationLanguage(review.translatedLanguage)&&review.translatedText?.trim()?[{language:translationLanguage(review.translatedLanguage),translated_text:review.translatedText}]:[],raw_payload:review.rawPayload??{}}));
+    const r=await admin.rpc('ingest_recent_reviews',{p_establishment:establishment.id,p_organization:establishment.organization_id,p_bundle:bundle,p_provider:provider});if(r.error)throw Error('RECENT_REVIEWS_INGEST_FAILED:'+r.error.message);return r.data.inserted;
+  }
   const validReviews = Array.from(
     new Map(reviewsForPersistence(reviews).map((review) => [review.externalReviewId, review])).values(),
   )
@@ -270,6 +276,7 @@ export async function persistEstablishmentSnapshot(
 }
 
 export interface InitializationFetchResult extends GoogleReviewsResult {
+  observedReviews?:NormalizedReview[]
   providerRequests: number
   initialLimit: number
   initialFetched: number
@@ -300,7 +307,8 @@ export async function fetchInitialization(
       providerRequests: 1,
       initialLimit: limit,
       initialFetched: reviews.length,
-      checkpointReview: reviews[0] ?? null,
+      observedReviews:result.reviews,
+      checkpointReview: sortNewest([...result.reviews])[0] ?? null,
     }
   }
 
@@ -310,6 +318,7 @@ export async function fetchInitialization(
       language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,
       sort: 'newest',
       limit,
+      since:recentReviewCutoff(),
     })
     const reviews = prepareInitialReviews(result.reviews, limit)
     return {
@@ -319,7 +328,8 @@ export async function fetchInitialization(
       providerRequests: 1,
       initialLimit: limit,
       initialFetched: reviews.length,
-      checkpointReview: reviews[0] ?? null,
+      observedReviews:result.reviews,
+      checkpointReview: sortNewest([...result.reviews])[0] ?? null,
     }
   }
 
@@ -327,6 +337,7 @@ export async function fetchInitialization(
     query,
     apiKey: outscraperKey(),
     reviewsLimit: limit,
+    cutoff:Math.floor(Date.parse(recentReviewCutoff())/1000),
     sort: 'newest',
     timeoutMs: 90_000,
   })
@@ -339,7 +350,8 @@ export async function fetchInitialization(
     providerRequests: 1,
     initialLimit: limit,
     initialFetched: reviews.length,
-    checkpointReview: reviews[0] ?? null,
+    observedReviews:result.reviews,
+    checkpointReview: sortNewest([...result.reviews])[0] ?? null,
   }
 }
 
@@ -377,6 +389,7 @@ export async function initializeEstablishment(
   language: PreferredLanguage = 'fr',
 ) {
   const provider = providerName()
+  await assertIngestionAllowed(admin)
   const result = await fetchInitialization(query, language)
   if (expectedGoogleId && result.establishment.googleId !== expectedGoogleId) {
     throw new Error('ESTABLISHMENT_MISMATCH')
@@ -433,7 +446,7 @@ export async function initializeEstablishment(
 
   const runId = await createRun(admin, establishment, 'initialization', provider)
   try {
-    const inserted = await insertReviews(admin, establishment, importedReviews, true, result.provider)
+    const inserted = await insertReviews(admin, establishment, result.observedReviews??importedReviews, true, result.provider)
     await persistEstablishmentSnapshot(
       admin,
       establishment,
@@ -541,12 +554,13 @@ export async function backfillHistoricalReviews(
   establishment: EstablishmentRow,
   language: PreferredLanguage = 'fr',
 ) {
+  await assertIngestionAllowed(admin)
   const result = await fetchInitialization(establishment.google_maps_url || establishment.google_id, language)
   if (result.establishment.googleId !== establishment.google_id) {
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
 
-  const inserted = await insertReviews(admin, establishment, result.reviews, true, result.provider)
+  const inserted = await insertReviews(admin, establishment, result.observedReviews??result.reviews, true, result.provider)
   await persistEstablishmentSnapshot(
     admin,
     establishment,
@@ -614,6 +628,7 @@ export async function syncEstablishment(
   admin: SupabaseClient,
   establishment: EstablishmentRow,
 ): Promise<SyncSummary> {
+  await assertIngestionAllowed(admin)
   const provider = providerName()
   const runId = await createRun(admin, establishment, 'incremental', provider)
   let providerRequests = 0
@@ -638,7 +653,7 @@ export async function syncEstablishment(
         .eq('establishment_id', establishment.id)
         .in('external_review_id', externalIds)
       if (knownError) throw knownError
-      const knownIds = new Set((knownRows ?? []).map((row) => row.external_review_id as string))
+      const knownIds = new Set([...(knownRows ?? []).map((row) => row.external_review_id as string),...await knownReviewKeys(admin,establishment.id,externalIds)])
       const newReviews = page.reviews.filter((review) => !knownIds.has(review.externalReviewId))
       inserted += await insertReviews(admin, establishment, newReviews, false, page.provider)
       if (pageNumber === 0) {

@@ -11,6 +11,7 @@ import {ConsultantReport} from './ConsultantReport'
 import {ReputationReport} from './ReputationReport'
 import './parallel-reports.css'
 export interface CurrentReportsView {
+ retention?:{policy:{version:string;enabled:boolean};state:{retained_count:number;period_start:string|null;period_end:string|null}|null;scope:{as_of:string;review_count:number;period_start:string;period_end:string;stale:boolean}|null;retired:{generated_at:string|null;review_count:number;period_start:string|null;period_end:string|null;reason:string}|null}|null;
  routing:{engine:'jev_sol_v2'|'sol_legacy';jev_transport?:'individual'|'batch_initial_v1';updated_at:string};current_transport?:'individual'|'batch_initial_v1';legacy_report:HistoricalReportRow|null;
  versions:{id:string;created_at:string;generated_at:string|null;state:string;current_source_run_id:string|null;configuration_version?:string}[];
  batch_progress?:{run_id:string;completed_batches:number;total_batches:number;completed_reviews:number;total_reviews:number;unknown_batches:number;can_resume:boolean;sol_attempts:number}|null;
@@ -21,12 +22,12 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
  establishmentId:string;account:string;enabled:boolean;languageKey:string|null;current:HistoricalReport|null;generating:boolean;generationRevision?:string;
  generationAction:ReactNode;children:ReactNode}){
  const {language}=useI18n(),fr=language==='fr',[params,setParams]=useSearchParams(),comparison=params.get('comparison')??'';
- const archive=params.get('variant')==='legacy'||!!comparison;
  const q=useQuery<CurrentReportsView>({queryKey:['current-reports',account,establishmentId,languageKey,comparison],enabled:enabled&&!!languageKey,retry:false,
   refetchInterval:query=>generating||[query.state.data?.request_run,query.state.data?.run].some(r=>r&&['queued','running','retry'].includes(r.status))?4000:false,
   queryFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'read_current',establishment_id:establishmentId,...(comparison?{comparison_id:comparison}:{})}});if(r.error||!r.data||r.data.error)throw Error('CURRENT_REPORT_READ_FAILED');return r.data}})
  useEffect(()=>{if(enabled)void q.refetch()},[enabled,generationRevision]) // eslint-disable-line react-hooks/exhaustive-deps
- const data=q.data,row=data?.experimental,v2=data?.routing.engine==='jev_sol_v2',legacy=data?.legacy_report?mapHistoricalReport(data.legacy_report):current;
+ const data=q.data,row=data?.experimental,v2=data?.routing.engine==='jev_sol_v2',legacy=data?.legacy_report?mapHistoricalReport(data.legacy_report):current,retention=data?.retention;
+ const archive=!retention&&(params.get('variant')==='legacy'||!!comparison);
  const date=(value:string|null|undefined)=>value?new Date(value).toLocaleString(fr?'fr-FR':'vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'—';
  const statuses:Record<string,string>=fr?{queued:'En attente',running:'En cours',completed:'Terminé',needs_review:'À réexaminer',invalid_output:'Sortie invalide',blocked:'Bloqué',failed:'Échec',billing_uncertain:'Issue incertaine',authorization_expired:'Autorisation expirée'}:{queued:'Đang chờ',running:'Đang xử lý',completed:'Hoàn tất',needs_review:'Cần xem lại',invalid_output:'Kết quả không hợp lệ',blocked:'Bị chặn',failed:'Thất bại',billing_uncertain:'Chưa rõ kết quả',authorization_expired:'Ủy quyền hết hạn'};
  const stages:Record<string,string>=fr?{preparing:'Préparation du corpus et du lancement',jev:'Classification JEV',prepare_evidence:'Préparation des preuves',measure_sol:'Préparation du rapport',sol:'Rédaction Sol',validate_sol:'Contrôles et sauvegarde',completed:'Rapport enregistré'}:{preparing:'Chuẩn bị bộ đánh giá và khởi chạy',jev:'Phân loại JEV',prepare_evidence:'Chuẩn bị bằng chứng',measure_sol:'Chuẩn bị báo cáo',sol:'Soạn báo cáo Sol',validate_sol:'Kiểm tra và lưu',completed:'Đã lưu báo cáo'};
@@ -47,13 +48,13 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
  return <>
   {generationAction}
   {q.isError&&<div role="alert"><p>{fr?'Impossible de lire les rapports enregistrés. Aucun lancement automatique.':'Không thể đọc báo cáo đã lưu. Không tự động khởi chạy.'}</p><button className="secondary-button" onClick={()=>void q.refetch()}>{fr?'Actualiser l’état (sans appel IA)':'Làm mới trạng thái (không gọi AI)'}</button></div>}
-  {!data&&current&&<section><h2>{fr?'Rapport précédent conservé':'Báo cáo trước đây đã lưu'}</h2>{children}</section>}
   {q.isPending&&<p role="status">{fr?'Lecture des rapports…':'Đang tải báo cáo…'}</p>}
   {data&&<>
+   {retention&&<section className="card" aria-label={fr?'Périmètre du corpus':'Phạm vi bộ đánh giá'}><p>{fr?'Jusqu’à 100 avis textuels sur les 6 derniers mois.':'Tối đa 100 đánh giá có nội dung trong 6 tháng gần nhất.'}</p><p>{fr?'Corpus disponible':'Bộ đánh giá hiện có'} : {retention.state?.retained_count??0} {fr?'textes':'nội dung'} · {date(retention.state?.period_start)} → {date(retention.state?.period_end)}.</p>{retention.scope&&<p>{fr?'Rapport figé au':'Báo cáo chốt lúc'} {date(retention.scope.as_of)} · {retention.scope.review_count} {fr?'textes publiés du':'nội dung đăng từ'} {date(retention.scope.period_start)} → {date(retention.scope.period_end)}. {retention.scope.stale&&(fr?'Le corpus a changé : ce rapport n’est pas actualisé automatiquement.':'Bộ đánh giá đã thay đổi; báo cáo này không tự cập nhật.')}</p>}{(retention.scope?.review_count??retention.state?.retained_count??0)<10&&<p>{fr?'Peu de témoignages : les constats sont limités à ces retours et ne représentent pas tous les clients.':'Ít phản hồi: nhận định chỉ giới hạn trong những lời kể này, không đại diện cho mọi khách hàng.'}</p>}{!retention.state?.retained_count&&<p>{fr?'Aucune donnée textuelle récente admissible.':'Không có nội dung gần đây đủ điều kiện.'}</p>}{retention.retired&&!row&&<p>{fr?'Le périmètre du dernier rapport a expiré ; son contenu a été supprimé. Rapport du':'Phạm vi báo cáo trước đã hết hạn; nội dung đã được xóa. Báo cáo ngày'} {date(retention.retired.generated_at)} · {retention.retired.review_count} {fr?'textes':'nội dung'} · {date(retention.retired.period_start)} → {date(retention.retired.period_end)}.</p>}<small>{fr?'Les statistiques Google décrivent l’établissement ; elles sont distinctes de ce corpus textuel.':'Thống kê Google mô tả cơ sở và khác với bộ nội dung được giữ lại này.'}</small></section>}
    <p className="v5-muted">{v2?(data.current_transport==='batch_initial_v1'?(fr?'Parcours V2 de cette demande : JEV par lots → Sol compact, sans Luna.':'Quy trình V2 của yêu cầu này: JEV theo nhóm → Sol với bộ dữ liệu gọn, không qua Luna.'):(fr?'Parcours courant V2 : JEV court → Sol compact, sans Luna.':'Quy trình hiện tại V2: JEV ngắn → Sol với bộ dữ liệu gọn, không qua Luna.')):(fr?'Parcours de retour arrière : Sol seul. Aucun basculement automatique en cas d’erreur.':'Quy trình dự phòng: chỉ Sol. Không tự động chuyển quy trình khi có lỗi.')}</p>
    <div className="parallel-tabs" role="tablist" aria-label={fr?'Versions du rapport':'Các phiên bản báo cáo'}>
     <button id="current-report-tab" role="tab" aria-selected={!archive} aria-controls="current-report-panel" onClick={()=>switchTab(false)}>{fr?'Rapport courant':'Báo cáo hiện tại'}{v2?' · V2':' · Sol'}</button>
-    <button id="archive-report-tab" role="tab" aria-selected={archive} aria-controls="archive-report-panel" onClick={()=>switchTab(true)}>{fr?'Rapports précédents':'Báo cáo trước đây'}</button>
+    {!retention&&<button id="archive-report-tab" role="tab" aria-selected={archive} aria-controls="archive-report-panel" onClick={()=>switchTab(true)}>{fr?'Rapports précédents':'Báo cáo trước đây'}</button>}
    </div>
    <section id="current-report-panel" role="tabpanel" aria-labelledby="current-report-tab" hidden={archive}>
     {!v2?legacyReport:<>
@@ -63,14 +64,14 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
      {!archive&&batchProgress}
      {currentRun&&['queued','running','retry'].includes(currentRun.status)&&<p role="status">{currentRun.stage&&stages[currentRun.stage]||(fr?'Traitement serveur':'Máy chủ đang xử lý')}. {fr?'Vous pouvez fermer l’application.':'Bạn có thể đóng ứng dụng.'}</p>}
      {currentRun?.error_code&&<p role="alert">{statuses[currentRun.status]??currentRun.status} : <span className="parallel-audit-id">{currentRun.error_code}</span></p>}
-     {!row&&!currentRun&&<p>{fr?'Aucun rapport V2 pour cet établissement. Les rapports précédents sont conservés dans l’autre onglet.':'Cơ sở này chưa có báo cáo V2. Báo cáo trước đây vẫn được lưu ở thẻ bên cạnh.'}</p>}
+     {!row&&!currentRun&&<p>{fr?'Aucun rapport disponible pour ce corpus.':'Chưa có báo cáo cho bộ đánh giá này.'}</p>}
      {row&&<><p className="v5-muted">{row.current_source_run_id?(fr?'Génération V2 courante.':'Báo cáo được tạo theo V2 hiện tại.'):(fr?'Génération expérimentale V2 antérieure, conservée sans recalcul.':'Bản V2 thử nghiệm trước đây, giữ nguyên không tính lại.')}</p><ExperimentalReport key={row.id} row={row} operation={data.operation} methodology={method}/></>}
     </>}
    </section>
-   <section id="archive-report-panel" role="tabpanel" aria-labelledby="archive-report-tab" hidden={!archive}>
+   {!retention&&<section id="archive-report-panel" role="tabpanel" aria-labelledby="archive-report-tab" hidden={!archive}>
     <label className="parallel-corpus-label">{fr?'Version archivée':'Phiên bản đã lưu'}<select aria-label={fr?'Version archivée':'Phiên bản đã lưu'} value={comparison} onChange={e=>choose(e.target.value)}><option value="">{fr?'Ancien rapport · Sol seul':'Báo cáo cũ · chỉ Sol'}</option>{data.versions.map(v=><option value={v.id} key={v.id}>{v.configuration_version==='jev-multi-review-initial-v1'?(v.current_source_run_id?(fr?'V2 · JEV par lots':'V2 · JEV theo nhóm'):(fr?'Essai JEV par lots':'Thử nghiệm JEV theo nhóm')):v.current_source_run_id?'V2':fr?'Essai V2 archivé':'V2 thử nghiệm đã lưu'} — {date(v.generated_at??v.created_at)} — {statuses[v.state]??v.state}</option>)}</select></label>
     {comparison&&row?<>{meta(row)}{batchProgress}<ExperimentalReport key={'archive:'+row.id} row={row} operation={data.operation} methodology={method}/>{!row.current_source_run_id&&row.source_report?.consultant_report&&<details className="card"><summary>{fr?'Rapport Sol de référence du même corpus':'Báo cáo Sol tham chiếu của cùng bộ đánh giá'}</summary><ConsultantReport report={row.source_report.consultant_report}/></details>}</>:<><p className="v5-muted">{fr?'Rapport historique Sol, conservé avec sa provenance.':'Báo cáo Sol cũ được giữ nguyên cùng nguồn gốc.'} {date(legacy?.generatedAt)}</p>{legacyReport}</>}
-   </section>
+   </section>}
   </>}
  </>
 }

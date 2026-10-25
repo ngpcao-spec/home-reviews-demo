@@ -13,6 +13,7 @@ const now = Date.parse('2026-09-30T00:00:00.000Z')
 const review = (index: number, rating = index % 5 + 1) => ({
   externalReviewId: `review-${index}`,
   rating,
+  text: 'Un témoignage',
   publishedAt: new Date(now - index * 60_000).toISOString(),
 })
 
@@ -64,5 +65,9 @@ describe('import initial des avis les plus récents', () => {
   it('never overwrites an existing canonical establishment name with a localized provider title', () => {
     expect(canonicalEstablishmentName('Green Home Restaurant', 'Nhà hàng Green Home')).toBe('Green Home Restaurant')
     expect(canonicalEstablishmentName(null, 'Green Home Restaurant')).toBe('Green Home Restaurant')
+  })
+  it('rejects empty and old texts, preserves text across duplicates and cannot refresh an old publication',()=>{
+    const valid=review(0),empty={...review(1),text:' '},old={...review(2),publishedAt:'2020-01-01T00:00:00Z'};
+    expect(prepareInitialReviews([valid,{...valid,text:''},empty,old,{...old,publishedAt:valid.publishedAt}])).toEqual([valid]);
   })
 })
