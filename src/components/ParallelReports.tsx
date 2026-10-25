@@ -11,7 +11,7 @@ import {ReputationReport} from './ReputationReport'
 import {ExperimentalReport} from './ExperimentalReport'
 import './parallel-reports.css'
 type Section={category?:string;text:string;evidence_ids:string[]}
-type Recommendation={title:string;category:string;evidence_ids:string[];observations:{text:string;evidence_id:string;quote:string}[];proposed_action:string;priority_reason:string}
+type Recommendation={title:string;category:string;evidence_ids:string[];observations:{text:string;evidence_id:string;quote?:string}[];proposed_action:string;priority_reason:string}
 interface ExperimentalResult {format_version:string;report:{categories:Section[];positive_aspects:Section[];negative_aspects:Section[];conclusion:Section;recommendations:Recommendation[]}}
 async function launchError(data:unknown,error:unknown){
  let body=data as {error?:string;stage?:string;request_id?:string}|null;
@@ -27,7 +27,7 @@ export interface ParallelView {
  experimental:null|{id:string;current_source_run_id?:string|null;state:string;error_code:string|null;generated_at:string|null;created_at:string;derived_report:ExperimentalResult|null;original_report:unknown;raw_response:unknown;corrections:unknown;
  source_report?:HistoricalReportRow;reference_generation_id?:string;
  source_reviews:{id:string;original_text:string;analysis_text:string|null;rating?:number|null;published_at?:string|null;analysis_language?:string|null;original_language?:string|null;translation_provenance?:{original_language?:string|null}}[];statistics:{scope:{source_reviews:number;analysed_text_reviews:number;textless_statistics_only:number};counts:{categories:Record<string,{positive_reviews?:number;negative_reviews?:number;positive_including_mixed?:number;negative_including_mixed?:number;positive_review_ids?:string[];negative_review_ids?:string[];distinct_mentioned_reviews:number;denominator_reviews?:number;exclusive?:Record<string,number>}>}}|null;
-  controls:{technical_checks_passed?:boolean;section_issues?:{path:string;reason:string}[];evidence?:{evidence_id:string;review_id:string;quote:string}[]}|null;usage:unknown;imported_derivative_id?:string}
+  controls:{technical_checks_passed?:boolean;dated_publication?:boolean;source_availability?:{review_id:string;available:boolean;reason:string|null}[];section_issues?:{path:string;reason:string}[];evidence?:{evidence_id:string;review_id:string;quote?:string|null;available?:boolean}[]}|null;usage:unknown;imported_derivative_id?:string}
  run:null|{id:string;status:string;stage:string;error_code:string|null};tasks:{id:string;phase:string;status:string;request_count:number}[];operation:unknown
 }
 export function ParallelReports({current,account,enabled,children}:{current:HistoricalReport|null;account:string;enabled:boolean;children:ReactNode}){

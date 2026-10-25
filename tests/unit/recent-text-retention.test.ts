@@ -28,6 +28,9 @@ beforeAll(async()=>{
   const sql=readFileSync('supabase/migrations/'+file,'utf8');await db.exec(sql.slice(sql.indexOf('create function public.'+name),sql.indexOf('$$;',sql.indexOf('create function public.'+name))+3));
  }
  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_recover_compact_saved_references.sql')),'utf8'));
+ const finishSql=readFileSync('supabase/migrations/20261024080230_current_jev_batch_transport.sql','utf8'),finishStart=finishSql.indexOf('create or replace function public.jev_batch_finish(');
+ await db.exec(finishSql.slice(finishStart,finishSql.indexOf('$$;',finishStart)+3));
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_current_report_publications.sql')),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -114,7 +117,7 @@ it('removes a superseded failed frozen source and keeps its request tombstone wi
  expect((await db.query('select id from public.historical_report_runs')).rows).toEqual([{id:fresh.id}]);
  expect((await db.query('select request_id from private.retired_generation_keys')).rows).toEqual([{request_id:'50000000-0000-4000-8000-000000000001'}]);
 });
-it('expires a published report without table DDL and retains only its last scope metadata',async()=>{
+it('purges the disposable expired source without table DDL while preserving its last scope tombstone',async()=>{
  await insert('one',new Date(Date.now()-86400000).toISOString());await db.exec('set local role service_role');
  const fresh=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi','60000000-0000-4000-8000-000000000001','gpt-6.1-sol',8])).rows[0];
  await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,generated_at) values(gen_random_uuid(),$1,$2,$3,'vi','completed',now())",[org,est,fresh.id]);
@@ -138,7 +141,7 @@ async function savedCompactReceipt(){
  const original={statistics_sha256:envelope.statistics_sha256,report:{negative_aspects:[{category:'quality',text:'Food reported cold.',evidence_ids:evidence.map(e=>e.evidence_id)}]}};
  const derived=structuredClone(original);derived.report.negative_aspects[0].evidence_ids=['evidence-0'];
  const result={response:raw,original_report:original,derived_report:derived,corrections:{changes:[{path:'negative_aspects[0]',reason:'extra_incompatible_polarity_same_review_and_identical_text',before:['evidence-0','evidence-1'],after:['evidence-0']}]},controls:{technical_checks_passed:true,validator_version:'jls-direct4-reference-links-v1',compact_response:compact,evidence,server_statistics:statistics,section_issues:[]}};
- await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,error_code,raw_response,statistics,usage,generated_at) values($1,$2,$3,$4,'vi','invalid_output','COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE',$5,$6,$7,'2026-10-25 00:00Z')",[reportId,org,est,sourceId,raw,statistics,raw.usage]);
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,error_code,raw_response,statistics,usage,source_reviews,generated_at) values($1,$2,$3,$4,'vi','invalid_output','COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE',$5,$6,$7,$8,'2026-10-25 00:00Z')",[reportId,org,est,sourceId,raw,statistics,raw.usage,[{id:reviewId,original_text:'Good food, but cold.',analysis_text:'Good food, but cold.'}]]);
  await db.query("insert into public.analysis_jev_batch_runs(id,organization_id,establishment_id,current_source_run_id,report_id,status,stage,error_code,armed,sol_request_count,envelope,envelope_sha256,sol_receipt,sol_receipt_sha256,completed_at) values($1,$2,$3,$4,$5,'invalid_output','validate_sol','COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE',false,1,$6,$7,$8,$9,'2026-10-25 00:00Z')",[run,org,est,sourceId,reportId,envelope,await directHash(envelope),receipt,await directHash(receipt)]);
  await db.query("insert into public.analysis_jev_batch_tasks(run_id,status,request_count,receipt) values($1,'completed',1,'{}')",[run]);
  await db.query("update public.historical_report_runs set status='failed',completed_at='2026-10-25 00:00Z' where id=$1",[sourceId]);
@@ -178,4 +181,65 @@ it('rolls back publication and restores the immutable guard if any remaining pub
 });
 it('does not expose saved-receipt publication to authenticated clients',async()=>{
  const f=await savedCompactReceipt();await db.exec('set local role authenticated');await expect(f.publish()).rejects.toThrow('permission denied');
+});
+
+async function datedPublication(ago='1 hour'){
+ if(!(await db.query('select id from public.reviews limit 1')).rows.length)await insert('dated',new Date(Date.now()-86400000).toISOString(),'SYNTHETIC full review to remove');
+ await db.exec('set local role service_role');
+ const s=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi',crypto.randomUUID(),'gpt-6.1-sol',8])).rows[0];
+ await db.query("update public.historical_report_runs set status='completed',created_at=clock_timestamp()-$2::interval where id=$1",[s.id,ago]);
+ const reviews=(await db.query('select id,rating,published_at,original_text from public.reviews order by id')).rows.map(r=>({...r,analysis_text:r.original_text,analysis_language:'en'}));
+ const ids=reviews.map(r=>r.id),first=reviews[0],reportId=crypto.randomUUID();
+ const report={categories:['service','price','quality','ambiance'].map(category=>({category,text:'SYNTHETIC dated synthesis',evidence_ids:[]})),positive_aspects:[],negative_aspects:[],conclusion:{text:'SYNTHETIC dated conclusion',evidence_ids:[]},recommendations:[{title:'SYNTHETIC recommendation',category:'quality',evidence_ids:['e1'],observations:[{text:'SYNTHETIC generated observation',evidence_id:'e1',quote:first.original_text,quote_sha256:'hash'}],proposed_action:'Check',priority_reason:'Isolated'}]};
+ const statistics={scope:{source_reviews:ids.length,analysed_text_reviews:ids.length,textless_statistics_only:0},counts:{categories:{quality:{negative_including_mixed:ids.length,positive_including_mixed:0,negative_review_ids:ids,positive_review_ids:[]}}}};
+ const controls={technical_checks_passed:true,evidence:[{evidence_id:'e1',review_id:first.id,category:'quality',polarity:'negative',quote:first.original_text,context:first.original_text,quote_sha256:await analysisTextSha256(first.original_text as string)}]};
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,derived_report,controls,statistics,source_reviews,generated_at) values($1,$2,$3,$4,'vi','completed',$5,$6,$7,$8,clock_timestamp())",[reportId,org,est,s.id,{report},controls,statistics,reviews]);
+ return {id:reportId,source:s.id,reviews,report};
+}
+const readDated=async()=>(await db.query('select public.read_current_report_publication($1,$2) p',[est,'vi'])).rows[0].p as {scope:{stale:boolean;review_count:number};row:{id:string;source_reviews:{id:string}[];statistics:{scope:{source_reviews:number}};controls:{evidence:{quote:string|null;available:boolean}[]}}};
+it('keeps the dated report when a new review replaces the 100th, with original counters and an unavailable reference',async()=>{
+ for(let i=0;i<100;i++)await insert('dated-'+i,new Date(Date.now()-(i+1)*86400000).toISOString(),'SYNTHETIC full review '+i);
+ const p=await datedPublication();await insert('newest',new Date(Date.now()-10000).toISOString(),'SYNTHETIC newest');
+ const view=await readDated();expect(view.row.id).toBe(p.id);expect(view.scope.stale).toBe(true);expect(view.scope.review_count).toBe(100);expect(view.row.statistics.scope.source_reviews).toBe(100);expect(view.row.source_reviews).toHaveLength(99);
+ expect((await db.query('select count(*)::int n from public.reviews')).rows[0].n).toBe(100);
+ expect((await db.query('select count(*)::int n from public.historical_report_runs')).rows[0].n).toBe(0);
+ const stored=(await db.query('select to_jsonb(p)::text body from public.current_report_publications p')).rows[0].body as string;
+ expect(stored).not.toContain('SYNTHETIC full review');expect(stored).toContain('SYNTHETIC dated synthesis');
+ expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(1);
+},30000);
+it('keeps a dated report after all reviews expire without an ingestion, with no retained source quotation',async()=>{
+ const p=await datedPublication();await db.query("select public.apply_recent_review_retention($1,now()+interval '7 months')",[est]);
+ const view=await readDated();expect(view.row.id).toBe(p.id);expect(view.scope.stale).toBe(true);expect(view.row.source_reviews).toHaveLength(0);expect(view.row.controls.evidence[0]).toMatchObject({quote:null,available:false});
+ expect((await db.query('select count(*)::int n from public.reviews')).rows[0].n).toBe(0);
+ expect((await db.query('select count(*)::int n from public.analysis_parallel_reports')).rows[0].n).toBe(0);
+});
+it('keeps the last report on regeneration failure and replaces it only on compatible success, without accumulating publications',async()=>{
+ const old=await datedPublication();await insert('addition',new Date(Date.now()-10000).toISOString(),'SYNTHETIC extra');
+ const failed=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi',crypto.randomUUID(),'gpt-6.1-sol',8])).rows[0];
+ await db.query("update public.historical_report_runs set status='failed' where id=$1",[failed.id]);
+ expect((await readDated()).row.id).toBe(old.id);expect((await readDated()).scope.stale).toBe(true);
+ const fresh=await datedPublication('0 seconds');expect((await readDated()).row.id).toBe(fresh.id);expect((await readDated()).scope.stale).toBe(false);
+ expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(1);
+});
+it('blocks a consumed generation when its text changes, preserves the dated report and never reclassifies the new text',async()=>{
+ const old=await datedPublication(),req=crypto.randomUUID();
+ const s=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi',req,'gpt-6.1-sol',8])).rows[0],run=crypto.randomUUID(),report=crypto.randomUUID();
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,configuration_version) values($1,$2,$3,$4,'vi','queued','jev-multi-review-initial-v1')",[report,org,est,s.id]);
+ await db.query("insert into public.analysis_jev_batch_runs(id,organization_id,establishment_id,current_source_run_id,report_id,status,stage,armed,sol_request_count,sol_receipt) values($1,$2,$3,$4,$5,'running','validate_sol',true,1,'{\"saved\":true}')",[run,org,est,s.id,report]);
+ await db.query("insert into public.analysis_jev_batch_tasks(run_id,status,request_count,lease_until) values($1,'reserved',1,now()+interval '1 hour')",[run]);
+ await db.query("update public.reviews set original_text='SYNTHETIC modified after reservation',text='SYNTHETIC modified after reservation' where id=$1",[old.reviews[0].id]);
+ expect((await readDated()).scope.stale).toBe(true);expect((await readDated()).row.source_reviews).toHaveLength(0);
+ expect((await db.query('select armed from public.analysis_jev_batch_runs where id=$1',[run])).rows[0].armed).toBe(false);
+ await db.query("select public.jev_batch_finish($1,'completed',$2,'{}',null)",[run,{response:{saved:true},derived_report:{report:old.report},controls:{technical_checks_passed:true}}]);
+ expect((await db.query('select state from public.analysis_parallel_reports where id=$1',[report])).rows[0].state).toBe('blocked');
+ expect((await db.query('select status,sol_request_count,sol_receipt from public.analysis_jev_batch_runs where id=$1',[run])).rows[0]).toMatchObject({status:'blocked',sol_request_count:1,sol_receipt:{saved:true}});
+ expect((await readDated()).row.id).toBe(old.id);
+ await db.query("update public.analysis_jev_batch_tasks set lease_until=now()-interval '1 second' where run_id=$1",[run]);await db.exec('select public.maintain_recent_review_corpora()');
+ expect((await db.query('select count(*)::int n from public.analysis_jev_batch_runs where id=$1',[run])).rows[0].n).toBe(0);
+ expect((await db.query("select outcome from private.provider_attempt_ledger where phase='sol'")).rows.length).toBeGreaterThan(0);
+ await expect(db.query('select public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)',[est,org,user,'vi',req,'gpt-6.1-sol',8])).rejects.toThrow('REPORT_REQUEST_RETIRED');
+});
+it('keeps publications tenant scoped and the live source projection unavailable to clients',async()=>{
+ await datedPublication();await db.exec('set local role authenticated');expect((await db.query('select * from public.current_report_publications')).rows).toEqual([]);
+ await expect(db.query('select public.read_current_report_publication($1,$2)',[est,'vi'])).rejects.toThrow('permission denied');
 });

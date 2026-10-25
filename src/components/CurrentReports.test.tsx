@@ -24,6 +24,16 @@ it('does not expose a cached old report before server confirmation',()=>{
  render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language="fr"><CurrentReports establishmentId="est" account="account" languageKey="fr" enabled current={{} as never} generating={false} generationAction={<button>Generate</button>}>DELETED OLD REPORT BODY</CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);
  expect(screen.queryByText('DELETED OLD REPORT BODY')).not.toBeInTheDocument();
 });
+it('keeps a dated stale report visible after a failed regeneration and explains unavailable sources',async()=>{
+ const row=parallelPresentationRow('fr');row.current_source_run_id='old-source';row.controls={...row.controls,dated_publication:true,source_availability:[{review_id:'removed',available:false,reason:'review_removed'}]};row.source_reviews=[];
+ draw('fr','jev_sol_v2','/analyses',{experimental:row,retention:{policy:{version:'recent_text_100_6m_v1',enabled:true},state:{retained_count:0,period_start:null,period_end:null},scope:{as_of:'2026-10-25',review_count:3,period_start:'2026-07-01',period_end:'2026-10-01',stale:true},retired:null},request_run:{source_run_id:'failed-source',establishment_id:'est',preferred_language:'fr',generation_id:'failed',status:'failed',progress:0,total_steps:0,resumable:false,error_code:'SYNTHETIC_FAILED',created_at:'2026-10-25'} as never});
+ expect(await screen.findByText('À actualiser')).toBeVisible();expect(screen.getByText(/ce rapport daté décrit son ancien corpus/)).toBeVisible();expect(screen.getByText(/Aucune donnée textuelle récente admissible/)).toBeVisible();
+ expect(screen.getByText(/SYNTHETIC_FAILED/)).toBeVisible();
+ expect(screen.getByText(/textes sources sont devenus indisponibles/)).toBeVisible();
+ fireEvent.click(screen.getAllByRole('button',{name:/Avis négatifs, mixtes inclus/})[0]);
+ expect(await screen.findByText(/référence\(s\) devenue\(s\) indisponible/)).toBeVisible();
+ expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
+});
 it('keeps a completed available report separate from a newer request and attaches progress to that request',async()=>{
  const row=parallelPresentationRow('fr');row.current_source_run_id='old-source';row.state='completed';
  const data={routing:{engine:'jev_sol_v2',jev_transport:'batch_initial_v1',updated_at:'2026-10-24'},legacy_report:null,versions:[],experimental:row,

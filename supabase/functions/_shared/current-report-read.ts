@@ -9,6 +9,8 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  const org=e.data.organization_id,language=profile.data.preferred_language;
  const policyRead=await c.client.from('review_corpus_policy').select('version,enabled,paused,epoch').eq('id',true).single();if(policyRead.error)throw Error('REVIEW_POLICY_UNAVAILABLE');
  const policy=policyRead.data;if(policy.enabled)input={establishment_id:input.establishment_id};
+ const publication=policy.enabled?await c.admin.rpc('read_current_report_publication',{p_establishment:e.data.id,p_language:language}):{data:null,error:null};
+ if(publication.error)throw Error('CURRENT_PUBLICATION_READ_FAILED');
  const [routing,legacy,versions,request,abandoned]=await Promise.all([
   c.client.from('report_pipeline_settings').select('engine,jev_transport,updated_at').eq('id',true).single(),
   c.client.from('historical_establishment_reports').select('*').eq('organization_id',org).eq('establishment_id',e.data.id).eq('preferred_language',language).maybeSingle(),
@@ -28,11 +30,11 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  }
  const requested=versions.data.find(v=>v.id===request.data?.comparison_id);
  const available=versions.data.find(v=>v.current_source_run_id&&['completed','needs_review'].includes(v.state));
- const chosen=input.comparison_id??(request.data?.engine==='jev_sol_v2'?
+ const chosen=publication.data?undefined:input.comparison_id??(request.data?.engine==='jev_sol_v2'?
   (requested&&['completed','needs_review'].includes(requested.state)?requested.id:available?.id??requested?.id):
   routing.data.engine==='jev_sol_v2'?available?.id:versions.data.find(v=>v.configuration_version!=='jev-multi-review-initial-v1')?.id);
  if(input.comparison_id&&!versions.data.some(v=>v.id===input.comparison_id))throw Error('FORBIDDEN');
- let row=null,run=null,tasks:unknown[]=[],operation=null,batch_progress=null;
+ let row=publication.data?.row??null,run=null,tasks:unknown[]=[],operation=null,batch_progress=null;
  if(chosen){
   const p=await c.client.from('analysis_parallel_reports').select('*').eq('id',chosen).eq('organization_id',org).eq('establishment_id',e.data.id).single();if(p.error)throw Error('CURRENT_REPORT_READ_FAILED');row=p.data;
   if(row.run_id){const [r,t,o]=await Promise.all([c.client.from('analysis_jls_restaurant_runs').select('id,status,stage,error_code,created_at').eq('id',row.run_id).single(),c.client.from('analysis_jls_restaurant_tasks').select('id,phase,review_id,status,request_count').eq('run_id',row.run_id),c.client.from('analysis_jls_sol_ready_operations').select('id,status,result,receipt,request_count').eq('run_id',row.run_id).maybeSingle()]);if(r.error||t.error||o.error)throw Error('CURRENT_REPORT_READ_FAILED');run=r.data;tasks=t.data;operation=o.data;}
@@ -51,7 +53,7 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  let retention=null;
  if(policy.enabled){const [state,scope,retired]=await Promise.all([
   c.client.from('review_corpus_states').select('*').eq('organization_id',org).eq('establishment_id',e.data.id).maybeSingle(),
-  row?.current_source_run_id?c.client.from('report_corpus_scopes').select('*').eq('organization_id',org).eq('source_run_id',row.current_source_run_id).maybeSingle():Promise.resolve({data:null,error:null}),
+  publication.data?Promise.resolve({data:publication.data.scope,error:null}):row?.current_source_run_id?c.client.from('report_corpus_scopes').select('*').eq('organization_id',org).eq('source_run_id',row.current_source_run_id).maybeSingle():Promise.resolve({data:null,error:null}),
   c.admin.rpc('read_retired_report_scope',{p_establishment:e.data.id,p_organization:org,p_language:language})]);
   if(state.error||scope.error||retired.error)throw Error('REVIEW_SCOPE_READ_FAILED');retention={policy,state:state.data,scope:scope.data,retired:retired.data};
  }

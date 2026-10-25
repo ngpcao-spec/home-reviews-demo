@@ -45,7 +45,7 @@ it('keeps zero counters inert and closes the panel with Escape/cancel',()=>{
 it('reports missing IDs, missing source text, dates and ratings without fetching or fabricating data',()=>{
  const row=parallelPresentationRow('fr');row.source_reviews=row.source_reviews.filter(r=>r.id!=='review-never-selected');Object.assign(row.source_reviews[0],{original_text:'',analysis_text:null,rating:null,published_at:null})
  draw('fr',row);fireEvent.click(screen.getAllByRole('button',{name:'Avis négatifs, mixtes inclus : 2 — Service'})[0]);const panel=screen.getByRole('dialog')
- expect(panel).toHaveTextContent('1 avis classé(s) n’ont pas de source');expect(within(panel).getAllByText('Non disponible dans le corpus figé')).toHaveLength(3)
+ expect(panel).toHaveTextContent('1 référence(s) devenue(s) indisponible(s)');expect(within(panel).getAllByText('Non disponible dans le corpus figé')).toHaveLength(3)
 })
 it('does not substitute evidence IDs when saved classification lists are missing or inconsistent',()=>{
  const row=parallelPresentationRow('fr');delete row.statistics!.counts.categories.service.positive_review_ids
