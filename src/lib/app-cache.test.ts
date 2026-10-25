@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cacheGeneration, purgeAppCache, readAppCache, validAppCache } from './app-cache'
-const record=()=>({version:2,userId:'a',organizationIds:['org-a'],cachedAt:Date.now(),data:{
+const record=()=>({version:3,userId:'a',organizationIds:['org-a'],cachedAt:Date.now(),data:{
   establishments:[],reviews:[],notifications:[],initialImportJobs:[],monitoringIntervalHours:12,preferredLanguage:'vi',
 }})
 describe('account cache validation',()=>{

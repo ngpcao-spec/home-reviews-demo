@@ -9,6 +9,7 @@ import type {ParallelView} from './ParallelReports'
 import {ExperimentalReport} from './ExperimentalReport'
 import {ConsultantReport} from './ConsultantReport'
 import {ReputationReport} from './ReputationReport'
+import {ReportLanguageInfo} from './CustomerRatingSummary'
 import './parallel-reports.css'
 export interface CurrentReportsView {
  retention?:{policy:{version:string;enabled:boolean};state:{retained_count:number;period_start:string|null;period_end:string|null}|null;scope:{as_of:string;review_count:number;period_start:string;period_end:string;stale:boolean}|null;retired:{generated_at:string|null;review_count:number;period_start:string|null;period_end:string|null;reason:string}|null}|null;
@@ -59,7 +60,7 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
    </div>
    <section id="current-report-panel" role="tabpanel" aria-labelledby="current-report-tab" hidden={archive}>
     {!v2?legacyReport:<>
-     {row&&meta(row)}
+     {row&&meta(row)}{row&&<ReportLanguageInfo source={row.source_report as Record<string,unknown>|undefined}/> }
      {row&&requestRun&&row.current_source_run_id!==requestRun.source_run_id&&<p className="v5-muted">{fr?'Rapport précédent disponible. Il est distinct de la nouvelle demande ci-dessous.':'Báo cáo trước đây vẫn có sẵn, tách biệt với yêu cầu mới bên dưới.'}</p>}
      {requestRun?.request_id&&<p className="v5-muted" data-current-request-id={requestRun.request_id}>{fr?'Demande':'Yêu cầu'} {requestRun.request_id.slice(0,8)} · {date(requestRun.created_at)} · {statuses[requestRun.status]??requestRun.status}</p>}
      {!archive&&batchProgress}

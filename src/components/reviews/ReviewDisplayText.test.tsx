@@ -24,6 +24,9 @@ it('shows original while pending, then refreshes when the translation becomes av
 it('labels unknown or failed output explicitly without calling it a translation',async()=>{
  mock.read.mockResolvedValue({...result('unknown'),error_code:'TRANSLATION_OUTCOME_UNKNOWN'});render(ui());expect(await screen.findByText('Original · traduction indisponible')).toBeVisible();expect(screen.getByText(review.originalText!)).toBeVisible();expect(screen.queryByRole('button')).toBeNull()
 })
+it('shows a missing Google version without preparing or polling a new translation',async()=>{
+ vi.useFakeTimers();mock.read.mockResolvedValue(result('missing'));render(ui());await act(async()=>{await vi.advanceTimersByTimeAsync(10)});expect(screen.getByRole('status')).toHaveTextContent('Original · traduction indisponible');await act(async()=>{await vi.advanceTimersByTimeAsync(15000)});expect(mock.read).toHaveBeenCalledTimes(1);expect(screen.queryByRole('button')).toBeNull()
+})
 it('never prepares a textless review',()=>{
  render(ui('fr',{...review,originalText:'',reviewText:''}));expect(mock.read).not.toHaveBeenCalled();expect(screen.queryByRole('status')).toBeNull()
 })

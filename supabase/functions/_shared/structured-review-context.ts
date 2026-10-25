@@ -9,7 +9,7 @@ export interface StructuredContextStats {
 }
 const normalize=(s:string)=>s.normalize('NFKC').toLowerCase().trim().replace(/[–—−]/g,'-').replace(/\s+/g,' ')
 const keys:Record<string,string[]>={
-  noise:['noise','noise level','niveau sonore','niveau de bruit','độ ồn'],
+  noise:['noise','noise level','niveau sonore','niveau de bruit','độ ồn','mức độ ồn'],
   wait_time:['wait_time','wait time','waiting time','temps d’attente',"temps d'attente",'thời gian chờ'],
   price_per_person:['price_per_person','price per person','prix par personne','giá mỗi người'],
   meal_type:['meal_type','meal type','type de repas','loại hình bữa ăn','loại bữa ăn'],
@@ -17,17 +17,17 @@ const keys:Record<string,string[]>={
 }
 const noise:Record<string,keyof Omit<StructuredContextStats['noise'],'total'>>={
   'rất yên tĩnh':'quiet','yên tĩnh, dễ trò chuyện':'quiet','quiet, easy to talk':'quiet','very quiet':'quiet','calme, conversation facile':'quiet',
-  'ồn ào ở mức vừa phải':'moderate','moderately loud':'moderate','moderate noise':'moderate','modérément bruyant':'moderate',
+  'ồn ào ở mức vừa phải':'moderate','moderately loud':'moderate','tiếng ồn vừa phải':'moderate','độ ồn vừa phải':'moderate','bruit modéré':'moderate','moderate noise':'moderate','modérément bruyant':'moderate',
   'ồn ào, nhưng bạn vẫn trò chuyện được':'noisy_conversation_possible','loud, but you can still talk':'noisy_conversation_possible','bruyant, mais conversation possible':'noisy_conversation_possible',
 }
 const waits:Record<string,keyof Omit<StructuredContextStats['wait_time'],'total'>>={
-  'không phải chờ':'no_wait','không cần chờ':'no_wait','no wait':'no_wait','sans attente':'no_wait',
-  'dưới 10 phút':'under_10_min','tới 10 phút':'under_10_min','up to 10 min':'under_10_min','under 10 min':'under_10_min','moins de 10 min':'under_10_min',
+  'không phải chờ':'no_wait','không cần chờ':'no_wait','no wait':'no_wait','aucune attente':'no_wait','sans attente':'no_wait',
+  'dưới 10 phút':'under_10_min','tới 10 phút':'under_10_min','up to 10 min':'under_10_min','under 10 min':'under_10_min','moins de 10 minutes':'under_10_min','jusqu’à 10 min':'under_10_min','moins de 10 min':'under_10_min',
   '10-30 phút':'from_10_to_30_min','10-30 min':'from_10_to_30_min',
   '30-60 phút':'from_30_to_60_min','30-60 min':'from_30_to_60_min',
   'hơn 60 phút':'over_60_min','over 60 min':'over_60_min','plus de 60 min':'over_60_min',
 }
-const meals:Record<string,string>={'bữa sáng':'breakfast',breakfast:'breakfast','petit déjeuner':'breakfast','bữa trưa':'lunch',lunch:'lunch','déjeuner':'lunch','bữa tối':'dinner',dinner:'dinner','dîner':'dinner',brunch:'brunch','khác':'other',other:'other',autre:'other'}
+const meals:Record<string,string>={'bữa sáng':'breakfast',breakfast:'breakfast','petit-déjeuner':'breakfast','petit déjeuner':'breakfast','bữa trưa':'lunch',lunch:'lunch','déjeuner':'lunch','bữa tối':'dinner',dinner:'dinner','dîner':'dinner',brunch:'brunch','khác':'other',other:'other',autre:'other'}
 const groups:Record<string,string>={'1 người':'1','1 person':'1','1 personne':'1','2 người':'2','2 people':'2','2 personnes':'2','3 đến 4 người':'3-4','5 đến 8 người':'5-8','phù hợp với mọi quy mô nhóm':'all_sizes','suitable for all group sizes':'all_sizes'}
 export function normalizeContextPrice(value:string) {
   const clean=value.normalize('NFKC').trim().replace(/\s+/g,' ')

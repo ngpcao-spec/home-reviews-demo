@@ -37,7 +37,7 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
   return {id:r.id,organization_id:report.organization_id,establishment_id:report.establishment_id,rating:r.rating,
    original_text:original,original_text_sha256:await analysisTextSha256(String(original)),
    analysis_text:r.analysis_text.trim()?r.analysis_text:null,analysis_text_sha256:r.analysis_text.trim()?await analysisTextSha256(r.analysis_text):null,
-   analysis_language:r.analysis_language,analysis_source:r.analysis_source,translation_provenance:{historical_run_id:history.id,source:r.analysis_source,original_language:r.original_language,frozen:true,provider_translation_id:null},
+   analysis_language:r.analysis_language,analysis_source:r.analysis_source,translation_provenance:{historical_run_id:history.id,source:r.analysis_source,original_language:r.original_language,frozen:true,provider_translation_id:null,...(r.analysis_translation_provenance&&typeof r.analysis_translation_provenance==='object'?r.analysis_translation_provenance:{} )},
    review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,published_at:r.published_at} as SourceReview;
  }));
  if(new Set(reviews.map(r=>r.id)).size!==reviews.length)throw Error('PARALLEL_DUPLICATE_REVIEW');

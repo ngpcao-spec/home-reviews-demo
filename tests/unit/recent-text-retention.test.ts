@@ -6,6 +6,7 @@ import {beforeAll,beforeEach,afterEach,afterAll,it,expect,describe} from 'vitest
 import {directHash} from '../../supabase/functions/_shared/jev-direct-categories';
 import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
 import {analysisTextForReview} from '../../supabase/functions/_shared/analysis-text';
+import {prepareNativeLanguage} from '../fixtures/prepare-native-language';
 const fixture=JSON.parse(readFileSync('tests/fixtures/retention-production-definitions.json','utf8'));
 let db:PGlite;
 const org='10000000-0000-4000-8000-000000000001',est='20000000-0000-4000-8000-000000000001',user='30000000-0000-4000-8000-000000000001';
@@ -333,5 +334,53 @@ describe('latest 150 review corpus',()=>{
   expect((await db.query('select * from public.organization_members')).rows).toEqual(access);
   expect((await db.query('select count(*)::int n from private.retired_generation_keys')).rows[0].n).toBeGreaterThan(0);
   expect((await db.query('select count(*)::int n from private.provider_attempt_ledger where establishment_id is not null or organization_id is not null')).rows[0].n).toBe(0);
+ });
+});
+
+
+describe('native account language after complete reset',()=>{
+ beforeEach(()=>prepareNativeLanguage(db,user));
+ const google=async(id:unknown,language:string,text:string)=>{await db.exec("select set_config('home.retention_ingest','on',true)");await db.query('insert into public.review_translations(review_id,language,translated_text) values($1,$2,$3)',[id,language,text]);};
+ const display=async(id:unknown,prepare=true)=>(await db.query('select public.read_review_display($1,$2) r',[[id],prepare])).rows[0].r as {status:string;language:string;translated_text:string|null}[];
+ it('reads FR/VI Google versions without enqueueing a translator, including older clients',async()=>{
+  const id=(await insert('native','2020-01-01','Original russe')).rows[0].id;await google(id,'vi','Bản Google Việt');await google(id,'fr','Version Google française');
+  expect(await display(id)).toMatchObject([{status:'translated',language:'vi',translated_text:'Bản Google Việt'}]);
+  await db.query("update public.profiles set preferred_language='fr' where user_id=$1",[user]);expect(await display(id)).toMatchObject([{status:'translated',language:'fr',translated_text:'Version Google française'}]);
+  expect((await db.query('select enabled from private.review_display_runtime')).rows[0].enabled).toBe(false);expect((await db.query("select * from public.claim_review_display('worker')")).rows).toHaveLength(0);
+ });
+ it('never substitutes English or another target; matching originals and textless reviews need no translation',async()=>{
+  const id=(await insert('native','2020-01-01','English original')).rows[0].id;await google(id,'en','Wrong English version');await google(id,'fr','Version française');expect(await display(id)).toMatchObject([{status:'missing',translated_text:null}]);
+  await db.query("update public.reviews set original_language='vi' where id=$1",[id]);expect(await display(id)).toMatchObject([{status:'original',translated_text:null}]);
+  const empty=(await insert('empty','2020-01-01','')).rows[0].id;expect(await display(empty)).toMatchObject([{status:'original'}]);
+ });
+ it('binds exact Unicode source hashes and removes translations after modification',async()=>{
+  const id=(await insert('native','2020-01-01','Đồ ăn rất ngon.')).rows[0].id;await google(id,'fr','Très bon repas.');
+  expect((await db.query('select source_text_sha256 h from public.review_translations')).rows[0].h).toBe(await analysisTextSha256('Đồ ăn rất ngon.'));
+  await db.query('update public.reviews set original_text=$2,text=$2 where id=$1',[id,'Original modifié']);expect((await db.query('select count(*)::int n from public.review_translations')).rows[0].n).toBe(0);
+ });
+ it('freezes collection language in a durable import, establishment and subsequent automatic sync',async()=>{
+  const j=crypto.randomUUID(),e=crypto.randomUUID();await db.query("insert into public.initial_import_jobs(id,organization_id,user_id,query,expected_google_id,preferred_language,status) values($1,$2,$3,'offline','fresh','vi','running')",[j,org,user]);
+  await db.query("insert into public.establishments(id,organization_id,name,google_id,initial_import_job_id) values($1,$2,'Offline fixture','fresh',$3)",[e,org,j]);expect((await db.query('select collection_language from public.establishments where id=$1',[e])).rows[0].collection_language).toBe('vi');
+  await db.query("update public.profiles set preferred_language='fr' where user_id=$1",[user]);await db.query('insert into public.review_sync_jobs(establishment_id,organization_id,scheduled_for) values($1,$2,now())',[e,org]);expect((await db.query('select collection_language from public.review_sync_jobs')).rows[0].collection_language).toBe('vi');
+  await db.exec('savepoint frozen');await expect(db.query("update public.initial_import_jobs set preferred_language='fr' where id=$1",[j])).rejects.toThrow('FROZEN_COLLECTION_LANGUAGE');await db.exec('rollback to savepoint frozen');
+ });
+ it('does not reissue an unknown sync start, including through a freshly scheduled job',async()=>{
+  const j=crypto.randomUUID();await db.query("insert into public.review_sync_jobs(id,establishment_id,organization_id,status,locked_by,lease_until) values($1,$2,$3,'running','worker',now()+interval '2 minutes')",[j,est,org]);const reserve=()=>db.query("select public.reserve_review_sync_start($1,'worker') ok",[j]);
+  expect((await reserve()).rows[0].ok).toBe(true);expect((await reserve()).rows[0].ok).toBe(false);await db.exec("update public.review_sync_jobs set lease_until=now()-interval '1 second'");expect((await db.query("select * from public.claim_review_sync_jobs('cron')")).rows).toHaveLength(0);
+  expect((await db.query('select status,error_code from public.review_sync_jobs')).rows[0]).toEqual({status:'dead',error_code:'APIFY_START_OUTCOME_UNKNOWN'});await db.query('insert into public.review_sync_jobs(establishment_id,organization_id) values($1,$2)',[est,org]);expect((await db.query('select count(*)::int n from public.review_sync_jobs')).rows[0].n).toBe(1);
+ });
+ it('resumes only the known Apify run after a lost worker, with the original language',async()=>{
+  const j=crypto.randomUUID();await db.query("insert into public.review_sync_jobs(id,establishment_id,organization_id,status,locked_by,lease_until,pagination_cursor) values($1,$2,$3,'running','old',now()-interval '1 second',$4)",[j,est,org,JSON.stringify({provider:'apify',runId:'known',datasetId:'dataset',language:'fr'})]);expect((await db.query("select * from public.claim_review_sync_jobs('new')")).rows).toHaveLength(1);
+  expect((await db.query('select apify_run_id,collection_language from public.review_sync_jobs')).rows[0]).toEqual({apify_run_id:'known',collection_language:'fr'});expect((await db.query("select public.reserve_review_sync_start($1,'new') ok",[j])).rows[0].ok).toBe(false);
+ });
+ it('preserves latest-150 retention without age/text bias, replacement and manual report lifecycle',async()=>{
+  for(let n=0;n<152;n++)await insert('native'+String(n).padStart(3,'0'),'2020-01-01',n%2?'Texte':'',n%5+1);expect((await db.query('select count(*)::int n from public.reviews')).rows[0].n).toBe(150);
+  const old=await datedPublication();await db.exec('reset role');await insert('newest',new Date(Date.now()-10000).toISOString(),'Nouveau');expect((await readDated()).scope.stale).toBe(true);expect((await readDated()).row.id).toBe(old.id);
+  const fresh=await datedPublication('0 seconds');expect((await readDated()).row.id).toBe(fresh.id);expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(1);
+ });
+ it('freezes Google target language and source hash, without reading English overrides',async()=>{
+  expect((await db.query("select pg_get_functiondef('public.read_current_report_publication(uuid,text)'::regprocedure) d")).rows[0].d).not.toContain('english');
+  const id=(await insert('native','2020-01-01','Original русский')).rows[0].id;await google(id,'vi','Bản Google Việt');await google(id,'en','Unused English');await db.exec('set local role service_role');
+  const s=(await db.query("select public.freeze_recent_review_source($1,$2,'vi',now()) s",[est,org])).rows[0].s as {analysis_text_policy:string;retention_frozen_rows:{review_translations:{language:string;source_text_sha256:string}[]}[]};expect(s.analysis_text_policy).toBe('account_google_or_original_v1');expect(s).not.toHaveProperty('retention_english_overrides');expect(s.retention_frozen_rows[0].review_translations.find(t=>t.language==='vi')?.source_text_sha256).toBe(await analysisTextSha256('Original русский'));
  });
 });

@@ -20,7 +20,7 @@ import {
 import { configuredInteger, mapWithConcurrency, retryPolicy } from '../_shared/sync-queue.ts'
 import { sendPushToUser } from '../_shared/push.ts'
 import { dispatchImportCompletionNotifications } from '../_shared/import-completion-notifications.ts'
-import {GOOGLE_REVIEWS_IMPORT_LANGUAGE} from '../_shared/review-language.ts'
+import {collectionLanguage} from '../_shared/review-language.ts'
 import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
 import {advanceInitialApify} from '../_shared/initial-import-apify.ts'
 
@@ -260,7 +260,7 @@ async function processApify(
   acquire:async()=>{slot=await acquireProviderSlot(admin,providerToken,config.providerLeaseSeconds,config.providerSlotWaitMs);return slot!==null},
   release:async()=>{if(slot!==null)await admin.rpc('release_review_provider_slot',{p_slot_number:slot,p_worker_token:providerToken,p_cooldown_ms:config.providerCooldownMs})},
   reserveStart:async()=>await requireSuccess<boolean>(admin.rpc('mark_initial_import_phase',{p_job:job.id,p_worker:worker,p_phase:'provider_start'})),
-  start:async reserve=>await startApifyRun(token,{placeUrl:job.query,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,sort:'newest',limit:job.reviews_target},undefined,reserve),
+  start:async reserve=>await startApifyRun(token,{placeUrl:job.query,language:collectionLanguage(job.preferred_language),sort:'newest',limit:job.reviews_target},undefined,reserve),
   saveRun:async run=>{
    resolvedPlaceUrl=run.resolvedPlaceUrl??resolvedPlaceUrl
    await checkpoint(admin,job,worker,{providerRunId:run.runId,providerDatasetId:run.datasetId,resolvedPlaceUrl:run.resolvedPlaceUrl},config.leaseSeconds)

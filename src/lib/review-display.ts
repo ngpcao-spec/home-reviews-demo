@@ -18,7 +18,7 @@ export function readReviewDisplay(account:string,language:PreferredLanguage,id:s
     void(async()=>{
      try{
       if(!supabase)throw Error('TRANSLATION_UNAVAILABLE')
-      const {data,error}=await supabase.rpc('read_review_display',{p_reviews:group,p_prepare:true})
+      const {data,error}=await supabase.rpc('read_review_display',{p_reviews:group,p_prepare:false})
       if(error)throw Error('TRANSLATION_UNAVAILABLE')
       for(const w of listeners){const row=(data as ReviewDisplay[]).find(r=>r.review_id===w.id&&r.language===language);if(row)w.resolve(row);else w.reject(Error('DISPLAY_LANGUAGE_CHANGED'))}
      }catch{for(const w of listeners)w.reject(Error('TRANSLATION_UNAVAILABLE'))}

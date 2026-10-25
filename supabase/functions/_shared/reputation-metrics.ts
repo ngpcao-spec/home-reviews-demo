@@ -11,6 +11,9 @@ export interface ReputationReview {
   normalized_category_ratings?:import('./cross-rating-analysis.ts').CategoryRatings
   analysis_language?:string|null
   analysis_source?:import('./analysis-text.ts').AnalysisSource
+  analysis_target_language?:'fr'|'vi'
+  analysis_text_sha256?:string
+  analysis_translation_provenance?:{policy:string;target_language:string;original_language:string|null;original_text_sha256:string;provider_translation_id:string|null;provider_translation_language:string|null;provider:string;translation_available:boolean;translation_missing:boolean}
   analysis_translation_override?:import('./analysis-text.ts').EnglishOverrideProvenance
   text: string | null
   published_at: string | null

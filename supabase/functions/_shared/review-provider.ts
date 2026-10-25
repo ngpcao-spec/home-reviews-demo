@@ -1,6 +1,6 @@
 import {fetchOutscraperGoogleReviews} from './outscraper.ts'
 import {fetchApifyReviews, type ProviderLanguage} from './apify.ts'
-import {GOOGLE_REVIEWS_IMPORT_LANGUAGE} from './review-language.ts'
+import {collectionLanguage} from './review-language.ts'
 
 export interface PlaceCandidate{placeRef:string;name:string;address:string;rating:number;reviewCount:number;googleMapsUrl:string;photoUrl?:string;confidence:number}
 export interface ProviderReview{externalReviewId:string;authorName:string;authorAvatarUrl?:string;rating:number;text:string;translatedText?:string;language?:string;translatedLanguage?:string;publishedAt:string;sourceUrl:string;ownerResponse?:string}
@@ -26,18 +26,18 @@ export class OutscraperReviewProvider implements ReviewProvider{
 export class ApifyReviewProvider implements ReviewProvider{
   readonly name='apify' as const
   constructor(private token:string){}
-  async resolvePlace(input:string,language:ProviderLanguage='en'){
-    const result=await fetchApifyReviews(this.token,{placeUrl:input,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,sort:'newest',limit:1})
+  async resolvePlace(input:string,language:ProviderLanguage='fr'){
+    const result=await fetchApifyReviews(this.token,{placeUrl:input,language:collectionLanguage(language),sort:'newest',limit:1})
     const place=result.establishment
     return[{placeRef:place.googleId,name:place.name,address:place.fullAddress,rating:place.rating,reviewCount:place.totalReviews,googleMapsUrl:place.locationLink??input,photoUrl:place.photo??undefined,confidence:.95}]
   }
-  async getPlace(placeRef:string,language:ProviderLanguage='en'){
+  async getPlace(placeRef:string,language:ProviderLanguage='fr'){
     const found=await this.resolvePlace(placeRef,language)
     if(!found[0])throw new Error('PLACE_NOT_FOUND')
     return found[0]
   }
   async fetchReviews(placeRef:string,options:{sort:'newest'|'lowest_rating';limit?:number;since?:string;language?:ProviderLanguage}){
-    const result=await fetchApifyReviews(this.token,{placeUrl:placeRef,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,sort:options.sort,limit:options.limit,since:options.since})
+    const result=await fetchApifyReviews(this.token,{placeUrl:placeRef,language:collectionLanguage(options.language??'fr'),sort:options.sort,limit:options.limit,since:options.since})
     return{reviews:result.reviews.map(review=>({externalReviewId:review.externalReviewId,authorName:review.authorName,authorAvatarUrl:review.authorImage??undefined,rating:review.rating,text:review.text,translatedText:review.translatedText??undefined,language:review.language??undefined,translatedLanguage:review.translatedLanguage??undefined,publishedAt:review.publishedAt??new Date(0).toISOString(),sourceUrl:review.reviewUrl??result.establishment.locationLink??'https://maps.google.com',ownerResponse:review.ownerResponse??undefined}))}
   }
 }

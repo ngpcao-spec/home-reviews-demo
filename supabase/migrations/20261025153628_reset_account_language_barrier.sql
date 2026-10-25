@@ -1,0 +1,11 @@
+set local lock_timeout='5s';
+set local statement_timeout='30s';
+update public.review_corpus_policy set paused=true,ingestions_paused=true,epoch=gen_random_uuid(),updated_at=clock_timestamp() where id;
+update private.restaurant_reset_control set started_at=clock_timestamp(),completed_at=null,previous_active_jobs=coalesce((select array_agg(jobid) from cron.job where active and jobname<>'home-reviews-cron-log-retention-v1'),'{}') where id;
+update private.review_display_runtime set enabled=false where singleton;
+do $$declare j bigint;begin foreach j in array(select previous_active_jobs from private.restaurant_reset_control where id) loop perform cron.alter_job(j,active:=false);end loop;end$$;
+insert into private.restaurant_reset_fence(kind,key) select 'establishment',id from public.establishments on conflict do nothing;
+insert into private.restaurant_reset_fence(kind,key) select 'import',id from public.initial_import_jobs on conflict do nothing;
+insert into private.restaurant_reset_fence(kind,key) select 'request',id from public.report_generation_requests on conflict do nothing;
+insert into private.restaurant_reset_fence(kind,key) select 'source',id from public.historical_report_runs on conflict do nothing;
+insert into private.restaurant_reset_fence(kind,key) select 'batch',id from public.analysis_jev_batch_runs on conflict do nothing;

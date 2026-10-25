@@ -47,5 +47,5 @@ it('uses the bounded provider GET option and native timestamps with a fully mock
 })
 it('never sends the POST when the durable reservation fails, after URL preparation',async()=>{
  vi.stubGlobal('Deno',{env:{get:()=>undefined}});const fetch=vi.spyOn(globalThis,'fetch').mockRejectedValue(Error('NETWORK_FORBIDDEN'))
- try{await expect(startApifyRun('synthetic-key',{placeUrl:'https://www.google.com/maps?cid=123',language:'en',sort:'newest',limit:150},undefined,async()=>{throw Error('LEASE_LOST')})).rejects.toThrow('LEASE_LOST');expect(fetch).not.toHaveBeenCalled()}finally{fetch.mockRestore();vi.unstubAllGlobals()}
+ try{await expect(startApifyRun('synthetic-key',{placeUrl:'https://www.google.com/maps?cid=123',language:'vi',sort:'newest',limit:150},undefined,async()=>{throw Error('LEASE_LOST')})).rejects.toThrow('LEASE_LOST');expect(fetch).not.toHaveBeenCalled()}finally{fetch.mockRestore();vi.unstubAllGlobals()}
 })

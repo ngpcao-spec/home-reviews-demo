@@ -29,7 +29,7 @@ function DisplayContent({review,quote,linkTo,toggle=true,account,live}:Props&{ac
     // Never display a result for another revision, even if the account changes mid-request.
     if(result.original_text!==original){setUnavailable(true);return}
     setData(result);setUnavailable(false)
-    if(['queued','processing','missing'].includes(result.status))timer=setTimeout(()=>void read(),3000)
+    if(['queued','processing'].includes(result.status))timer=setTimeout(()=>void read(),3000)
    }catch{if(active)setUnavailable(true)}
   }
   void read()
@@ -39,7 +39,7 @@ function DisplayContent({review,quote,linkTo,toggle=true,account,live}:Props&{ac
  const isTranslated=Boolean(hasText&&translated&&translated!==original)
  const text=showOriginal?original:isTranslated?translated:live?original:review.reviewText.trim()?review.reviewText:original
  const body=quote?<blockquote>{text}</blockquote>:<p>{text}</p>
- const status=hasText&&live&&!isTranslated&&data?.status!=='original'?(unavailable||['failed','unknown'].includes(data?.status??'')?messages.reviews.displayTranslationUnavailable:messages.reviews.displayTranslationPending):null
+ const status=hasText&&live&&!isTranslated&&data?.status!=='original'?(unavailable||['missing','failed','unknown'].includes(data?.status??'')?messages.reviews.displayTranslationUnavailable:messages.reviews.displayTranslationPending):null
  return <div ref={root} className="review-display-text">
   {linkTo?<Link className="review-open" to={linkTo}>{body}</Link>:body}
   {isTranslated&&<small className="review-translation-status">{showOriginal?messages.reviews.original:messages.reviews.displayTranslated}</small>}
