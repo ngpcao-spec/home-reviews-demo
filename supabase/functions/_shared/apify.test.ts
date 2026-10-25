@@ -54,7 +54,7 @@ describe('ApifyReviewProvider normalization', () => {
     expect(result.resolvedPlaceUrl).toBe(resolved)
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
-  it('requests one newest-first initial sample capped at 100 reviews', () => {
+  it('requests one newest-first initial sample capped at 150 reviews without an age cutoff', () => {
     expect(apifyActorInput({
       placeUrl: item.url,
       language: 'fr',
@@ -66,7 +66,7 @@ describe('ApifyReviewProvider normalization', () => {
       reviewsSort: 'newest',
       language: 'en',
       personalData: true,
-      maxReviews: 100,
+      maxReviews: 150,
     })
   })
 

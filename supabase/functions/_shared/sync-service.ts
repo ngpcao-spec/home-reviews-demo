@@ -12,15 +12,15 @@ import {
 import { reviewClassification, reviewsForPersistence } from './review-classification.ts'
 import {
   initialHistoryComplete,
-  initialReviewsLimit,
+  DEFAULT_INITIAL_REVIEWS_LIMIT,
   prepareInitialReviews,
 } from './initial-import.ts'
 import { reviewPersistenceBatches } from './review-persistence.ts'
 import { GOOGLE_REVIEWS_IMPORT_LANGUAGE,translationLanguage,normalizeReviewLanguage } from './review-language.ts'
-import {readReviewPolicy,assertIngestionAllowed,knownReviewKeys,recentReviewCutoff} from './recent-review-policy.ts'
+import {readReviewPolicy,assertIngestionAllowed,knownReviewKeys} from './recent-review-policy.ts'
 
-const INCREMENTAL_WINDOW = 20
-const MAX_INCREMENTAL_PAGES = 5
+const INCREMENTAL_WINDOW = 150
+const MAX_INCREMENTAL_PAGES = 1
 
 export interface EstablishmentRow {
   id: string
@@ -296,7 +296,7 @@ export async function fetchInitialization(
   language: PreferredLanguage,
 ): Promise<InitializationFetchResult> {
   const provider = providerName()
-  const limit = initialReviewsLimit(Deno.env.get('INITIAL_REVIEWS_LIMIT'))
+  const limit = DEFAULT_INITIAL_REVIEWS_LIMIT
   if (provider === 'mock') {
     const result = getMockGoogleReviews(query)
     const reviews = prepareInitialReviews(result.reviews, limit)
@@ -318,7 +318,6 @@ export async function fetchInitialization(
       language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,
       sort: 'newest',
       limit,
-      since:recentReviewCutoff(),
     })
     const reviews = prepareInitialReviews(result.reviews, limit)
     return {
@@ -337,7 +336,6 @@ export async function fetchInitialization(
     query,
     apiKey: outscraperKey(),
     reviewsLimit: limit,
-    cutoff:Math.floor(Date.parse(recentReviewCutoff())/1000),
     sort: 'newest',
     timeoutMs: 90_000,
   })
@@ -609,16 +607,11 @@ export async function fetchIncrementalPage(
   if (provider === 'mock') return getMockGoogleReviews(establishment.google_id)
   if (provider === 'apify') throw new Error('APIFY_ASYNC_WORKER_REQUIRED')
 
-  const cutoff = establishment.last_review_at
-    ? Math.max(0, Math.floor(Date.parse(establishment.last_review_at) / 1_000) - 5)
-    : undefined
-
   return fetchOutscraperReviews({
     query: establishment.google_id,
     apiKey: outscraperKey(),
     reviewsLimit: INCREMENTAL_WINDOW,
     sort: 'newest',
-    cutoff,
     lastPaginationId: cursor,
     timeoutMs: 45_000,
   })
@@ -654,8 +647,7 @@ export async function syncEstablishment(
         .in('external_review_id', externalIds)
       if (knownError) throw knownError
       const knownIds = new Set([...(knownRows ?? []).map((row) => row.external_review_id as string),...await knownReviewKeys(admin,establishment.id,externalIds)])
-      const newReviews = page.reviews.filter((review) => !knownIds.has(review.externalReviewId))
-      inserted += await insertReviews(admin, establishment, newReviews, false, page.provider)
+      inserted += await insertReviews(admin, establishment, page.reviews, false, page.provider)
       if (pageNumber === 0) {
         await persistEstablishmentSnapshot(admin, establishment, page.provider, page.establishment, `sync:${runId}`)
       }

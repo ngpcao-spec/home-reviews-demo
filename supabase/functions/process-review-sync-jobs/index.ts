@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
-import {assertIngestionAllowed,recentReviewCutoff} from '../_shared/recent-review-policy.ts'
+import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
 import {GOOGLE_REVIEWS_IMPORT_LANGUAGE,type ProviderLanguage} from '../_shared/review-language.ts'
 import {
   apifyToken,
@@ -22,7 +22,6 @@ import {
 import {
   configuredInteger,
   mapWithConcurrency,
-  pageBeforeCheckpoint,
   retryPolicy,
 } from '../_shared/sync-queue.ts'
 
@@ -116,15 +115,11 @@ async function processApifyJob(
 
     try {
       const language = GOOGLE_REVIEWS_IMPORT_LANGUAGE
-      const since = job.checkpoint_review_at
-        ? new Date(Date.parse(job.checkpoint_review_at) - 5_000).toISOString()
-        : new Date(Date.now() - 30 * 86_400_000).toISOString()
       const run = await startApifyRun(token, {
         placeUrl: job.google_maps_url,
         language,
         sort: 'newest',
-        since: since>recentReviewCutoff()?since:recentReviewCutoff(),
-        limit: 100,
+        limit: 150,
       })
       cursor = { provider: 'apify', runId: run.runId, datasetId: run.datasetId, language }
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
@@ -175,11 +170,10 @@ async function processApifyJob(
   const first = page.reviews[0]
   const headReviewId = job.head_review_id ?? first?.externalReviewId ?? null
   const headReviewAt = job.head_review_at ?? first?.publishedAt ?? null
-  const checkpoint = pageBeforeCheckpoint(page.reviews, job.checkpoint_review_id)
   const inserted = await insertReviews(admin, {
     id: job.establishment_id,
     organization_id: job.organization_id,
-  }, checkpoint.reviews, false, page.provider)
+  }, page.reviews, false, page.provider)
   await persistEstablishmentSnapshot(admin, {
     id: job.establishment_id,
     organization_id: job.organization_id,
@@ -291,18 +285,18 @@ async function processJob(
       const first = page.reviews[0]
       headReviewId ??= first?.externalReviewId ?? null
       headReviewAt ??= first?.publishedAt ?? null
-      const checkpoint = pageBeforeCheckpoint(page.reviews, job.checkpoint_review_id)
       const inserted = await insertReviews(admin, {
         id: job.establishment_id,
         organization_id: job.organization_id,
-      }, checkpoint.reviews, false, page.provider)
+      }, page.reviews, false, page.provider)
       if (pageNumber === 0) {
         await persistEstablishmentSnapshot(admin, {
           id: job.establishment_id,
           organization_id: job.organization_id,
         }, page.provider, page.establishment, `sync:${job.id}`)
       }
-      const nextCursor = page.reviews.at(-1)?.paginationId ?? null
+      // One complete newest-150 window; older pages cannot enter this corpus.
+      const nextCursor = null
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
         p_job_id: job.id,
         p_worker_id: worker,
@@ -316,7 +310,7 @@ async function processJob(
       }))
       if (saved !== true) throw new Error('SYNC_LEASE_LOST')
 
-      const caughtUp = checkpoint.caughtUp || page.reviews.length === 0 || !nextCursor
+      const caughtUp = !nextCursor
       if (caughtUp) {
         const completed = await requireSuccess(admin.rpc('complete_review_sync_job', {
           p_job_id: job.id,

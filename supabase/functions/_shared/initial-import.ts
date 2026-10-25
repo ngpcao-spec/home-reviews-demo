@@ -1,5 +1,4 @@
-import {recentReviewCutoff} from './recent-review-policy.ts'
-export const DEFAULT_INITIAL_REVIEWS_LIMIT = 100
+export const DEFAULT_INITIAL_REVIEWS_LIMIT = 150
 
 export interface InitialImportReview {
   externalReviewId: string
@@ -32,7 +31,7 @@ export function prepareInitialReviews<T extends InitialImportReview>(
   }
 
   return [...unique.values()]
-    .filter(r=>r.text?.trim()&&r.publishedAt&&Date.parse(r.publishedAt)>=Date.parse(recentReviewCutoff())&&Date.parse(r.publishedAt)<=Date.now())
+    .filter(r=>r.publishedAt&&Date.parse(r.publishedAt)<=Date.now())
     .sort((left, right) => {
       const leftTime = left.publishedAt ? Date.parse(left.publishedAt) : 0
       const rightTime = right.publishedAt ? Date.parse(right.publishedAt) : 0

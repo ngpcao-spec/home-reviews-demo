@@ -233,7 +233,7 @@ export function AddEstablishmentPage() {
         <EstablishmentAvatar id={candidate.placeRef} name={candidate.name} photoUrl={candidate.photoUrl} large />
         <div>
           <strong>{candidate.name}</strong>
-          <span className="rating-line"><b>{candidate.rating.toFixed(1)}</b><Stars rating={Math.round(candidate.rating)} compact /><em>{candidate.reviewCount} {messages.add.googleReviews}</em></span>
+          <span className="rating-line"><em>{result.inserted??0} {messages.add.googleReviews}</em></span>
         </div>
       </div>
       {result.importStatus === 'failed'

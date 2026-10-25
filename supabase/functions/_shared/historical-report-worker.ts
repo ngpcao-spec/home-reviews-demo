@@ -38,7 +38,7 @@ export async function prepareHistoricalSnapshot(admin:SupabaseClient, run:Histor
   const ANALYSIS_VERSION=historicalNarrativeVersion(run)
   const id=run.establishment_id, language=run.language, end=run.created_at
   const frozen=run.snapshot.retention_frozen_rows,scope=run.snapshot.retention;
-  if(scope&&(!frozen||frozen.length!==scope.review_count||frozen.length>100||new Set(frozen.map(r=>r.id)).size!==frozen.length||frozen.some(r=>!scope.review_ids.includes(r.id))))throw Error('RETAINED_SOURCE_INVALID');
+  if(scope&&(!frozen||frozen.length!==scope.review_count||frozen.length>(scope.version==='latest_reviews_150_v1'?150:100)||new Set(frozen.map(r=>r.id)).size!==frozen.length||frozen.some(r=>!scope.review_ids.includes(r.id))))throw Error('RETAINED_SOURCE_INVALID');
   const {data:e,error} = scope?{data:run.snapshot.retention_establishment,error:null}:await admin.from('establishments').select('id,organization_id,name,rating,total_reviews,created_at').eq('id',id).eq('organization_id',run.organization_id).single()
   check(error,'REPORT_ESTABLISHMENT_READ_FAILED')
   if(!e)throw new Error('REPORT_ESTABLISHMENT_READ_FAILED')

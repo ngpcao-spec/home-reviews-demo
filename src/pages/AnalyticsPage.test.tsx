@@ -102,7 +102,7 @@ describe('manual historical report generation', () => {
     fireEvent.click(button)
     await waitFor(() => expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(1))
     resolveRequest({ data: { error: 'NO_REVIEWS_AVAILABLE' }, error: null })
-    expect(await screen.findByText('Không có đánh giá có nội dung đủ điều kiện trong 6 tháng gần nhất.')).toBeVisible()
+    expect(await screen.findByText('Chưa có nội dung trong 150 đánh giá mới nhất.')).toBeVisible()
   })
 
   it('enqueues once and observes the server generation without client batches', async () => {
