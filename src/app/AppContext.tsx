@@ -506,7 +506,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setDataReady(true)
     setDataLoading(false)
     setDataError(null)
-    setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(mapEstablishment))
+    setEstablishments((establishmentsResult.data as EstablishmentRow[]).map(row=>{const e=mapEstablishment(row),corpus=(reviewsResult.data as ReviewRow[]).filter(r=>r.establishment_id===row.id);return {...e,currentRating:corpus.length?corpus.reduce((n,r)=>n+r.rating,0)/corpus.length:0,currentReviewCount:corpus.length}}))
     setInitialImportJobs((initialImportsResult.data as InitialImportJobRow[]).map(mapInitialImportJob))
     const profile = profileResult.data as ProfileRow | null
     const language = profile?.preferred_language === 'vi' ? 'vi' : 'fr'

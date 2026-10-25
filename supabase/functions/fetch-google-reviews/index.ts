@@ -8,7 +8,7 @@ import {
 } from '../_shared/outscraper.ts'
 import { ApifyError, fetchApifyReviews } from '../_shared/apify.ts'
 import { apifyToken, preferredLanguageForUser } from '../_shared/sync-service.ts'
-import {assertIngestionAllowed,recentReviewCutoff} from '../_shared/recent-review-policy.ts'
+import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
 
 interface RequestBody {
   query?: unknown
@@ -42,14 +42,13 @@ Deno.serve(async (request) => {
         placeUrl: query,
         language,
         sort: 'newest',
-        limit: 20,
-        since:recentReviewCutoff(),
+        limit: 150,
       }))
     }
     if (provider !== 'outscraper') return json({ error: 'REVIEW_PROVIDER_UNSUPPORTED' }, 500)
 
     const apiKey = Deno.env.get('OUTSCRAPER_API_KEY') ?? ''
-    const result = await fetchOutscraperGoogleReviews({ query, apiKey, reviewsLimit: 20 })
+    const result = await fetchOutscraperGoogleReviews({ query, apiKey, reviewsLimit: 150 })
     return json(result)
   } catch (error) {
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)

@@ -97,8 +97,8 @@ describe('confirmation d’ajout d’un établissement', () => {
   it('conserve l’écran de succès et affiche toutes les informations attendues', async () => {
     await completeSuccessfulAdd()
     expect(screen.getByText('Restaurant Test')).toBeVisible()
-    expect(screen.getByText(/4.6/)).toBeVisible()
-    expect(screen.getByText(/4430 avis Google/)).toBeVisible()
+    expect(screen.queryByText(/4430/)).not.toBeInTheDocument()
+    expect(screen.getByText(/18 avis du corpus/)).toBeVisible()
     expect(screen.getByText(/18 avis négatifs importés/)).toBeVisible()
     expect(screen.getByText(/Surveillance toutes les 12 heures/)).toBeVisible()
     expect(screen.getByText(/Prochain contrôle dans environ 12 h/)).toBeVisible()

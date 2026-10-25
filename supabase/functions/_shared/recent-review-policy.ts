@@ -1,5 +1,5 @@
 import type {SupabaseClient} from 'npm:@supabase/supabase-js@2.117.2';
-export const RECENT_TEXT_POLICY='recent_text_100_6m_v1';
+export const RECENT_TEXT_POLICY='latest_reviews_150_v1';
 /** Calendar subtraction in the fixed business timezone (UTC+7, no DST). */
 export function recentReviewCutoff(asOf=new Date()):string{
  const local=new Date(asOf.getTime()+7*3600000),day=local.getUTCDate();local.setUTCDate(1);local.setUTCMonth(local.getUTCMonth()-6);

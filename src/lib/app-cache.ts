@@ -10,7 +10,7 @@ export interface CachedAppData {
   preferredLanguage: PreferredLanguage | null
 }
 export interface AppCacheRecord {
-  version: 1
+  version: 2
   userId: string
   organizationIds: string[]
   cachedAt: number
@@ -32,8 +32,11 @@ async function transaction<T>(mode: IDBTransactionMode, run: (store: IDBObjectSt
     const finish = (value?: T) => { if (!settled) { settled = true; clearTimeout(timer); db?.close(); resolve(value) } }
     const timer = setTimeout(() => finish(), 1500)
     try {
-      const open = indexedDB.open(DB_NAME, 1)
-      open.onupgradeneeded = () => open.result.createObjectStore(STORE, { keyPath: 'userId' })
+      const open = indexedDB.open(DB_NAME, 2)
+      open.onupgradeneeded = () => {
+        if(open.result.objectStoreNames.contains(STORE))open.result.deleteObjectStore(STORE)
+        open.result.createObjectStore(STORE, { keyPath: 'userId' })
+      }
       open.onerror = () => finish()
       open.onblocked = () => finish()
       open.onsuccess = () => {
@@ -52,7 +55,7 @@ async function transaction<T>(mode: IDBTransactionMode, run: (store: IDBObjectSt
 export function validAppCache(value: unknown, userId: string, now = Date.now()): value is AppCacheRecord {
   if (!value || typeof value !== 'object') return false
   const cache = value as AppCacheRecord
-  if (cache.version !== 1 || cache.userId !== userId || !Number.isFinite(cache.cachedAt)
+  if (cache.version !== 2 || cache.userId !== userId || !Number.isFinite(cache.cachedAt)
     || now - cache.cachedAt > MAX_AGE || cache.cachedAt > now + 60_000
     || !Array.isArray(cache.organizationIds) || !cache.data) return false
   const { establishments, reviews, notifications, initialImportJobs, preferredLanguage } = cache.data
@@ -79,7 +82,7 @@ export async function writeAppCache(userId: string, organizationIds: string[], d
       if (cacheGeneration(userId) !== generation) return
       const previous = request.result as AppCacheRecord | undefined
       const sameScope = previous?.organizationIds.slice().sort().join() === [...organizationIds].sort().join()
-      const next: AppCacheRecord = { version: 1, userId, organizationIds, cachedAt: Date.now(), data,
+      const next: AppCacheRecord = { version: 2, userId, organizationIds, cachedAt: Date.now(), data,
         analytics: sameScope ? previous?.analytics : undefined }
       if (validAppCache(next, userId)) store.put(next)
       else store.delete(userId)

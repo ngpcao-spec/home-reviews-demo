@@ -2,7 +2,7 @@
 import {PGlite} from '@electric-sql/pglite';
 import {pgcrypto} from '@electric-sql/pglite/contrib/pgcrypto';
 import {readFileSync,readdirSync} from 'node:fs';
-import {beforeAll,beforeEach,afterEach,afterAll,it,expect} from 'vitest';
+import {beforeAll,beforeEach,afterEach,afterAll,it,expect,describe} from 'vitest';
 import {directHash} from '../../supabase/functions/_shared/jev-direct-categories';
 import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
 const fixture=JSON.parse(readFileSync('tests/fixtures/retention-production-definitions.json','utf8'));
@@ -271,4 +271,60 @@ it('marks rating and subrating edits stale during a deferred ingestion without c
  expect((await db.query('select scope->>\'fingerprint\' f from public.current_report_publications')).rows[0].f).toBe(fp);
  expect((await db.query('select count(*)::int n from public.historical_report_runs')).rows[0].n).toBe(0);
  expect((await readDated()).row.id).toBe(p.id);
+});
+
+
+describe('latest 150 review corpus',()=>{
+ beforeEach(async()=>{await db.exec('create or replace function private.enqueue_review_ai() returns trigger language plpgsql as $$begin return new;end$$');await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_latest_150_review_policy.sql')),'utf8'));});
+ it('keeps the newest 150 unique published reviews including textless and old ones, all stars and stable equal dates',async()=>{
+  for(let i=154;i>=0;i--)await insert('r'+String(i).padStart(3,'0'),'2020-01-01',i%2?'':'Text',i%5+1);
+  const rows=(await db.query('select external_review_id,rating from public.reviews order by external_review_id')).rows;
+  expect(rows).toHaveLength(150);expect(rows.at(-1)?.external_review_id).toBe('r149');expect(new Set(rows.map(r=>r.rating)).size).toBe(5);
+  expect((await db.query('select count(*)::int n from public.reviews where text=\'\'')).rows[0].n).toBe(75);
+  await db.query('select public.apply_recent_review_retention($1,now()+interval \'20 years\')',[est]);expect((await db.query('select count(*)::int n from public.reviews')).rows[0].n).toBe(150);
+ });
+ it('replaces review 150, removes translations and raws, and keeps the previous dated report stale',async()=>{
+  const f=await savedCompactReceipt();await f.publish();await db.exec('reset role');
+  const oldest=(await db.query('select id from public.reviews')).rows[0].id;
+  await db.query('insert into public.review_translations(review_id,language,translated_text) values($1,\'fr\',\'Text\')',[oldest]);
+  for(let i=0;i<150;i++)await insert('new-'+i,new Date(Date.now()-3600000).toISOString(),i%2?'':'New');
+  expect((await db.query('select count(*)::int n from public.reviews where id=$1',[oldest])).rows[0].n).toBe(0);
+  expect((await db.query('select count(*)::int n from public.review_translations where review_id=$1',[oldest])).rows[0].n).toBe(0);
+  expect((await db.query('select report_id,stale from public.current_report_publications')).rows).toEqual([{report_id:f.reportId,stale:true}]);
+ });
+ it('freezes ratings from all retained reviews while only real text can become JEV input',async()=>{
+  await insert('text','2020-01-01','Original',5);await insert('stars','2020-01-02','',1);await db.exec('set local role service_role');
+  const frozen=(await db.query('select public.freeze_recent_review_source($1,$2,\'vi\',now()) j',[est,org])).rows[0].j as {retention:{review_count:number;cutoff:null};retention_frozen_rows:{original_text:string}[];retention_establishment:{total_reviews:number;rating:number}};
+  expect(frozen.retention.review_count).toBe(2);expect(frozen.retention.cutoff).toBeNull();expect(frozen.retention_establishment.total_reviews).toBe(2);expect(Number(frozen.retention_establishment.rating)).toBe(3);expect(frozen.retention_frozen_rows.filter(x=>x.original_text?.trim())).toHaveLength(1);
+ });
+ it('does not replace the available publication after a failed regeneration or publish a modified in-flight corpus',async()=>{
+  const f=await savedCompactReceipt();await f.publish();
+  const fresh=(await db.query('select (public.enqueue_current_report($1,$2,$3,\'vi\',$4,\'gpt-6.1-sol\',8)).*',[est,org,user,crypto.randomUUID()])).rows[0];
+  await db.query('update public.reviews set rating=1,original_text=\'Changed\',text=\'Changed\'');
+  await db.query('update public.historical_report_runs set status=\'failed\' where id=$1',[fresh.id]);
+  expect((await db.query('select report_id,stale from public.current_report_publications')).rows).toEqual([{report_id:f.reportId,stale:true}]);
+  expect((await db.query('select count(*)::int n from public.analysis_parallel_reports where current_source_run_id=$1 and state=\'completed\'',[fresh.id])).rows[0].n).toBe(0);
+ });
+ it('neutralizes old import IDs and requires a fresh claimed job for service restaurant creation',async()=>{
+  await db.exec('reset role');await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_reset_restaurant_barrier.sql')),'utf8'));
+  await db.exec('update public.review_corpus_policy set paused=false,ingestions_paused=false;set local role service_role');
+  await db.exec('savepoint denied');await expect(db.query('insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values($1,$2,\'Late\',\'late\',\'late\')',[crypto.randomUUID(),org])).rejects.toThrow('FRESH_IMPORT_JOB_REQUIRED');await db.exec('rollback to savepoint denied');
+  await db.exec('reset role');const job=crypto.randomUUID();
+  await db.query('insert into public.initial_import_jobs(id,organization_id,user_id,query,expected_google_id,preferred_language,status,created_at,lease_until) values($1,$2,$3,\'New\',\'new\',\'vi\',\'running\',now()+interval \'1 second\',now()+interval \'1 hour\')',[job,org,user]);
+  await db.exec('set local role service_role');await db.query('insert into public.establishments(id,organization_id,name,google_id,google_maps_url,initial_import_job_id) values($1,$2,\'New\',\'new\',\'new\',$3)',[crypto.randomUUID(),org,job]);
+  expect((await db.query('select count(*)::int n from public.establishments')).rows[0].n).toBe(2);
+ });
+ it('purges the reviewed content tables while retaining access and content-free consumed-attempt fences',async()=>{
+  await datedPublication();await db.exec('reset role');
+  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_reset_restaurant_barrier.sql')),'utf8'));
+  const access=(await db.query('select * from public.organization_members')).rows;
+  const sql=readFileSync('supabase/maintenance/reset-restaurants.sql','utf8').replace(/^begin;$/m,'').replace(/^commit;$/m,'');
+  await db.exec(sql);
+  expect((await db.query('select count(*)::int n from public.establishments')).rows[0].n).toBe(0);
+  expect((await db.query('select count(*)::int n from public.reviews')).rows[0].n).toBe(0);
+  expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(0);
+  expect((await db.query('select * from public.organization_members')).rows).toEqual(access);
+  expect((await db.query('select count(*)::int n from private.retired_generation_keys')).rows[0].n).toBeGreaterThan(0);
+  expect((await db.query('select count(*)::int n from private.provider_attempt_ledger where establishment_id is not null or organization_id is not null')).rows[0].n).toBe(0);
+ });
 });

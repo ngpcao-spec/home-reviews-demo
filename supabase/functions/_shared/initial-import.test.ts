@@ -18,28 +18,28 @@ const review = (index: number, rating = index % 5 + 1) => ({
 })
 
 describe('import initial des avis les plus récents', () => {
-  it('utilise la limite serveur 100 et rejette une ancienne configuration 500', () => {
-    expect(DEFAULT_INITIAL_REVIEWS_LIMIT).toBe(100)
-    expect(initialReviewsLimit(undefined)).toBe(100)
+  it('utilise la limite serveur 150 et rejette une ancienne configuration 500', () => {
+    expect(DEFAULT_INITIAL_REVIEWS_LIMIT).toBe(150)
+    expect(initialReviewsLimit(undefined)).toBe(150)
     expect(initialReviewsLimit('65')).toBe(65)
-    expect(initialReviewsLimit('500')).toBe(100)
-    expect(initialReviewsLimit('101')).toBe(100)
-    expect(initialReviewsLimit('incorrect')).toBe(100)
+    expect(initialReviewsLimit('500')).toBe(150)
+    expect(initialReviewsLimit('151')).toBe(150)
+    expect(initialReviewsLimit('incorrect')).toBe(150)
   })
 
-  it.each([65, 100])('conserve tous les %i avis disponibles', (total) => {
+  it.each([65, 150])('conserve tous les %i avis disponibles', (total) => {
     const result = prepareInitialReviews(Array.from({ length: total }, (_, index) => review(index)))
     expect(result).toHaveLength(total)
-    expect(initialHistoryComplete(total, result.length, 100)).toBe(true)
-    expect(initialHistoryComplete(total, result.length - 1, 100)).toBe(false)
+    expect(initialHistoryComplete(total, result.length, 150)).toBe(true)
+    expect(initialHistoryComplete(total, result.length - 1, 150)).toBe(false)
   })
 
-  it.each([345, 1_659, 10_000])('plafonne à 100 les %i avis Google les plus récents', (total) => {
+  it.each([345, 1_659, 10_000])('plafonne à 150 les %i avis Google les plus récents', (total) => {
     const result = prepareInitialReviews(Array.from({ length: total }, (_, index) => review(index)))
-    expect(result).toHaveLength(100)
+    expect(result).toHaveLength(150)
     expect(result[0].externalReviewId).toBe('review-0')
-    expect(result.at(-1)?.externalReviewId).toBe('review-99')
-    expect(initialHistoryComplete(total, result.length, 100)).toBe(false)
+    expect(result.at(-1)?.externalReviewId).toBe('review-149')
+    expect(initialHistoryComplete(total, result.length, 150)).toBe(false)
   })
 
   it('conserve toutes les notes 1★ à 5★, déduplique et trie par date décroissante', () => {
@@ -66,8 +66,8 @@ describe('import initial des avis les plus récents', () => {
     expect(canonicalEstablishmentName('Green Home Restaurant', 'Nhà hàng Green Home')).toBe('Green Home Restaurant')
     expect(canonicalEstablishmentName(null, 'Green Home Restaurant')).toBe('Green Home Restaurant')
   })
-  it('rejects empty and old texts, preserves text across duplicates and cannot refresh an old publication',()=>{
-    const valid=review(0),empty={...review(1),text:' '},old={...review(2),publishedAt:'2020-01-01T00:00:00Z'};
-    expect(prepareInitialReviews([valid,{...valid,text:''},empty,old,{...old,publishedAt:valid.publishedAt}])).toEqual([valid]);
+  it('keeps textless and old reviews, preserves text across duplicates and cannot refresh an old publication',()=>{
+    const valid=review(0),empty={...review(1),text:' '},old={...review(2),publishedAt:'2020-01-01T00:00:00.000Z'};
+    expect(prepareInitialReviews([valid,{...valid,text:''},empty,old,{...old,publishedAt:valid.publishedAt}])).toEqual([valid,empty,old]);
   })
 })

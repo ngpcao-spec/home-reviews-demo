@@ -15,7 +15,8 @@ export function HomePage() {
   const active = establishments.filter((item) => item.isActive)
   const pending = reviews.filter((item) => isNegativeReview(item) && item.status === 'to_process')
   const latestNegative = recentNegativeReviews(reviews)
-  const weightedRating = active.length ? active.reduce((sum, item) => sum + item.currentRating * item.currentReviewCount, 0) / active.reduce((sum, item) => sum + item.currentReviewCount, 0) : 0
+  const corpusCount=active.reduce((sum,item)=>sum+item.currentReviewCount,0)
+  const weightedRating = corpusCount ? active.reduce((sum, item) => sum + item.currentRating * item.currentReviewCount, 0) / corpusCount : 0
   const activeIds = active.map((item) => item.id).join('|')
   const [selectedEstablishmentId, setSelectedEstablishmentId] = useState<string | undefined>(() => active[0]?.id)
   const featuredId = active.some((item) => item.id === selectedEstablishmentId) ? selectedEstablishmentId : active[0]?.id

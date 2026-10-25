@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cacheGeneration, purgeAppCache, readAppCache, validAppCache } from './app-cache'
-const record=()=>({version:1,userId:'a',organizationIds:['org-a'],cachedAt:Date.now(),data:{
+const record=()=>({version:2,userId:'a',organizationIds:['org-a'],cachedAt:Date.now(),data:{
   establishments:[],reviews:[],notifications:[],initialImportJobs:[],monitoringIntervalHours:12,preferredLanguage:'vi',
 }})
 describe('account cache validation',()=>{
@@ -10,7 +10,7 @@ describe('account cache validation',()=>{
   })
   it('rejects expired, corrupt, and foreign-tenant snapshots',()=>{
     expect(validAppCache({...record(),cachedAt:0},'a')).toBe(false)
-    expect(validAppCache({...record(),version:2},'a')).toBe(false)
+    expect(validAppCache({...record(),version:1},'a')).toBe(false)
     const mixed={...record(),data:{...record().data,establishments:[{id:'e',organizationId:'org-b'}]}}
     expect(validAppCache(mixed,'a')).toBe(false)
   })
