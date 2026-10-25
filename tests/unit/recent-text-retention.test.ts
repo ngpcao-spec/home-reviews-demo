@@ -184,17 +184,17 @@ it('does not expose saved-receipt publication to authenticated clients',async()=
  const f=await savedCompactReceipt();await db.exec('set local role authenticated');await expect(f.publish()).rejects.toThrow('permission denied');
 });
 
-async function datedPublication(ago='1 hour'){
+async function datedPublication(ago='1 hour',language='vi'){
  if(!(await db.query('select id from public.reviews limit 1')).rows.length)await insert('dated',new Date(Date.now()-86400000).toISOString(),'SYNTHETIC full review to remove');
  await db.exec('set local role service_role');
- const s=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi',crypto.randomUUID(),'gpt-6.1-sol',8])).rows[0];
+ const s=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,language,crypto.randomUUID(),'gpt-6.1-sol',8])).rows[0];
  await db.query("update public.historical_report_runs set status='completed',created_at=clock_timestamp()-$2::interval where id=$1",[s.id,ago]);
  const reviews=(await db.query('select id,rating,published_at,original_text from public.reviews order by id')).rows.map(r=>({...r,analysis_text:r.original_text,analysis_language:'en'}));
  const ids=reviews.map(r=>r.id),first=reviews[0],reportId=crypto.randomUUID();
  const report={categories:['service','price','quality','ambiance'].map(category=>({category,text:'SYNTHETIC dated synthesis',evidence_ids:[]})),positive_aspects:[],negative_aspects:[],conclusion:{text:'SYNTHETIC dated conclusion',evidence_ids:[]},recommendations:[{title:'SYNTHETIC recommendation',category:'quality',evidence_ids:['e1'],observations:[{text:'SYNTHETIC generated observation',evidence_id:'e1',quote:first.original_text,quote_sha256:'hash'}],proposed_action:'Check',priority_reason:'Isolated'}]};
  const statistics={scope:{source_reviews:ids.length,analysed_text_reviews:ids.length,textless_statistics_only:0},counts:{categories:{quality:{negative_including_mixed:ids.length,positive_including_mixed:0,negative_review_ids:ids,positive_review_ids:[]}}}};
  const controls={technical_checks_passed:true,evidence:[{evidence_id:'e1',review_id:first.id,category:'quality',polarity:'negative',quote:first.original_text,context:first.original_text,quote_sha256:await analysisTextSha256(first.original_text as string)}]};
- await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,derived_report,controls,statistics,source_reviews,generated_at) values($1,$2,$3,$4,'vi','completed',$5,$6,$7,$8,clock_timestamp())",[reportId,org,est,s.id,{report},controls,statistics,reviews]);
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,derived_report,controls,statistics,source_reviews,generated_at) values($1,$2,$3,$4,$9,'completed',$5,$6,$7,$8,clock_timestamp())",[reportId,org,est,s.id,{report},controls,statistics,reviews,language]);
  return {id:reportId,source:s.id,reviews,report};
 }
 const readDated=async()=>(await db.query('select public.read_current_report_publication($1,$2) p',[est,'vi'])).rows[0].p as {scope:{stale:boolean;review_count:number};row:{id:string;source_reviews:{id:string}[];statistics:{scope:{source_reviews:number}};controls:{evidence:{quote:string|null;available:boolean}[]}}};
@@ -249,4 +249,15 @@ it('uses the same establishment lock for publication and cleanup, without a glob
  expect(d).toContain('recent-text-corpus:');expect(d).not.toContain('retention-source-cleanup');
  const f=(await db.query("select pg_get_functiondef('public.jev_batch_finish(uuid,text,jsonb,jsonb,text)'::regprocedure) d")).rows[0].d as string;
  expect(f.indexOf('recent-text-corpus:')).toBeLessThan(f.indexOf('where id=p_run for update'));
+});
+it('atomically replaces a success on the same corpus and retires its previous full operational copy',async()=>{
+ const old=await datedPublication(),fresh=await datedPublication('0 seconds');expect((await readDated()).row.id).toBe(fresh.id);
+ expect((await db.query('select id from public.analysis_parallel_reports')).rows).toEqual([{id:fresh.id}]);
+ expect((await db.query('select count(*)::int n from public.historical_report_runs where id=$1',[old.source])).rows[0].n).toBe(0);
+ expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(1);
+});
+it('keeps exactly one publication independently for each report language',async()=>{
+ const vi=await datedPublication(),fr=await datedPublication('0 seconds','fr');expect((await readDated()).row.id).toBe(vi.id);
+ expect((await db.query("select report_id from public.current_report_publications where language='fr'")).rows).toEqual([{report_id:fr.id}]);
+ expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(2);
 });
