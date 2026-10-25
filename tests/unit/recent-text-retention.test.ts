@@ -18,7 +18,7 @@ beforeAll(async()=>{
  await db.exec('create table if not exists public.organizations(id uuid primary key);grant usage on schema private,extensions to service_role;grant all on all tables in schema public,private to service_role;grant select on public.organization_members to authenticated;');
  for(const f of fixture.functions.filter((f:{proname:string})=>['enqueue_current_report','jev_batch_claim','jev_batch_claim_sol'].includes(f.proname)))await db.exec(f.definition);
  await db.exec("create function cron.schedule(text,text,text) returns bigint language plpgsql as $$begin insert into cron.job values(999,$1,true);return 999;end $$");
- for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql','_recent_text_ingestion_dedup.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
+ for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql','_recent_text_ingestion_dedup.sql','_recent_text_native_usage.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -88,4 +88,9 @@ it('deduplicates a real ingestion bundle before counting, preserving usable text
  await db.query("select public.ingest_recent_reviews($1,$2,$3,'apify')",[est,org,JSON.stringify(payload)]);
  expect((await db.query('select count(*)::int n,min(original_text) t from public.reviews')).rows).toEqual([{n:1,t:'Actual review'}]);
  expect((await db.query('select observed_reviews::int n from public.review_observation_totals')).rows[0].n).toBe(1);
+});
+it('reads Sol tokens and both cache counters from the real saved HTTP body even if run usage exists',async()=>{
+ const native={model:'gpt-6.1-sol',usage:{input_tokens:100,output_tokens:40,input_tokens_details:{cached_tokens:20,cache_write_tokens:80}}};
+ await db.query("select private.record_retention_attempt('fixture_sol',$1)",[JSON.stringify({id:'native-sol',sol_request_count:1,status:'completed',usage:{sol:{}},sol_receipt:{raw_response_text:JSON.stringify(native)}})]);
+ expect((await db.query('select model,input_tokens::int i,output_tokens::int o,cache_read_tokens::int r,cache_write_tokens::int w from private.provider_attempt_ledger')).rows).toEqual([{model:'gpt-6.1-sol',i:100,o:40,r:20,w:80}]);
 });
