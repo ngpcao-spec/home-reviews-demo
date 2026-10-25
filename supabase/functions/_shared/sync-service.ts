@@ -140,7 +140,7 @@ function reviewRow(
     original_text: review.text,
     original_language: review.language,
     language: review.language,
-    published_at: review.publishedAt,
+    published_at: review.publishedAt&&Number.isFinite(Date.parse(review.publishedAt))?new Date(review.publishedAt).toISOString():null,
     review_url: review.reviewUrl,
     owner_response: review.ownerResponse,
     source_provider: provider,
@@ -276,6 +276,7 @@ export async function persistEstablishmentSnapshot(
 }
 
 export interface InitializationFetchResult extends GoogleReviewsResult {
+  observedReviews?:NormalizedReview[]
   providerRequests: number
   initialLimit: number
   initialFetched: number
@@ -306,7 +307,8 @@ export async function fetchInitialization(
       providerRequests: 1,
       initialLimit: limit,
       initialFetched: reviews.length,
-      checkpointReview: reviews[0] ?? null,
+      observedReviews:result.reviews,
+      checkpointReview: sortNewest([...result.reviews])[0] ?? null,
     }
   }
 
@@ -326,7 +328,8 @@ export async function fetchInitialization(
       providerRequests: 1,
       initialLimit: limit,
       initialFetched: reviews.length,
-      checkpointReview: reviews[0] ?? null,
+      observedReviews:result.reviews,
+      checkpointReview: sortNewest([...result.reviews])[0] ?? null,
     }
   }
 
@@ -334,6 +337,7 @@ export async function fetchInitialization(
     query,
     apiKey: outscraperKey(),
     reviewsLimit: limit,
+    cutoff:Math.floor(Date.parse(recentReviewCutoff())/1000),
     sort: 'newest',
     timeoutMs: 90_000,
   })
@@ -346,7 +350,8 @@ export async function fetchInitialization(
     providerRequests: 1,
     initialLimit: limit,
     initialFetched: reviews.length,
-    checkpointReview: reviews[0] ?? null,
+    observedReviews:result.reviews,
+    checkpointReview: sortNewest([...result.reviews])[0] ?? null,
   }
 }
 
@@ -441,7 +446,7 @@ export async function initializeEstablishment(
 
   const runId = await createRun(admin, establishment, 'initialization', provider)
   try {
-    const inserted = await insertReviews(admin, establishment, importedReviews, true, result.provider)
+    const inserted = await insertReviews(admin, establishment, result.observedReviews??importedReviews, true, result.provider)
     await persistEstablishmentSnapshot(
       admin,
       establishment,
@@ -555,7 +560,7 @@ export async function backfillHistoricalReviews(
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
 
-  const inserted = await insertReviews(admin, establishment, result.reviews, true, result.provider)
+  const inserted = await insertReviews(admin, establishment, result.observedReviews??result.reviews, true, result.provider)
   await persistEstablishmentSnapshot(
     admin,
     establishment,

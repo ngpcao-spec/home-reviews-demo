@@ -25,8 +25,10 @@ export function prepareInitialReviews<T extends InitialImportReview>(
   for (const review of reviews) {
     if (!review.externalReviewId.trim() || review.rating < 1 || review.rating > 5) continue
     const id=review.externalReviewId.trim(),prior=unique.get(id);
-    const date=prior?.publishedAt&&review.publishedAt?new Date(Math.min(Date.parse(prior.publishedAt),Date.parse(review.publishedAt))).toISOString():prior?.publishedAt??review.publishedAt;
-    unique.set(id,{...review,externalReviewId:id,publishedAt:date})
+    const dates=[prior?.publishedAt,review.publishedAt].filter((v):v is string=>!!v&&Number.isFinite(Date.parse(v))).map(v=>Date.parse(v))
+    const date=dates.length?new Date(Math.min(...dates)).toISOString():null
+    const selected=prior?.text?.trim()&&!review.text?.trim()?prior:review
+    unique.set(id,{...selected,externalReviewId:id,publishedAt:date})
   }
 
   return [...unique.values()]

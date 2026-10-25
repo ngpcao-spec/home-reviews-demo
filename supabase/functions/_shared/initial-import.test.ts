@@ -66,4 +66,8 @@ describe('import initial des avis les plus récents', () => {
     expect(canonicalEstablishmentName('Green Home Restaurant', 'Nhà hàng Green Home')).toBe('Green Home Restaurant')
     expect(canonicalEstablishmentName(null, 'Green Home Restaurant')).toBe('Green Home Restaurant')
   })
+  it('rejects empty and old texts, preserves text across duplicates and cannot refresh an old publication',()=>{
+    const valid=review(0),empty={...review(1),text:' '},old={...review(2),publishedAt:'2020-01-01T00:00:00Z'};
+    expect(prepareInitialReviews([valid,{...valid,text:''},empty,old,{...old,publishedAt:valid.publishedAt}])).toEqual([valid]);
+  })
 })

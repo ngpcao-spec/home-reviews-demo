@@ -183,7 +183,7 @@ async function persistResult(
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
   const importedReviews = newestFirst(prepareInitialReviews(fetched.reviews, job.reviews_target))
-  const newest = importedReviews[0] ?? null
+  const newest = fetched.checkpointReview??newestFirst([...(fetched.observedReviews??fetched.reviews)])[0]??null
   const oldest = importedReviews.at(-1) ?? null
   const establishmentId = await createOrResumeEstablishment(admin, job, fetched)
   await checkpoint(admin, job, worker, {
@@ -194,7 +194,7 @@ async function persistResult(
   await insertReviews(admin, {
     id: establishmentId,
     organization_id: job.organization_id,
-  }, fetched.reviews, true, fetched.provider)
+  }, fetched.observedReviews??fetched.reviews, true, fetched.provider)
   await persistEstablishmentSnapshot(admin, {
     id: establishmentId,
     organization_id: job.organization_id,

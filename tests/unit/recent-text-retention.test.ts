@@ -18,7 +18,7 @@ beforeAll(async()=>{
  await db.exec('create table if not exists public.organizations(id uuid primary key);grant usage on schema private,extensions to service_role;grant all on all tables in schema public,private to service_role;grant select on public.organization_members to authenticated;');
  for(const f of fixture.functions.filter((f:{proname:string})=>['enqueue_current_report','jev_batch_claim','jev_batch_claim_sol'].includes(f.proname)))await db.exec(f.definition);
  await db.exec("create function cron.schedule(text,text,text) returns bigint language plpgsql as $$begin insert into cron.job values(999,$1,true);return 999;end $$");
- for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
+ for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql','_recent_text_ingestion_dedup.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -80,4 +80,12 @@ it('keeps retained statistics tenant-scoped and prevents authenticated maintenan
  await insert('scoped',new Date(Date.now()-86400000).toISOString());await db.exec('set local role authenticated');
  expect((await db.query('select * from public.review_corpus_states')).rows).toEqual([]);
  await expect(db.query('select * from private.review_seen_keys')).rejects.toThrow();
+});
+it('deduplicates a real ingestion bundle before counting, preserving usable text and earliest publication',async()=>{
+ const date=new Date(Date.now()-86400000).toISOString(),base={organization_id:org,establishment_id:est,external_review_id:'duplicate',rating:2,author_name:'Fixture',published_at:date,source_provider:'apify',historical_import:true,requires_attention:false,requires_ai_analysis:false,status:'ignored'};
+ await db.exec('set local role service_role');
+ const payload=[{row:{...base,text:'Actual review',original_text:'Actual review'}},{row:{...base,text:' ',original_text:''}}];
+ await db.query("select public.ingest_recent_reviews($1,$2,$3,'apify')",[est,org,JSON.stringify(payload)]);
+ expect((await db.query('select count(*)::int n,min(original_text) t from public.reviews')).rows).toEqual([{n:1,t:'Actual review'}]);
+ expect((await db.query('select observed_reviews::int n from public.review_observation_totals')).rows[0].n).toBe(1);
 });
