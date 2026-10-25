@@ -5,6 +5,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import {beforeAll,beforeEach,afterEach,afterAll,it,expect,describe} from 'vitest';
 import {directHash} from '../../supabase/functions/_shared/jev-direct-categories';
 import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
+import {analysisTextForReview} from '../../supabase/functions/_shared/analysis-text';
 const fixture=JSON.parse(readFileSync('tests/fixtures/retention-production-definitions.json','utf8'));
 let db:PGlite;
 const org='10000000-0000-4000-8000-000000000001',est='20000000-0000-4000-8000-000000000001',user='30000000-0000-4000-8000-000000000001';
@@ -275,7 +276,7 @@ it('marks rating and subrating edits stale during a deferred ingestion without c
 
 
 describe('latest 150 review corpus',()=>{
- beforeEach(async()=>{await db.exec('create or replace function private.enqueue_review_ai() returns trigger language plpgsql as $$begin return new;end$$');await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_latest_150_review_policy.sql')),'utf8'));});
+ beforeEach(async()=>{await db.exec('create or replace function private.enqueue_review_ai() returns trigger language plpgsql as $$begin return new;end$$');for(const suffix of ['_latest_150_review_policy.sql','_normalize_textless_frozen_sources.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));});
  it('keeps the newest 150 unique published reviews including textless and old ones, all stars and stable equal dates',async()=>{
   for(let i=154;i>=0;i--)await insert('r'+String(i).padStart(3,'0'),'2020-01-01',i%2?'':'Text',i%5+1);
   const rows=(await db.query('select external_review_id,rating from public.reviews order by external_review_id')).rows;
@@ -296,6 +297,12 @@ describe('latest 150 review corpus',()=>{
   await insert('text','2020-01-01','Original',5);await insert('stars','2020-01-02','',1);await db.exec('set local role service_role');
   const frozen=(await db.query('select public.freeze_recent_review_source($1,$2,\'vi\',now()) j',[est,org])).rows[0].j as {retention:{review_count:number;cutoff:null};retention_frozen_rows:{original_text:string}[];retention_establishment:{total_reviews:number;rating:number}};
   expect(frozen.retention.review_count).toBe(2);expect(frozen.retention.cutoff).toBeNull();expect(frozen.retention_establishment.total_reviews).toBe(2);expect(Number(frozen.retention_establishment.rating)).toBe(3);expect(frozen.retention_frozen_rows.filter(x=>x.original_text?.trim())).toHaveLength(1);
+ });
+ it('keeps invisible-only reviews in statistics and out of textual AI without changing real comments',async()=>{
+  await insert('invisible','2020-01-01','\u200b',1);await insert('actual','2020-01-02',' Original text ',5);await db.exec('set local role service_role');
+  const f=(await db.query("select public.freeze_recent_review_source($1,$2,'vi',now()) j",[est,org])).rows[0].j as {retention_frozen_rows:{original_text:string|null;text:string|null}[]};
+  expect(f.retention_frozen_rows.map(r=>analysisTextForReview(r).analysis_text).filter(Boolean)).toEqual([' Original text ']);
+  expect(f.retention_frozen_rows).toHaveLength(2);
  });
  it('does not replace the available publication after a failed regeneration or publish a modified in-flight corpus',async()=>{
   const f=await savedCompactReceipt();await f.publish();
