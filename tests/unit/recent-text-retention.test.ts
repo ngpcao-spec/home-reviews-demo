@@ -32,6 +32,7 @@ beforeAll(async()=>{
  await db.exec(finishSql.slice(finishStart,finishSql.indexOf('$$;',finishStart)+3));
  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_current_report_publications.sql')),'utf8'));
  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_finalize_report_publication_safety.sql')),'utf8'));
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_report_metadata_staleness.sql')),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -260,4 +261,14 @@ it('keeps exactly one publication independently for each report language',async(
  const vi=await datedPublication(),fr=await datedPublication('0 seconds','fr');expect((await readDated()).row.id).toBe(vi.id);
  expect((await db.query("select report_id from public.current_report_publications where language='fr'")).rows).toEqual([{report_id:fr.id}]);
  expect((await db.query('select count(*)::int n from public.current_report_publications')).rows[0].n).toBe(2);
+});
+it('marks rating and subrating edits stale during a deferred ingestion without changing the original fingerprint',async()=>{
+ const p=await datedPublication();const fp=(await db.query('select scope->>\'fingerprint\' f from public.current_report_publications')).rows[0].f;
+ await db.exec("select set_config('home.retention_ingest','on',true)");
+ await db.query("update public.reviews set rating=1,review_detailed_rating='{\"Food\":1}' where id=$1",[p.reviews[0].id]);
+ expect((await readDated()).scope.stale).toBe(true);
+ await db.exec("select set_config('home.retention_ingest','',true)");await db.query('select public.apply_recent_review_retention($1)',[est]);
+ expect((await db.query('select scope->>\'fingerprint\' f from public.current_report_publications')).rows[0].f).toBe(fp);
+ expect((await db.query('select count(*)::int n from public.historical_report_runs')).rows[0].n).toBe(0);
+ expect((await readDated()).row.id).toBe(p.id);
 });

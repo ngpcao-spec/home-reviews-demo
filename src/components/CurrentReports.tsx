@@ -66,7 +66,7 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
      {currentRun&&['queued','running','retry'].includes(currentRun.status)&&<p role="status">{currentRun.stage&&stages[currentRun.stage]||(fr?'Traitement serveur':'Máy chủ đang xử lý')}. {fr?'Vous pouvez fermer l’application.':'Bạn có thể đóng ứng dụng.'}</p>}
      {currentRun?.error_code&&<p role="alert">{statuses[currentRun.status]??currentRun.status} : <span className="parallel-audit-id">{currentRun.error_code}</span></p>}
      {!row&&!currentRun&&<p>{fr?'Aucun rapport disponible pour ce corpus.':'Chưa có báo cáo cho bộ đánh giá này.'}</p>}
-     {row&&<><p className="v5-muted">{row.current_source_run_id?(fr?'Génération V2 courante.':'Báo cáo được tạo theo V2 hiện tại.'):(fr?'Génération expérimentale V2 antérieure, conservée sans recalcul.':'Bản V2 thử nghiệm trước đây, giữ nguyên không tính lại.')}</p><ExperimentalReport key={row.id} row={row} operation={data.operation} methodology={method}/></>}
+     {row&&<><p className="v5-muted">{row.controls?.dated_publication?(fr?'Dernier rapport V2 daté, conservé sans actualisation automatique.':'Báo cáo V2 có ngày gần nhất, không tự động cập nhật.'):row.current_source_run_id?(fr?'Génération V2 courante.':'Báo cáo được tạo theo V2 hiện tại.'):(fr?'Génération expérimentale V2 antérieure, conservée sans recalcul.':'Bản V2 thử nghiệm trước đây, giữ nguyên không tính lại.')}</p><ExperimentalReport key={row.id} row={row} operation={data.operation} methodology={method}/></>}
     </>}
    </section>
    {!retention&&<section id="archive-report-panel" role="tabpanel" aria-labelledby="archive-report-tab" hidden={!archive}>
