@@ -10,6 +10,8 @@ import {processHistoricalV9Run,type V9Job} from './historical-v9-worker.ts'
 import {processHistoricalV10Run,type V10Job} from './historical-v10-worker.ts'
 import {processHistoricalV11Run,type V11Job} from './historical-v11-worker.ts'
 
+import {chosenAnalysisText,chosenAnalysisStats} from './chosen-analysis-text.ts'
+import {customerRatingStats} from './customer-ratings.ts'
 import {freshEnglishAnalysisInputs} from './analysis-text-overrides-server.ts'
 
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
@@ -19,7 +21,7 @@ export interface HistoricalJob {
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
-  snapshot:{retention?:{epoch:string;version:string;as_of:string;cutoff:string;review_count:number;period_start:string;period_end:string;review_ids:string[];fingerprint:string};retention_frozen_rows?:InputReview[];retention_english_overrides?:EnglishTranslationOverride[];retention_establishment?:{id:string;organization_id:string;name:string;rating:number;total_reviews:number;created_at:string};english_translation_override_policy?:string;analysis_version?:3|4|5|6|7|8|9|10|11;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
+  snapshot:{retention?:{epoch:string;version:string;as_of:string;cutoff:string;review_count:number;period_start:string;period_end:string;review_ids:string[];fingerprint:string};retention_frozen_rows?:InputReview[];retention_english_overrides?:EnglishTranslationOverride[];retention_establishment?:{id:string;organization_id:string;name:string;rating:number;total_reviews:number;created_at:string};english_translation_override_policy?:string;analysis_text_policy?:string;analysis_version?:3|4|5|6|7|8|9|10|11;reviews?:ReputationReview[];base?:Record<string,unknown>;publication?:Record<string,unknown>};
   token_usage_complete:boolean; created_at:string; last_error:string|null; error_code?:string|null;
 }
 const languageOf = (v?: string) => v?.toLowerCase().replace('_','-').split('-')[0]
@@ -44,11 +46,12 @@ export async function prepareHistoricalSnapshot(admin:SupabaseClient, run:Histor
   if(!e)throw new Error('REPORT_ESTABLISHMENT_READ_FAILED')
       const reviews: ReputationReview[] = []
       for (let offset=0;;offset+=500) {
-        const {data,error} = frozen?{data:frozen,error:null}:await admin.from('reviews').select('id,rating,original_text,original_language,review_translations(id,language,translated_text,created_at,updated_at),text,published_at,historical_import,has_negative_feedback,status,review_detailed_rating,review_context,ai_status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,review_reply_drafts(language,ai_status,draft_text,ai_suggested_reply)')
+        const {data,error} = frozen?{data:frozen,error:null}:await admin.from('reviews').select('id,rating,original_text,original_language,review_translations(id,language,translated_text,source_text_sha256,created_at,updated_at),text,published_at,historical_import,has_negative_feedback,status,review_detailed_rating,review_context,ai_status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,review_reply_drafts(language,ai_status,draft_text,ai_suggested_reply)')
           .eq('organization_id',e.organization_id).eq('establishment_id',id).lte('created_at',end).gte('rating',1).lte('rating',5).order('id').range(offset,offset+499)
         check(error,'REPORT_REVIEWS_READ_FAILED')
         const inputs=(data??[]) as InputReview[],useOverrides=ANALYSIS_VERSION>=7&&run.snapshot.english_translation_override_policy===ENGLISH_OVERRIDE_POLICY
-        const resolved=useOverrides?(scope?await Promise.all(inputs.map(r=>analysisTextForFreshReview(r,run.snapshot.retention_english_overrides?.find(o=>o.review_id===r.id),scope.as_of))):await freshEnglishAnalysisInputs(admin,inputs,e.organization_id,end)):null
+        const chosen=run.engine==='jev_sol_v2'||run.snapshot.analysis_text_policy==='account_google_or_original_v1'
+        const resolved=chosen?await Promise.all(inputs.map(r=>chosenAnalysisText(r,language))):useOverrides?(scope?await Promise.all(inputs.map(r=>analysisTextForFreshReview(r,run.snapshot.retention_english_overrides?.find(o=>o.review_id===r.id),scope.as_of))):await freshEnglishAnalysisInputs(admin,inputs,e.organization_id,end)):null
         for (const [index,r] of inputs.entries()) {
           const localized = r.review_reply_drafts.find(d => d.language === language)
           const hasDraft = r.reply_draft_text !== null && r.reply_draft_text !== undefined
@@ -61,10 +64,10 @@ export async function prepareHistoricalSnapshot(admin:SupabaseClient, run:Histor
       if (!reviews.length) throw new Error('NO_REVIEWS_AVAILABLE')
       const sourceFingerprint = await fingerprint({reviews,language,googleTotal:e.total_reviews,googleRating:e.rating,version:ANALYSIS_VERSION})
       const dated = reviews.map(r=>r.published_at).filter((v):v is string=>!!v && Number.isFinite(Date.parse(v))).sort()
-      const snapshot = {analysis_version:ANALYSIS_VERSION,...(scope?{retention:scope}:{}),...(run.snapshot.english_translation_override_policy===ENGLISH_OVERRIDE_POLICY?{english_translation_override_policy:ENGLISH_OVERRIDE_POLICY}:{}),reviews, base:{ organization_id:e.organization_id,establishment_id:id,preferred_language:language,
+      const snapshot = {analysis_version:ANALYSIS_VERSION,...(scope?{retention:scope}:{}),...(run.engine!=='jev_sol_v2'&&run.snapshot.english_translation_override_policy===ENGLISH_OVERRIDE_POLICY?{english_translation_override_policy:ENGLISH_OVERRIDE_POLICY}:{}),reviews, base:{ organization_id:e.organization_id,establishment_id:id,preferred_language:language,
         ...(scope?{retention:scope}:{}),period_start:dated[0] ?? e.created_at,period_end:scope?scope.period_end:end,google_rating:e.rating,google_total_reviews:e.total_reviews,
         source_latest_published_at:dated.at(-1) ?? null,source_undated_count:reviews.length-dated.length,
-        ...reputationMetrics(reviews,e.total_reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION,...(ANALYSIS_VERSION>=7?{analysis_input_stats:analysisInputStats(reviews)}:{})}}
+        ...reputationMetrics(reviews,e.total_reviews),customer_rating_statistics:customerRatingStats(reviews),source_fingerprint:sourceFingerprint,analysis_version:ANALYSIS_VERSION,...(ANALYSIS_VERSION>=7?{analysis_input_stats:(run.engine==='jev_sol_v2'||run.snapshot.analysis_text_policy==='account_google_or_original_v1'?chosenAnalysisStats(reviews,language):analysisInputStats(reviews))}:{})}}
       const classifications = reviews.filter(review=>!(ANALYSIS_VERSION>=7?groundingText(review,ANALYSIS_VERSION):(review.original_text ?? review.text ?? '')).trim()).map(ratingClassification)
 
   return {snapshot,classifications,total_steps:consultantBatches(reviews,ANALYSIS_VERSION).length+1}

@@ -1,0 +1,1128 @@
+{
+  "columns": [
+    {
+      "table_name": "establishments",
+      "column_name": "id",
+      "type": "uuid",
+      "default_value": "gen_random_uuid()"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "organization_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "name",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "google_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "place_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "google_maps_url",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "address",
+      "type": "text",
+      "default_value": "''::text"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "rating",
+      "type": "numeric(2,1)",
+      "default_value": "0"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "total_reviews",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "photo_url",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "active",
+      "type": "boolean",
+      "default_value": "true"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "initialized_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "last_sync_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "last_review_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "last_review_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "sync_status",
+      "type": "text",
+      "default_value": "'pending'::text"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "sync_error",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "next_sync_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "last_sync_status",
+      "type": "text",
+      "default_value": "'pending'::text"
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "last_sync_error",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "sync_lock_token",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "sync_locked_until",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "reporting_started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "establishments",
+      "column_name": "initial_import_job_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "id",
+      "type": "uuid",
+      "default_value": "gen_random_uuid()"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "organization_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "user_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "query",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "expected_google_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "establishment_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "preferred_language",
+      "type": "text",
+      "default_value": "'fr'::text"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "candidate_snapshot",
+      "type": "jsonb",
+      "default_value": "'{}'::jsonb"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "status",
+      "type": "text",
+      "default_value": "'queued'::text"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "reviews_target",
+      "type": "integer",
+      "default_value": "150"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "reviews_fetched",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "reviews_inserted",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_requests",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_run_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_dataset_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "attempts",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "available_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "lease_until",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "locked_by",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "error_code",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "result",
+      "type": "jsonb",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "acknowledged_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "finished_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "resolved_place_url",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "worker_started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_start_attempted_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_run_saved_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_finished_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_finished_observed_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_status",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "retrieval_started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "retrieval_completed_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "persistence_started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "persistence_completed_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "phase_events",
+      "type": "jsonb",
+      "default_value": "'[]'::jsonb"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "provider_attempt_history",
+      "type": "jsonb",
+      "default_value": "'[]'::jsonb"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "resolution_diagnostic_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "wake_requested_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "wake_request_id",
+      "type": "bigint",
+      "default_value": null
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "wake_count",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "initial_import_jobs",
+      "column_name": "wake_error",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "id",
+      "type": "uuid",
+      "default_value": "gen_random_uuid()"
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "review_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "ai_summary",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "ai_suggested_reply",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "draft_text",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "draft_updated_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "draft_version",
+      "type": "bigint",
+      "default_value": "0"
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "translated_reply_text",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "translated_reply_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "translated_from_draft_version",
+      "type": "bigint",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "translated_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "ai_status",
+      "type": "text",
+      "default_value": "'pending'::text"
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "ai_error",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_reply_drafts",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "id",
+      "type": "uuid",
+      "default_value": "gen_random_uuid()"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "establishment_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "organization_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "status",
+      "type": "text",
+      "default_value": "'queued'::text"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "scheduled_for",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "available_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "attempts",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "claim_count",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "lease_until",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "locked_by",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "pagination_cursor",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "checkpoint_review_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "checkpoint_review_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "head_review_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "head_review_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "provider_requests",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "reviews_fetched",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "reviews_inserted",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "error_code",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "started_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_sync_jobs",
+      "column_name": "finished_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "review_translations",
+      "column_name": "id",
+      "type": "uuid",
+      "default_value": "gen_random_uuid()"
+    },
+    {
+      "table_name": "review_translations",
+      "column_name": "review_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "review_translations",
+      "column_name": "language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_translations",
+      "column_name": "translated_text",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "review_translations",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "review_translations",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "id",
+      "type": "uuid",
+      "default_value": "gen_random_uuid()"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "organization_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "establishment_id",
+      "type": "uuid",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "external_review_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "author_name",
+      "type": "text",
+      "default_value": "'Client Google'::text"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "author_image",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "rating",
+      "type": "smallint",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "text",
+      "type": "text",
+      "default_value": "''::text"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "published_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "review_url",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "owner_response",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "requires_attention",
+      "type": "boolean",
+      "default_value": "false"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "requires_ai_analysis",
+      "type": "boolean",
+      "default_value": "false"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "status",
+      "type": "text",
+      "default_value": "'new'::text"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "historical_import",
+      "type": "boolean",
+      "default_value": "false"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "created_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "updated_at",
+      "type": "timestamp with time zone",
+      "default_value": "now()"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_summary",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_suggested_reply",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_detected_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_analyzed_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_status",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_error",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_model",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_input_tokens",
+      "type": "integer",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_output_tokens",
+      "type": "integer",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_reasoning_tokens",
+      "type": "integer",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_total_tokens",
+      "type": "integer",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_attempt_count",
+      "type": "integer",
+      "default_value": "0"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_error_history",
+      "type": "jsonb",
+      "default_value": "'[]'::jsonb"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_last_rejected_summary",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_last_rejected_reply",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_last_rejected_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_validation_error",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "original_text",
+      "type": "text",
+      "default_value": "''::text"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "original_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "ai_suggested_reply_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reply_draft_text",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reply_draft_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reply_draft_updated_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reply_draft_version",
+      "type": "bigint",
+      "default_value": "0"
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "translated_reply_text",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "translated_reply_language",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "translated_from_draft_updated_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "translated_from_draft_version",
+      "type": "bigint",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "translated_reply_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "source_provider",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "provider_publish_at",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "provider_rating",
+      "type": "numeric",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "likes_count",
+      "type": "integer",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "review_context",
+      "type": "jsonb",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "review_detailed_rating",
+      "type": "jsonb",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "visited_in",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "review_image_urls",
+      "type": "jsonb",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "response_from_owner_text",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "response_from_owner_date",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reviewer_id",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reviewer_url",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reviewer_number_of_reviews",
+      "type": "integer",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "reviewer_photo_url",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "is_local_guide",
+      "type": "boolean",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "review_origin",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "provider_scraped_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "has_negative_feedback",
+      "type": "boolean",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "negative_feedback_summary",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "negative_feedback_checked_at",
+      "type": "timestamp with time zone",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "negative_feedback_model",
+      "type": "text",
+      "default_value": null
+    },
+    {
+      "table_name": "reviews",
+      "column_name": "negative_feedback_status",
+      "type": "text",
+      "default_value": null
+    }
+  ],
+  "functions": [
+    {
+      "schema": "public",
+      "name": "checkpoint_review_sync_job",
+      "args": "p_job_id uuid, p_worker_id text, p_pagination_cursor text, p_head_review_id text, p_head_review_at timestamp with time zone, p_provider_requests integer, p_reviews_fetched integer, p_reviews_inserted integer, p_lease_seconds integer",
+      "definition": "CREATE OR REPLACE FUNCTION public.checkpoint_review_sync_job(p_job_id uuid, p_worker_id text, p_pagination_cursor text, p_head_review_id text, p_head_review_at timestamp with time zone, p_provider_requests integer, p_reviews_fetched integer, p_reviews_inserted integer, p_lease_seconds integer DEFAULT 240)\n RETURNS boolean\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  with u as (\n    update public.review_sync_jobs set\n      pagination_cursor=p_pagination_cursor,\n      head_review_id=coalesce(head_review_id,p_head_review_id),\n      head_review_at=coalesce(head_review_at,p_head_review_at),\n      provider_requests=provider_requests+greatest(coalesce(p_provider_requests,0),0),\n      reviews_fetched=reviews_fetched+greatest(coalesce(p_reviews_fetched,0),0),\n      reviews_inserted=reviews_inserted+greatest(coalesce(p_reviews_inserted,0),0),\n      lease_until=now()+make_interval(secs=>least(greatest(coalesce(p_lease_seconds,240),30),900)),\n      updated_at=now()\n    where id=p_job_id and status='running' and locked_by=left(p_worker_id,120)\n      and lease_until>now() returning 1\n  ) select exists(select 1 from u)\n$function$\n"
+    },
+    {
+      "schema": "public",
+      "name": "fail_review_sync_job",
+      "args": "p_job_id uuid, p_worker_id text, p_error_code text, p_retryable boolean, p_max_attempts integer, p_backoff_seconds integer",
+      "definition": "CREATE OR REPLACE FUNCTION public.fail_review_sync_job(p_job_id uuid, p_worker_id text, p_error_code text, p_retryable boolean, p_max_attempts integer DEFAULT 5, p_backoff_seconds integer DEFAULT 60)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_attempts integer; v_status text; v_establishment_id uuid;\nbegin\n  select attempts+1,establishment_id into v_attempts,v_establishment_id\n  from public.review_sync_jobs\n  where id=p_job_id and status='running' and locked_by=left(p_worker_id,120)\n  for update;\n  if not found then return 'lease_lost'; end if;\n  v_status:=case when p_retryable\n    and v_attempts<least(greatest(coalesce(p_max_attempts,5),1),20)\n    then 'retry' else 'dead' end;\n  update public.review_sync_jobs set status=v_status,attempts=v_attempts,\n    available_at=case when v_status='retry' then\n      now()+make_interval(secs=>least(greatest(coalesce(p_backoff_seconds,60),1),86400))\n      else available_at end,\n    lease_until=null,locked_by=null,error_code=left(coalesce(p_error_code,'SYNC_FAILED'),200),\n    finished_at=case when v_status='dead' then now() else null end,updated_at=now()\n  where id=p_job_id;\n  update public.establishments set\n    sync_status=case when v_status='dead' then 'error' else 'pending' end,\n    sync_error=left(coalesce(p_error_code,'SYNC_FAILED'),200),\n    last_sync_status=case when v_status='dead' then 'error' else 'pending' end,\n    last_sync_error=left(coalesce(p_error_code,'SYNC_FAILED'),200)\n  where id=v_establishment_id;\n  return v_status;\nend $function$\n"
+    }
+  ]
+}

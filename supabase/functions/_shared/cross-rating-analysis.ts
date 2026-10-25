@@ -8,7 +8,7 @@ const STATUSES:CrossStatus[]=['confirmed_negative','low_score_unexplained','text
 export interface CrossReview {id:string;rating:number;analysis_text?:string;review_detailed_rating?:unknown;review_context?:unknown;normalized_category_ratings?:CategoryRatings}
 export interface TextFinding {review_id:string;theme_key:string;sentiment:'positive'|'negative';evidence:string|null}
 const normalize=(key:string)=>key.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/đ/g,'d').trim().replace(/[_\s]+/g,' ')
-const aliases:Record<string,RatingCategory>={'do an':'food',food:'food',cuisine:'food','food rating':'food','dich vu':'service',service:'service','service rating':'service','bau khong khi':'atmosphere',atmosphere:'atmosphere',ambiance:'atmosphere',ambience:'atmosphere','atmosphere rating':'atmosphere'}
+const aliases:Record<string,RatingCategory>={'qualite':'food','nourriture':'food','thuc an':'food','do an':'food',food:'food',cuisine:'food','food rating':'food','dich vu':'service',service:'service','service rating':'service','khong gian':'atmosphere','bau khong khi':'atmosphere',atmosphere:'atmosphere',ambiance:'atmosphere',ambience:'atmosphere','atmosphere rating':'atmosphere'}
 function score(raw:unknown):number|null {const value=typeof raw==='number'?raw:typeof raw==='string'&&/^[1-5](?:\s*\/\s*5)?$/.test(raw.trim())?Number(raw.trim().split('/')[0]):NaN;return Number.isInteger(value)&&value>=1&&value<=5?value:null}
 export function normalizeCategoryRatings(raw:unknown):CategoryRatings {
   const values={food:new Set<number>(),service:new Set<number>(),atmosphere:new Set<number>()}

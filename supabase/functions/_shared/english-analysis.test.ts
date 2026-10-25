@@ -11,8 +11,9 @@ import {readFileSync} from 'node:fs'
 import {processHistoricalRun,type HistoricalJob} from './historical-report-worker.ts'
 const ru={original_text:'Официант был грубым.',original_language:'ru',review_translations:[{language:'en',translated_text:'The waiter was rude.'},{language:'vi',translated_text:'Nhân viên thô lỗ.'}]}
 const review:ReputationReview={id:'one',rating:1,...ru,...analysisTextForReview(ru),text:ru.original_text,published_at:null,historical_import:true,has_negative_feedback:null,status:'ignored',review_context:{Noise:'Quiet'},review_detailed_rating:null}
-describe('English ingestion and immutable originals',()=>{
-  it.each(['fr','vi'] as const)('A/B: preferred %s still creates an EN Apify input',language=>{expect(apifyActorInput({placeUrl:'https://www.google.com/maps?cid=123',language,sort:'newest',limit:150}).language).toBe('en')})
+describe('native collection and immutable originals; legacy analysis remains isolated',()=>{
+  it.each(['fr','vi'] as const)('freezes the chosen %s in the single Apify input',language=>{expect(apifyActorInput({placeUrl:'https://www.google.com/maps?cid=123',language,sort:'newest',limit:150}).language).toBe(language)})
+  it('rejects a retired English collection before any request can be sent',()=>expect(()=>apifyActorInput({placeUrl:'https://www.google.com/maps?cid=123',language:'en' as never,sort:'newest',limit:150})).toThrow('COLLECTION_LANGUAGE_REQUIRED'))
   it('C: original text including whitespace remains exact and provider language is independent',()=>{
     const item={reviewId:'id',stars:3,text:'  Русский текст.\n',textTranslated:'English version.',originalLanguage:'ru',translatedLanguage:'en-US'}
     const r=normalizeApifyReview(item)!;expect(r.text).toBe(item.text);expect(r.language).toBe('ru');expect(r.rawPayload).toEqual(item)

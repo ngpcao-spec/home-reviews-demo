@@ -1,11 +1,11 @@
 import { normalizeReviewLanguage } from './review-language.ts'
-export type AnalysisSource='original_en'|'google_translation_en'|'verified_translation_override_en'|'fallback_original'|'textless'
-export interface ProviderTranslation {id?:string;language:string;translated_text:string;created_at?:string;updated_at?:string}
+export type AnalysisSource='original_en'|'google_translation_en'|'verified_translation_override_en'|'fallback_original'|'textless'|'original_target'|'google_translation_target'
+export interface ProviderTranslation {id?:string;language:string;translated_text:string;source_text_sha256?:string|null;created_at?:string;updated_at?:string}
 export interface EnglishTranslationOverride {review_id:string;original_text_sha256:string;provider_translation_sha256:string;correction_language:string;corrected_english_text:string;corrected_english_sha256:string;error_type:string;evidence_fr:string;source:string;status:string;benchmark_policy:string;created_at:string}
 export const ENGLISH_OVERRIDE_POLICY='verified_english_translation_overrides_v1'
 export type EnglishOverrideError='REVIEW_ID_MISMATCH'|'ORIGINAL_HASH_MISMATCH'|'PROVIDER_HASH_MISMATCH'|'CORRECTED_HASH_MISMATCH'|'CORRECTION_LANGUAGE_INVALID'|'OVERRIDE_POLICY_INVALID'|'OVERRIDE_SOURCE_INVALID'|'PROVIDER_ENGLISH_NOT_SELECTED'|'OVERRIDE_TIME_INVALID'|'CORRECTION_TEXT_EMPTY'
 export interface EnglishOverrideProvenance {policy:typeof ENGLISH_OVERRIDE_POLICY;status:'applied'|'rejected';review_id:string;override_review_id:string;errors:EnglishOverrideError[];original_text_sha256:string;observed_corrected_english_sha256:string;provider_translation:{table:'review_translations';id:string|null;provider_source:'google_translation_en';provider_name:null;provider_name_status:'not_recorded_in_legacy_schema';language:string;translated_text:string;sha256:string;created_at:string|null;updated_at:string|null}|null;correction:EnglishTranslationOverride}
-export interface AnalysisReview {id?:string;original_text:string|null;original_language?:string|null;analysis_text?:string;analysis_language?:string|null;analysis_source?:AnalysisSource;analysis_translation_override?:EnglishOverrideProvenance;review_translations?:ProviderTranslation[]|null}
+export interface AnalysisReview {id?:string;original_text:string|null;text?:string|null;original_language?:string|null;analysis_text?:string;analysis_language?:string|null;analysis_source?:AnalysisSource;analysis_translation_override?:EnglishOverrideProvenance;review_translations?:ProviderTranslation[]|null}
 export const analysisTextSha256=async(text:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))),n=>n.toString(16).padStart(2,'0')).join('')
 export function analysisTextForReview(review:AnalysisReview) {
   const original=review.original_text??'',language=normalizeReviewLanguage(review.original_language)

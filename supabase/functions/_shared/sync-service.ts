@@ -16,7 +16,7 @@ import {
   prepareInitialReviews,
 } from './initial-import.ts'
 import { reviewPersistenceBatches } from './review-persistence.ts'
-import { GOOGLE_REVIEWS_IMPORT_LANGUAGE,translationLanguage,normalizeReviewLanguage } from './review-language.ts'
+import { translationLanguage } from './review-language.ts'
 import {readReviewPolicy,assertIngestionAllowed,knownReviewKeys} from './recent-review-policy.ts'
 
 const INCREMENTAL_WINDOW = 150
@@ -28,6 +28,7 @@ export interface EstablishmentRow {
   google_id: string
   google_maps_url: string
   last_review_id: string | null
+  collection_language?: PreferredLanguage
   last_review_at: string | null
 }
 
@@ -225,11 +226,9 @@ export async function insertReviews(
         console.error('TRANSLATIONS_UPSERT_FAILED', translationError.message)
         throw new Error('TRANSLATIONS_UPSERT_FAILED')
       }
-      console.info('ENGLISH_TRANSLATION_PERSISTED',{establishment_id:establishment.id,count:translations.filter(t=>t.language==='en').length})
+      console.info('GOOGLE_TRANSLATION_PERSISTED',{establishment_id:establishment.id,count:translations.length})
     }
     const observedAt = new Date().toISOString()
-    const missingEnglish=batch.filter(r=>r.text.trim() && normalizeReviewLanguage(r.language)!=='en' && !(translationLanguage(r.translatedLanguage)==='en' && r.translatedText?.trim())).length
-    if(missingEnglish)console.info('ENGLISH_TRANSLATION_MISSING',{establishment_id:establishment.id,count:missingEnglish})
     const providerPayloads = batch.flatMap((review) => {
       const reviewId = byExternalId.get(review.externalReviewId)
       if (!reviewId) return []
@@ -315,7 +314,7 @@ export async function fetchInitialization(
   if (provider === 'apify') {
     const result = await fetchApifyReviews(apifyToken(), {
       placeUrl: query,
-      language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,
+      language,
       sort: 'newest',
       limit,
     })
@@ -364,7 +363,7 @@ export async function resolveEstablishmentCandidate(
     : provider === 'apify'
       ? await fetchApifyReviews(apifyToken(), {
         placeUrl: query,
-        language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,
+        language,
         sort: 'newest',
         limit: 1,
       }, observe)

@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
 import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
-import {GOOGLE_REVIEWS_IMPORT_LANGUAGE,type ProviderLanguage} from '../_shared/review-language.ts'
+import {collectionLanguage,type ProviderLanguage} from '../_shared/review-language.ts'
 import {
   apifyToken,
   insertReviews,
@@ -29,6 +29,10 @@ interface SyncJob {
   id: string
   establishment_id: string
   organization_id: string
+  collection_language: 'fr'|'vi'
+  provider_start_attempted_at: string|null
+  apify_run_id: string|null
+  apify_dataset_id: string|null
   attempts: number
   pagination_cursor: string | null
   checkpoint_review_id: string | null
@@ -96,7 +100,11 @@ async function processApifyJob(
 ) {
   const token = apifyToken()
   await assertIngestionAllowed(admin)
-  let cursor = parseApifyCursor(job.pagination_cursor)
+  const frozen=await requireSuccess<{collection_language:'fr'|'vi';provider_start_attempted_at:string|null;apify_run_id:string|null;apify_dataset_id:string|null}>(admin.from('review_sync_jobs').select('collection_language,provider_start_attempted_at,apify_run_id,apify_dataset_id').eq('id',job.id).single())
+  Object.assign(job,frozen)
+  let cursor = parseApifyCursor(job.pagination_cursor)??(job.apify_run_id&&job.apify_dataset_id?{provider:'apify' as const,runId:job.apify_run_id,datasetId:job.apify_dataset_id,language:job.collection_language}:null)
+  if(cursor&&cursor.language!==job.collection_language)throw Error('SYNC_PROVIDER_LANGUAGE_CHANGED')
+  if(!cursor&&job.provider_start_attempted_at)throw Error('APIFY_START_OUTCOME_UNKNOWN')
   if (!cursor) {
     const providerToken = `${worker}:${job.id}:apify-start`
     const slotDeadline = performance.now() + config.providerSlotWaitMs
@@ -114,12 +122,16 @@ async function processApifyJob(
     }
 
     try {
-      const language = GOOGLE_REVIEWS_IMPORT_LANGUAGE
+      const language = collectionLanguage(job.collection_language)
       const run = await startApifyRun(token, {
         placeUrl: job.google_maps_url,
         language,
         sort: 'newest',
         limit: 150,
+      },undefined,async()=>{
+        const reserved=await requireSuccess<boolean>(admin.rpc('reserve_review_sync_start',{p_job:job.id,p_worker:worker}))
+        if(reserved!==true)throw Error('SYNC_APIFY_START_ALREADY_RESERVED')
+        job.provider_start_attempted_at=new Date().toISOString()
       })
       cursor = { provider: 'apify', runId: run.runId, datasetId: run.datasetId, language }
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
@@ -128,12 +140,13 @@ async function processApifyJob(
         p_pagination_cursor: JSON.stringify(cursor),
         p_head_review_id: job.head_review_id,
         p_head_review_at: job.head_review_at,
-        p_provider_requests: 1,
+        p_provider_requests: 0,
         p_reviews_fetched: 0,
         p_reviews_inserted: 0,
         p_lease_seconds: config.leaseSeconds,
       }))
       if (saved !== true) throw new Error('SYNC_LEASE_LOST')
+      job.apify_run_id=run.runId;job.apify_dataset_id=run.datasetId
     } finally {
       await admin.rpc('release_review_provider_slot', {
         p_slot_number: slot,
@@ -154,7 +167,7 @@ async function processApifyJob(
     await admin.rpc('checkpoint_review_sync_job', {
       p_job_id: job.id,
       p_worker_id: worker,
-      p_pagination_cursor: null,
+      p_pagination_cursor: JSON.stringify(cursor),
       p_head_review_id: job.head_review_id,
       p_head_review_at: job.head_review_at,
       p_provider_requests: 0,
@@ -181,7 +194,7 @@ async function processApifyJob(
   const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
     p_job_id: job.id,
     p_worker_id: worker,
-    p_pagination_cursor: null,
+    p_pagination_cursor: JSON.stringify(cursor),
     p_head_review_id: headReviewId,
     p_head_review_at: headReviewAt,
     p_provider_requests: 0,
@@ -218,11 +231,12 @@ async function processJob(
       return await processApifyJob(admin, job, worker, config)
     } catch (error) {
       const policy = retryPolicy(error, job.attempts, config.backoffSeconds)
+      if(job.provider_start_attempted_at&&!job.apify_run_id){policy.code='APIFY_START_OUTCOME_UNKNOWN';policy.retryable=false}
       const status = await requireSuccess(admin.rpc('fail_review_sync_job', {
         p_job_id: job.id,
         p_worker_id: worker,
         p_error_code: policy.code,
-        p_retryable: policy.retryable,
+        p_retryable: policy.retryable&&!policy.code.startsWith('APIFY_RUN_'),
         p_max_attempts: config.maxAttempts,
         p_backoff_seconds: policy.backoffSeconds,
       }))

@@ -1,5 +1,5 @@
 import { apifyGoogleMapsUrl } from './google-maps-link.ts'
-import { GOOGLE_REVIEWS_IMPORT_LANGUAGE,type ProviderLanguage } from './review-language.ts'
+import { collectionLanguage,type ProviderLanguage } from './review-language.ts'
 export type {PreferredLanguage,ProviderLanguage} from './review-language.ts'
 import type {
   GoogleReviewsResult,
@@ -123,7 +123,7 @@ export function apifyActorInput(request: ApifyReviewRequest) {
     startUrls: [{ url: apifyGoogleMapsUrl(request.placeUrl) }],
     reviewsOrigin: 'google',
     reviewsSort: request.sort === 'lowest_rating' ? 'lowestRanking' : 'newest',
-    language: GOOGLE_REVIEWS_IMPORT_LANGUAGE,
+    language: collectionLanguage(request.language),
     personalData: true,
     ...(request.limit ? { maxReviews: request.limit } : {}),
     ...(request.since ? { reviewsStartDate: request.since } : {}),
@@ -159,6 +159,7 @@ export async function startApifyRun(
   observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
   beforeStart?:()=>Promise<void>,
 ): Promise<ApifyRunState> {
+  collectionLanguage(request.language)
   if (!token.trim()) throw new ApifyError('APIFY_TOKEN_MISSING', 503)
   observe?.('link_resolution')
   const resolvedUrl = await resolvePlaceUrl(request.placeUrl)
@@ -168,7 +169,7 @@ export async function startApifyRun(
     : 1
   observe?.('run_start')
   await beforeStart?.()
-  console.info('GOOGLE_REVIEWS_ENGLISH_FETCH_STARTED',{language:GOOGLE_REVIEWS_IMPORT_LANGUAGE})
+  console.info('GOOGLE_REVIEWS_FETCH_STARTED',{language:request.language})
   const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}`, {
     method: 'POST',
     headers: apiHeaders(token, true),
@@ -337,7 +338,7 @@ export async function fetchApifyReviews(
   const run = await startApifyRun(token, request, observe)
   observe?.('run_wait')
   const completed = await waitForApifyRun(token, run)
-  console.info('GOOGLE_REVIEWS_ENGLISH_FETCH_COMPLETED',{run_id:completed.runId,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE})
+  console.info('GOOGLE_REVIEWS_FETCH_COMPLETED',{run_id:completed.runId,language:request.language})
   observe?.('dataset_fetch')
   const items = await fetchApifyDataset(token, completed.datasetId)
   observe?.('normalization')
