@@ -1,0 +1,66 @@
+[
+  {
+    "relation": "historical_report_runs",
+    "tgname": "certified_source_guard",
+    "schema": "public",
+    "proname": "guard_jls_certified_source",
+    "trigger_definition": "CREATE TRIGGER certified_source_guard BEFORE DELETE OR UPDATE ON public.historical_report_runs FOR EACH ROW EXECUTE FUNCTION guard_jls_certified_source()",
+    "definition": "CREATE OR REPLACE FUNCTION public.guard_jls_certified_source()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare sid uuid;begin\n if tg_op='INSERT' then\n  sid=new.run_id;\n  perform pg_advisory_xact_lock_shared(hashtextextended('jls-frozen-source:'||sid::text,0));\n  if exists(select 1 from public.analysis_jls_source_certificate_refs where source_table='analysis_jls_restaurant_runs' and source_id=sid)\n  then raise exception 'JLS_CERTIFIED_SOURCE_IMMUTABLE';end if;\n  return new;\n end if;\n if tg_table_name='historical_report_runs' and tg_op='UPDATE'\n and exists(select 1 from public.report_generation_requests q where q.source_run_id=old.id and q.engine='jev_sol_v2')\n and (to_jsonb(new)-array['status','locked_by','lease_until','updated_at','completed_at','error_code','last_error'])=(to_jsonb(old)-array['status','locked_by','lease_until','updated_at','completed_at','error_code','last_error']) then return new;end if; if exists(select 1 from public.analysis_jls_source_certificate_refs where source_table=tg_table_name and source_id=old.id)\n then raise exception 'JLS_CERTIFIED_SOURCE_IMMUTABLE';end if;\n if tg_op='DELETE' then return old;end if;return new;\nend $function$\n"
+  },
+  {
+    "relation": "analysis_parallel_reports",
+    "tgname": "parallel_history_immutable",
+    "schema": "public",
+    "proname": "guard_parallel_history",
+    "trigger_definition": "CREATE TRIGGER parallel_history_immutable BEFORE DELETE OR UPDATE ON public.analysis_parallel_reports FOR EACH ROW EXECUTE FUNCTION guard_parallel_history()",
+    "definition": "CREATE OR REPLACE FUNCTION public.guard_parallel_history()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$begin\n if tg_op='DELETE' then raise exception 'IMMUTABLE_HISTORY';end if;\n if old.derived_report is not null or old.raw_response is not null or old.imported_derivative_id is not null then raise exception 'IMMUTABLE_HISTORY';end if;\n if (to_jsonb(new)-array['state','error_code','raw_response','original_report','derived_report','corrections','controls','statistics','usage','generated_at'])<>(to_jsonb(old)-array['state','error_code','raw_response','original_report','derived_report','corrections','controls','statistics','usage','generated_at']) then raise exception 'IMMUTABLE_SOURCE';end if;return new;\nend $function$\n"
+  },
+  {
+    "relation": "report_generation_abandonments",
+    "tgname": "report_abandonment_immutable",
+    "schema": "public",
+    "proname": "guard_report_abandonment",
+    "trigger_definition": "CREATE TRIGGER report_abandonment_immutable BEFORE DELETE OR UPDATE ON public.report_generation_abandonments FOR EACH ROW EXECUTE FUNCTION guard_report_abandonment()",
+    "definition": "CREATE OR REPLACE FUNCTION public.guard_report_abandonment()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\nbegin raise exception 'REPORT_ABANDONMENT_IMMUTABLE';end $function$\n"
+  },
+  {
+    "relation": "report_generation_requests",
+    "tgname": "report_request_immutable",
+    "schema": "public",
+    "proname": "guard_report_request",
+    "trigger_definition": "CREATE TRIGGER report_request_immutable BEFORE DELETE OR UPDATE ON public.report_generation_requests FOR EACH ROW EXECUTE FUNCTION guard_report_request()",
+    "definition": "CREATE OR REPLACE FUNCTION public.guard_report_request()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$begin\n if tg_op='DELETE' or (to_jsonb(new)-'comparison_id') is distinct from (to_jsonb(old)-'comparison_id') or old.comparison_id is not null then raise exception 'REPORT_REQUEST_IMMUTABLE';end if;return new;end $function$\n"
+  },
+  {
+    "relation": "historical_report_runs",
+    "tgname": "historical_v10_source_guard",
+    "schema": "public",
+    "proname": "historical_v10_immutable",
+    "trigger_definition": "CREATE TRIGGER historical_v10_source_guard BEFORE DELETE OR UPDATE ON public.historical_report_runs FOR EACH ROW EXECUTE FUNCTION historical_v10_immutable()",
+    "definition": "CREATE OR REPLACE FUNCTION public.historical_v10_immutable()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare state text;\nbegin\n if tg_table_name='historical_report_runs' then\n  if old.snapshot->>'analysis_version' is distinct from '10' then if tg_op='DELETE' then return old;end if;return new;end if;\n  if old.status='completed' then raise exception 'REPORT_V10_IMMUTABLE';end if;\n  if tg_op='UPDATE' and (old.snapshot-'publication') is distinct from (new.snapshot-'publication') then raise exception 'REPORT_V10_SOURCE_IMMUTABLE';end if;\n else\n  select status into state from public.historical_report_runs where id=case when tg_op='DELETE' then old.run_id else new.run_id end for update;\n  if state='completed' then raise exception 'REPORT_V10_IMMUTABLE';end if;\n  if tg_op='UPDATE' and (to_jsonb(old)-array['served_models','jev_theme_requests','jev_sentiment_requests','jev_input_tokens','jev_output_tokens','jev_retry_count','jev_elapsed_ms','sol_narrative_calls','sol_narrative_input_tokens','sol_narrative_output_tokens','sol_narrative_elapsed_ms','narrative_state','narrative_error','narrative_result','usage_complete']) is distinct from (to_jsonb(new)-array['served_models','jev_theme_requests','jev_sentiment_requests','jev_input_tokens','jev_output_tokens','jev_retry_count','jev_elapsed_ms','sol_narrative_calls','sol_narrative_input_tokens','sol_narrative_output_tokens','sol_narrative_elapsed_ms','narrative_state','narrative_error','narrative_result','usage_complete']) then raise exception 'REPORT_V10_CONFIG_IMMUTABLE';end if;\n end if;\n if tg_op='DELETE' then return old;end if;return new;\nend $function$\n"
+  },
+  {
+    "relation": "historical_report_runs",
+    "tgname": "historical_v11_source_guard",
+    "schema": "public",
+    "proname": "historical_v11_immutable",
+    "trigger_definition": "CREATE TRIGGER historical_v11_source_guard BEFORE DELETE OR UPDATE ON public.historical_report_runs FOR EACH ROW EXECUTE FUNCTION historical_v11_immutable()",
+    "definition": "CREATE OR REPLACE FUNCTION public.historical_v11_immutable()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare state text;\nbegin\n if tg_table_name='historical_report_runs' then\n  if old.snapshot->>'analysis_version' is distinct from '11' then if tg_op='DELETE' then return old;end if;return new;end if;\n  if old.status='completed' then raise exception 'REPORT_V11_IMMUTABLE';end if;\n  if tg_op='UPDATE' and (old.snapshot-'publication') is distinct from (new.snapshot-'publication') then raise exception 'REPORT_V11_SOURCE_IMMUTABLE';end if;\n else\n  select status into state from public.historical_report_runs where id=case when tg_op='DELETE' then old.run_id else new.run_id end for update;\n  if state='completed' then raise exception 'REPORT_V11_IMMUTABLE';end if;\n  if tg_op='UPDATE' and (to_jsonb(old)-array['served_models','jev_theme_requests','jev_sentiment_requests','jev_input_tokens','jev_output_tokens','jev_retry_count','jev_elapsed_ms','sol_narrative_calls','sol_narrative_input_tokens','sol_narrative_output_tokens','sol_narrative_elapsed_ms','narrative_state','narrative_error','narrative_result','usage_complete']) is distinct from (to_jsonb(new)-array['served_models','jev_theme_requests','jev_sentiment_requests','jev_input_tokens','jev_output_tokens','jev_retry_count','jev_elapsed_ms','sol_narrative_calls','sol_narrative_input_tokens','sol_narrative_output_tokens','sol_narrative_elapsed_ms','narrative_state','narrative_error','narrative_result','usage_complete']) then raise exception 'REPORT_V11_CONFIG_IMMUTABLE';end if;\n end if;\n if tg_op='DELETE' then return old;end if;return new;\nend $function$\n"
+  },
+  {
+    "relation": "historical_report_runs",
+    "tgname": "historical_v9_source_guard",
+    "schema": "public",
+    "proname": "historical_v9_immutable",
+    "trigger_definition": "CREATE TRIGGER historical_v9_source_guard BEFORE DELETE OR UPDATE ON public.historical_report_runs FOR EACH ROW EXECUTE FUNCTION historical_v9_immutable()",
+    "definition": "CREATE OR REPLACE FUNCTION public.historical_v9_immutable()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare state text;\nbegin\n if tg_table_name='historical_report_runs' then\n  if old.snapshot->>'analysis_version' is distinct from '9' then if tg_op='DELETE' then return old;end if;return new;end if;\n  if old.status='completed' then raise exception 'REPORT_V9_IMMUTABLE';end if;\n  if tg_op='UPDATE' and (new.snapshot->'source_snapshot' is distinct from old.snapshot->'source_snapshot' or new.snapshot->'reviews' is distinct from old.snapshot->'reviews' or new.snapshot->'base' is distinct from old.snapshot->'base' or new.snapshot->>'source_generation_id' is distinct from old.snapshot->>'source_generation_id' or new.snapshot->>'analysis_version' is distinct from '9') then raise exception 'REPORT_V9_SOURCE_IMMUTABLE';end if;\n else\n  select status into state from public.historical_report_runs where id=case when tg_op='DELETE' then old.run_id else new.run_id end for update;if state='completed' then raise exception 'REPORT_V9_IMMUTABLE';end if;\n  if tg_op='UPDATE' then\n   if new.run_id<>old.run_id or new.organization_id<>old.organization_id then raise exception 'REPORT_V9_SOURCE_IMMUTABLE';end if;\n   if tg_table_name='historical_jev_analysis_tasks' then if old.status in ('completed','failed') then raise exception 'JEV_TASK_IMMUTABLE';end if;end if;\n  end if;\n end if;\n if tg_op='DELETE' then return old;end if;return new;\nend $function$\n"
+  },
+  {
+    "relation": "analysis_parallel_launch_preparations",
+    "tgname": "immutable_parallel_launch_preparation",
+    "schema": "public",
+    "proname": "pilot_evidence_immutable",
+    "trigger_definition": "CREATE TRIGGER immutable_parallel_launch_preparation BEFORE DELETE OR UPDATE ON public.analysis_parallel_launch_preparations FOR EACH ROW EXECUTE FUNCTION pilot_evidence_immutable()",
+    "definition": "CREATE OR REPLACE FUNCTION public.pilot_evidence_immutable()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$begin raise exception 'EVIDENCE_AUDIT_IMMUTABLE';end $function$\n"
+  }
+]
