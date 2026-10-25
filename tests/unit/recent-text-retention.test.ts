@@ -17,8 +17,11 @@ beforeAll(async()=>{
  // Parent identities remain outside the purge scope in production.
  await db.exec('create table if not exists public.organizations(id uuid primary key);grant usage on schema private,extensions to service_role;grant all on all tables in schema public,private to service_role;grant select on public.organization_members to authenticated;');
  for(const f of fixture.functions.filter((f:{proname:string})=>['enqueue_current_report','jev_batch_claim','jev_batch_claim_sol'].includes(f.proname)))await db.exec(f.definition);
+ const guards=JSON.parse(readFileSync('tests/fixtures/retention-delete-guards.json','utf8'));
+ for(const f of new Map(guards.map((g:{schema:string;proname:string;definition:string})=>[g.schema+'.'+g.proname,g.definition])).values())await db.exec(f as string);
+ for(const t of guards)await db.exec(t.trigger_definition);
  await db.exec("create function cron.schedule(text,text,text) returns bigint language plpgsql as $$begin insert into cron.job values(999,$1,true);return 999;end $$");
- for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql','_recent_text_ingestion_dedup.sql','_recent_text_native_usage.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
+ for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql','_recent_text_ingestion_dedup.sql','_recent_text_native_usage.sql','_recent_text_superseded_cleanup.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -93,4 +96,24 @@ it('reads Sol tokens and both cache counters from the real saved HTTP body even 
  const native={model:'gpt-6.1-sol',usage:{input_tokens:100,output_tokens:40,input_tokens_details:{cached_tokens:20,cache_write_tokens:80}}};
  await db.query("select private.record_retention_attempt('fixture_sol',$1)",[JSON.stringify({id:'native-sol',sol_request_count:1,status:'completed',usage:{sol:{}},sol_receipt:{raw_response_text:JSON.stringify(native)}})]);
  expect((await db.query('select model,input_tokens::int i,output_tokens::int o,cache_read_tokens::int r,cache_write_tokens::int w from private.provider_attempt_ledger')).rows).toEqual([{model:'gpt-6.1-sol',i:100,o:40,r:20,w:80}]);
+});
+it('removes a superseded failed frozen source and keeps its request tombstone without deleting the newer report',async()=>{
+ await insert('one',new Date(Date.now()-86400000).toISOString());await db.exec('set local role service_role');
+ const args=[est,org,user,'vi','50000000-0000-4000-8000-000000000001','gpt-6.1-sol',8];
+ const old=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',args)).rows[0];
+ await db.query("update public.historical_report_runs set status='failed',created_at=now()-interval '1 hour' where id=$1",[old.id]);
+ args[4]='50000000-0000-4000-8000-000000000002';const fresh=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',args)).rows[0];
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,generated_at) values(gen_random_uuid(),$1,$2,$3,'vi','completed',now())",[org,est,fresh.id]);
+ await db.exec('select public.maintain_recent_review_corpora()');
+ expect((await db.query('select id from public.historical_report_runs')).rows).toEqual([{id:fresh.id}]);
+ expect((await db.query('select request_id from private.retired_generation_keys')).rows).toEqual([{request_id:'50000000-0000-4000-8000-000000000001'}]);
+});
+it('expires a published report without table DDL and retains only its last scope metadata',async()=>{
+ await insert('one',new Date(Date.now()-86400000).toISOString());await db.exec('set local role service_role');
+ const fresh=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi','60000000-0000-4000-8000-000000000001','gpt-6.1-sol',8])).rows[0];
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,generated_at) values(gen_random_uuid(),$1,$2,$3,'vi','completed',now())",[org,est,fresh.id]);
+ await db.query("select public.apply_recent_review_retention($1,now()+interval '7 months')",[est]);
+ expect((await db.query('select count(*)::int n from public.analysis_parallel_reports')).rows[0].n).toBe(0);
+ expect((await db.query('select review_count,reason from private.retired_report_scopes')).rows).toEqual([{review_count:1,reason:'CORPUS_REVIEW_REMOVED'}]);
+ expect((await db.query("select pg_get_functiondef('private.retention_retire_source(uuid,text)'::regprocedure) d")).rows[0].d).not.toContain('alter table');
 });
