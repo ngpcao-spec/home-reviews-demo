@@ -31,6 +31,7 @@ beforeAll(async()=>{
  const finishSql=readFileSync('supabase/migrations/20261024080230_current_jev_batch_transport.sql','utf8'),finishStart=finishSql.indexOf('create or replace function public.jev_batch_finish(');
  await db.exec(finishSql.slice(finishStart,finishSql.indexOf('$$;',finishStart)+3));
  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_current_report_publications.sql')),'utf8'));
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_finalize_report_publication_safety.sql')),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -242,4 +243,10 @@ it('blocks a consumed generation when its text changes, preserves the dated repo
 it('keeps publications tenant scoped and the live source projection unavailable to clients',async()=>{
  await datedPublication();await db.exec('set local role authenticated');expect((await db.query('select * from public.current_report_publications')).rows).toEqual([]);
  await expect(db.query('select public.read_current_report_publication($1,$2)',[est,'vi'])).rejects.toThrow('permission denied');
+});
+it('uses the same establishment lock for publication and cleanup, without a global lock inversion',async()=>{
+ const d=(await db.query("select pg_get_functiondef('private.retention_retire_source(uuid,text)'::regprocedure) d")).rows[0].d as string;
+ expect(d).toContain('recent-text-corpus:');expect(d).not.toContain('retention-source-cleanup');
+ const f=(await db.query("select pg_get_functiondef('public.jev_batch_finish(uuid,text,jsonb,jsonb,text)'::regprocedure) d")).rows[0].d as string;
+ expect(f.indexOf('recent-text-corpus:')).toBeLessThan(f.indexOf('where id=p_run for update'));
 });
