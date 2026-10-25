@@ -80,6 +80,8 @@ export async function verifyCompactSolWire(s:CompactSource,language:'fr'|'vi',ma
 }
 // Call only after verifying the immutable ready artifact and its source binding.
 // Unknown or incompatible references are rejected, never guessed or replaced.
+// Identical mixed-review polarity aliases already cited together may reach the
+// existing audited reference derivation; final polarity validation is unchanged.
 export function reconstructCompactSolResponse(raw:unknown,manifest:CompactManifest,evidence:DirectReportEvidence[]){
  const parsed=compactSolResponse.parse(raw),r=parsed.report;
  const resolve=(ref:string,category?:string,polarity?:string)=>{
@@ -90,7 +92,21 @@ export function reconstructCompactSolResponse(raw:unknown,manifest:CompactManife
    throw Error('COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE');
   return e;
  };
- const ids=(refs:string[],category?:string,polarity?:string)=>refs.map(ref=>resolve(ref,category,polarity).evidence_id);
+ const ids=(refs:string[],category?:string,polarity?:string)=>{
+  const sources=refs.map(ref=>resolve(ref,category));
+  for(const source of sources)if(polarity&&source.polarity!==polarity){
+   // No new reference: the matching polarity must already occur in THIS
+   // passage, with the same frozen review, exact quote/context and boundaries.
+   const paired=sources.some(other=>other.polarity===polarity&&other.review_id===source.review_id&&other.category===source.category&&
+    other.analysis_text_sha256===source.analysis_text_sha256&&other.quote_sha256===source.quote_sha256&&
+    other.quote===source.quote&&other.context===source.context&&other.quote_start===source.quote_start&&other.quote_end===source.quote_end&&
+    other.context_start===source.context_start&&other.context_end===source.context_end);
+   if(!paired)throw Error('COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE');
+  }
+  // Preserve all native IDs here. validateParallelReport already records the
+  // redundant alias removal and then runs the strict evidence validator.
+  return sources.map(source=>source.evidence_id);
+ };
  const passage=(p:typeof r.categories[number],polarity?:string)=>({category:p.category,text:p.text,evidence_ids:ids(p.refs,p.category,polarity)});
  return {format_version:'jls-direct-categories4-report-v1' as const,statistics_sha256:manifest.statistics_sha256,report:{
   categories:r.categories.map(p=>passage(p)),positive_aspects:r.positive_aspects.map(p=>passage(p,'positive')),

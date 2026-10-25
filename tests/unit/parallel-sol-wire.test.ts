@@ -3,6 +3,7 @@ import {COMPACT_SOL_WIRE,compactSolResponse,prepareCompactSolWire,verifyCompactS
 import {directHash} from '../../supabase/functions/_shared/jev-direct-categories';
 import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
 import {directSynthesisStatistics,type DirectReportEvidence} from '../../supabase/functions/_shared/jev-direct-report-preparation';
+import {validateParallelReport} from '../../supabase/functions/_shared/parallel-report';
 
 async function fixture(){
  const organization_id=crypto.randomUUID(),establishment_id=crypto.randomUUID();
@@ -75,4 +76,25 @@ it('uses a strict output schema without quotation/hash duplication or unbound ex
  const {wire}=await fixture(),raw=response(wire);expect(compactSolResponse.safeParse(raw).success).toBe(true);
  expect(compactSolResponse.safeParse({...raw,statistics_sha256:'0'.repeat(64)}).success).toBe(false);
  expect(compactSolResponse.safeParse({...raw,report:{...raw.report,recommendations:[{...raw.report.recommendations[0],observations:[{...raw.report.recommendations[0].observations[0],quote:'invented'}]}]}}).success).toBe(false);
+});
+it('lets the existing audited derivation remove an already-cited identical mixed alias, without changing prose',async()=>{
+ const {source,wire}=await fixture(),raw=response(wire),a=wire.manifest.associations;
+ const positive=a.find(e=>e.category==='service'&&e.polarity==='positive')!,negative=a.find(e=>e.category==='service'&&e.polarity==='negative')!;
+ raw.report.negative_aspects[0].refs=[negative.ref,positive.ref];
+ raw.report.categories.find(c=>c.category==='price')!.text='Chưa đủ căn cứ từ các ý kiến được cung cấp cho nhóm này.';
+ const before=JSON.stringify(raw),expanded=reconstructCompactSolResponse(raw,wire.manifest,source.evidence);
+ expect(expanded.report.negative_aspects[0].evidence_ids).toEqual([negative.evidence_id,positive.evidence_id]);
+ const validated=await validateParallelReport(expanded,{evidence:source.evidence,statistics_sha256:source.statistics_sha256,statistics:source.statistics} as never);
+ expect(validated.technical_checks_passed).toBe(true);expect(validated.report.negative_aspects[0]).toEqual({category:'service',text:raw.report.negative_aspects[0].text,evidence_ids:[negative.evidence_id]});
+ expect(validated.reference_derivation.changes).toContainEqual(expect.objectContaining({path:'negative_aspects[0]',reason:'extra_incompatible_polarity_same_review_and_identical_text'}));
+ expect(JSON.stringify(raw)).toBe(before);
+});
+it.each(['other_review','other_quote','other_context','other_boundary','counterpart_only_in_other_section'])('still rejects a paired-looking %s without guessing a replacement',async kind=>{
+ const {source,wire}=await fixture(),raw=response(wire),a=wire.manifest.associations,positive=a.find(e=>e.category==='service'&&e.polarity==='positive')!,negative=a.find(e=>e.category==='service'&&e.polarity==='negative')!;
+ raw.report.negative_aspects[0].refs=[negative.ref,positive.ref];const e=source.evidence.find(e=>e.evidence_id===positive.evidence_id)!;
+ if(kind==='other_review'){e.review_id=crypto.randomUUID();positive.review_id=e.review_id;}
+ if(kind==='other_quote'){e.quote+=' changed';e.quote_sha256=await analysisTextSha256(e.quote);positive.quote_sha256=e.quote_sha256;}
+ if(kind==='other_context')e.context+=' changed';if(kind==='other_boundary'){e.context_start=1;positive.context_start=1;}
+ if(kind==='counterpart_only_in_other_section')raw.report.negative_aspects[0].refs=[positive.ref];
+ expect(()=>reconstructCompactSolResponse(raw,wire.manifest,source.evidence)).toThrow('COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE');
 });
