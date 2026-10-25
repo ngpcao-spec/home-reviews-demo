@@ -24,11 +24,11 @@ const review = (id: string): NormalizedReview => ({
 })
 
 describe('scalable review sync queue helpers', () => {
-  it.each([100, 350, 500])('keeps %i existing reviews and appends incremental reviews without the initial cap', (size) => {
+  it.each([100, 350, 500])('limits the initial selection to 150 within %i candidates; persistence batching itself does not discard rows', (size) => {
     const existing = Array.from({ length: size }, (_, i) => review(`old-${i}`))
     const stored = new Map(existing.map(item => [item.externalReviewId, item]))
     const initial = prepareInitialReviews(existing)
-    expect(initial).toHaveLength(100)
+    expect(initial).toHaveLength(Math.min(size,150))
     expect(existing).toHaveLength(size)
     const next = { ...review('new-review'), rating: 5 }
     const page = pageBeforeCheckpoint([next, existing[0]], existing[0].externalReviewId)
