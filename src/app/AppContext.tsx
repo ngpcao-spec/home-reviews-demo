@@ -229,6 +229,7 @@ interface SaveReplyDraftPayload {
 }
 
 interface ResolvePayload {
+  resolution?:{diagnostic_id:string;started_at:string;completed_at:string;duration_ms:number}
   candidate?: {
     name: string
     fullAddress: string
@@ -814,6 +815,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.functions.invoke<ResolvePayload>('resolve-establishment', { body: { input } })
     if (error || !data?.candidate) throw new Error(await functionErrorCode(error, data))
     return {
+      resolutionDiagnosticId:data.resolution?.diagnostic_id,
       placeRef: data.candidate.googleId,
       name: data.candidate.name,
       address: data.candidate.fullAddress,

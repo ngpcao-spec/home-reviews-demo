@@ -2,8 +2,6 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.1
 import { json } from '../_shared/cors.ts'
 import {
   ApifyError,
-  apifyRunFinished,
-  apifyRunSucceeded,
   fetchApifyDataset,
   getApifyRun,
   normalizeApifyDataset,
@@ -24,6 +22,7 @@ import { sendPushToUser } from '../_shared/push.ts'
 import { dispatchImportCompletionNotifications } from '../_shared/import-completion-notifications.ts'
 import {GOOGLE_REVIEWS_IMPORT_LANGUAGE} from '../_shared/review-language.ts'
 import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
+import {advanceInitialApify} from '../_shared/initial-import-apify.ts'
 
 interface InitialImportJob {
   id: string
@@ -38,6 +37,7 @@ interface InitialImportJob {
   attempts: number
   provider_run_id: string | null
   provider_dataset_id: string | null
+  provider_start_attempted_at?: string | null
   resolved_place_url: string | null
 }
 
@@ -52,7 +52,7 @@ async function requireSuccess<T>(
   return data as T
 }
 
-async function continueJob(admin: SupabaseClient, jobId: string, worker: string, delaySeconds = 5) {
+async function continueJob(admin: SupabaseClient, jobId: string, worker: string, delaySeconds = 0) {
   const continued = await requireSuccess<boolean>(admin.rpc('continue_initial_import_job', {
     p_job_id: jobId,
     p_worker_id: worker,
@@ -89,6 +89,11 @@ async function checkpoint(
     p_lease_seconds: leaseSeconds,
   }))
   if (saved !== true) throw new Error('INITIAL_IMPORT_LEASE_LOST')
+}
+
+async function phase(admin:SupabaseClient,job:InitialImportJob,worker:string,name:string,providerAt?:string,status?:string){
+ const saved=await requireSuccess<boolean>(admin.rpc('mark_initial_import_phase',{p_job:job.id,p_worker:worker,p_phase:name,p_provider_at:providerAt??null,p_status:status??null}))
+ if(!saved)throw Error('INITIAL_IMPORT_LEASE_LOST')
 }
 
 async function acquireProviderSlot(
@@ -185,6 +190,7 @@ async function persistResult(
   const importedReviews = newestFirst(prepareInitialReviews(fetched.reviews, job.reviews_target))
   const newest = fetched.checkpointReview??newestFirst([...(fetched.observedReviews??fetched.reviews)])[0]??null
   const oldest = importedReviews.at(-1) ?? null
+  await phase(admin,job,worker,'persistence_started')
   const establishmentId = await createOrResumeEstablishment(admin, job, fetched)
   await checkpoint(admin, job, worker, {
     establishmentId,
@@ -222,6 +228,7 @@ async function persistResult(
     job.reviews_target,
   )
   const completedAt = new Date().toISOString()
+  await phase(admin,job,worker,'persistence_completed')
   const finalized = await requireSuccess<boolean>(admin.rpc('finalize_initial_import_job', {
     p_job_id: job.id,
     p_worker_id: worker,
@@ -243,76 +250,42 @@ async function persistResult(
 }
 
 async function processApify(
-  admin: SupabaseClient,
-  job: InitialImportJob,
-  worker: string,
-  config: {
-    leaseSeconds: number
-    providerLeaseSeconds: number
-    providerCooldownMs: number
-    providerSlotWaitMs: number
+ admin:SupabaseClient,job:InitialImportJob,worker:string,
+ config:{leaseSeconds:number;providerLeaseSeconds:number;providerCooldownMs:number;providerSlotWaitMs:number},
+){
+ const token=apifyToken(),providerToken=`${worker}:${job.id}:start`
+ let resolvedPlaceUrl=job.resolved_place_url
+ let slot:number|null=null
+ return advanceInitialApify(job,{
+  acquire:async()=>{slot=await acquireProviderSlot(admin,providerToken,config.providerLeaseSeconds,config.providerSlotWaitMs);return slot!==null},
+  release:async()=>{if(slot!==null)await admin.rpc('release_review_provider_slot',{p_slot_number:slot,p_worker_token:providerToken,p_cooldown_ms:config.providerCooldownMs})},
+  reserveStart:async()=>await requireSuccess<boolean>(admin.rpc('mark_initial_import_phase',{p_job:job.id,p_worker:worker,p_phase:'provider_start'})),
+  start:async reserve=>await startApifyRun(token,{placeUrl:job.query,language:GOOGLE_REVIEWS_IMPORT_LANGUAGE,sort:'newest',limit:job.reviews_target},undefined,reserve),
+  saveRun:async run=>{
+   resolvedPlaceUrl=run.resolvedPlaceUrl??resolvedPlaceUrl
+   await checkpoint(admin,job,worker,{providerRunId:run.runId,providerDatasetId:run.datasetId,resolvedPlaceUrl:run.resolvedPlaceUrl},config.leaseSeconds)
+   if(run.startedAt)await phase(admin,job,worker,'provider_started',run.startedAt)
   },
-) {
-  const token = apifyToken()
-  if (!job.provider_run_id || !job.provider_dataset_id) {
-    const providerToken = `${worker}:${job.id}:start`
-    const slot = await acquireProviderSlot(
-      admin,
-      providerToken,
-      config.providerLeaseSeconds,
-      config.providerSlotWaitMs,
-    )
-    if (slot === null) {
-      await continueJob(admin, job.id, worker, 5)
-      return { jobId: job.id, status: 'deferred' }
-    }
-    try {
-      const run = await startApifyRun(token, {
-        placeUrl: job.query,
-        language: GOOGLE_REVIEWS_IMPORT_LANGUAGE,
-        sort: 'newest',
-        limit: job.reviews_target,
-      })
-      await checkpoint(admin, job, worker, {
-        providerRunId: run.runId,
-        providerDatasetId: run.datasetId,
-        resolvedPlaceUrl: run.resolvedPlaceUrl,
-        providerRequests: 1,
-      }, config.leaseSeconds)
-    } finally {
-      await admin.rpc('release_review_provider_slot', {
-        p_slot_number: slot,
-        p_worker_token: providerToken,
-        p_cooldown_ms: config.providerCooldownMs,
-      })
-    }
-    await continueJob(admin, job.id, worker, 5)
-    return { jobId: job.id, status: 'provider_started' }
-  }
-
-  const run = await getApifyRun(token, job.provider_run_id)
-  if (!apifyRunFinished(run.status)) {
-    await continueJob(admin, job.id, worker, 5)
-    return { jobId: job.id, status: 'provider_running' }
-  }
-  if (!apifyRunSucceeded(run.status)) throw new ApifyError(`APIFY_RUN_${run.status}`, 503)
-
-  const items = await fetchApifyDataset(token, job.provider_dataset_id)
-  const normalized = normalizeApifyDataset(items, job.query, job.resolved_place_url ?? undefined)
-  const reviews = prepareInitialReviews(normalized.reviews, job.reviews_target)
-  await checkpoint(admin, job, worker, {
-    reviewsFetched: reviews.length,
-    providerRequests: 2,
-  }, config.leaseSeconds)
-  return persistResult(admin, job, worker, {
-    ...normalized,
-    reviews,
-    count: reviews.length,
-    providerRequests: 3,
-    initialLimit: job.reviews_target,
-    initialFetched: reviews.length,
-    checkpointReview: reviews[0] ?? null,
-  }, config.leaseSeconds)
+  get:async(runId,seconds)=>{
+   await checkpoint(admin,job,worker,{providerRequests:1},config.leaseSeconds)
+   const run=await getApifyRun(token,runId,seconds)
+   if(run.startedAt)await phase(admin,job,worker,'provider_started',run.startedAt)
+   return run
+  },
+  finished:async run=>await phase(admin,job,worker,'provider_finished',run.finishedAt,run.status),
+  retrieve:async run=>{
+   await phase(admin,job,worker,'retrieval_started')
+   let requests=0,items
+   try{items=await fetchApifyDataset(token,run.datasetId,()=>{requests++})}
+   finally{if(requests)await checkpoint(admin,job,worker,{providerRequests:requests},config.leaseSeconds)}
+   await phase(admin,job,worker,'retrieval_completed')
+   const normalized=normalizeApifyDataset(items,job.query,resolvedPlaceUrl??undefined)
+   const reviews=prepareInitialReviews(normalized.reviews,job.reviews_target)
+   await checkpoint(admin,job,worker,{reviewsFetched:reviews.length},config.leaseSeconds)
+   return persistResult(admin,job,worker,{...normalized,reviews,count:reviews.length,providerRequests:requests,initialLimit:job.reviews_target,initialFetched:reviews.length,checkpointReview:reviews[0]??null},config.leaseSeconds)
+  },
+  defer:async seconds=>{await continueJob(admin,job.id,worker,seconds);return {jobId:job.id,status:seconds?'deferred':'provider_running'}},
+ })
 }
 
 async function processDirect(
@@ -367,6 +340,7 @@ async function processJob(
   },
 ) {
   try {
+    await phase(admin,job,worker,'worker_started')
     await assertIngestionAllowed(admin)
     return providerName() === 'apify'
       ? await processApify(admin, job, worker, config)
@@ -421,10 +395,14 @@ Deno.serve(async (request) => {
     providerCooldownMs: configuredInteger(String(runtime.provider_cooldown_ms), 200, 0, 10_000),
     providerSlotWaitMs: 2_000,
   }
+  let readyAt=0
+  try{const body=await request.json();readyAt=Date.parse(body?.ready_at??'')}catch{/* cron compatibility */}
+  if(Number.isFinite(readyAt)&&readyAt>Date.now())await wait(Math.min(5_000,readyAt-Date.now()))
   const worker = workerId()
   const jobs = await requireSuccess<InitialImportJob[]>(admin.rpc('claim_initial_import_jobs', {
     p_worker_id: worker,
-    p_limit: config.claimBatch,
+    p_limit: Math.min(config.claimBatch,config.concurrency),
+    p_max_running: config.concurrency,
     p_lease_seconds: config.leaseSeconds,
   }))
   const results = await mapWithConcurrency(jobs ?? [], config.concurrency, (job) =>

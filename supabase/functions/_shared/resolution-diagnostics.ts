@@ -25,11 +25,11 @@ export function createResolutionDiagnostics() {
   const emit = (event: string, errorCode?: string) => {
     // Explicit fields only: never serialize requests, errors, stacks or provider payloads.
     console.info(JSON.stringify({ event, diagnostic_id: diagnosticId, stage,
-      elapsed_ms: Date.now() - startedAt, ...(errorCode ? { error_code: errorCode } : {}) }))
+      started_at:new Date(startedAt).toISOString(),observed_at:new Date().toISOString(),elapsed_ms: Date.now() - startedAt, ...(errorCode ? { error_code: errorCode } : {}) }))
   }
   return {
     step: (next: ResolutionStage) => { stage = next; emit('resolve_establishment_step') },
     failed: (error: unknown) => emit('resolve_establishment_failed', safeResolutionError(error)),
-    completed: () => emit('resolve_establishment_completed'),
+    completed: () => {emit('resolve_establishment_completed');return {diagnostic_id:diagnosticId,started_at:new Date(startedAt).toISOString(),completed_at:new Date().toISOString(),duration_ms:Date.now()-startedAt}},
   }
 }
