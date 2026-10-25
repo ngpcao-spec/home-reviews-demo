@@ -13,6 +13,7 @@ const now = Date.parse('2026-09-30T00:00:00.000Z')
 const review = (index: number, rating = index % 5 + 1) => ({
   externalReviewId: `review-${index}`,
   rating,
+  text: 'Un témoignage',
   publishedAt: new Date(now - index * 60_000).toISOString(),
 })
 

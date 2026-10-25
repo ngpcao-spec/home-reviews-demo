@@ -23,6 +23,7 @@ import { configuredInteger, mapWithConcurrency, retryPolicy } from '../_shared/s
 import { sendPushToUser } from '../_shared/push.ts'
 import { dispatchImportCompletionNotifications } from '../_shared/import-completion-notifications.ts'
 import {GOOGLE_REVIEWS_IMPORT_LANGUAGE} from '../_shared/review-language.ts'
+import {assertIngestionAllowed,recentReviewCutoff} from '../_shared/recent-review-policy.ts'
 
 interface InitialImportJob {
   id: string
@@ -193,7 +194,7 @@ async function persistResult(
   await insertReviews(admin, {
     id: establishmentId,
     organization_id: job.organization_id,
-  }, importedReviews, true, fetched.provider)
+  }, fetched.reviews, true, fetched.provider)
   await persistEstablishmentSnapshot(admin, {
     id: establishmentId,
     organization_id: job.organization_id,
@@ -271,6 +272,7 @@ async function processApify(
         language: GOOGLE_REVIEWS_IMPORT_LANGUAGE,
         sort: 'newest',
         limit: job.reviews_target,
+        since: recentReviewCutoff(),
       })
       await checkpoint(admin, job, worker, {
         providerRunId: run.runId,
@@ -366,6 +368,7 @@ async function processJob(
   },
 ) {
   try {
+    await assertIngestionAllowed(admin)
     return providerName() === 'apify'
       ? await processApify(admin, job, worker, config)
       : await processDirect(admin, job, worker, config)

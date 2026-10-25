@@ -6,6 +6,7 @@ import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { preferredLanguageForUser, resolveEstablishmentCandidate } from '../_shared/sync-service.ts'
 import { normalizeGoogleMapsLink } from '../_shared/google-maps-link.ts'
 import { createResolutionDiagnostics } from '../_shared/resolution-diagnostics.ts'
+import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
 
 interface RequestBody { input?: unknown }
 
@@ -18,6 +19,7 @@ Deno.serve(async (request) => {
   try {
     diagnostics.step('authentication')
     const { user, admin } = await requireUser(request)
+    await assertIngestionAllowed(admin)
     enforceRateLimit(`resolve-establishment:${user.id}`, 10, 60_000)
     diagnostics.step('validation')
     const body = await request.json() as RequestBody

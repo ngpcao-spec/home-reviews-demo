@@ -7,12 +7,23 @@ import {CurrentReports,type CurrentReportsView} from './CurrentReports'
 import {parallelPresentationRow} from '../../tests/fixtures/parallel-presentation'
 const mock=vi.hoisted(()=>({invoke:vi.fn()}));vi.mock('../lib/supabase',()=>({supabase:{functions:{invoke:mock.invoke}}}))
 afterEach(()=>{cleanup();mock.invoke.mockReset()})
-function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',initial='/analyses'){
+function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',initial='/analyses',extra:Partial<CurrentReportsView>={}){
  const row=parallelPresentationRow(language);row.current_source_run_id='source';
- const data={routing:{engine,updated_at:'2026-10-23'},legacy_report:null,versions:[{id:row.id,current_source_run_id:'source',created_at:'2026-10-23',generated_at:'2026-10-23',state:'completed'}],experimental:row,run:null,tasks:[],operation:null} satisfies CurrentReportsView;
+ const data={routing:{engine,updated_at:'2026-10-23'},legacy_report:null,versions:[{id:row.id,current_source_run_id:'source',created_at:'2026-10-23',generated_at:'2026-10-23',state:'completed'}],experimental:row,run:null,tasks:[],operation:null,...extra} satisfies CurrentReportsView;
  mock.invoke.mockResolvedValue({data,error:null});const generate=vi.fn();
  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={[initial]}><I18nProvider language={language}><CurrentReports establishmentId="est" account="account" languageKey={language} enabled current={null} generating={false} generationAction={<button onClick={generate}>NORMAL GENERATE</button>}><p>LEGACY SOL PRESERVED</p></CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);return {generate,data}
 }
+it('shows retained scope and sparse limits, hides archives and preserves negative/mixed access',async()=>{
+ draw('fr','jev_sol_v2','/analyses?variant=legacy',{retention:{policy:{version:'recent_text_100_6m_v1',enabled:true},state:{retained_count:2,period_start:'2026-07-01',period_end:'2026-10-01'},scope:{as_of:'2026-10-25',review_count:2,period_start:'2026-07-01',period_end:'2026-10-01',stale:true},retired:null}});
+ expect(await screen.findByText(/Jusqu’à 100 avis textuels sur les 6 derniers mois/)).toBeVisible();
+ expect(screen.queryByRole('tab',{name:'Rapports précédents'})).not.toBeInTheDocument();expect(screen.getByText(/Peu de témoignages/)).toBeVisible();expect(screen.getByText(/pas actualisé automatiquement/)).toBeVisible();
+ expect(screen.getAllByRole('button',{name:/Avis négatifs, mixtes inclus/}).length).toBeGreaterThan(0);
+});
+it('does not expose a cached old report before server confirmation',()=>{
+ mock.invoke.mockImplementation(()=>new Promise(()=>{}));
+ render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><I18nProvider language="fr"><CurrentReports establishmentId="est" account="account" languageKey="fr" enabled current={{} as never} generating={false} generationAction={<button>Generate</button>}>DELETED OLD REPORT BODY</CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);
+ expect(screen.queryByText('DELETED OLD REPORT BODY')).not.toBeInTheDocument();
+});
 it('keeps a completed available report separate from a newer request and attaches progress to that request',async()=>{
  const row=parallelPresentationRow('fr');row.current_source_run_id='old-source';row.state='completed';
  const data={routing:{engine:'jev_sol_v2',jev_transport:'batch_initial_v1',updated_at:'2026-10-24'},legacy_report:null,versions:[],experimental:row,

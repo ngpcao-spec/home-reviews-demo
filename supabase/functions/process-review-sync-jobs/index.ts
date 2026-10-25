@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { json } from '../_shared/cors.ts'
+import {assertIngestionAllowed,recentReviewCutoff} from '../_shared/recent-review-policy.ts'
 import {GOOGLE_REVIEWS_IMPORT_LANGUAGE,type ProviderLanguage} from '../_shared/review-language.ts'
 import {
   apifyToken,
@@ -95,6 +96,7 @@ async function processApifyJob(
   },
 ) {
   const token = apifyToken()
+  await assertIngestionAllowed(admin)
   let cursor = parseApifyCursor(job.pagination_cursor)
   if (!cursor) {
     const providerToken = `${worker}:${job.id}:apify-start`
@@ -121,7 +123,8 @@ async function processApifyJob(
         placeUrl: job.google_maps_url,
         language,
         sort: 'newest',
-        since,
+        since: since>recentReviewCutoff()?since:recentReviewCutoff(),
+        limit: 100,
       })
       cursor = { provider: 'apify', runId: run.runId, datasetId: run.datasetId, language }
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {

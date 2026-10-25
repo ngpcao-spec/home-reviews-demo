@@ -8,7 +8,7 @@ import { supabase } from './supabase'
 export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: string, establishmentId: string, language: string | null, enabled: boolean) {
   const controller = useMemo(() => {
     const key = `historical:${establishmentId}:${language}`
-    const storageKey = `historical-run:${establishmentId}:${language}`
+    const storageKey = `historical-run-recent-text-100-6m-v1:${establishmentId}:${language}`
     return cache.generation(key, () => new HistoricalGeneration<HistoricalReportRow>({
       establishmentId, language: language ?? '',
       visible: () => document.visibilityState === 'visible' && navigator.onLine,

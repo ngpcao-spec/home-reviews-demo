@@ -7,7 +7,7 @@ function fixture(preparing=false,abandoned=false){
  const db={from:(table:string)=>{const f:Record<string,unknown>={};const q={select:()=>q,order:()=>q,limit:()=>q,in:()=>q,
   eq:(key:string,value:unknown)=>{f[key]=value;return q;},single:async()=>result(),maybeSingle:async()=>result(),then:(resolve:(v:unknown)=>unknown)=>Promise.resolve(result()).then(resolve)};
   function result(){reads.push({table,filters:{...f}});const data=table==='establishments'?{id:'est',organization_id:'org'}:table==='organization_members'?{role:'manager'}
-   :table==='profiles'?{preferred_language:'vi'}:table==='report_pipeline_settings'?{engine:'jev_sol_v2',jev_transport:'batch_initial_v1'}
+   :table==='profiles'?{preferred_language:'vi'}:table==='review_corpus_policy'?{enabled:false,paused:false}:table==='report_pipeline_settings'?{engine:'jev_sol_v2',jev_transport:'batch_initial_v1'}
    :table==='historical_establishment_reports'?null:table==='report_generation_requests'?{id:'new-request',engine:'jev_sol_v2',jev_transport:'batch_initial_v1',source_run_id:'new-source',comparison_id:preparing?null:'new-report'}
    :table==='report_generation_abandonments'?(abandoned?[{request_id:'new-request',source_run_id:'new-source'}]:[])
    :table==='historical_report_runs'?{id:'new-source',generation_id:'new-generation',status:'running',establishment_id:'est',language:'vi',cursor:0,error_code:null}
