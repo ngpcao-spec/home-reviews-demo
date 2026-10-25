@@ -276,7 +276,7 @@ const AppContext = createContext<AppContextValue | null>(null)
 const mockProvider = new MockReviewProvider()
 const STORAGE_KEY = 'home-reviews-demo-v1'
 const allowDemo = import.meta.env.DEV || import.meta.env.MODE === 'test' || import.meta.env.VITE_DEMO_MODE === 'true'
-const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,review_detailed_rating,review_context,original_language,language,published_at,created_at,review_url,historical_import,requires_attention,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_translations(language,translated_text),review_reply_drafts(language,ai_suggested_reply,draft_text,draft_updated_at,draft_version,translated_reply_text,translated_reply_language,translated_from_draft_version,translated_at,ai_status,ai_error)'
+const REVIEW_SELECT = 'id,organization_id,establishment_id,external_review_id,author_name,rating,text,original_text,review_detailed_rating,review_context,original_language,language,published_at,created_at,review_url,historical_import,requires_attention,has_negative_feedback,negative_feedback_summary,negative_feedback_checked_at,status,ai_suggested_reply,ai_suggested_reply_language,reply_draft_text,reply_draft_language,reply_draft_updated_at,reply_draft_version,translated_reply_text,translated_reply_language,translated_from_draft_updated_at,translated_from_draft_version,translated_reply_at,ai_detected_language,ai_analyzed_at,ai_status,ai_error,review_reply_drafts(language,ai_suggested_reply,draft_text,draft_updated_at,draft_version,translated_reply_text,translated_reply_language,translated_from_draft_version,translated_at,ai_status,ai_error)'
 const REVIEW_LOAD_PAGE_SIZE = 500
 
 type StoredState = { establishments: Establishment[]; reviews: Review[]; notifications: AppNotification[]; actions: ReviewAction[] }
@@ -339,7 +339,9 @@ function mapInitialImportJob(row: InitialImportJobRow): InitialImportJob {
 function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review {
   const actionable = row.rating <= 3 || (row.rating === 4 && row.has_negative_feedback === true)
   const status = actionable && row.status === 'new' ? 'to_process' : row.status
-  const localized = localizedReviewText(row.original_text || row.text, row.review_translations, preferredLanguage)
+  // Display translations are fetched lazily with a verified original-text hash.
+  // Provider English remains available exclusively to the unchanged analysis path.
+  const localized = localizedReviewText(row.original_text || row.text, null, preferredLanguage)
   const localizedReply = row.review_reply_drafts?.find((draft) => draft.language === preferredLanguage)
   const hasLocalizedReply = Boolean(localizedReply?.draft_text && localizedReply.ai_status === 'completed')
   return {
@@ -354,7 +356,7 @@ function mapReview(row: ReviewRow, preferredLanguage: PreferredLanguage): Review
     translatedText: localized.translatedText,
     reviewDetailedRating: row.review_detailed_rating,
     reviewContext: row.review_context,
-    reviewLanguage: row.original_language ?? row.language ?? 'fr',
+    reviewLanguage: row.original_language ?? row.language ?? 'und',
     publishedAt: row.published_at ?? row.created_at,
     hasGooglePublicationDate: Boolean(row.published_at),
     sourceUrl: row.review_url ?? '',

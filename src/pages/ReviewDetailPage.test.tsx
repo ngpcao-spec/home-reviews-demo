@@ -105,7 +105,7 @@ describe('ReviewDetailPage translation toggle', () => {
     expect(screen.getByText('Service très lent.')).toBeVisible()
     expect(screen.queryByText('Очень медленное обслуживание.')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: "Voir l’avis original" }))
+    await user.click(screen.getByRole('button', { name: "Voir l’original" }))
     expect(screen.getByText('Очень медленное обслуживание.')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Voir la traduction' })).toBeVisible()
   })

@@ -12,6 +12,5 @@ export function localizedReviewText(
   preferredLanguage: PreferredLanguage,
 ) {
   const translatedText = translations?.find((item) => item.language === preferredLanguage && item.translated_text?.trim())?.translated_text?.trim()
-    || translations?.find(item=>item.language==='en' && item.translated_text?.trim())?.translated_text?.trim()
   return { originalText, translatedText: translatedText || undefined, displayText: translatedText || originalText }
 }
