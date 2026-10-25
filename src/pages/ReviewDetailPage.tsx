@@ -7,6 +7,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
 import { useI18n } from '../i18n'
 import { GoogleReviewDetails } from '../components/reviews/GoogleReviewDetails'
+import {ReviewDisplayText} from '../components/reviews/ReviewDisplayText'
 
 function baseLanguage(language?: string | null) {
   return language?.trim().toLowerCase().split(/[-_]/)[0] ?? ''
@@ -25,7 +26,6 @@ export function ReviewDetailPage() {
   const [generating, setGenerating] = useState(false)
   const [translating, setTranslating] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [showOriginal, setShowOriginal] = useState(false)
   const pendingSave = useRef<{ text: string; promise: Promise<number> } | null>(null)
 
   const persistDraft = (text: string) => {
@@ -42,10 +42,6 @@ export function ReviewDetailPage() {
   useEffect(() => {
     setResponse(persistedDraft)
   }, [review?.id, persistedDraft])
-
-  useEffect(() => {
-    setShowOriginal(false)
-  }, [review?.id])
 
   useEffect(() => {
     if (review) logAction(review.id, 'opened')
@@ -101,7 +97,6 @@ export function ReviewDetailPage() {
   const statusCopy = review.aiStatus === 'failed'
     ? messages.reviews.analysisFailed
     : needsLocalizedDraft ? messages.reviews.prepareReply : messages.reviews.analysisPending
-  const hasTranslation = Boolean(review.translatedText && review.originalText && review.translatedText !== review.originalText)
   const draftDirty = response !== persistedDraft
   const sourceLanguage = baseLanguage(review.replyDraftLanguage ?? preferredLanguage)
   const clientLanguage = baseLanguage(review.reviewLanguage ?? review.aiDetectedLanguage)
@@ -143,8 +138,7 @@ export function ReviewDetailPage() {
         <div><strong>{establishment.name}</strong><span>{relativeTime(review.publishedAt)}</span><b className={`detail-rating rating-${review.rating}`}>{review.rating} ★</b></div>
       </div>
       <h2 className="review-section-label">{messages.reviews.reviewLabel}</h2>
-      <blockquote>{showOriginal ? review.originalText : review.reviewText}</blockquote>
-      {hasTranslation && <button className="text-button" onClick={() => setShowOriginal((value) => !value)}>{showOriginal ? messages.reviews.viewTranslation : messages.reviews.viewOriginal}</button>}
+      <ReviewDisplayText review={review} quote/>
       <span className="author">— {review.authorName}</span>
     </section>
 

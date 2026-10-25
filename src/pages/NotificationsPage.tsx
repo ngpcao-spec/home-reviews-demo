@@ -5,6 +5,7 @@ import { EmptyState } from '../components/ui/Loading'
 import { PageHeader } from '../components/ui/PageHeader'
 import { relativeTime } from '../lib/format'
 import { useI18n } from '../i18n'
+import {ReviewDisplayText} from '../components/reviews/ReviewDisplayText'
 
 export function NotificationsPage() {
   const { notifications, establishments, reviews, markNotificationRead, markAllNotificationsRead } = useApp()
@@ -37,7 +38,7 @@ export function NotificationsPage() {
         <span>
           <strong>{item.type === 'initial_import_completed' ? item.title : establishment?.name ?? item.title}</strong>
           {review && <span className="notification-meta"><Star size={13} fill="currentColor" /> {review.rating}★ · {relativeTime(review.hasGooglePublicationDate === false ? item.createdAt : review.publishedAt || item.createdAt)}</span>}
-          <p>{review?.reviewText?.trim() || review?.originalText?.trim() || item.body}</p>
+          {review&&(review.originalText??review.reviewText).trim()?<ReviewDisplayText review={review} toggle={false}/>:<p>{item.body}</p>}
           {!review && <small>{relativeTime(item.createdAt)}</small>}
         </span>
         {!item.readAt && <i aria-label={messages.notifications.unread} />}
