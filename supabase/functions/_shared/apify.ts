@@ -27,6 +27,8 @@ export interface ApifyRunState {
   datasetId: string
   status: string
   resolvedPlaceUrl?: string
+  startedAt?: string
+  finishedAt?: string
 }
 
 export interface ApifyReviewRequest {
@@ -147,13 +149,15 @@ function runFromPayload(payload: JsonRecord): ApifyRunState {
   const datasetId = stringValue(data.defaultDatasetId)
   const status = stringValue(data.status)
   if (!runId || !datasetId || !status) throw new ApifyError('APIFY_INVALID_RUN', 502)
-  return { runId, datasetId, status }
+  const date=(key:string)=>typeof data[key]==='string'&&Number.isFinite(Date.parse(data[key]))?data[key] as string:undefined
+  return { runId, datasetId, status,...(date('startedAt')?{startedAt:date('startedAt')}:{}),...(date('finishedAt')?{finishedAt:date('finishedAt')}:{} ) }
 }
 
 export async function startApifyRun(
   token: string,
   request: ApifyReviewRequest,
   observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
+  beforeStart?:()=>Promise<void>,
 ): Promise<ApifyRunState> {
   if (!token.trim()) throw new ApifyError('APIFY_TOKEN_MISSING', 503)
   observe?.('link_resolution')
@@ -163,6 +167,7 @@ export async function startApifyRun(
     ? Math.min(10, Math.max(0.1, configuredChargeLimit))
     : 1
   observe?.('run_start')
+  await beforeStart?.()
   console.info('GOOGLE_REVIEWS_ENGLISH_FETCH_STARTED',{language:GOOGLE_REVIEWS_IMPORT_LANGUAGE})
   const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}`, {
     method: 'POST',
@@ -172,8 +177,9 @@ export async function startApifyRun(
   return { ...runFromPayload(payload), resolvedPlaceUrl: resolvedUrl }
 }
 
-export async function getApifyRun(token: string, runId: string): Promise<ApifyRunState> {
-  const payload = await apiJson(token, `/actor-runs/${encodeURIComponent(runId)}`)
+export async function getApifyRun(token: string, runId: string,waitSeconds=0): Promise<ApifyRunState> {
+  const bounded=Math.min(20,Math.max(0,Math.floor(waitSeconds)))
+  const payload = await apiJson(token, `/actor-runs/${encodeURIComponent(runId)}${bounded?'?waitForFinish='+bounded:''}`,{},30_000)
   return runFromPayload(payload)
 }
 

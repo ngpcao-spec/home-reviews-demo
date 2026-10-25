@@ -1,0 +1,169 @@
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "default": "gen_random_uuid()"
+    },
+    {
+      "name": "organization_id",
+      "type": "uuid",
+      "default": null
+    },
+    {
+      "name": "user_id",
+      "type": "uuid",
+      "default": null
+    },
+    {
+      "name": "query",
+      "type": "text",
+      "default": null
+    },
+    {
+      "name": "expected_google_id",
+      "type": "text",
+      "default": null
+    },
+    {
+      "name": "establishment_id",
+      "type": "uuid",
+      "default": null
+    },
+    {
+      "name": "preferred_language",
+      "type": "text",
+      "default": "'fr'::text"
+    },
+    {
+      "name": "candidate_snapshot",
+      "type": "jsonb",
+      "default": "'{}'::jsonb"
+    },
+    {
+      "name": "status",
+      "type": "text",
+      "default": "'queued'::text"
+    },
+    {
+      "name": "reviews_target",
+      "type": "integer",
+      "default": "150"
+    },
+    {
+      "name": "reviews_fetched",
+      "type": "integer",
+      "default": "0"
+    },
+    {
+      "name": "reviews_inserted",
+      "type": "integer",
+      "default": "0"
+    },
+    {
+      "name": "provider_requests",
+      "type": "integer",
+      "default": "0"
+    },
+    {
+      "name": "provider_run_id",
+      "type": "text",
+      "default": null
+    },
+    {
+      "name": "provider_dataset_id",
+      "type": "text",
+      "default": null
+    },
+    {
+      "name": "attempts",
+      "type": "integer",
+      "default": "0"
+    },
+    {
+      "name": "available_at",
+      "type": "timestamp with time zone",
+      "default": "now()"
+    },
+    {
+      "name": "lease_until",
+      "type": "timestamp with time zone",
+      "default": null
+    },
+    {
+      "name": "locked_by",
+      "type": "text",
+      "default": null
+    },
+    {
+      "name": "error_code",
+      "type": "text",
+      "default": null
+    },
+    {
+      "name": "result",
+      "type": "jsonb",
+      "default": null
+    },
+    {
+      "name": "acknowledged_at",
+      "type": "timestamp with time zone",
+      "default": null
+    },
+    {
+      "name": "created_at",
+      "type": "timestamp with time zone",
+      "default": "now()"
+    },
+    {
+      "name": "started_at",
+      "type": "timestamp with time zone",
+      "default": null
+    },
+    {
+      "name": "finished_at",
+      "type": "timestamp with time zone",
+      "default": null
+    },
+    {
+      "name": "updated_at",
+      "type": "timestamp with time zone",
+      "default": "now()"
+    },
+    {
+      "name": "resolved_place_url",
+      "type": "text",
+      "default": null
+    }
+  ],
+  "functions": [
+    {
+      "name": "checkpoint_initial_import_job(uuid,text,text,text,uuid,integer,integer,integer,integer,text)",
+      "definition": "CREATE OR REPLACE FUNCTION public.checkpoint_initial_import_job(p_job_id uuid, p_worker_id text, p_provider_run_id text DEFAULT NULL::text, p_provider_dataset_id text DEFAULT NULL::text, p_establishment_id uuid DEFAULT NULL::uuid, p_reviews_fetched integer DEFAULT NULL::integer, p_reviews_inserted integer DEFAULT NULL::integer, p_provider_requests integer DEFAULT 0, p_lease_seconds integer DEFAULT 240, p_resolved_place_url text DEFAULT NULL::text)\n RETURNS boolean\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  with u as (\n    update public.initial_import_jobs set\n      provider_run_id=coalesce(p_provider_run_id,provider_run_id),\n      provider_dataset_id=coalesce(p_provider_dataset_id,provider_dataset_id),\n      resolved_place_url=coalesce(nullif(trim(p_resolved_place_url),''),resolved_place_url),\n      establishment_id=coalesce(p_establishment_id,establishment_id),\n      reviews_fetched=coalesce(p_reviews_fetched,reviews_fetched),\n      reviews_inserted=coalesce(p_reviews_inserted,reviews_inserted),\n      provider_requests=provider_requests+greatest(coalesce(p_provider_requests,0),0),\n      lease_until=now()+make_interval(secs=>least(greatest(coalesce(p_lease_seconds,240),30),900)),\n      updated_at=now()\n    where id=p_job_id\n      and status='running'\n      and locked_by=left(p_worker_id,120)\n      and lease_until>now()\n    returning 1\n  )\n  select exists(select 1 from u)\n$function$\n"
+    },
+    {
+      "name": "claim_initial_import_jobs(text,integer,integer)",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_initial_import_jobs(p_worker_id text, p_limit integer DEFAULT 5, p_lease_seconds integer DEFAULT 240)\n RETURNS SETOF initial_import_jobs\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  with candidates as (\n    select id from public.initial_import_jobs\n    where (status in ('queued','retry') and available_at<=now())\n       or (status='running' and lease_until<now())\n    order by available_at,created_at,id\n    for update skip locked\n    limit least(greatest(coalesce(p_limit,5),1),25)\n  )\n  update public.initial_import_jobs j set\n    status='running',locked_by=left(p_worker_id,120),\n    lease_until=now()+make_interval(secs=>least(greatest(coalesce(p_lease_seconds,240),30),900)),\n    started_at=coalesce(j.started_at,now()),finished_at=null,updated_at=now()\n  from candidates c where j.id=c.id returning j.*\n$function$\n"
+    },
+    {
+      "name": "continue_initial_import_job(uuid,text,integer)",
+      "definition": "CREATE OR REPLACE FUNCTION public.continue_initial_import_job(p_job_id uuid, p_worker_id text, p_delay_seconds integer DEFAULT 5)\n RETURNS boolean\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  with u as (\n    update public.initial_import_jobs set status='queued',\n      available_at=now()+make_interval(secs=>least(greatest(coalesce(p_delay_seconds,5),0),300)),\n      lease_until=null,locked_by=null,error_code=null,updated_at=now()\n    where id=p_job_id and status='running' and locked_by=left(p_worker_id,120)\n    returning 1\n  ) select exists(select 1 from u)\n$function$\n"
+    },
+    {
+      "name": "enqueue_initial_import_job(uuid,uuid,text,text,text,jsonb)",
+      "definition": "CREATE OR REPLACE FUNCTION public.enqueue_initial_import_job(p_organization_id uuid, p_user_id uuid, p_query text, p_expected_google_id text, p_preferred_language text, p_candidate_snapshot jsonb DEFAULT '{}'::jsonb)\n RETURNS initial_import_jobs\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_job public.initial_import_jobs%rowtype;\nbegin\n  if not exists(\n    select 1 from public.organization_members\n    where organization_id=p_organization_id and user_id=p_user_id\n      and role in ('owner','admin','manager')\n  ) then raise exception 'FORBIDDEN'; end if;\n  if exists(\n    select 1 from public.establishments\n    where organization_id=p_organization_id and google_id=p_expected_google_id\n  ) then raise exception 'ESTABLISHMENT_ALREADY_ADDED'; end if;\n\n  select * into v_job from public.initial_import_jobs\n  where organization_id=p_organization_id\n    and expected_google_id=p_expected_google_id\n    and status in ('queued','running','retry')\n  order by created_at desc limit 1 for update;\n  if found then return v_job; end if;\n\n  begin\n    insert into public.initial_import_jobs(\n      organization_id,user_id,query,expected_google_id,preferred_language,candidate_snapshot\n    ) values(\n      p_organization_id,p_user_id,left(trim(p_query),500),left(trim(p_expected_google_id),500),\n      case when p_preferred_language='vi' then 'vi' else 'fr' end,\n      coalesce(p_candidate_snapshot,'{}'::jsonb)\n    ) returning * into v_job;\n  exception when unique_violation then\n    select * into v_job from public.initial_import_jobs\n    where organization_id=p_organization_id\n      and expected_google_id=p_expected_google_id\n      and status in ('queued','running','retry')\n    order by created_at desc limit 1;\n  end;\n  return v_job;\nend $function$\n"
+    },
+    {
+      "name": "fail_initial_import_job(uuid,text,text,boolean,integer,integer,boolean)",
+      "definition": "CREATE OR REPLACE FUNCTION public.fail_initial_import_job(p_job_id uuid, p_worker_id text, p_error_code text, p_retryable boolean, p_max_attempts integer DEFAULT 5, p_backoff_seconds integer DEFAULT 60, p_reset_provider boolean DEFAULT false)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_attempts integer; v_status text; v_establishment_id uuid;\nbegin\n  select attempts+1,establishment_id into v_attempts,v_establishment_id\n  from public.initial_import_jobs\n  where id=p_job_id and status='running' and locked_by=left(p_worker_id,120)\n  for update;\n  if not found then return 'lease_lost'; end if;\n  v_status:=case when p_retryable\n    and v_attempts<least(greatest(coalesce(p_max_attempts,5),1),20)\n    then 'retry' else 'failed' end;\n  update public.initial_import_jobs set status=v_status,attempts=v_attempts,\n    available_at=case when v_status='retry' then\n      now()+make_interval(secs=>least(greatest(coalesce(p_backoff_seconds,60),1),86400))\n      else available_at end,\n    provider_run_id=case when p_reset_provider then null else provider_run_id end,\n    provider_dataset_id=case when p_reset_provider then null else provider_dataset_id end,\n    lease_until=null,locked_by=null,\n    error_code=left(coalesce(p_error_code,'INITIAL_IMPORT_FAILED'),200),\n    finished_at=case when v_status='failed' then now() else null end,updated_at=now()\n  where id=p_job_id;\n  if v_establishment_id is not null then\n    update public.establishments set\n      sync_status=case when v_status='failed' then 'error' else 'pending' end,\n      sync_error=left(coalesce(p_error_code,'INITIAL_IMPORT_FAILED'),200),\n      last_sync_status=case when v_status='failed' then 'error' else 'pending' end,\n      last_sync_error=left(coalesce(p_error_code,'INITIAL_IMPORT_FAILED'),200),\n      updated_at=now()\n    where id=v_establishment_id;\n  end if;\n  return v_status;\nend $function$\n"
+    },
+    {
+      "name": "finalize_initial_import_job(uuid,text,uuid,text,timestamp with time zone,timestamp with time zone,jsonb)",
+      "definition": "CREATE OR REPLACE FUNCTION public.finalize_initial_import_job(p_job_id uuid, p_worker_id text, p_establishment_id uuid, p_last_review_id text, p_last_review_at timestamp with time zone, p_reporting_started_at timestamp with time zone, p_result jsonb)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_job public.initial_import_jobs%rowtype; v_interval integer; v_now timestamptz:=now();\nbegin\n  select * into v_job from public.initial_import_jobs\n  where id=p_job_id and status='running' and locked_by=left(p_worker_id,120)\n    and lease_until>now() for update;\n  if not found then return false; end if;\n  select monitoring_interval_hours into v_interval\n  from public.organizations where id=v_job.organization_id;\n  update public.establishments set\n    active=true,initialized_at=coalesce(initialized_at,v_now),\n    last_review_id=p_last_review_id,last_review_at=p_last_review_at,\n    reporting_started_at=p_reporting_started_at,\n    last_sync_at=v_now,\n    next_sync_at=v_now+make_interval(hours=>v_interval)\n      +public.review_sync_spread_offset(id,v_interval),\n    sync_status='ok',sync_error=null,last_sync_status='ok',last_sync_error=null,\n    updated_at=v_now\n  where id=p_establishment_id and organization_id=v_job.organization_id\n    and initial_import_job_id=p_job_id;\n  if not found then raise exception 'INITIAL_IMPORT_ESTABLISHMENT_MISSING'; end if;\n  update public.initial_import_jobs set\n    establishment_id=p_establishment_id,status='completed',\n    result=coalesce(p_result,'{}'::jsonb),error_code=null,\n    lease_until=null,locked_by=null,finished_at=v_now,updated_at=v_now\n  where id=p_job_id;\n  return true;\nend $function$\n"
+    },
+    {
+      "name": "retry_initial_import_job(uuid)",
+      "definition": "CREATE OR REPLACE FUNCTION public.retry_initial_import_job(p_job_id uuid)\n RETURNS initial_import_jobs\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare v_job public.initial_import_jobs%rowtype;\nbegin\n  update public.initial_import_jobs set\n    status='queued',attempts=0,available_at=now(),lease_until=null,locked_by=null,\n    reviews_target=least(reviews_target,100),\n    provider_run_id=null,provider_dataset_id=null,error_code=null,finished_at=null,\n    acknowledged_at=null,updated_at=now()\n  where id=p_job_id and user_id=(select auth.uid()) and status='failed'\n    and (select private.is_org_member(organization_id))\n  returning * into v_job;\n  if not found then raise exception 'IMPORT_JOB_NOT_RETRYABLE'; end if;\n  return v_job;\nend $function$\n"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 export interface PlaceCandidate {
+  resolutionDiagnosticId?:string
   placeRef: string
   name: string
   address: string

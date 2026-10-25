@@ -21,6 +21,7 @@ function candidateSnapshot(value: unknown) {
     return Number.isFinite(parsed) ? parsed : null
   }
   return {
+    resolutionDiagnosticId:text('resolutionDiagnosticId',36),
     name: text('name', 250),
     address: text('address'),
     photoUrl: text('photoUrl', 1_500),

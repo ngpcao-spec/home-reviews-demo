@@ -60,8 +60,8 @@ Deno.serve(async (request) => {
       return json({ error: 'ESTABLISHMENT_ALREADY_ADDED' }, 409)
     }
 
-    diagnostics.completed()
-    return json({ candidate: resolved.establishment })
+    const resolution=diagnostics.completed()
+    return json({ candidate: resolved.establishment, resolution })
   } catch (error) {
     diagnostics.failed(error)
     if (error instanceof OutscraperError) return json({ error: error.code }, error.httpStatus)

@@ -27,10 +27,10 @@ Deno.serve(async (request) => {
 
     const { data: job, error } = await client.rpc('retry_initial_import_job', { p_job_id: jobId })
     if (error || !job) {
-      const code = error?.message.includes('IMPORT_JOB_NOT_RETRYABLE')
+      const code = error?.message.includes('APIFY_START_OUTCOME_UNKNOWN')?'APIFY_START_OUTCOME_UNKNOWN':error?.message.includes('IMPORT_JOB_NOT_RETRYABLE')
         ? 'IMPORT_JOB_NOT_RETRYABLE'
         : 'IMPORT_RETRY_FAILED'
-      return json({ error: code }, code === 'IMPORT_JOB_NOT_RETRYABLE' ? 409 : 500)
+      return json({ error: code }, ['IMPORT_JOB_NOT_RETRYABLE','APIFY_START_OUTCOME_UNKNOWN'].includes(code) ? 409 : 500)
     }
     return json({ importJobId: job.id, status: job.status })
   } catch (error) {
