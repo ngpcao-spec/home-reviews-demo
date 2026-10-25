@@ -373,6 +373,14 @@ describe('native account language after complete reset',()=>{
   const j=crypto.randomUUID();await db.query("insert into public.review_sync_jobs(id,establishment_id,organization_id,status,locked_by,lease_until,pagination_cursor) values($1,$2,$3,'running','old',now()-interval '1 second',$4)",[j,est,org,JSON.stringify({provider:'apify',runId:'known',datasetId:'dataset',language:'fr'})]);expect((await db.query("select * from public.claim_review_sync_jobs('new')")).rows).toHaveLength(1);
   expect((await db.query('select apify_run_id,collection_language from public.review_sync_jobs')).rows[0]).toEqual({apify_run_id:'known',collection_language:'fr'});expect((await db.query("select public.reserve_review_sync_start($1,'new') ok",[j])).rows[0].ok).toBe(false);
  });
+ it('keeps an unknown start beyond job retention and still blocks automatic re-collection',async()=>{
+  await db.query("insert into public.review_sync_jobs(establishment_id,organization_id,status,finished_at) values($1,$2,'completed',now()-interval '60 days')",[est,org]);
+  const j=crypto.randomUUID();await db.query("insert into public.review_sync_jobs(id,establishment_id,organization_id,status,provider_start_attempted_at,finished_at) values($1,$2,$3,'dead',now()-interval '60 days',now()-interval '60 days')",[j,est,org]);
+  expect((await db.query('select public.cleanup_review_sync_jobs() r')).rows[0].r).toMatchObject({deleted:1});
+  expect((await db.query('select id from public.review_sync_jobs')).rows).toEqual([{id:j}]);
+  await db.query('insert into public.review_sync_jobs(establishment_id,organization_id) values($1,$2)',[est,org]);expect((await db.query('select count(*)::int n from public.review_sync_jobs')).rows[0].n).toBe(1);
+  expect((await db.query("select * from public.claim_review_sync_jobs('later-worker')")).rows).toHaveLength(0);
+ });
  it('preserves latest-150 retention without age/text bias, replacement and manual report lifecycle',async()=>{
   for(let n=0;n<152;n++)await insert('native'+String(n).padStart(3,'0'),'2020-01-01',n%2?'Texte':'',n%5+1);expect((await db.query('select count(*)::int n from public.reviews')).rows[0].n).toBe(150);
   const old=await datedPublication();await db.exec('reset role');await insert('newest',new Date(Date.now()-10000).toISOString(),'Nouveau');expect((await readDated()).scope.stale).toBe(true);expect((await readDated()).row.id).toBe(old.id);

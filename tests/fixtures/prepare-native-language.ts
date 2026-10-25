@@ -12,6 +12,12 @@ export async function prepareNativeLanguage(db:PGlite,user:string){
  for(const f of native.functions)await db.exec(f.definition)
  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_account_native_google_language.sql')),'utf8'))
  await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_native_publication_sources.sql')),'utf8'))
+ const cleanup=JSON.parse(readFileSync('tests/fixtures/native-sync-cleanup.json','utf8'))
+ for(const c of cleanup.columns){await db.exec('create table if not exists public.'+c.table_name+'(fixture_unused boolean)');await db.exec('alter table public.'+c.table_name+' add column if not exists "'+c.column_name+'" '+c.type+(c.default_value?' default '+c.default_value:''))}
+ await db.exec('create unique index if not exists offline_sync_metric_date on public.review_sync_daily_metrics(metric_date)')
+ await db.exec(cleanup.definition)
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_preserve_unknown_native_sync_attempts.sql')),'utf8'))
+ await db.exec('insert into public.review_sync_runtime_config(singleton) values(true) on conflict do nothing')
  await db.query("insert into public.profiles(user_id,preferred_language) values($1,'vi')",[user])
  await db.exec("grant execute on function public.read_review_display(uuid[],boolean) to authenticated;grant execute on function private.read_review_display(uuid[],boolean) to authenticated;grant all on all tables in schema public to service_role;")
  await db.query("select set_config('request.jwt.claim.sub',$1,true)",[user])

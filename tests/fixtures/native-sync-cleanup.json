@@ -1,0 +1,173 @@
+{
+  "columns": [
+    {
+      "type": "date",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "metric_date",
+      "default_value": null
+    },
+    {
+      "type": "bigint",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "completed_jobs",
+      "default_value": "0"
+    },
+    {
+      "type": "bigint",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "dead_jobs",
+      "default_value": "0"
+    },
+    {
+      "type": "bigint",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "provider_requests",
+      "default_value": "0"
+    },
+    {
+      "type": "bigint",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "reviews_fetched",
+      "default_value": "0"
+    },
+    {
+      "type": "bigint",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "reviews_inserted",
+      "default_value": "0"
+    },
+    {
+      "type": "numeric",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "duration_seconds_sum",
+      "default_value": "0"
+    },
+    {
+      "type": "bigint",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "duration_samples",
+      "default_value": "0"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table_name": "review_sync_daily_metrics",
+      "column_name": "updated_at",
+      "default_value": "now()"
+    },
+    {
+      "type": "boolean",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "singleton",
+      "default_value": "true"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "scheduler_enqueue_limit",
+      "default_value": "1000"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "claim_batch",
+      "default_value": "25"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "worker_concurrency",
+      "default_value": "5"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "worker_time_budget_ms",
+      "default_value": "50000"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "max_batches_per_invocation",
+      "default_value": "8"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "lease_seconds",
+      "default_value": "240"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "max_pages_per_claim",
+      "default_value": "5"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "max_attempts",
+      "default_value": "5"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "retry_base_seconds",
+      "default_value": "60"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "provider_slot_count",
+      "default_value": "5"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "provider_lease_seconds",
+      "default_value": "60"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "provider_cooldown_ms",
+      "default_value": "200"
+    },
+    {
+      "type": "numeric",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "jitter_fraction",
+      "default_value": "0.1000"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "jitter_cap_minutes",
+      "default_value": "30"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "completed_retention_days",
+      "default_value": "14"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "dead_retention_days",
+      "default_value": "90"
+    },
+    {
+      "type": "integer",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "maintenance_batch_size",
+      "default_value": "1000"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table_name": "review_sync_runtime_config",
+      "column_name": "updated_at",
+      "default_value": "now()"
+    }
+  ],
+  "definition": "CREATE OR REPLACE FUNCTION public.cleanup_review_sync_jobs(p_batch_size integer DEFAULT NULL::integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_batch integer;\n  v_completed_days integer;\n  v_dead_days integer;\n  v_deleted integer;\nbegin\n  select\n    least(coalesce(p_batch_size,maintenance_batch_size),maintenance_batch_size),\n    completed_retention_days,dead_retention_days\n  into v_batch,v_completed_days,v_dead_days\n  from public.review_sync_runtime_config where singleton=true;\n\n  with candidates as (\n    select id from public.review_sync_jobs\n    where (status='completed' and finished_at<now()-make_interval(days=>v_completed_days))\n       or (status='dead' and finished_at<now()-make_interval(days=>v_dead_days))\n    order by finished_at,id\n    for update skip locked\n    limit v_batch\n  ), aggregate_rows as (\n    select finished_at::date metric_date,\n      count(*) filter(where status='completed') completed_jobs,\n      count(*) filter(where status='dead') dead_jobs,\n      sum(provider_requests) provider_requests,\n      sum(reviews_fetched) reviews_fetched,\n      sum(reviews_inserted) reviews_inserted,\n      sum(extract(epoch from finished_at-started_at))\n        filter(where started_at is not null) duration_seconds_sum,\n      count(*) filter(where started_at is not null) duration_samples\n    from public.review_sync_jobs where id in(select id from candidates)\n    group by finished_at::date\n  ), metrics as (\n    insert into public.review_sync_daily_metrics(\n      metric_date,completed_jobs,dead_jobs,provider_requests,reviews_fetched,\n      reviews_inserted,duration_seconds_sum,duration_samples)\n    select metric_date,completed_jobs,dead_jobs,provider_requests,reviews_fetched,\n      reviews_inserted,coalesce(duration_seconds_sum,0),duration_samples\n    from aggregate_rows\n    on conflict(metric_date) do update set\n      completed_jobs=review_sync_daily_metrics.completed_jobs+excluded.completed_jobs,\n      dead_jobs=review_sync_daily_metrics.dead_jobs+excluded.dead_jobs,\n      provider_requests=review_sync_daily_metrics.provider_requests+excluded.provider_requests,\n      reviews_fetched=review_sync_daily_metrics.reviews_fetched+excluded.reviews_fetched,\n      reviews_inserted=review_sync_daily_metrics.reviews_inserted+excluded.reviews_inserted,\n      duration_seconds_sum=review_sync_daily_metrics.duration_seconds_sum+excluded.duration_seconds_sum,\n      duration_samples=review_sync_daily_metrics.duration_samples+excluded.duration_samples,\n      updated_at=now()\n    returning 1\n  ), deleted as (\n    delete from public.review_sync_jobs where id in(select id from candidates)\n    returning status\n  )\n  select count(*) into v_deleted from deleted;\n  return jsonb_build_object('deleted',v_deleted,'batchLimit',v_batch);\nend $function$\n"
+}
