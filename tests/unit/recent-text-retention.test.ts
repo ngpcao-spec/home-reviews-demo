@@ -3,6 +3,8 @@ import {PGlite} from '@electric-sql/pglite';
 import {pgcrypto} from '@electric-sql/pglite/contrib/pgcrypto';
 import {readFileSync,readdirSync} from 'node:fs';
 import {beforeAll,beforeEach,afterEach,afterAll,it,expect} from 'vitest';
+import {directHash} from '../../supabase/functions/_shared/jev-direct-categories';
+import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
 const fixture=JSON.parse(readFileSync('tests/fixtures/retention-production-definitions.json','utf8'));
 let db:PGlite;
 const org='10000000-0000-4000-8000-000000000001',est='20000000-0000-4000-8000-000000000001',user='30000000-0000-4000-8000-000000000001';
@@ -22,6 +24,10 @@ beforeAll(async()=>{
  for(const t of guards)await db.exec(t.trigger_definition);
  await db.exec("create function cron.schedule(text,text,text) returns bigint language plpgsql as $$begin insert into cron.job values(999,$1,true);return 999;end $$");
  for(const suffix of ['_recent_text_retention_transition.sql','_recent_text_retention_policy.sql','_recent_text_retention_safety.sql','_recent_text_source_guard.sql','_recent_text_rebuild_barrier.sql','_recent_text_ingestion_dedup.sql','_recent_text_native_usage.sql','_recent_text_superseded_cleanup.sql'])await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8'));
+ for(const [file,name] of [['20261010080134_jev_economy_preparation.sql','jev_economy_canonical'],['20261014160258_jls_restaurant_delegated_preparation.sql','jls_restaurant_hash']]){
+  const sql=readFileSync('supabase/migrations/'+file,'utf8');await db.exec(sql.slice(sql.indexOf('create function public.'+name),sql.indexOf('$$;',sql.indexOf('create function public.'+name))+3));
+ }
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_recover_compact_saved_references.sql')),'utf8'));
  await db.exec(`update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;insert into public.organizations values('${org}');insert into public.establishments(id,organization_id,name,google_id,google_maps_url) values('${est}','${org}','Fixture','fixture','fixture');insert into public.organization_members(organization_id,user_id,role) values('${org}','${user}','owner');insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine=excluded.engine,jev_transport=excluded.jev_transport;`);
 },60000);
 beforeEach(()=>db.exec('begin'));afterEach(()=>db.exec('rollback'));afterAll(()=>db.close());
@@ -116,4 +122,60 @@ it('expires a published report without table DDL and retains only its last scope
  expect((await db.query('select count(*)::int n from public.analysis_parallel_reports')).rows[0].n).toBe(0);
  expect((await db.query('select review_count,reason from private.retired_report_scopes')).rows).toEqual([{review_count:1,reason:'CORPUS_REVIEW_REMOVED'}]);
  expect((await db.query("select pg_get_functiondef('private.retention_retire_source(uuid,text)'::regprocedure) d")).rows[0].d).not.toContain('alter table');
+});
+
+// Synthetic saved receipt: the production history and corpus guards run here.
+// Native responses are replayed separately without committing customer texts.
+async function savedCompactReceipt(){
+ await insert('recovery',new Date(Date.now()-86400000).toISOString(),'Good food, but cold.');await db.exec('set local role service_role');
+ const source=(await db.query('select (public.enqueue_current_report($1,$2,$3,$4,$5,$6,$7)).*',[est,org,user,'vi',crypto.randomUUID(),'gpt-6.1-sol',8])).rows[0];
+ const sourceId=source.id,run=crypto.randomUUID(),reportId=crypto.randomUUID(),reviewId=(await db.query('select id from public.reviews')).rows[0].id;
+ const evidence=['negative','positive'].map((polarity,i)=>({evidence_id:'evidence-'+i,review_id:reviewId,category:'quality',polarity,quote:'Good food, but cold.',context:'Good food, but cold.',quote_start:0,quote_end:20,context_start:0,context_end:20,quote_sha256:'same',analysis_text_sha256:'same'}));
+ const compact={report:{negative_aspects:[{category:'quality',text:'Food reported cold.',refs:['e1','e2']}]}},statistics={total_reviews:1};
+ const raw={model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:30,output_tokens:20},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(compact)}]}]};
+ const envelope={evidence,statistics,statistics_sha256:await directHash(statistics),request_sha256:'request-hash'};
+ const receipt={request_sha256:'request-hash',http_status:200,raw_response_text:JSON.stringify(raw),raw_response_sha256:await analysisTextSha256(JSON.stringify(raw))};
+ const original={statistics_sha256:envelope.statistics_sha256,report:{negative_aspects:[{category:'quality',text:'Food reported cold.',evidence_ids:evidence.map(e=>e.evidence_id)}]}};
+ const derived=structuredClone(original);derived.report.negative_aspects[0].evidence_ids=['evidence-0'];
+ const result={response:raw,original_report:original,derived_report:derived,corrections:{changes:[{path:'negative_aspects[0]',reason:'extra_incompatible_polarity_same_review_and_identical_text',before:['evidence-0','evidence-1'],after:['evidence-0']}]},controls:{technical_checks_passed:true,validator_version:'jls-direct4-reference-links-v1',compact_response:compact,evidence,server_statistics:statistics,section_issues:[]}};
+ await db.query("insert into public.analysis_parallel_reports(id,organization_id,establishment_id,current_source_run_id,language,state,error_code,raw_response,statistics,usage,generated_at) values($1,$2,$3,$4,'vi','invalid_output','COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE',$5,$6,$7,'2026-10-25 00:00Z')",[reportId,org,est,sourceId,raw,statistics,raw.usage]);
+ await db.query("insert into public.analysis_jev_batch_runs(id,organization_id,establishment_id,current_source_run_id,report_id,status,stage,error_code,armed,sol_request_count,envelope,envelope_sha256,sol_receipt,sol_receipt_sha256,completed_at) values($1,$2,$3,$4,$5,'invalid_output','validate_sol','COMPACT_SOL_UNKNOWN_OR_INCOMPATIBLE_REFERENCE',false,1,$6,$7,$8,$9,'2026-10-25 00:00Z')",[run,org,est,sourceId,reportId,envelope,await directHash(envelope),receipt,await directHash(receipt)]);
+ await db.query("insert into public.analysis_jev_batch_tasks(run_id,status,request_count,receipt) values($1,'completed',1,'{}')",[run]);
+ await db.query("update public.historical_report_runs set status='failed',completed_at='2026-10-25 00:00Z' where id=$1",[sourceId]);
+ await db.query('update public.report_generation_requests set comparison_id=$1 where source_run_id=$2',[reportId,sourceId]);
+ const publish=async(value:unknown=result)=>db.query('select private.publish_revalidated_compact_sol($1,$2,$3,$4,$5) r',[run,await directHash(envelope),await directHash(receipt),value,await directHash(value)]);
+ return {run,sourceId,reportId,result,publish};
+}
+it('publishes only a known saved receipt, preserving native content, usage, attempts and original times; repeated publication is inert',async()=>{
+ const f=await savedCompactReceipt();const before=(await db.query('select to_jsonb(b) b,to_jsonb(p) p from public.analysis_jev_batch_runs b join public.analysis_parallel_reports p on p.id=b.report_id')).rows[0];
+ expect((await f.publish()).rows[0].r).toMatchObject({report_id:f.reportId,provider_calls:0});
+ const after=(await db.query('select to_jsonb(b) b,to_jsonb(p) p from public.analysis_jev_batch_runs b join public.analysis_parallel_reports p on p.id=b.report_id')).rows[0];
+ const strip=(v:Record<string,unknown>,keys:string[])=>Object.fromEntries(Object.entries(v).filter(([k])=>!keys.includes(k)));
+ expect(strip(after.b as never,['status','error_code'])).toEqual(strip(before.b as never,['status','error_code']));
+ expect(strip(after.p as never,['state','error_code','original_report','derived_report','corrections','controls'])).toEqual(strip(before.p as never,['state','error_code','original_report','derived_report','corrections','controls']));
+ expect((await f.publish()).rows[0].r).toMatchObject({already_published:true,provider_calls:0});
+ expect((await db.query("select tgenabled from pg_trigger where tgname='parallel_history_immutable'")).rows[0].tgenabled).toBe('O');
+ await expect(db.query('update public.analysis_parallel_reports set raw_response=null where id=$1',[f.reportId])).rejects.toThrow('IMMUTABLE_HISTORY');
+});
+it.each(['prose','native','missing_controls','unrelated_alias','stale','unknown','armed'])('refuses %s recovery without publishing or consuming a new attempt',async kind=>{
+ const f=await savedCompactReceipt(),r=structuredClone(f.result);
+ if(kind==='prose')r.derived_report.report.negative_aspects[0].text='Different meaning';
+ if(kind==='native')r.response.model='other-model';
+ if(kind==='missing_controls')delete (r as {controls?:unknown}).controls;
+ if(kind==='unrelated_alias')r.corrections.changes[0].reason='guess_a_reference';
+ if(kind==='stale')await db.query('update public.report_corpus_scopes set stale=true where source_run_id=$1',[f.sourceId]);
+ if(kind==='unknown')await db.query("update public.analysis_jev_batch_runs set status='billing_uncertain' where id=$1",[f.run]);
+ if(kind==='armed')await db.query('update public.analysis_jev_batch_runs set armed=true where id=$1',[f.run]);
+ await db.exec('savepoint rejected');await expect(f.publish(r)).rejects.toThrow('RECOVERY_');await db.exec('rollback to savepoint rejected');
+ expect((await db.query('select state from public.analysis_parallel_reports where id=$1',[f.reportId])).rows[0].state).toBe('invalid_output');
+ expect((await db.query('select sol_request_count from public.analysis_jev_batch_runs where id=$1',[f.run])).rows[0].sol_request_count).toBe(1);
+});
+it('rolls back publication and restores the immutable guard if any remaining publication guard fails',async()=>{
+ const f=await savedCompactReceipt();await db.exec("reset role;create function public.fixture_reject_recovery() returns trigger language plpgsql as $$begin if new.state='completed' then raise exception 'FIXTURE_PUBLICATION_REJECTED';end if;return new;end$$;create trigger z_fixture_reject before update on public.analysis_parallel_reports for each row execute function public.fixture_reject_recovery();set local role service_role");
+ await db.exec('savepoint rejected');await expect(f.publish()).rejects.toThrow('FIXTURE_PUBLICATION_REJECTED');await db.exec('rollback to savepoint rejected');
+ expect((await db.query("select tgenabled from pg_trigger where tgname='parallel_history_immutable'")).rows[0].tgenabled).toBe('O');
+ expect((await db.query('select state from public.analysis_parallel_reports where id=$1',[f.reportId])).rows[0].state).toBe('invalid_output');
+});
+it('does not expose saved-receipt publication to authenticated clients',async()=>{
+ const f=await savedCompactReceipt();await db.exec('set local role authenticated');await expect(f.publish()).rejects.toThrow('permission denied');
 });
