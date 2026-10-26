@@ -8,7 +8,7 @@ import {DIRECT_CATEGORY_KEYS,DIRECT_CONFIG,DIRECT_DEFINITIONS,DIRECT_CRITERIA,DI
 import {DIRECT_SOURCE_ID,DIRECT_SOURCE_SHA256} from './jev-direct-categories-preparation.ts';
 import {analysisTextSha256} from './analysis-text.ts';
 import {selectBalancedEvidence,BALANCED_POLICY,balancedSelectorHash} from './jev-hybrid-balanced.ts';
-import {DIRECT_COVERAGE_VERSION,DIRECT_COVERAGE_POLICY,directCoverageSelectorHash,selectDirectCoverage} from './jev-direct-evidence-selection.ts';
+import {evidenceSelectorVersion,evidenceSelectorBinding,evidenceSelectorPolicy,selectReportEvidence,type EvidenceSelectorVersion} from './report-evidence-selector.ts';
 import {parseDecisionEnvelope,parseEvidenceDecision,EVIDENCE_CONFIG,type DecisionQuestion} from './decisions-config.ts';
 import {localHybridTokens} from './jev-hybrid-evidence.ts';
 import {SOL_SIZE_POLICY,solRequestSize} from './jls-sol-size.ts';
@@ -243,14 +243,15 @@ function solDraft(statistics:unknown,statistics_sha256:string,evidence:DirectRep
   text:{format:{type:'json_schema',name:'jls_direct_categories4_report_v1',strict:true,schema}}},packet,wire);
  return {packet,prompt,schema,request,measurement:solRequestSize(request,SOL_SIZE_POLICY,count)};
 }
-export async function selectDirectReportSources(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION,comparisonIds?:string[],selectorVersion?:typeof DIRECT_COVERAGE_VERSION){
+export async function selectDirectReportSources(i:DirectReportInput,code_commit:string,binding?:DirectReportSourceBinding,synthesisVersion?:typeof DIRECT_SYNTHESIS_VERSION,comparisonIds?:string[],selectorVersion?:EvidenceSelectorVersion){
  if(synthesisVersion!==undefined&&synthesisVersion!==DIRECT_SYNTHESIS_VERSION)throw Error('DIRECT_REPORT_SYNTHESIS_VERSION_INVALID');
- if(selectorVersion!==undefined&&(selectorVersion!==DIRECT_COVERAGE_VERSION||comparisonIds))throw Error('DIRECT_REPORT_SELECTOR_VERSION_INVALID');
+ if(selectorVersion!==undefined){evidenceSelectorVersion(selectorVersion);if(comparisonIds)throw Error('DIRECT_REPORT_SELECTOR_VERSION_INVALID');}
  const counts=await verifyDirectReportSources(i,binding);if(!/^[a-f0-9]{40}$/.test(code_commit))throw Error('DIRECT_REPORT_CODE_PROVENANCE_REQUIRED');
  const candidates=await directReportCandidates(i);
  if(comparisonIds&&(synthesisVersion!==DIRECT_SYNTHESIS_VERSION||!comparisonIds.length||comparisonIds.length>32||
   new Set(comparisonIds).size!==comparisonIds.length||comparisonIds.some(id=>!candidates.some(e=>e.evidence_id===id))))throw Error('DIRECT_COMPARISON_SELECTION_INVALID');
- const covered=selectorVersion?selectDirectCoverage(candidates):undefined;
+ const covered=selectorVersion?selectReportEvidence(candidates,selectorVersion):undefined;
+ const selector=selectorVersion?await evidenceSelectorBinding(selectorVersion):undefined,selectorPolicy=selectorVersion?evidenceSelectorPolicy(selectorVersion):undefined;
  const selected=covered?.selected??(comparisonIds?comparisonIds.map(id=>candidates.find(e=>e.evidence_id===id)!):selectDirectEvidence(candidates,!!synthesisVersion));
  if(comparisonIds&&selected.some(e=>selected.filter(s=>s.review_id===e.review_id).length>DIRECT_COMPARISON_SELECTION.max_per_review))throw Error('DIRECT_COMPARISON_SELECTION_INVALID');
  const originals=selected.map(e=>e.review_id).filter((id,n,a)=>a.indexOf(id)===n).sort().map(review_id=>{
@@ -262,7 +263,7 @@ export async function selectDirectReportSources(i:DirectReportInput,code_commit:
   originals,originals_sha256:await directHash(originals)}:undefined;
  const configuration={...(synthesis?{...DIRECT_REPORT_POLICY,synthesis_version:synthesis.version,synthesis_configuration_sha256:synthesis.configuration_sha256,
   ...(comparisonIds?{comparison_selection:DIRECT_COMPARISON_SELECTION}:{})}:DIRECT_REPORT_POLICY),
-  ...(covered?{evidence_selector:{version:selectorVersion,sha256:await directCoverageSelectorHash()}}:{})};
+  ...(covered?{evidence_selector:selector}:{})};
  const stars=(rows:SnapshotReview[])=>Object.fromEntries([1,2,3,4,5].map(s=>[s,rows.filter(r=>r.rating===s).length]));
  const technicalMissing=binding?.technical_missing_review_ids?.length??0;
  const statistics={scope:{source_reviews:binding?.source_reviews??100,analysed_text_reviews:binding?.text_reviews??80,textless_statistics_only:(binding?.source_reviews??100)-(binding?.text_reviews??80)-technicalMissing,
@@ -270,9 +271,9 @@ export async function selectDirectReportSources(i:DirectReportInput,code_commit:
   star_distribution_all:stars(i.snapshot.body.reviews),star_distribution_analysed:stars(i.snapshot.body.reviews.filter(r=>i.dataset.body.reviews.some(d=>d.review_id===r.id))),
   categories:DIRECT_DEFINITIONS,uncertainty_preserved:true,frequency_unit:'distinct_review_per_category_not_specific_incident'};
  const statistics_sha256=await directHash(statistics),flow=directEvidenceFlow(candidates,selected);
- const selection={algorithm:selectorVersion??(comparisonIds?DIRECT_COMPARISON_SELECTION.version:'existing_selectBalancedEvidence'),algorithm_sha256:covered?await directCoverageSelectorHash():await balancedSelectorHash(),policy:covered?DIRECT_COVERAGE_POLICY:BALANCED_POLICY,
+ const selection={algorithm:selectorVersion??(comparisonIds?DIRECT_COMPARISON_SELECTION.version:'existing_selectBalancedEvidence'),algorithm_sha256:selector?.sha256??await balancedSelectorHash(),policy:covered?selectorPolicy!:BALANCED_POLICY,
    ...(covered?{coverage_diagnostics:covered.diagnostics}:{}),
-   ...(comparisonIds?{comparison_policy:DIRECT_COMPARISON_SELECTION}:{}),...(synthesis?{association_policy:covered?DIRECT_COVERAGE_POLICY:DIRECT_SYNTHESIS_POLICY,flow}:{}),
+   ...(comparisonIds?{comparison_policy:DIRECT_COMPARISON_SELECTION}:{}),...(synthesis?{association_policy:covered?selectorPolicy!:DIRECT_SYNTHESIS_POLICY,flow}:{}),
    quotation:'complete_frozen_review_exact; no 25-theme lexical pass; all are unverified candidates',specificity:'bounded_text_length_for_diversity_only_not_semantic_confidence',candidates,selected,
    coverage:DIRECT_CATEGORY_KEYS.map(category=>({category,positive:selected.filter(e=>e.category===category&&e.polarity==='positive').length,negative:selected.filter(e=>e.category===category&&e.polarity==='negative').length})),distinct_selected_reviews:new Set(selected.map(e=>e.review_id)).size};
  return {statistics,statistics_sha256,selection,configuration,synthesis,flow};

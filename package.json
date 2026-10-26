@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:selector-replay": "vitest run --config vitest.selector-replay.config.ts",
     "test:e2e": "playwright test",
     "test:pwa": "playwright test --config playwright.resume.config.ts",
     "test:pwa:offline": "vite build --config tests/e2e/vite.shell.config.ts && node scripts/prepare-pwa-test.mjs && playwright test --config playwright.shell.config.ts",

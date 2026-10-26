@@ -3,7 +3,8 @@ import {initialBatchIdentity,assertInitialBatchRequest,parseBatchJson,parseIniti
 import {directCanonical,directHash,directCategoryCounts} from './jev-direct-categories.ts';
 import {analysisTextSha256} from './analysis-text.ts';
 import {directReportCandidates,type DirectReportInput} from './jev-direct-report-preparation.ts';
-import {selectDirectCoverage} from './jev-direct-evidence-selection.ts';
+import {DIRECT_COVERAGE_VERSION} from './jev-direct-evidence-selection.ts';
+import {evidenceSelectorBinding,verifyEvidenceSelector,selectReportEvidence,type EvidenceSelectorBinding} from './report-evidence-selector.ts';
 import {prepareCompactSolWire,reconstructCompactSolResponse} from './parallel-sol-wire.ts';
 import {validateParallelReport} from './parallel-report.ts';
 import {solRequestSize,SOL_SIZE_POLICY} from './jls-sol-size.ts';
@@ -16,6 +17,15 @@ export interface BatchRun {id:string;organization_id:string;establishment_id:str
 export interface BatchProjection {parent_receipt_sha256:string;question_mapping_sha256:string;rows:ReturnType<typeof parseInitialBatchResponse>['rows'];
  usage:ReturnType<typeof parseInitialBatchResponse>['usage'];usage_is_historical:boolean;native_classifications:number}
 function check(ok:unknown,code:string):asserts ok{if(!ok)throw Error(code);}
+async function batchSelector(run:BatchRun){
+ const binding=run.template.evidence_selector as EvidenceSelectorBinding|undefined;
+ return binding?await verifyEvidenceSelector(binding):await evidenceSelectorBinding(DIRECT_COVERAGE_VERSION);
+}
+async function verifyBatchDraftSelector(run:BatchRun,draft:BatchDraft){
+ const selector=await batchSelector(run);
+ check(draft.selection.version===selector.version&&
+  (selector.version===DIRECT_COVERAGE_VERSION&&!draft.evidence_selector||directCanonical(draft.evidence_selector)===directCanonical(selector)),'BATCH_EVIDENCE_SELECTOR_CHANGED');
+}
 export async function validateBatchTask(run:BatchRun,task:BatchTask):Promise<BatchProjection>{
  check(await analysisTextSha256(task.request_wire)===task.request_sha256,'BATCH_REQUEST_CHANGED');
  const batch={payload:parseBatchJson(task.request_wire) as InitialBatch['payload'],mapping:task.mapping};
@@ -62,7 +72,7 @@ export async function batchSolDraft(run:BatchRun,tasks:BatchTask[]){
  // No synthetic individual supplier receipt is registered in the old cache.
  const candidates=await directReportCandidates({dataset:{body:{reviews:rows,configuration_id:'jev_categories4_short_common_1pass_v1'}},
   snapshot:{body:run.snapshot}} as unknown as DirectReportInput);
- const selection=selectDirectCoverage(candidates,32),evidence=selection.selected;
+ const selector=await batchSelector(run),selection=selectReportEvidence(candidates,selector.version,32),evidence=selection.selected;
  check(evidence.length>0,'BATCH_EVIDENCE_INSUFFICIENT');
  const compact=await prepareCompactSolWire({organization_id:run.organization_id,establishment_id:run.establishment_id,
   source_snapshot_sha256:run.snapshot_sha256,statistics,statistics_sha256,evidence,reviews:run.snapshot.reviews},run.template.packet.language);
@@ -71,6 +81,7 @@ export async function batchSolDraft(run:BatchRun,tasks:BatchTask[]){
  request.input=[{role:'system',content:compact.prompt},{role:'user',content:JSON.stringify(compact.packet)}];
  const request_json=JSON.stringify(request);
  return {version:BATCH_EXPERIMENT,statistics,statistics_sha256,counts,evidence,selection:selection.diagnostics,
+  ...(selector.version===DIRECT_COVERAGE_VERSION?{}:{evidence_selector:selector}),
   compact_manifest:compact.manifest,compact_manifest_sha256:compact.manifest_sha256,packet:compact.packet,
   classification_sources,classification_sources_sha256:await directHash(classification_sources),
   request_json,request_sha256:await directHash(request),request_raw_sha256:await analysisTextSha256(request_json)};
@@ -152,12 +163,14 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
  }
  if(run.stage==='measure_sol'){
   check(run.draft&&await directHash(run.draft)===run.draft_sha256,'BATCH_SOL_DRAFT_CHANGED');
+  await verifyBatchDraftSelector(run,run.draft);
   const b=await measureBatchSolDraft(run.draft);check(await port.envelope(id,b,await directHash(b)),'BATCH_ENVELOPE_SAVE_FAILED');
   return {phase:'compact_sol_prepared',provider_calls:0};
  }
  const envelope=run.envelope;
  check(envelope&&await directHash(envelope)===run.envelope_sha256&&await analysisTextSha256(envelope.request_json)===envelope.request_raw_sha256&&
   await directHash(JSON.parse(envelope.request_json))===envelope.request_sha256,'BATCH_SOL_ENVELOPE_CHANGED');
+ await verifyBatchDraftSelector(run,envelope);
  check(envelope.measurement.version===SOL_SIZE_POLICY.version&&envelope.measurement.guarded_input_tokens<=SOL_SIZE_POLICY.input_budget_tokens&&
   envelope.measurement.request_bytes===new TextEncoder().encode(envelope.request_json).length,'BATCH_SOL_MEASUREMENT_CHANGED');
  if(run.stage==='sol'){
