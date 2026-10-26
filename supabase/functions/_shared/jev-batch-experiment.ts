@@ -135,6 +135,9 @@ export function batchJevAccounting(tasks:BatchTask[]){
 export async function processBatchExperiment(port:BatchExperimentPort,id:string,keys:{jev:string;sol:string},http:typeof fetch){
  const {run,tasks}=await port.load(id),worker=crypto.randomUUID();let providerCalls=0;
  if(!run.armed||run.status!=='running')return {phase:'saved_or_disarmed',provider_calls:0};
+ // Reject an unknown or tampered frozen selector before any JEV reservation,
+ // not only later when constructing the Sol dossier.
+ await batchSelector(run);
  if(run.stage==='jev'){
   const t=await port.claim(id,worker);if(!t)return {phase:'concurrent_consumed_or_blocked',provider_calls:0};
   if(t.status==='reserved'){
@@ -205,10 +208,10 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   const validated=await validateParallelReport(reconstructed,envelope as unknown as Parameters<typeof validateParallelReport>[1]);
   const {report,format_version,statistics_sha256,...controls}=validated;
   result={...result,original_report:validated.original_report,derived_report:{report,format_version,statistics_sha256},corrections:validated.reference_derivation,
-   controls:{...controls,evidence:envelope.evidence,compact_response:compact,response_format_version:envelope.packet.version,
+   controls:{...controls,...(envelope.evidence_selector?{evidence_selector:envelope.evidence_selector}:{}),evidence:envelope.evidence,compact_response:compact,response_format_version:envelope.packet.version,
     batch_experiment:!run.current_source_run_id,jev_transport:BATCH_EXPERIMENT,new_jev_calls:jev.new_provider_attempts}};
   status=validated.technical_checks_passed?'completed':'needs_review';
- }catch(e){error=errorCode(e);result.controls={validation_error:error,batch_experiment:!run.current_source_run_id,new_jev_calls:jev.new_provider_attempts};}
+ }catch(e){error=errorCode(e);result.controls={validation_error:error,...(envelope.evidence_selector?{evidence_selector:envelope.evidence_selector}:{}),batch_experiment:!run.current_source_run_id,new_jev_calls:jev.new_provider_attempts};}
  check(await port.finish(id,status,result,usage,error),'BATCH_RESULT_SAVE_FAILED');
  return {phase:'sol_validation_saved',provider_calls:0,status,error_code:error};
 }

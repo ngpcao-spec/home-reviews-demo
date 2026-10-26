@@ -8,7 +8,7 @@ async function fixture(){
  const request_wire=JSON.stringify(b.payload),request_sha256=await analysisTextSha256(request_wire);
  const raw=JSON.stringify({model:'jev-1.13.0',usage:{input_tokens:10,output_tokens:20},answers:Object.fromEntries(Object.keys(b.mapping).map(k=>[k,{type:'choice',choice:k.endsWith('service')?'mixed':'not_mentioned',probabilities:Object.fromEntries(DIRECT_NATIVE_CHOICES.map(c=>[c,c===(k.endsWith('service')?'mixed':'not_mentioned')?1:0]))}]))});
  const receipt={request_sha256,raw_response_text:raw,raw_response_sha256:await analysisTextSha256(raw),http_status:200,error:null};
- const run={id:'run',status:'running',stage:'jev',armed:true,max_new_jev_calls:0,organization_id:'org',establishment_id:'est',snapshot:{reviews:[{id,organization_id:'org',establishment_id:'est',analysis_text:b.payload.state.avis['review_'+id],analysis_text_sha256:await analysisTextSha256(b.payload.state.avis['review_'+id])}]}} as unknown as BatchRun;
+ const run={id:'run',status:'running',stage:'jev',armed:true,template:{},max_new_jev_calls:0,organization_id:'org',establishment_id:'est',snapshot:{reviews:[{id,organization_id:'org',establishment_id:'est',analysis_text:b.payload.state.avis['review_'+id],analysis_text_sha256:await analysisTextSha256(b.payload.state.avis['review_'+id])}]}} as unknown as BatchRun;
  const task={id:'task',number:1,reviews:1,status:'received',request_count:0,request_wire,request_sha256,mapping:b.mapping,receipt,receipt_sha256:await directHash(receipt),historical_source:{saved:true}} as BatchTask;
  return {run,task};
 }
