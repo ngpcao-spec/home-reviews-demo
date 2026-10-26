@@ -17,6 +17,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Type-check current report server functions without execution
+        run: deno check --no-config --no-lock --no-remote --node-modules-dir=manual supabase/functions/process-historical-report-jobs/index.ts supabase/functions/jev-batch-experiment/index.ts supabase/functions/process-jls-restaurant/index.ts
       - run: npm run lint
       - run: npm test
       - run: npm run build

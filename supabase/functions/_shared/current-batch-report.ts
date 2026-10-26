@@ -2,7 +2,8 @@
 import {z} from 'npm:zod@4.6.5';
 import {planInitialBatches,initialBatchIdentity,INITIAL_BATCH_CONTRACT,type TokenCounter} from './jev-review-batches.ts';
 import {directHash,DIRECT_DEFINITIONS} from './jev-direct-categories.ts';
-import {DIRECT_COVERAGE_VERSION,directCoverageSelectorHash} from './jev-direct-evidence-selection.ts';
+import {DIRECT_COVERAGE_VERSION} from './jev-direct-evidence-selection.ts';
+import {verifyEvidenceSelector} from './report-evidence-selector.ts';
 import {compactSolResponse,compactSolInstructions,COMPACT_SOL_WIRE} from './parallel-sol-wire.ts';
 import {SOL_SIZE_POLICY} from './jls-sol-size.ts';
 import {verifyParallelProtocol,type ParallelProtocol} from './parallel-report.ts';
@@ -11,8 +12,9 @@ export const BATCH_TRANSPORT='batch_initial_v1';
 export async function currentBatchManifest(protocol:{body:ParallelProtocol;sha256:string},count:TokenCounter){
  await verifyParallelProtocol(protocol.body,protocol.sha256);
  const p=protocol.body,d=p.current_delivery;
- if(!d||p.configuration.sol_wire_version!==COMPACT_SOL_WIRE||p.configuration.evidence_selector?.version!==DIRECT_COVERAGE_VERSION)
+ if(!d||p.configuration.sol_wire_version!==COMPACT_SOL_WIRE||!p.configuration.evidence_selector)
   throw Error('CURRENT_BATCH_INITIAL_CONFIGURATION_REQUIRED');
+ const selector=await verifyEvidenceSelector(p.configuration.evidence_selector);
  // Canonical order for every restaurant, never a special case for the reference corpus.
  const rows=p.source_snapshot.reviews.filter(r=>r.analysis_text).map(r=>({review_id:r.id,text:r.analysis_text!})).sort((a,b)=>a.review_id.localeCompare(b.review_id));
  if(!rows.length)throw Error('NO_TEXT_REVIEWS_AVAILABLE');
@@ -32,9 +34,9 @@ export async function currentBatchManifest(protocol:{body:ParallelProtocol;sha25
  const body={version:CURRENT_BATCH_VERSION,transport:BATCH_TRANSPORT,organization_id:p.organization_id,establishment_id:p.establishment_id,
   authority_user_id:p.authority_user_id,language:p.language,current_delivery:d,reference:p.reference,frozen_report:p.frozen_report,
   snapshot:p.source_snapshot,snapshot_sha256:p.source_snapshot_sha256,source_protocol_sha256:protocol.sha256,plans,
-  configuration:{jev:INITIAL_BATCH_CONTRACT,selector:{version:DIRECT_COVERAGE_VERSION,sha256:await directCoverageSelectorHash()},sol_wire:COMPACT_SOL_WIRE,
+  configuration:{jev:INITIAL_BATCH_CONTRACT,selector,sol_wire:COMPACT_SOL_WIRE,
    sol_model:request.model,sol_reasoning:request.reasoning,sol_max_output_tokens:request.max_output_tokens},
-  template:{statistics,packet:{language:p.language},request_json:JSON.stringify(request)},max_new_jev_calls:plans.length,
+  template:{statistics,packet:{language:p.language},request_json:JSON.stringify(request),...(selector.version===DIRECT_COVERAGE_VERSION?{}:{evidence_selector:selector})},max_new_jev_calls:plans.length,
   max_sol_calls:1,max_luna_calls:0,max_apify_calls:0,automatic_retry:false};
  return {body,sha256:await directHash(body)};
 }

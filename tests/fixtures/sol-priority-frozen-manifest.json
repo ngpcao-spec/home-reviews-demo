@@ -1,0 +1,616 @@
+{
+  "tested_commit": "a9ed8d56f4f29ba33956fbf72a756c2e6ff20d7d",
+  "selector_source_sha256": "6dbe06273fd3c04e783032340f0468e40493e78b672f13d797b94670845e0b97",
+  "selector_function_sha256": "d34b02ac1128f24557cdca811e2acbab55709867135cd543f48325b8bb4dd2dd",
+  "corpora": [
+    {
+      "slug": "khouse",
+      "name": "K.HOUSE Restaurant",
+      "experiment_id": "ef32f424-3e09-40ef-a057-1bdaa6a4dbd3",
+      "source_run_id": "8b38c97a-6fec-428a-ba82-619c3b92acbb",
+      "source_snapshot_sha256": "46272e52782dd435fc7af2cf4d1427d872808bbbf2080aa319f63efd24b23c38",
+      "classifications_sha256": "9a38e943626627e87bca430058161eac61d3348cb74ee2ef0ffea60bff22c650",
+      "request_sha256": "9435fb666987d399bff762f8265a5364d60e55e2ed003e57d1ae0e31107a5f28",
+      "ordered_associations": [
+        {
+          "evidence_id": "1df5aa65645163c24c634238ed3f5ecf58bb31b94c5badcc8a8cd61ed117390e",
+          "review_id": "76f9e6b3-8a9b-4449-9dbf-e1058d92c757",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "1f3311f482e1d3c3defcf3d25361271182579048f444dc8a3106f02621ba5308",
+          "review_id": "89eadd38-3808-424b-9d7d-e85d7feaa215",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "40e4bf08d4c7372038609e422b71ce07e282d25d51b0ad66c9e9a0ff63615ded",
+          "review_id": "89eadd38-3808-424b-9d7d-e85d7feaa215",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "aed31aa625c2910007c37ef9de8b364384cde439ebd7fda3642babfd7bc5d251",
+          "review_id": "bfed8ff7-1fef-4f18-bdaf-7ad3dfd7961c",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "b51e7b6a35ef3c8830c61dbe8331a0f044426f6d361c2822b684007e53d44a63",
+          "review_id": "bfed8ff7-1fef-4f18-bdaf-7ad3dfd7961c",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "5b0c6d30a67a165d13a45291dd86c468cb4b492675d89348b152d961572e78a5",
+          "review_id": "2d44bf23-477c-42bd-b574-cd84059c719b",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "2ee412923f90f86c7f3227fffe1e18209af09bd068a990eec351b3942c9c0ce7",
+          "review_id": "51fd0102-ce2c-4e6c-af98-69cbe0f26360",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "b51220eab10733fed7138a62c798ae291392a0f9062ffa15a6b246b677c17bb9",
+          "review_id": "51fd0102-ce2c-4e6c-af98-69cbe0f26360",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "dbdef0d2cd4b127f0147edbe4e25e3464a59f56b6be6fcd449c31f02b065733c",
+          "review_id": "9ac62623-70b5-4a8b-a8a2-89cb74426e19",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "f4974479fe24e1ef0b62074061401ce6b472ef2984a8fd6c7e6ab159f1e3e46f",
+          "review_id": "9ac62623-70b5-4a8b-a8a2-89cb74426e19",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "7309361c6c319b8c26e202c7682994a990044ce316ca46a8df46fa64b7418b99",
+          "review_id": "a7ebabd8-6982-45eb-8214-65a5bcb586d9",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "eec45ee850fac2b6fb36c69fb9cb7fe9e156f32d40d353eeab9e38c76fe2e340",
+          "review_id": "2d44bf23-477c-42bd-b574-cd84059c719b",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "fb92616259d18ffe20685910efc9760e44a2fb8e20a8c692936cbb6d06363e1e",
+          "review_id": "2d44bf23-477c-42bd-b574-cd84059c719b",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "2677031f9960ad082fc858e549830962aba973ad21a1e82208060910279ef6d7",
+          "review_id": "9ac62623-70b5-4a8b-a8a2-89cb74426e19",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "f539a02a553e284db5c015f8a363cbacf514b55afb4a595b4525ed435533d1dc",
+          "review_id": "9ac62623-70b5-4a8b-a8a2-89cb74426e19",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "46b0cb4cf0da8167c8db86526da1c3ba9d8d1662ce09e3207d49f92931ae8b06",
+          "review_id": "bfed8ff7-1fef-4f18-bdaf-7ad3dfd7961c",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "def1e6bf63098a6a0ebc4701ff02eded26037d5c0dd8ee6eb297fa6730c27be7",
+          "review_id": "89eadd38-3808-424b-9d7d-e85d7feaa215",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "890d0b660ffeff576049fad30260c6149d12b63f7fed4f449f22e3ee26399990",
+          "review_id": "a3ac3d12-2bfa-4b25-b56b-796410f2dfb3",
+          "category": "price",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "0773e341a7807765c54f6876ee35e0b65be7f2735ea31178545ae157c0c84b6a",
+          "review_id": "b084812e-51f0-4a26-a7d7-0bad7ec4a7b2",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "4f5bd84577ce8615a3b5d5976169760ddc15af83481344f0c26b7fca026f2ed7",
+          "review_id": "69df28b1-3c9e-4ce2-8150-9b98b22459b0",
+          "category": "price",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "6719a906b5767b9ce4f20f80a6d06b1b1e169ab89582ed4f5f88017d02b2ff7c",
+          "review_id": "69df28b1-3c9e-4ce2-8150-9b98b22459b0",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "b51c509d26b2b00aba998c5c5ed78e72024fa55454483af7e591fb8d2a617211",
+          "review_id": "a87e1f96-c6ac-45b8-a61f-8dd590bc0414",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "82cdc1ca633b0e546a69984a68805e66d4e9420726262ba185b07453a5a5d53d",
+          "review_id": "0b823dd7-dec2-48ef-8eeb-80837ab9390e",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "66c5a58eb00befe44e4eeff6f1ba1f487c9b46bdb3f355cb748c6dcd81eb33d0",
+          "review_id": "94d000e8-3eff-4790-8ba7-fae1b1d0bfba",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "34ffc7a1297713bf8824d30789238e107acfe5a743f482d9bdd53981362cb7a5",
+          "review_id": "d288c428-ace7-4e1a-886d-235689ba4566",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "1cd2e20687d3f9e3df76564954ca7f13b4aabd006fa51f117dfea63ec2fe9c60",
+          "review_id": "79481648-a9bd-4ea7-920c-56225e34db58",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "8c69ca2a43c2f149fec7f88d9beb567144e43cc466f8046f878980534c9ad85f",
+          "review_id": "79481648-a9bd-4ea7-920c-56225e34db58",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "529053f05aba86a91dccae3386126cb8ed009370055ac5f977b7678807d08e70",
+          "review_id": "38bc2562-52f0-4655-a869-19bb87cb65ee",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "34235e16ea0277e80f7f7c516b2c91dc745e3e9750d7ef9cb45ab71e27f5dffd",
+          "review_id": "31e6d070-95af-4aef-818b-c3b60c45c1da",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "c9c6f56193a3f09fe4c819a7cd49f2da32526c44cc2242de933c36a0bdb43c2a",
+          "review_id": "a26cfc75-766a-473e-a981-f382d2139d6b",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "014c12d996c237723e792bb4034b8c6a2b4006051a1ce23be8c820476bb98c81",
+          "review_id": "b084812e-51f0-4a26-a7d7-0bad7ec4a7b2",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "3d9e8ee94dd41ba1eb41c96c7c5fe999f1b2efab766bd572635d18243c55c2a6",
+          "review_id": "b084812e-51f0-4a26-a7d7-0bad7ec4a7b2",
+          "category": "ambiance",
+          "polarity": "positive"
+        }
+      ]
+    },
+    {
+      "slug": "bottega26",
+      "name": "Bottega 26",
+      "experiment_id": "6c8e6297-b15e-4bfd-b32e-c06577911b2f",
+      "source_run_id": "6e0929a9-5734-4bb8-95bd-fb469b810e90",
+      "source_snapshot_sha256": "9164dac2ae0ae0d99492025233298b6baa5a5e374e1659d3d0454c484a18ab74",
+      "classifications_sha256": "0187a5ca51c5b3ef93a6eff9c4de5c5459f3c4fb0310ce47ed727d4a57341a9b",
+      "request_sha256": "644d9eacfb2f2f46e698d58bcdba62c33f9455c4e2874e11582c3c0bfa28538b",
+      "ordered_associations": [
+        {
+          "evidence_id": "0012034feeddda479da9c30e33ccc9f923c810a377010cba0246286ec1de45d7",
+          "review_id": "7c7f191f-ccab-441a-9b8f-4beb6cca548a",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "fd280ac652815c2b9e9a15bfa03be4dd6582ca374d9ed186750fa290e8fcd555",
+          "review_id": "7c7f191f-ccab-441a-9b8f-4beb6cca548a",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "c82eca6e21b983a34b42b8e22756080f4955b393562f4e8defa3879856c8c1e9",
+          "review_id": "c453ac97-64d9-465d-8ae9-ddf1760b0e2d",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "277b674aa69617089470b1d37928a1996aa511d5eff5b1520cf45e84380fc023",
+          "review_id": "c8fe77b4-e7cb-4c0f-b8ca-1fb2d3fc8efe",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "2a63084bc776898b5b7fe288d4159a8dc6dc438b2bec077d1edabecc0879dcf9",
+          "review_id": "d2838f11-9ae8-4db8-978a-6ea95bde9c1f",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "f15c7c6f82b701e6ad3fbaaa46e87c423e523048e26f7ec9cfd300c9f9400096",
+          "review_id": "d2838f11-9ae8-4db8-978a-6ea95bde9c1f",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "50ba61c651a8ef01eaeac53e81abf7a67efadd10e2860a1ca58cafbfeb1b5762",
+          "review_id": "55d66d1f-b437-4e21-abca-a8c75f467d54",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "b18ae719f6e64bdbc8c0f0b998ab538a60b6b3d2747151928f499e261a06919f",
+          "review_id": "55d66d1f-b437-4e21-abca-a8c75f467d54",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "a7fe95c5ef9135a6d500b3c3acc31ace8c2c55528b5a48b43e3e328825b4decf",
+          "review_id": "efe02825-0177-496f-8436-37cf58dfdd7c",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "61a55894805552e585042b252a1dfa45a83a1c211e1bdc732008e6e0966af090",
+          "review_id": "a31606e6-e8f2-4721-868f-4b3d8d470c6b",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "ad484feafb607901cf3977d99bcb719a5ba1cd1f0b76e4cc818acac62182a420",
+          "review_id": "a31606e6-e8f2-4721-868f-4b3d8d470c6b",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "ac6fdb9618f7139cec87979da9e58d135da165884bd5dedb5cec371701ba3580",
+          "review_id": "3bbd2d91-7f80-4f04-bc29-07ea9e4716e8",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "6f2de552af4038050d3ae471deb39e7db90253a945b2b80dc6af257d9d654d65",
+          "review_id": "efe02825-0177-496f-8436-37cf58dfdd7c",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "edebe3ec5b93aef92d8961fe2caa38a9c30fe4f6e5e43200d71f377f10ea2767",
+          "review_id": "efe02825-0177-496f-8436-37cf58dfdd7c",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "ffec23a0835fea0e5b22bb226cd30fd71e9b12c7240306622d1182b423cd2fa2",
+          "review_id": "a31606e6-e8f2-4721-868f-4b3d8d470c6b",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "700d4dc6ea3bcb65bcbac6c095ee526eb144f0d3927cf7a3415ffa9a1838aeb7",
+          "review_id": "d2838f11-9ae8-4db8-978a-6ea95bde9c1f",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "a37ec68abda3f61a9bd7b5a249052dd676279fa3bf6869e9463e31ff72278eab",
+          "review_id": "c012d3c9-d932-446f-ab88-63d825e433d8",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "e8d3c00fa8d9e9cb1ede1a439ee2f4319dcf6c98c52757ad8d3d5c4f583a292d",
+          "review_id": "c012d3c9-d932-446f-ab88-63d825e433d8",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "a92bbe9449cfa4618545cabd340893df462ea2330f07f03364cf8fa4fb14f4a5",
+          "review_id": "8ed43913-a34f-4d7a-b328-82dc8381b957",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "b4b9c83164325426dda859249c0d28123b46c622cc0295b9e745f7597a478b0e",
+          "review_id": "867dbdc5-673e-496d-a63a-f53b0184a922",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "13a5b0bca7546a706352cb488e84b02f9c66b3da63665ec8bcb30391b1d9f2d2",
+          "review_id": "7c5f4ef4-e433-464b-a753-432027fed92b",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "15485e6a4d7530f49f66894b5b1001ad7277ba193a43b3adb013b80f8c0ceccc",
+          "review_id": "9ae27a84-08c9-4206-ba09-b79d011449d3",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "581b0442f0077b1795e70e16c2d9834959b06cb445bbfd0c7edb30db9cad4d88",
+          "review_id": "a0c0e6ec-070b-47f4-b584-69e1dc06e5c7",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "95a0f01d83bdc5dcbfe362061313e2f5ad7f66230738a3c26f6c7153a7cc8a3e",
+          "review_id": "a0c0e6ec-070b-47f4-b584-69e1dc06e5c7",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "3ea5ed7d6a536a8bdd0701e1b2aaa8ec0700db906d661a7b32ed2cac1699134c",
+          "review_id": "02f3e8e6-4a83-44f3-bf0f-f14ccbbdf4d3",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "668424e2a471098c9768963c8d241954b4844effa3e853179aabb225cc45303a",
+          "review_id": "02f3e8e6-4a83-44f3-bf0f-f14ccbbdf4d3",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "82a81776a37ca7226170dc244f61e14ef24e84de97d1845bf7f9cef09514ae67",
+          "review_id": "6563eb19-3e64-408c-98b7-2d1f88965896",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "6146c7e081ff7fb1520f78af773a8532847c32336c060242e5e562a76ed2b2b9",
+          "review_id": "9ecd5b61-f9b7-4730-bb82-5d92b846cf99",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "b1a4d447ff269e17fc951f78bdb6728e1223c8e3d28d6e8576158d22c95ef982",
+          "review_id": "9ecd5b61-f9b7-4730-bb82-5d92b846cf99",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "e000d501ce4a4d3128fdd8c334e8451f50aade1bf3e518e97a3bb83380711b2e",
+          "review_id": "9ed62c22-6007-4eb5-b5af-dd20949bdcc9",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "19b78af7aa0ad11e1dd610a6f8808c0f67ccec0dca17defda21e72f7a124aa21",
+          "review_id": "3bbd2d91-7f80-4f04-bc29-07ea9e4716e8",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "a98965cdcacaac41c60670141a48370d02635a1ad2268fdb7fa9e5938893660b",
+          "review_id": "3099b5ac-53b3-458e-bd1d-6d2cb2054299",
+          "category": "price",
+          "polarity": "positive"
+        }
+      ]
+    },
+    {
+      "slug": "optimist",
+      "name": "OPTIMIST Casual Cafe",
+      "experiment_id": "dc676f14-0e32-4827-8acc-a71cdce54ce6",
+      "source_run_id": "a5e9605e-7044-4576-ac83-9f11e846a2ad",
+      "source_snapshot_sha256": "d77ecad707e346dfd1d2e878b2a2673c37cc261b3d962a6a12a8e68a8aa06236",
+      "classifications_sha256": "726f75b4333faf6773a675f197c7abbc34dd1549c2daf726d51060f1e8d4628c",
+      "request_sha256": "d6920b96013c11b9db041bea3453bd27bbb7a005914aab3da35894087efc580d",
+      "ordered_associations": [
+        {
+          "evidence_id": "5b4c6adf375ccfd6cfe12b4971a0cdad36e85baa3c26b8cfeb32fca5600d7085",
+          "review_id": "ccb9925d-c3bc-4119-b43d-afdbb2634cc3",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "822704889b9f9191086c1100eb02f2661cf51788227920b77777272367cadb96",
+          "review_id": "ccb9925d-c3bc-4119-b43d-afdbb2634cc3",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "82829547f725ba5c90c039789c1fec0b3fabecfc801b5b8c979f9df33baa7554",
+          "review_id": "5af6e499-5cd9-4987-8da0-45ea376ba628",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "d4ba919b244bb33f563298c3d74d35cf16ccd5a6e728e8db86042a8770b50e60",
+          "review_id": "5af6e499-5cd9-4987-8da0-45ea376ba628",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "3631ee12e8c6586eaf4e687a4f9285d4679e324e4dc0829f1dd3f99491a77472",
+          "review_id": "e8492adb-b542-407c-860a-db8f822f2fd4",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "bd190c0c8a2393bd1c3bf7e82d9ab03cad7e48abf18436f074ad93b5fd520e1b",
+          "review_id": "e8492adb-b542-407c-860a-db8f822f2fd4",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "d57ca079dd0ef814809633a87e77b57943362269216365b23fcbcf0ac346408b",
+          "review_id": "f46841a4-5db3-40f4-9941-9d9c62519c67",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "d92c23ba7aa635547b1aae00662408ee4be15f7e3bc25d59161d55964b4722a6",
+          "review_id": "f46841a4-5db3-40f4-9941-9d9c62519c67",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "b214f0b8ffc40b8c6d9eb4fc10782680a4f89f5b4595413d22ec10575220c4f7",
+          "review_id": "a2058199-c65b-4d46-a878-ba2fae232eb6",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "eedd8c5a3fd80c9a46743698b0f5aa9bf09b0657bd7d72a9b08386450a2686a3",
+          "review_id": "a2058199-c65b-4d46-a878-ba2fae232eb6",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "aa6211fbb24ccace700994d7d8c36ebb5efdbc5a7a029bc0a8781f7d7daf5a86",
+          "review_id": "e8492adb-b542-407c-860a-db8f822f2fd4",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "201d64a97b19211567d82955e27614daa300c34739aac0144b918f6a6f3b7580",
+          "review_id": "e8492adb-b542-407c-860a-db8f822f2fd4",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "2e1b5b87391299a423f09695f8eda8e7c884b19fb5aa24e5d34288ce8419d947",
+          "review_id": "e8492adb-b542-407c-860a-db8f822f2fd4",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "193a3c7cdaedaf6b5b1aafcce43f3f10a6aea09456e2dd82bd19a47163e177dd",
+          "review_id": "17a453fb-2823-4dda-8a91-faf84ad9d5ce",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "99a9eb5b613b80a022f3b7347f4b85556a7490ef993b5ecab4d34df1c7c43926",
+          "review_id": "5ee0e75b-07fb-4601-b398-0b246069c44a",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "45fa4b55a04b21e44be543c743405b7ab544c3471c76e267c37b9aa3c42e1c61",
+          "review_id": "2210d949-1dbb-4136-a0d5-81c61b94d9b4",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "f94da1d915c3f781cedb5b33f6de4cbdbbde4bb0bc4c9d172b68ae7a7a24bf63",
+          "review_id": "2210d949-1dbb-4136-a0d5-81c61b94d9b4",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "448ffb1cb1602a9c1b049e5e8d5c56741ddc482bd4a6ee264886a2b70f9235a8",
+          "review_id": "cfc74c6f-0369-4dda-a519-fd8fe2a06bc9",
+          "category": "price",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "6d1528ac920c57740376d39ce9e2cde5548384201dfa7425e76d622156ed0b42",
+          "review_id": "374ca933-8a45-4a00-b9a5-32c8732cf882",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "9e35b5ba10e7375d7ae79dd9d0a621fbf2cf5dc9f7bb5c280e0129afa92b6540",
+          "review_id": "374ca933-8a45-4a00-b9a5-32c8732cf882",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "6ad3dbfd23b590f9943d2d5f59d01a9e382b581154a2184319c13c6f02306551",
+          "review_id": "d9c11134-cfe4-4ffb-abf3-f1d39338274a",
+          "category": "price",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "182414c636398417ece8ab129a00daba4b4138041527423b8c13acc749394fd2",
+          "review_id": "a65a7db1-bb99-4ebd-8d35-bd2b99321caf",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "d8a0a16875a209fa5289aefb2063fed55effd60378ff5871da18ed8ca319a5f1",
+          "review_id": "a65a7db1-bb99-4ebd-8d35-bd2b99321caf",
+          "category": "quality",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "1ead896d1b9b03d68ccf17aba492cd3f3a3b869fcfebe92d58ce7fb39024aa4f",
+          "review_id": "8b25ea7d-0d3e-43ea-8a68-7f5477341eca",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "dd9e960fd8d812c03697ada22b6da997dcdcedd53d26580db44b78c6e41868f5",
+          "review_id": "8b25ea7d-0d3e-43ea-8a68-7f5477341eca",
+          "category": "ambiance",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "0a269db85e7912c1842b0fd33881fb6f0e64dc409eefec8b5db35240ffde3ad5",
+          "review_id": "cfc74c6f-0369-4dda-a519-fd8fe2a06bc9",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "78275ad0bd2c76af04e452920d68382f4e0193f0948db2cc2d032ea92ed1c531",
+          "review_id": "aee5c957-b507-435b-a597-0aa7e4a88dda",
+          "category": "quality",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "cbc1b64236dd7b979bfe273201fc580abcc191bc20b29d41d96970b12b62967b",
+          "review_id": "1a683e8a-4ea9-4847-a334-2ce4c81496e4",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "c3b10551e542a51a248bde3a6019c726e6c7782d87d414913ad12914611da6d1",
+          "review_id": "879e14ef-fd7b-49ee-a837-2ef64a02dad4",
+          "category": "ambiance",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "2aed1a2a3f5f166163f190f15e9e2ba79080659762a02238e693d876a504c9a2",
+          "review_id": "397c8448-405f-402f-80e2-f6fc1c81e27d",
+          "category": "service",
+          "polarity": "positive"
+        },
+        {
+          "evidence_id": "983ec180fe0b672d28d0b0bee7332b3c1bbf1c4feaddc53b6c1e80120903ced8",
+          "review_id": "397c8448-405f-402f-80e2-f6fc1c81e27d",
+          "category": "service",
+          "polarity": "negative"
+        },
+        {
+          "evidence_id": "3575805b0b350305ebbb45ac10c1207e88c7f32188ac78dd9a8605c9bf3c8a02",
+          "review_id": "9d339df9-03af-4994-a1cd-f8130dde486b",
+          "category": "service",
+          "polarity": "positive"
+        }
+      ]
+    }
+  ]
+}

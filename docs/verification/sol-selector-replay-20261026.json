@@ -1,0 +1,42 @@
+{
+  "version": "sol-evidence-single-negative-source-completion-proposal-v1",
+  "provider_calls": 0,
+  "results": [
+    {
+      "slug": "khouse",
+      "experiment_id": "ef32f424-3e09-40ef-a057-1bdaa6a4dbd3",
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "wire_exact": true,
+      "request_sha256": "9435fb666987d399bff762f8265a5364d60e55e2ed003e57d1ae0e31107a5f28",
+      "statistics_unchanged": true,
+      "native_receipts_unchanged": true,
+      "legacy_wire_exact": true,
+      "critical_quality_binding": "89eadd38"
+    },
+    {
+      "slug": "bottega26",
+      "experiment_id": "6c8e6297-b15e-4bfd-b32e-c06577911b2f",
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "wire_exact": true,
+      "request_sha256": "644d9eacfb2f2f46e698d58bcdba62c33f9455c4e2874e11582c3c0bfa28538b",
+      "statistics_unchanged": true,
+      "native_receipts_unchanged": true,
+      "legacy_wire_exact": true,
+      "critical_quality_binding": "d2838f11"
+    },
+    {
+      "slug": "optimist",
+      "experiment_id": "dc676f14-0e32-4827-8acc-a71cdce54ce6",
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "wire_exact": true,
+      "request_sha256": "d6920b96013c11b9db041bea3453bd27bbb7a005914aab3da35894087efc580d",
+      "statistics_unchanged": true,
+      "native_receipts_unchanged": true,
+      "legacy_wire_exact": true,
+      "critical_quality_binding": "5ee0e75b"
+    }
+  ]
+}
