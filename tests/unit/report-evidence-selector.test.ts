@@ -29,7 +29,7 @@ it('keeps the tested function byte-identical after normalizing checkout line end
  const code=readFileSync('supabase/functions/_shared/jev-priority-evidence-selection.ts','utf8').replaceAll('\r\n','\n');
  expect(createHash('sha256').update(code.slice(code.indexOf('export function selectSourceCompletePriorityEvidence'))).digest('hex')).toBe(tested.selector_function_sha256);
 });
-it('has only two immutable bindings, defaults unversioned work to the old selector, and rejects changed hashes',async()=>{
+it('preserves both prior immutable bindings, defaults unversioned work to the old selector, and rejects changed hashes',async()=>{
  expect(await evidenceSelectorBinding()).toEqual({version:DIRECT_COVERAGE_VERSION,sha256:'17ea400f28bdc39c7218e2d62c9d9452d137b8e0b4e4891acfacfa8e0237de5e'});
  const b=await evidenceSelectorBinding(PRIORITY_SELECTOR_VERSION);
  expect(b.sha256).toBe('3ca3d6002e5cb3a1d29221f6b392bed79514b18af5c29eae7861ab90ed2ce973');

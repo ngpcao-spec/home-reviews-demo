@@ -40,6 +40,7 @@ import {compileParallelSol} from '../_shared/parallel-report.ts';
 import {COMPACT_SOL_WIRE} from '../_shared/parallel-sol-wire.ts';
 import {directHash} from '../_shared/jev-direct-categories.ts';
 import {DIRECT_COVERAGE_VERSION,directCoverageSelectorHash} from '../_shared/jev-direct-evidence-selection.ts';
+import {SUPPORTED_EVIDENCE_SELECTORS} from '../_shared/report-evidence-selector.ts';
 
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async r=>{
@@ -48,7 +49,7 @@ Deno.serve(async r=>{
  const auth=await admin.rpc("verify_review_scheduler_token",{p_token:r.headers.get("x-home-reviews-scheduler")??""});
  if(auth.error||auth.data!==true)return json({error:"UNAUTHORIZED"},401);
  const payload=await r.clone().json().catch(()=>null);
- if(payload?.mode==='parallel_report_capability')return json({version:PARALLEL_REPORT,worker_revision:DIRECT_COVERAGE_VERSION,evidence_selector_sha256:await directCoverageSelectorHash(),sol_wire_version:COMPACT_SOL_WIRE,stages:['jev','prepare_evidence','sol','validate_sol'],max_luna_calls:0,max_sol_calls:1,provider_calls:0});
+ if(payload?.mode==='parallel_report_capability')return json({version:PARALLEL_REPORT,worker_revision:DIRECT_COVERAGE_VERSION,evidence_selector_sha256:await directCoverageSelectorHash(),selectors_supported:SUPPORTED_EVIDENCE_SELECTORS,sol_wire_version:COMPACT_SOL_WIRE,stages:['jev','prepare_evidence','sol','validate_sol'],max_luna_calls:0,max_sol_calls:1,provider_calls:0});
  if(payload?.mode==='parallel_report_probe'){
   // Deployed-path rehearsal with explicit injected suppliers, no durable run,
   // authorization, reservation or database write. Returns before provider keys.

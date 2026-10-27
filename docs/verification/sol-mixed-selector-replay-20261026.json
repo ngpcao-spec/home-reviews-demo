@@ -1,0 +1,168 @@
+{
+  "production_selector": {
+    "version": "sol-evidence-started-source-mixed-completion-v1",
+    "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+  },
+  "tested_source_sha256": "95e7b9ff4ca650a254303154db51961679fb670aab76a741dd0608d807bbda2c",
+  "tested_commit": "f1627c4e7e86314e61af9e103a52016cca8dfc5d",
+  "experiment_id": "b5709377-d629-4bec-8a36-7555299c34cc",
+  "provider_calls": 0,
+  "results": [
+    {
+      "corpus": "khouse-historical",
+      "source_run_id": "8b38c97a-6fec-428a-ba82-619c3b92acbb",
+      "source_snapshot_sha256": "46272e52782dd435fc7af2cf4d1427d872808bbbf2080aa319f63efd24b23c38",
+      "production_selector": {
+        "version": "sol-evidence-started-source-mixed-completion-v1",
+        "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+      },
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "sol_wire_exact": true,
+      "compact_references_exact": true,
+      "request_sha256": "9435fb666987d399bff762f8265a5364d60e55e2ed003e57d1ae0e31107a5f28",
+      "statistics_unchanged": true,
+      "native_classifications_unchanged": true,
+      "complete_mixed_pairs": true,
+      "positive_illustration_categories": [
+        "service",
+        "price",
+        "quality",
+        "ambiance"
+      ],
+      "selected_reviews": 18,
+      "input_estimate": 8066,
+      "request_bytes": 34293
+    },
+    {
+      "corpus": "khouse-new",
+      "source_run_id": "3c3f2732-5e0c-48dc-b0c1-6bdccbcd9f39",
+      "source_snapshot_sha256": "dc12d81fd2380aee4a0baa5229054e322d9a03dea4ae93faa4679ca5330e2379",
+      "production_selector": {
+        "version": "sol-evidence-started-source-mixed-completion-v1",
+        "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+      },
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "sol_wire_exact": true,
+      "compact_references_exact": true,
+      "request_sha256": "fcc377fc8046255745983133f3d30e40ecaa30b035a1215ba9dc1699c2d9cc7d",
+      "statistics_unchanged": true,
+      "native_classifications_unchanged": true,
+      "complete_mixed_pairs": true,
+      "positive_illustration_categories": [
+        "service",
+        "price",
+        "quality",
+        "ambiance"
+      ],
+      "selected_reviews": 18,
+      "input_estimate": 8065,
+      "request_bytes": 34290
+    },
+    {
+      "corpus": "bottega26-historical",
+      "source_run_id": "6e0929a9-5734-4bb8-95bd-fb469b810e90",
+      "source_snapshot_sha256": "9164dac2ae0ae0d99492025233298b6baa5a5e374e1659d3d0454c484a18ab74",
+      "production_selector": {
+        "version": "sol-evidence-started-source-mixed-completion-v1",
+        "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+      },
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "sol_wire_exact": true,
+      "compact_references_exact": true,
+      "request_sha256": "990d3c6626addea402788ec2563ed01be935baea561ec6d5f75633646a9b01d1",
+      "statistics_unchanged": true,
+      "native_classifications_unchanged": true,
+      "complete_mixed_pairs": true,
+      "positive_illustration_categories": [
+        "service",
+        "price",
+        "quality",
+        "ambiance"
+      ],
+      "selected_reviews": 16,
+      "input_estimate": 6441,
+      "request_bytes": 29541
+    },
+    {
+      "corpus": "bottega26-new",
+      "source_run_id": "81235e8f-d797-4b87-ab45-256fefad4d00",
+      "source_snapshot_sha256": "d83f24187a1b1fe1d1bfd67977074df0400d7121ec4bf7bb1e8897fda605a717",
+      "production_selector": {
+        "version": "sol-evidence-started-source-mixed-completion-v1",
+        "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+      },
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "sol_wire_exact": true,
+      "compact_references_exact": true,
+      "request_sha256": "3d43a87a36bd5750507e846e88c5e1d619ad4c6a60822f254e25f4e256f910a3",
+      "statistics_unchanged": true,
+      "native_classifications_unchanged": true,
+      "complete_mixed_pairs": true,
+      "positive_illustration_categories": [
+        "service",
+        "price",
+        "quality",
+        "ambiance"
+      ],
+      "selected_reviews": 18,
+      "input_estimate": 6918,
+      "request_bytes": 31959
+    },
+    {
+      "corpus": "optimist-historical",
+      "source_run_id": "a5e9605e-7044-4576-ac83-9f11e846a2ad",
+      "source_snapshot_sha256": "d77ecad707e346dfd1d2e878b2a2673c37cc261b3d962a6a12a8e68a8aa06236",
+      "production_selector": {
+        "version": "sol-evidence-started-source-mixed-completion-v1",
+        "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+      },
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "sol_wire_exact": true,
+      "compact_references_exact": true,
+      "request_sha256": "d6920b96013c11b9db041bea3453bd27bbb7a005914aab3da35894087efc580d",
+      "statistics_unchanged": true,
+      "native_classifications_unchanged": true,
+      "complete_mixed_pairs": true,
+      "positive_illustration_categories": [
+        "service",
+        "price",
+        "quality",
+        "ambiance"
+      ],
+      "selected_reviews": 18,
+      "input_estimate": 8719,
+      "request_bytes": 40568
+    },
+    {
+      "corpus": "optimist-new",
+      "source_run_id": "d76d2cac-f445-4c60-9723-69a1055e1054",
+      "source_snapshot_sha256": "eeb6e54d03d79253f417e2b3141c173c70c4c2a2aa5de4286b3e6311359e51e8",
+      "production_selector": {
+        "version": "sol-evidence-started-source-mixed-completion-v1",
+        "sha256": "ed41510685e7897f0f0252fee2a9323140dc49e630d7524a51e706b35d09f1b5"
+      },
+      "associations": 32,
+      "ordered_associations_exact": true,
+      "sol_wire_exact": true,
+      "compact_references_exact": true,
+      "request_sha256": "072c8e0e1755165f8f431bd3419912d92e098d56ca8b9fead0e78987080e5e02",
+      "statistics_unchanged": true,
+      "native_classifications_unchanged": true,
+      "complete_mixed_pairs": true,
+      "positive_illustration_categories": [
+        "service",
+        "price",
+        "quality",
+        "ambiance"
+      ],
+      "selected_reviews": 18,
+      "input_estimate": 8724,
+      "request_bytes": 40605
+    }
+  ]
+}

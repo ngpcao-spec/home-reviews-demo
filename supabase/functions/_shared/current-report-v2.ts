@@ -6,20 +6,21 @@ import {prepareHistoricalSnapshot,type HistoricalJob} from './historical-report-
 import {parallelProtocol,CURRENT_V2,type ParallelCurrent,type ParallelHistory} from './parallel-report.ts';
 import {currentBatchManifest,BATCH_TRANSPORT} from './current-batch-report.ts';
 import {localHybridTokens} from './jev-hybrid-evidence.ts';
-import {evidenceSelectorVersion} from './report-evidence-selector.ts';
-import {DIRECT_COVERAGE_VERSION} from './jev-direct-evidence-selection.ts';
+import {requestEvidenceSelector} from './report-evidence-selector.ts';
 export const CURRENT_REPORT_CODE='bdbc5d541968adf8810cdea90fdd24f26cb1ca97';
 export async function currentReportProtocol(run:HistoricalJob){
+ const selector=await requestEvidenceSelector(run.evidence_selector_version,run.evidence_selector_sha256);
  const base=run.snapshot.base,reviews=run.snapshot.reviews;
  if(run.engine!=='jev_sol_v2'||!run.request_id||!run.requested_by||!base||!reviews?.length||base.organization_id!==run.organization_id||base.establishment_id!==run.establishment_id)throw Error('CURRENT_V2_SOURCE_MISSING');
  if(typeof base.source_fingerprint!=='string'||base.stored_reviews_count!==reviews.length)throw Error('CURRENT_V2_SOURCE_MISSING');
  const report={...base,organization_id:run.organization_id,establishment_id:run.establishment_id,stored_reviews_count:reviews.length,source_fingerprint:base.source_fingerprint,id:run.id,generation_id:run.generation_id,preferred_language:run.language,ai_status:'source_frozen',ai_model:null,consultant_report:null};
  return await parallelProtocol(report as ParallelCurrent,{id:run.id,generation_id:run.generation_id,organization_id:run.organization_id,establishment_id:run.establishment_id,status:'source_frozen',snapshot:{base,reviews}} as unknown as ParallelHistory,run.requested_by,CURRENT_REPORT_CODE,
-  {version:CURRENT_V2,source_run_id:run.id,generation_id:run.generation_id,request_id:run.request_id},evidenceSelectorVersion(run.evidence_selector_version??DIRECT_COVERAGE_VERSION));
+  {version:CURRENT_V2,source_run_id:run.id,generation_id:run.generation_id,request_id:run.request_id},selector.version);
 }
 export async function processCurrentReportPreparation(admin:SupabaseClient,run:HistoricalJob,worker:string){
  const save=async(values:Record<string,unknown>)=>{const r=await admin.rpc('checkpoint_historical_report_run',{p_run_id:run.id,p_generation_id:run.generation_id,p_worker_id:worker,p_cursor:run.cursor,p_values:values});if(r.error||r.data!==true)throw Error('CURRENT_V2_CHECKPOINT_FAILED');};
  try{
+  await requestEvidenceSelector(run.evidence_selector_version,run.evidence_selector_sha256);
   if(run.engine!=='jev_sol_v2'||run.v2_report_id)throw Error('CURRENT_V2_PREPARATION_SCOPE_CHANGED');
   if(!run.snapshot.reviews||!run.snapshot.base){
    const prepared=await prepareHistoricalSnapshot(admin,run);

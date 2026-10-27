@@ -2,12 +2,12 @@
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 import {beforeAll,beforeEach,afterAll,afterEach,it,expect,vi} from 'vitest';
-import {evidenceSelectorBinding,PRIORITY_SELECTOR_VERSION} from '../../supabase/functions/_shared/report-evidence-selector';
+import {evidenceSelectorBinding,PRIORITY_SELECTOR_VERSION,MIXED_SELECTOR_VERSION} from '../../supabase/functions/_shared/report-evidence-selector';
 import {DIRECT_COVERAGE_VERSION} from '../../supabase/functions/_shared/jev-direct-evidence-selection';
 const org='00000000-0000-4000-8000-000000000001',est='00000000-0000-4000-8000-000000000002',actor='00000000-0000-4000-8000-000000000003';
 const oldSource='00000000-0000-4000-8000-000000000010',oldRequest='00000000-0000-4000-8000-000000000011',intent='00000000-0000-4000-8000-000000000012';
 const batch='00000000-0000-4000-8000-000000000013';
-let db:PGlite,deny:ReturnType<typeof vi.spyOn>,beforeDefinitions:unknown;
+let db:PGlite,deny:ReturnType<typeof vi.spyOn>,beforeDefinitions:unknown,beforeRequests:unknown;
 const query=async<T>(sql:string,params:unknown[]=[])=> (await db.query<T>(sql,params)).rows;
 async function sha(body:unknown){return (await query<{sha:string}>('select public.jls_restaurant_hash($1::jsonb) sha',[JSON.stringify(body)]))[0].sha;}
 async function enqueue(id=intent){return (await query<{id:string}>("select id from public.enqueue_current_report($1::uuid,$2::uuid,$3::uuid,'vi',$4::uuid,'gpt-6.1-sol',7)",[est,org,actor,id]))[0].id;}
@@ -45,18 +45,27 @@ beforeAll(async()=>{
  await db.query("insert into public.report_generation_requests(id,organization_id,establishment_id,authority_user_id,language,engine,source_run_id,jev_transport)values($1,$2,$3,$4,'vi','jev_sol_v2',$5,'batch_initial_v1')",[oldRequest,org,est,actor,oldSource]);
  beforeDefinitions=await query("select proname,pg_get_functiondef(oid) definition from pg_proc where proname in('enqueue_current_report','claim_historical_report_jobs','guard_report_request') order by proname");
  await db.exec(readFileSync('supabase/migrations/20261026132413_pin_report_evidence_selector.sql','utf8'));
+ // Represent both kinds of pre-existing request without activating anything.
+ await db.exec("update public.report_pipeline_settings set evidence_selector_version='sol-evidence-single-negative-source-completion-proposal-v1'");
+ await db.query("insert into public.historical_report_runs(id,organization_id,establishment_id,status)values('00000000-0000-4000-8000-000000000060',$1,$2,'completed')",[org,est]);
+ await db.query("insert into public.report_generation_requests(id,organization_id,establishment_id,authority_user_id,language,engine,source_run_id,jev_transport)values('00000000-0000-4000-8000-000000000061',$1,$2,$3,'vi','jev_sol_v2','00000000-0000-4000-8000-000000000060','batch_initial_v1')",[org,est,actor]);
+ await db.exec("update public.report_pipeline_settings set evidence_selector_version='jls-direct4-negative-mixed-coverage-v1'");
+ beforeRequests=await query('select to_jsonb(q) body from public.report_generation_requests q order by id');
+ await db.exec(readFileSync('supabase/migrations/20261026161509_pin_mixed_source_evidence_selector.sql','utf8'));
+
 },30000);
 beforeEach(async()=>{await db.exec('begin;set local role service_role');});
 afterEach(async()=>{await db.exec('rollback');expect(deny).not.toHaveBeenCalled();});
 afterAll(async()=>{await db.close();deny.mockRestore();});
 it('ships unactivated and keeps existing requests, enqueue, claim and immutable guards intact',async()=>{
  expect(await query('select evidence_selector_version from public.report_pipeline_settings')).toEqual([{evidence_selector_version:DIRECT_COVERAGE_VERSION}]);
- expect(await query('select evidence_selector_version from public.report_generation_requests')).toEqual([{evidence_selector_version:DIRECT_COVERAGE_VERSION}]);
+ expect(await query("select to_jsonb(q)-'evidence_selector_sha256' body from public.report_generation_requests q order by id")).toEqual(beforeRequests);
+ expect(await query("select tgenabled from pg_trigger where tgname='report_request_immutable'")).toEqual([{tgenabled:'O'}]);
  expect(await query("select proname,pg_get_functiondef(oid) definition from pg_proc where proname in('enqueue_current_report','claim_historical_report_jobs','guard_report_request') order by proname")).toEqual(beforeDefinitions);
  expect(await query('select * from public.report_pipeline_events')).toEqual([]);expect(await query('select * from public.test_dispatch')).toEqual([]);
 });
 it('uses the same descriptor hashes as the deployed-code registry and disallows additional fields',async()=>{
- for(const version of [DIRECT_COVERAGE_VERSION,PRIORITY_SELECTOR_VERSION]){
+ for(const version of [DIRECT_COVERAGE_VERSION,PRIORITY_SELECTOR_VERSION,MIXED_SELECTOR_VERSION]){
   const b=await evidenceSelectorBinding(version);
   expect(await query('select public.report_evidence_selector_sha($1) sha',[version])).toEqual([{sha:b.sha256}]);
   expect(await query('select public.report_evidence_selector_matches($1,$2::jsonb) ok',[version,JSON.stringify(b)])).toEqual([{ok:true}]);
@@ -124,4 +133,28 @@ it('keeps the switch service-only, rejects unknown versions, and creates one aud
  await rejects("select public.set_current_report_evidence_selector('unknown','EXPLICIT LOCAL TEST')",[],'FORBIDDEN');
  await switchTo();await switchTo();expect((await query('select * from public.report_pipeline_events')).length).toBe(1);
  expect(await query('select * from public.test_dispatch')).toEqual([]);
+});
+it('fills both version and hash at creation, overwrites caller values, and keeps old bindings after rollback',async()=>{
+ await switchTo(MIXED_SELECTOR_VERSION);const source=await enqueue(),mixed=await evidenceSelectorBinding(MIXED_SELECTOR_VERSION);
+ expect(await query('select evidence_selector_version,evidence_selector_sha256 from public.report_generation_requests where source_run_id=$1',[source]))
+  .toEqual([{evidence_selector_version:mixed.version,evidence_selector_sha256:mixed.sha256}]);
+ await rejects('update public.report_generation_requests set evidence_selector_sha256=$1 where id=$2',['0'.repeat(64),intent],'REPORT_REQUEST_IMMUTABLE');
+ await switchTo(PRIORITY_SELECTOR_VERSION);
+ expect(await enqueue('00000000-0000-4000-8000-000000000070')).toBe(source);
+ expect(await query('select evidence_selector_sha256 from public.report_generation_requests where source_run_id=$1',[source])).toEqual([{evidence_selector_sha256:mixed.sha256}]);
+ await db.query("update public.historical_report_runs set status='completed' where id=$1",[source]);
+ const future=await enqueue('00000000-0000-4000-8000-000000000071'),prior=await evidenceSelectorBinding(PRIORITY_SELECTOR_VERSION);
+ expect(await query('select evidence_selector_version,evidence_selector_sha256 from public.report_generation_requests where source_run_id=$1',[future]))
+  .toEqual([{evidence_selector_version:prior.version,evidence_selector_sha256:prior.sha256}]);
+ const directSource='00000000-0000-4000-8000-000000000072';
+ await db.query("insert into public.historical_report_runs(id,organization_id,establishment_id,status)values($1,$2,$3,'completed')",[directSource,org,est]);
+ await db.query("insert into public.report_generation_requests(id,organization_id,establishment_id,authority_user_id,language,engine,source_run_id,jev_transport,evidence_selector_version,evidence_selector_sha256)values('00000000-0000-4000-8000-000000000073',$1,$2,$3,'vi','jev_sol_v2',$4,'batch_initial_v1',$5,$6)",[org,est,actor,directSource,MIXED_SELECTOR_VERSION,'0'.repeat(64)]);
+ expect(await query('select evidence_selector_version,evidence_selector_sha256 from public.report_generation_requests where source_run_id=$1',[directSource]))
+  .toEqual([{evidence_selector_version:prior.version,evidence_selector_sha256:prior.sha256}]);
+});
+it('matches the creation-time hash as well as the descriptor and checks the new helper permissions',async()=>{
+ const b=await evidenceSelectorBinding(MIXED_SELECTOR_VERSION);
+ for(const [sha,descriptor,expected] of [[b.sha256,b,true],['0'.repeat(64),b,false],[b.sha256,{...b,sha256:'0'.repeat(64)},false]] as const)
+  expect(await query('select public.report_request_evidence_selector_matches($1,$2,$3::jsonb) ok',[b.version,sha,JSON.stringify(descriptor)])).toEqual([{ok:expected}]);
+ for(const role of ['anon','authenticated'])expect(await query('select has_function_privilege($1,$2,$3) ok',[role,'public.report_request_evidence_selector_matches(text,text,jsonb)','EXECUTE'])).toEqual([{ok:false}]);
 });

@@ -5,8 +5,7 @@ import {processBatchExperiment,batchSolDraft,measureBatchSolDraft,type BatchExpe
 import {directHash} from '../_shared/jev-direct-categories.ts';
 import {INITIAL_BATCH_CONTRACT} from '../_shared/jev-review-batches.ts';
 import {CURRENT_BATCH_VERSION} from '../_shared/current-batch-report.ts';
-import {DIRECT_COVERAGE_VERSION} from '../_shared/jev-direct-evidence-selection.ts';
-import {PRIORITY_SELECTOR_VERSION} from '../_shared/report-evidence-selector.ts';
+import {SUPPORTED_EVIDENCE_SELECTORS} from '../_shared/report-evidence-selector.ts';
 import {rehearseCurrentBatches} from '../_shared/current-batch-probe.ts';
 import {saveBatchReceipt} from '../_shared/jev-batch-receipt.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
@@ -25,7 +24,7 @@ Deno.serve(async request=>{
   if(auth.error||auth.data!==true)throw Error('UNAUTHORIZED');
   if(body.action==='capability'){
    const s=await admin.from('report_pipeline_settings').select('engine,jev_transport,evidence_selector_version,updated_at').eq('id',true).single();if(s.error)throw Error('BATCH_SETTINGS_READ_FAILED');
-   return json({version:CURRENT_BATCH_VERSION,contract:INITIAL_BATCH_CONTRACT,selector:s.data.evidence_selector_version,selectors_supported:[DIRECT_COVERAGE_VERSION,PRIORITY_SELECTOR_VERSION],routing:s.data,
+   return json({version:CURRENT_BATCH_VERSION,contract:INITIAL_BATCH_CONTRACT,selector:s.data.evidence_selector_version,selectors_supported:SUPPORTED_EVIDENCE_SELECTORS,routing:s.data,
     jev_server_access_available:!!Deno.env.get('TYPESAFE_API_KEY'),sol_server_access_available:!!Deno.env.get('OPENAI_API_KEY'),provider_calls:0,new_runs:0});
   }
   if(body.action==='simulate_current')return json(await rehearseCurrentBatches());

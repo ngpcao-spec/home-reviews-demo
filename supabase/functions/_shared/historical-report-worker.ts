@@ -17,7 +17,7 @@ import {freshEnglishAnalysisInputs} from './analysis-text-overrides-server.ts'
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
 type InputReview = ReputationReview & { review_translations?:ProviderTranslation[];review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
 export interface HistoricalJob {
-  engine?:'sol_legacy'|'jev_sol_v2';jev_transport?:'individual'|'batch_initial_v1';evidence_selector_version?:string;request_id?:string;requested_by?:string;v2_report_id?:string|null;
+  engine?:'sol_legacy'|'jev_sol_v2';jev_transport?:'individual'|'batch_initial_v1';evidence_selector_version?:string;evidence_selector_sha256?:string;request_id?:string;requested_by?:string;v2_report_id?:string|null;
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
   findings:ConsultantFinding[]; classifications:Classification[]; rejected_findings_count:number;
