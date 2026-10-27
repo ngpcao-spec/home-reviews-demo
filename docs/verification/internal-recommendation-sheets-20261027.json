@@ -1,0 +1,18 @@
+{
+  "version": "internal-recommendation-v1",
+  "source_checked_at": "2026-10-27T15:20:34.909505+00:00",
+  "source_file_sha256": "e601e2aafd75545a6418e1458992c5545cc6a20454d12c9626ca30416928452d",
+  "production_access": "SELECT only",
+  "execution": "local PostgreSQL, actual migration backfill over durable publication inputs",
+  "durable_projection_verified_without_live_reviews": true,
+  "production_writes": 0,
+  "provider_calls": 0,
+  "restaurants": 8,
+  "published_reports": 7,
+  "calculable": 7,
+  "stale_reports": 6,
+  "missing_report": 1,
+  "google_establishment_price_provided": 0,
+  "coordinates_available": 8,
+  "privacy": "Public repository: no restaurant identifiers, customer text, report references or real scores are included."
+}
