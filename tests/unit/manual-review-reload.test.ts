@@ -57,6 +57,15 @@ beforeAll(async()=>{ db=new PGlite({extensions:{pgcrypto}});await db.waitReady;
  await db.exec('create table public.restaurant_recommendation_sheets(establishment_id uuid,language text);create table public.review_display_texts(review_id uuid)');
  for(const table of ['review_translations','review_provider_payloads','review_reply_drafts','review_display_texts','notifications']) await db.exec('alter table public.'+table+' add constraint reload_'+table+'_fk foreign key(review_id) references public.reviews(id) on delete cascade');
  await db.exec(migration('_manual_atomic_review_reload.sql'));
+ const production=JSON.parse(readFileSync('tests/fixtures/review-reload-production-guards.json','utf8'));
+ for(const c of production.checks){
+  await db.exec('alter table public.reviews drop constraint if exists "'+c.name+'"');
+  await db.exec('alter table public.reviews add constraint "'+c.name+'" '+c.definition);
+ }
+ await db.exec("create table if not exists public.ai_webhook_config(singleton boolean,secret text);insert into public.ai_webhook_config values(true,'SYNTHETIC');");
+ await db.exec(production.aiTrigger.body);
+ await db.exec('drop trigger reviews_enqueue_ai_after_insert on public.reviews;'+production.aiTrigger.definition);
+ await db.exec(migration('_allow_historical_attention_without_auto_ai.sql'));
  await db.exec(`grant all on all tables in schema public to service_role;grant usage on schema extensions,private to service_role;
  update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;`);
 },90000);
@@ -231,4 +240,82 @@ it.each([null,{http_status:null,error:'network outcome unknown'}])('blocks consu
  await db.query("insert into public.analysis_jev_batch_runs(id,organization_id,establishment_id,status,armed,sol_request_count,sol_receipt) values($1,$2,$3,'failed',false,1,$4)",[run,org,est,receipt]);
  await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'RELOAD_GENERATION_OR_RESULT_PENDING');
  expect((await db.query('select count(*)::int n from public.reviews where establishment_id=$1',[est])).rows[0].n).toBe(1);
+});
+
+it('reproduces the production CHECK failure, rolls back the old corpus/report, then installs the identical staged 1--5-star batch without automatic AI',async()=>{
+ await seed();const report=crypto.randomUUID();
+ await db.query(`insert into public.current_report_publications(establishment_id,organization_id,language,report_id,source_run_id,source_created_at,generated_at,scope,document,source_bindings,evidence_bindings)
+ values($1,$2,'vi',$3,$4,now()-interval '1 hour',now(),'{}','{"summary":"UNCHANGED"}','[]','[]')`,[est,org,report,crypto.randomUUID()]);
+ const j=await running();await stage(j,items(150,1790));await db.exec('reset role');
+ const fixed=(await db.query("select pg_get_constraintdef(oid) d from pg_constraint where conrelid='public.reviews'::regclass and conname='reviews_attention_rule'")).rows[0].d;
+ const old=JSON.parse(readFileSync('tests/fixtures/review-reload-production-guards.json','utf8')).checks.find((c:{name:string})=>c.name==='reviews_attention_rule').definition;
+ await db.exec('alter table public.reviews drop constraint reviews_attention_rule;alter table public.reviews add constraint reviews_attention_rule '+old);
+ const before=(await db.query('select sha256 from private.review_reload_staging where job_id=$1',[j.id])).rows[0].sha256;
+ await db.exec('set local role service_role');await reject("select public.apply_review_reload($1,'worker')",[j.id],'reviews_attention_rule');
+ expect((await db.query('select original_text from public.reviews where establishment_id=$1',[est])).rows).toEqual([{original_text:'Old original'}]);
+ expect((await db.query('select document from public.current_report_publications where establishment_id=$1',[est])).rows[0].document).toEqual({summary:'UNCHANGED'});
+ expect((await db.query('select sha256 from private.review_reload_staging where job_id=$1',[j.id])).rows[0].sha256).toBe(before);
+ await db.exec('reset role');await db.exec('alter table public.reviews drop constraint reviews_attention_rule;alter table public.reviews add constraint reviews_attention_rule '+fixed);
+ await db.exec('set local role service_role');await apply(j.id);
+ const rows=(await db.query('select rating,historical_import,requires_attention,requires_ai_analysis,ai_status,ai_attempt_count from public.reviews where establishment_id=$1',[est])).rows;
+ expect(rows).toHaveLength(150);expect(new Set(rows.map(r=>r.rating)).size).toBe(5);
+ for(const r of rows)expect(r).toMatchObject({historical_import:true,requires_attention:(r.rating as number)<=3,requires_ai_analysis:false,ai_status:null,ai_attempt_count:0});
+ await db.exec('reset role');
+ expect((await db.query("select count(*)::int n from private.fake_net_calls where url like '%/analyze-review'")).rows[0].n).toBe(0);
+ expect((await db.query('select count(*)::int n from public.report_generation_requests')).rows[0].n).toBe(0);
+ expect((await db.query('select count(*)::int n from public.historical_report_runs')).rows[0].n).toBe(0);
+ expect((await db.query('select count(*)::int n from public.reviews where establishment_id=$1',[other])).rows[0].n).toBe(1);
+});
+
+it('keeps live-review constraints and proves the production AI trigger would be observed by the HTTP mock',async()=>{
+ const insert=`insert into public.reviews(organization_id,establishment_id,external_review_id,rating,text,original_text,published_at,historical_import,requires_attention,requires_ai_analysis)
+ values($1,$2,$3,$4,'Text','Text','2020-01-01',$5,$6,$7)`;
+ for(const rating of [1,2,3]){
+  await reject(insert,[org,est,'invalid-live-'+rating,rating,false,true,false],'reviews_attention_rule');
+  await reject(insert,[org,est,'invalid-attention-'+rating,rating,true,false,false],'reviews_attention_rule');
+  await db.query(insert,[org,est,'valid-historical-'+rating,rating,true,true,false]);
+ }
+ for(const rating of [4,5])await reject(insert,[org,est,'invalid-positive-'+rating,rating,true,true,false],'reviews_attention_rule');
+ expect((await db.query("select count(*)::int n from private.fake_net_calls where url like '%/analyze-review'")).rows[0].n).toBe(0);
+ await db.query(insert,[org,est,'live-control',2,false,true,true]);
+ expect((await db.query("select count(*)::int n from private.fake_net_calls where url like '%/analyze-review'")).rows[0].n).toBe(1);
+});
+
+it('Retry requeues the validated batch with identical native IDs, hash and counters, without another collection reservation',async()=>{
+ await seed();const j=await running();await stage(j,items(150,1790));
+ await db.query("select public.fail_review_reload($1,'worker','reviews_attention_rule')",[j.id]);await db.exec('reset role');
+ const before=(await db.query('select sha256 from private.review_reload_staging where job_id=$1',[j.id])).rows[0].sha256;
+ const resumed=await request();expect(resumed.id).toBe(j.id);
+ expect(resumed).toMatchObject({provider_run_id:'native-run',provider_dataset_id:'native-dataset',reviews_fetched:150,provider_requests:0});
+ expect((await db.query('select count(*)::int n from public.initial_import_jobs where request_kind=\'reload\'')).rows[0].n).toBe(1);
+ expect((await db.query('select sha256 from private.review_reload_staging where job_id=$1',[j.id])).rows[0].sha256).toBe(before);
+ await db.query("update public.initial_import_jobs set status='running',locked_by='worker',lease_until=now()+interval '5 minutes' where id=$1",[j.id]);
+ await db.exec('set local role service_role');expect((await db.query("select public.review_reload_stage_ready($1,'worker') ok",[j.id])).rows[0].ok).toBe(true);
+ await apply(j.id);
+});
+
+it.each([false,true])('blocks expired/deleted validated stages before any provider fallback (legacy marker=%s)',async legacy=>{
+ await seed();const j=await running();await stage(j,items(150,1790));
+ await db.query("select public.fail_review_reload($1,'worker','reviews_attention_rule')",[j.id]);await db.exec('reset role');
+ if(legacy)await db.query("update public.initial_import_jobs set result='{}',persistence_started_at=now() where id=$1",[j.id]);
+ await db.query("update private.review_reload_staging set created_at=now()-interval '25 hours' where job_id=$1",[j.id]);
+ await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'RELOAD_VALIDATED_STAGE_EXPIRED');
+ await db.exec('select private.expire_review_reload_stages()');
+ expect((await db.query('select count(*)::int n from private.review_reload_staging')).rows[0].n).toBe(0);
+ await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'RELOAD_VALIDATED_STAGE_EXPIRED');
+ await db.query("update public.initial_import_jobs set status='running',locked_by='worker',lease_until=now()+interval '5 minutes' where id=$1",[j.id]);
+ await db.exec('set local role service_role');
+ await reject("select public.review_reload_stage_ready($1,'worker')",[j.id],'RELOAD_VALIDATED_STAGE_EXPIRED');
+ expect((await db.query('select external_review_id from public.reviews where establishment_id=$1',[est])).rows).toEqual([{external_review_id:'old'}]);
+});
+
+it('preserves the validation marker for a zero-review stage so its expiration cannot fall through to provider access',async()=>{
+ await seed();const j=await running();
+ const zero=[{cid:'fixture',placeId:'place-fixture',reviewsCount:0,language:'vi',scrapedAt:new Date().toISOString()}];
+ await stage(j,zero as ReturnType<typeof items>);
+ await db.query("select public.fail_review_reload($1,'worker','SYNTHETIC_DATABASE_ERROR')",[j.id]);await db.exec('reset role');
+ const saved=(await db.query('select reviews_fetched,result from public.initial_import_jobs where id=$1',[j.id])).rows[0];
+ expect(saved.reviews_fetched).toBe(0);expect(saved.result).toHaveProperty('validated_stage.sha256');
+ await db.query("update private.review_reload_staging set created_at=now()-interval '25 hours' where job_id=$1",[j.id]);await db.exec('select private.expire_review_reload_stages()');
+ await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'RELOAD_VALIDATED_STAGE_EXPIRED');
 });

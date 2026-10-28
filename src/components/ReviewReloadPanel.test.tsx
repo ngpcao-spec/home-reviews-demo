@@ -43,3 +43,12 @@ it('observes a running reload read-only and makes the normal manual-report optio
  view.rerender(ui('vi',{...place,currentReviewCount:5,reviewReload:{requestId,status:'completed',count:5}}))
  expect(screen.getByRole('status')).toHaveTextContent('Có 5 đánh giá.')
 })
+
+it('the Retry button after a confirmed SQL failure sends a new manual intent for the same restaurant, without retrying on mount',async()=>{
+ const previous=crypto.randomUUID();localStorage.setItem('review-reload:user:place',previous)
+ render(ui('fr',{...place,reviewReload:{jobId:'saved-stage-job',requestId:previous,status:'failed'}}))
+ expect(reload).not.toHaveBeenCalled();expect(localStorage.getItem('review-reload:user:place')).toBeNull()
+ await userEvent.click(screen.getByRole('button',{name:'Réessayer'}))
+ expect(reload).toHaveBeenCalledTimes(1);expect(reload.mock.calls[0][0]).toBe(place.id)
+ expect(reload.mock.calls[0][1]).not.toBe(previous)
+})
