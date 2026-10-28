@@ -1,5 +1,7 @@
 # Fiche interne de recommandation V1
 
+Historique de la formule −2. La version active suivante, −4, est documentée dans [internal-recommendation-sheet-v2.md](internal-recommendation-sheet-v2.md). Les fonctions V1 restent disponibles pour l'audit, sans être utilisées par le nouveau déclencheur de publication.
+
 Cette PR prépare le calcul et la projection privée d'un rapport durable. Elle
 ne déploie rien, ne crée aucune génération et ne raccorde pas HOME AI.
 
