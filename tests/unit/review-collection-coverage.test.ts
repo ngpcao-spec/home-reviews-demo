@@ -59,7 +59,7 @@ beforeAll(async () => {
     create function private.sanitize_snapshot() returns trigger language plpgsql as $$begin new.raw_place_payload:='{}'; return new;end$$;
     create trigger retention_sanitize before insert or update on public.establishment_snapshots for each row execute function private.sanitize_snapshot();
     create table public.reviews(establishment_id uuid,external_review_id text,primary key(establishment_id,external_review_id));
-    create table public.review_sync_jobs(id uuid primary key default gen_random_uuid(),establishment_id uuid,status text default 'queued',provider_start_attempted_at timestamptz,apify_run_id text);
+    create table public.review_sync_jobs(id uuid primary key default gen_random_uuid(),establishment_id uuid,status text default 'queued',provider_start_attempted_at timestamptz,apify_run_id text,error_code text);
     create function public.review_sync_spread_offset(uuid,integer) returns interval language sql as $$select interval '0 seconds'$$;
     create function private.is_org_member(p uuid) returns boolean language sql security definer as $$select exists(select 1 from public.organization_members where organization_id=p and user_id=auth.uid())$$;
     create table public.review_corpus_policy(id boolean,enabled boolean default true,paused boolean default false,ingestions_paused boolean default false,retired_relations text[] default '{}');
@@ -165,6 +165,20 @@ it('refuses a fresh attempt for a complete restaurant or an unconfirmed terminal
   await reject('select public.retry_initial_import_job($1)', [small.id], 'IMPORT_JOB_NOT_RETRYABLE')
   await db.query('update public.initial_import_jobs set provider_finished_observed_at=null where id=$1', [historical.id])
   await reject('select public.retry_initial_import_job($1)', [historical.id], 'IMPORT_RESULT_NOT_CONFIRMED')
+})
+
+it('blocks an abandoned sync whose known provider run has no confirmed terminal outcome', async () => {
+  await db.query(`insert into public.review_sync_jobs(establishment_id,status,provider_start_attempted_at,apify_run_id,error_code)
+    values($1,'dead',now(),'known-but-unconfirmed','APIFY_TIMEOUT')`, [historical.est])
+  await reject('select public.retry_initial_import_job($1)', [historical.id], 'REVIEW_COLLECTION_BUSY')
+  expect((await db.query('select provider_attempt_history from public.initial_import_jobs where id=$1',[historical.id])).rows[0].provider_attempt_history).toEqual([])
+})
+
+it('refuses a competing initial import before clearing the previous consumed receipt', async () => {
+  await db.query(`insert into public.initial_import_jobs(organization_id,user_id,query,expected_google_id,status)
+    values($1,$2,'synthetic',$3,'queued')`, [org,user,historical.est])
+  await reject('select public.retry_initial_import_job($1)', [historical.id], 'REVIEW_COLLECTION_BUSY')
+  expect((await db.query('select provider_attempt_history from public.initial_import_jobs where id=$1',[historical.id])).rows[0].provider_attempt_history).toEqual([])
 })
 
 it('allows only the authorized account and organization; keeps helper functions private', async () => {

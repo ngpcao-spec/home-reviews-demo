@@ -107,7 +107,13 @@ begin
     select * into e from public.establishments where id=j.establishment_id and organization_id=j.organization_id for update;
     if not found or e.initial_import_job_id is distinct from j.id then raise exception 'IMPORT_JOB_NOT_RETRYABLE'; end if;
     if exists(select 1 from public.review_sync_jobs s where s.establishment_id=e.id
-      and (s.status in ('queued','running','retry') or (s.provider_start_attempted_at is not null and s.apify_run_id is null))) then
+      and (s.status in ('queued','running','retry') or
+        ((s.provider_start_attempted_at is not null or s.apify_run_id is not null) and s.status<>'completed'
+          and (s.apify_run_id is null or coalesce(s.error_code,'') not in ('APIFY_RUN_FAILED','APIFY_RUN_TIMED-OUT','APIFY_RUN_ABORTED'))))) then
+      raise exception 'REVIEW_COLLECTION_BUSY';
+    end if;
+    if exists(select 1 from public.initial_import_jobs q where q.organization_id=j.organization_id
+      and q.expected_google_id=j.expected_google_id and q.id<>j.id and q.status in ('queued','running','retry')) then
       raise exception 'REVIEW_COLLECTION_BUSY';
     end if;
   end if;
