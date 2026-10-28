@@ -1,0 +1,70 @@
+{
+  "checks": [
+    {
+      "name": "reviews_ai_attempt_count_check",
+      "validated": true,
+      "definition": "CHECK ((ai_attempt_count >= 0))"
+    },
+    {
+      "name": "reviews_ai_rating_check",
+      "validated": true,
+      "definition": "CHECK ((((rating >= 1) AND (rating <= 3)) OR ((ai_summary IS NULL) AND (ai_suggested_reply IS NULL) AND (ai_detected_language IS NULL) AND (ai_analyzed_at IS NULL) AND (ai_status IS NULL) AND (ai_error IS NULL))))"
+    },
+    {
+      "name": "reviews_ai_status_check",
+      "validated": true,
+      "definition": "CHECK (((ai_status IS NULL) OR (ai_status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text]))))"
+    },
+    {
+      "name": "reviews_ai_token_counts_check",
+      "validated": true,
+      "definition": "CHECK ((((ai_input_tokens IS NULL) OR (ai_input_tokens >= 0)) AND ((ai_output_tokens IS NULL) OR (ai_output_tokens >= 0)) AND ((ai_reasoning_tokens IS NULL) OR (ai_reasoning_tokens >= 0)) AND ((ai_total_tokens IS NULL) OR (ai_total_tokens >= 0))))"
+    },
+    {
+      "name": "reviews_attention_rule",
+      "validated": true,
+      "definition": "CHECK (((((rating >= 1) AND (rating <= 3)) AND requires_attention AND requires_ai_analysis) OR ((rating = ANY (ARRAY[4, 5])) AND (NOT requires_attention) AND (NOT requires_ai_analysis))))"
+    },
+    {
+      "name": "reviews_negative_feedback_status_check",
+      "validated": true,
+      "definition": "CHECK (((negative_feedback_status IS NULL) OR (negative_feedback_status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))))"
+    },
+    {
+      "name": "reviews_rating_check",
+      "validated": true,
+      "definition": "CHECK (((rating >= 1) AND (rating <= 5)))"
+    },
+    {
+      "name": "reviews_reply_draft_text_length",
+      "validated": true,
+      "definition": "CHECK (((reply_draft_text IS NULL) OR (char_length(reply_draft_text) <= 4000)))"
+    },
+    {
+      "name": "reviews_reply_draft_version_nonnegative",
+      "validated": true,
+      "definition": "CHECK ((reply_draft_version >= 0))"
+    },
+    {
+      "name": "reviews_source_provider_check",
+      "validated": true,
+      "definition": "CHECK (((source_provider IS NULL) OR (source_provider = ANY (ARRAY['apify'::text, 'outscraper'::text, 'mock'::text]))))"
+    },
+    {
+      "name": "reviews_status_check",
+      "validated": true,
+      "definition": "CHECK ((status = ANY (ARRAY['new'::text, 'to_process'::text, 'processed'::text, 'ignored'::text])))"
+    },
+    {
+      "name": "reviews_translated_reply_text_length",
+      "validated": true,
+      "definition": "CHECK (((translated_reply_text IS NULL) OR (char_length(translated_reply_text) <= 4000)))"
+    }
+  ],
+  "aiTrigger": {
+    "body": "CREATE OR REPLACE FUNCTION private.enqueue_review_ai()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  webhook_secret text;\nbegin\n  if new.historical_import\n     or new.rating < 1\n     or new.rating > 4\n     or (new.rating = 4 and length(btrim(coalesce(new.original_text, new.text, ''))) = 0) then\n    return new;\n  end if;\n\n  select config.secret\n  into webhook_secret\n  from public.ai_webhook_config as config\n  where config.singleton;\n\n  perform net.http_post(\n    url := 'https://ihuztjkblywzjdruusdj.supabase.co/functions/v1/analyze-review',\n    headers := jsonb_build_object(\n      'Content-Type', 'application/json',\n      'x-home-reviews-webhook', webhook_secret\n    ),\n    body := jsonb_build_object('review_id', new.id)\n  );\n\n  return new;\nend\n$function$\n",
+    "name": "reviews_enqueue_ai_after_insert",
+    "function": "private.enqueue_review_ai()",
+    "definition": "CREATE TRIGGER reviews_enqueue_ai_after_insert AFTER INSERT ON public.reviews FOR EACH ROW WHEN (((new.historical_import = false) AND ((new.rating >= 1) AND (new.rating <= 4)) AND (review_usable_text(new.original_text, new.text) IS NOT NULL))) EXECUTE FUNCTION private.enqueue_review_ai()"
+  }
+}
