@@ -46,7 +46,7 @@ export function AnalyticsPage() {
   const [requestVersion, setRequestVersion] = useState(0)
   const [demoFeedback, setDemoFeedback] = useState<HistoricalFeedback>(null)
   const generation = useHistoricalGeneration(cache, currentUser.id ?? currentUser.email, resolvedEstablishmentId, preferredLanguage,
-    !demoMode && periodMode === 'historical')
+    !demoMode && periodMode === 'historical', establishments.find(item=>item.id===resolvedEstablishmentId)?.reviewReload?.completedAt)
   const historicalGenerating = generation.phase === 'generating' || generation.phase === 'paused'
   const historicalFeedback = demoMode ? demoFeedback : generation.feedback === 'empty' ? 'empty' : generation.phase === 'failed' ? 'error' : generation.feedback
   const historicalProgress = generation.run?.progress_unit==='jev_batches'

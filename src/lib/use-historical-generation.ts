@@ -4,12 +4,12 @@ import { HistoricalGeneration, type GenerationReply, type HistoricalRun } from '
 import { mapHistoricalReport, type HistoricalReportRow } from './historical-report'
 import { readUiState, saveUiState } from './navigation-state'
 import { supabase } from './supabase'
+import { historicalGenerationKeys } from './historical-generation-keys'
 
-export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: string, establishmentId: string, language: string | null, enabled: boolean) {
+export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: string, establishmentId: string, language: string | null, enabled: boolean, reloadCompletedAt?: string) {
   const controller = useMemo(() => {
-    const key = `historical:${establishmentId}:${language}`
-    const storageKey = `historical-run-recent-text-100-6m-v1:${establishmentId}:${language}`
-    return cache.generation(key, () => new HistoricalGeneration<HistoricalReportRow>({
+    const { reportKey: key, controllerKey, storageKey } = historicalGenerationKeys(establishmentId, language, reloadCompletedAt)
+    return cache.generation(controllerKey, () => new HistoricalGeneration<HistoricalReportRow>({
       establishmentId, language: language ?? '',
       visible: () => document.visibilityState === 'visible' && navigator.onLine,
       persist: run => saveUiState(userId, storageKey, run),
@@ -48,7 +48,7 @@ export function useHistoricalGeneration(cache: AnalyticsSessionCache, userId: st
         if(data)cache.put(key, mapHistoricalReport(data as HistoricalReportRow), data.updated_at ?? data.generated_at ?? '')
       },
     }, readUiState<HistoricalRun>(userId, storageKey)))
-  }, [cache, userId, establishmentId, language])
+  }, [cache, userId, establishmentId, language, reloadCompletedAt])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
   useEffect(() => {
     if (!enabled || !establishmentId || !language) return
