@@ -1,7 +1,9 @@
 import {add, compare, exactJson, quotient, rational, subtract, type Rational} from './restaurant-recommendation-numbers.ts';
+import {PLACE_FEATURES,placeFeatureLabel,placeCategories,taxonomyValue,type TaxonomyKind} from './google-place-taxonomy.ts';
+import {scheduledOpening,PLACE_PROFILE_VERSION,type PlaceProfile} from './google-place-profile.ts';
 import {googleMoneyRange,googlePriceLevel,type MoneyRange} from './google-maps-prices.ts';
 
-export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v1';
+export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v2';
 export const COMPARABLE_SCORE_GAP = '0.10';
 export const COMPARABLE_DISTANCE_METRES = 250;
 export const CATEGORIES = ['quality', 'service', 'ambiance'] as const;
@@ -10,7 +12,8 @@ export type Point = {latitude: number; longitude: number};
 export type Area = {kind: 'radius'; metres: number} | {kind: 'bounds'; south: number; north: number; west: number; east: number};
 export type Budget = {kind: 'price_level'; allowed: number[]} | {kind: 'amount'; currency: string; maximum: number; minimum?: number};
 export type Request = {
-  origin: Point; area: Area; cuisines?: string[]; budget?: Budget;
+  origin: Point; area: Area; cuisines?: string[]; specialties?: string[]; usages?: string[]; budget?: Budget;
+  visit_at?: string; hours_kind?: 'venue'|'kitchen'|'delivery'|'takeaway'|'breakfast';
   preferences?: {categories?: Category[]; features?: string[]}; required_features?: string[];
 };
 type Obj = Record<string, unknown>;
@@ -34,34 +37,34 @@ export type Proposal = {
   cuisines: {values: string[]; source: string | null; observed_at: string | null};
   scores: Record<Category, Score> & {global: Score}; budget: Prices; budget_match: 'not_requested' | 'google_level' | 'google_range';
   reasons: {code: string; category?: Category; feature?: string; citations?: Citation[]}[]; reservations: Citation[];
-  features: Record<string, {status: 'reported' | 'conflicted' | 'not_documented'; citations: Citation[]}>;
+  features: Record<string, {status: 'reported' | 'denied' | 'conflicted' | 'not_documented'; citations: Citation[]; label?:string; google?:unknown}>;
+  practical:PlaceProfile|null; specialties:string[]; usages:string[];
+  opening:{status:'not_requested'|'scheduled_open'; live:false; holiday_guarantee:false};
+  contradictions:{feature:string; google:unknown; citations:Citation[]}[];
   report: {id: string; generated_at: string; language: string; freshness: 'current'; corpus: Obj};
 };
 type Candidate = {proposal: Proposal; global: Rational; preference: Rational; matches: number; band: number; preference_band: number};
 export type Result = {
   version: string; comparable_score_gap: string; proposals: Proposal[];
   excluded: {establishment_id: string; name: string; report_id: string; reasons: string[]}[];
-  notices: string[]; refinements: {kind: 'closer' | 'lower_price_level' | 'lower_price_range'; from_id: string; alternative_id: string}[];
+  notices: string[]; refinements: {kind: 'closer' | 'lower_price_level' | 'lower_price_range' | 'documented_feature'; feature?:string; from_id: string; alternative_id: string}[];
 };
 const obj = (v: unknown): Obj => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Obj : {};
 const str = (v: unknown) => typeof v === 'string' ? v : null;
 const list = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
 const key = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
-const cuisineAliases: Record<string, string> = {'italien':'italian', 'italienne':'italian', 'y':'italian', 'viet nam':'vietnamese', 'vietnamien':'vietnamese', 'vietnamienne':'vietnamese', 'hai san':'seafood', 'fruits de mer':'seafood', 'europeen':'european', 'europeenne':'european', 'grillades':'barbecue', 'mon nuong':'barbecue'};
-const categoryCuisines: Record<string,string> = Object.fromEntries([
-  ['italian',['italian restaurant','restaurant italien','nha hang y']],
-  ['vietnamese',['vietnamese restaurant','restaurant vietnamien','nha hang viet nam']],
-  ['seafood',['seafood restaurant','restaurant de fruits de mer','nha hang hai san']],
-  ['pizza',['pizza restaurant','pizzeria','nha hang pizza']],
-  ['european',['european restaurant','restaurant europeen','nha hang chau au']],
-  ['barbecue',['barbecue restaurant','restaurant de grillades','nha hang mon nuong','bbq']],
-  ['steak',['steak house','steakhouse','nha hang bit tet']],
-].flatMap(([value,labels]) => (labels as string[]).map(label => [label,value as string])));
-const cuisine = (s: string) => Object.hasOwn(cuisineAliases,key(s)) ? cuisineAliases[key(s)] : Object.hasOwn(categoryCuisines,key(s)) ? categoryCuisines[key(s)] : key(s);
-function documentedCuisines(google: Obj) {
-  if (google.source !== 'google_maps_import') return [];
-  return [...new Set([...list(google.cuisine_types).filter((x):x is string => typeof x === 'string').map(cuisine),
-    ...list(google.google_categories).filter((x):x is string => typeof x === 'string').flatMap(x => Object.hasOwn(categoryCuisines,key(x)) ? [categoryCuisines[key(x)]] : [])])].sort();
+const cuisine=(s:string)=>taxonomyValue('cuisines',s)??key(s);
+function documentedTaxonomy(google:Obj,profile:PlaceProfile|null,kind:TaxonomyKind){
+ if(profile)return profile.categories[kind];
+ if(google.source!=='google_maps_import')return [];
+ const labels=[...list(google.cuisine_types),...list(google.google_categories)].filter((s):s is string=>typeof s==='string');
+ return placeCategories(labels)[kind];
+}
+function practicalProfile(row:SheetRow):PlaceProfile|null{
+ const p=obj(row.metadata.google_place_profile),i=obj(p.identity),binding=obj(p.binding);
+ return p.version===PLACE_PROFILE_VERSION&&binding.establishment_id===row.establishment_id&&binding.organization_id===row.organization_id
+  &&i.source==='google_maps_place_details'&&typeof i.observed_at==='string'&&Number.isFinite(Date.parse(i.observed_at))
+  &&p.categories&&p.hours&&p.attributes&&p.contacts ? p as PlaceProfile : null;
 }
 const canonical = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.map(x => JSON.parse(canonical(x))) : v && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, JSON.parse(canonical((v as Obj)[k]))])) : v);
@@ -85,7 +88,9 @@ function validateRequest(r: Request) {
       || r.budget.minimum !== undefined && (!Number.isFinite(r.budget.minimum) || r.budget.minimum < 0 || r.budget.minimum > r.budget.maximum)) throw Error('INVALID_BUDGET');
   }
   if (r.preferences?.categories?.some(c => !CATEGORIES.includes(c))) throw Error('INVALID_CATEGORY_PREFERENCE');
-  if (r.cuisines?.some(c => !c.trim())) throw Error('INVALID_CUISINE');
+  if ([...(r.cuisines??[]),...(r.specialties??[]),...(r.usages??[])].some(c=>typeof c!=='string'||!c.trim())) throw Error('INVALID_CUISINE');
+  if(r.visit_at&&(!/T.*(?:Z|[+-]\d\d:\d\d)$/.test(r.visit_at)||!Number.isFinite(Date.parse(r.visit_at))))throw Error('INVALID_VISIT_TIME');
+  if(r.hours_kind&&!['venue','kitchen','delivery','takeaway','breakfast'].includes(r.hours_kind))throw Error('INVALID_HOURS_KIND');
   if ([...(r.preferences?.features ?? []),...(r.required_features ?? [])].some(f => typeof f !== 'string' || !/^[a-z_]{1,40}$/.test(f))) throw Error('INVALID_FEATURE');
 }
 function inArea(p: Point, distance: number, area: Area) {
@@ -135,6 +140,13 @@ function featureStatus(name: string, positives: Citation[], negatives: Citation[
   const yes = positives.filter(p => hasPhrase(p.text, name) && affirmative(p.text) && !contrary(p));
   const no = [...negatives.filter(p => hasPhrase(p.text, name) || contrary(p)), ...positives.filter(p => hasPhrase(p.text, name) && (!affirmative(p.text) || contrary(p)))];
   return {status: yes.length ? no.length ? 'conflicted' : 'reported' : no.length ? 'conflicted' : 'not_documented', citations: [...yes, ...no]};
+}
+function combinedFeature(name:string,profile:PlaceProfile|null,positives:Citation[],negatives:Citation[],language:string):Proposal['features'][string]{
+ const report=featureStatus(name,positives,negatives),fact=profile&&Object.hasOwn(profile.attributes.facts,name)?profile.attributes.facts[name]:undefined;
+ const google=fact?{...fact,source:profile!.attributes.source,observed_at:profile!.attributes.observed_at}:undefined;
+ const status=fact?.status==='conflicted'||fact?.value===true&&report.status==='conflicted'||fact?.value===false&&report.status==='reported'?'conflicted'
+  :fact?.value===false?'denied':fact?.value===true?'reported':report.status;
+ return {status,citations:report.citations,label:placeFeatureLabel(name,language),...(google?{google}:{})};
 }
 function priceRange(raw: unknown): Prices['establishment']['range'] {
   const r=googleMoneyRange(raw);
@@ -197,7 +209,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
   const result: Result = {version:RECOMMENDATION_ENGINE_VERSION,comparable_score_gap:COMPARABLE_SCORE_GAP,proposals:[],excluded:[],notices:[],refinements:[]};
   const features = [...new Set([...(request.preferences?.features ?? []),...(request.required_features ?? [])])];
   const preferredCategories = [...new Set(request.preferences?.categories ?? [])];
-  const unknownFeatures = features.filter(f => !Object.hasOwn(featurePhrases,f));
+  const unknownFeatures = features.filter(f => !Object.hasOwn(featurePhrases,f)&&!Object.hasOwn(PLACE_FEATURES,f));
   result.notices.push(...unknownFeatures.map(f => 'UNSUPPORTED_FEATURE:' + f));
   const authorised = rows.filter(r => r.organization_id === organization && r.language === language);
   const seen = new Set<string>(), duplicates = new Set<string>();
@@ -210,16 +222,22 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     if (duplicates.has(row.establishment_id)) reasons.push('DUPLICATE_SHEET');
     if (row.stale || row.publication?.stale) reasons.push('STALE_SHEET');
     if (row.calculation_version !== 'internal-recommendation-v2') reasons.push('UNSUPPORTED_SCORE_VERSION');
-    const point = obj(google.coordinates) as Point;
+    const profile=practicalProfile(row);
+    if(profile?.hours.permanently_closed===true||profile?.hours.temporarily_closed===true)reasons.push('GOOGLE_CLOSURE_OBSERVED');
+    const opening=request.visit_at&&profile?scheduledOpening(profile,request.visit_at,request.hours_kind):null;
+    if(request.visit_at&&opening!=='scheduled_open')reasons.push(opening==='scheduled_closed'?'OUTSIDE_DOCUMENTED_HOURS':'HOURS_NOT_VERIFIABLE');
+    const point = obj(profile?.identity.coordinates??google.coordinates) as Point;
     const distance = validPoint(point) ? distanceMetres(request.origin,point) : null;
     if (distance === null) reasons.push('MISSING_COORDINATES');
     else if (!inArea(point,distance,request.area)) reasons.push('OUTSIDE_AREA');
-    const types = documentedCuisines(google);
+    const types=documentedTaxonomy(google,profile,'cuisines'),specialties=documentedTaxonomy(google,profile,'specialties'),usages=documentedTaxonomy(google,profile,'usages');
+    for(const [kind,values]of [['specialties',specialties],['usages',usages]] as const)if(request[kind]?.length&&!request[kind]!.some(c=>values.includes(taxonomyValue(kind,c)??key(c))))reasons.push(kind.toUpperCase()+'_NOT_CONFIRMED');
     if (request.cuisines?.length && !request.cuisines.some(c => types.includes(cuisine(c)))) reasons.push(types.length ? 'CUISINE_MISMATCH' : 'CUISINE_NOT_DOCUMENTED');
     const budget = prices(row.metadata,language), match = budgetMatch(budget,request.budget);
     if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
     const positives = citations(row,'positive_aspects'), reservations = citations(row,'reservations');
-    const observations = Object.fromEntries(features.map(f => [f,featureStatus(f,positives,reservations)]));
+    const observations=Object.fromEntries(features.map(f=>[f,combinedFeature(f,profile,positives,reservations,language)]));
+    const contradictions=Object.keys(featurePhrases).map(f=>({feature:f,...combinedFeature(f,profile,positives,reservations,language)})).filter(x=>x.status==='conflicted'&&x.google&&x.citations.length).map(x=>({feature:x.feature,google:x.google,citations:x.citations}));
     if (request.required_features?.some(f => observations[f].status !== 'reported')) reasons.push('REQUIRED_FEATURE_NOT_CONFIRMED');
     let global: ReturnType<typeof score> | null = null, categories: Record<Category, ReturnType<typeof score>> | null = null;
     try {
@@ -238,12 +256,13 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const choiceReasons: Proposal['reasons'] = [{code:'INTERNAL_V2_GLOBAL'},{code:'WITHIN_REQUESTED_AREA'}];
     if (request.cuisines?.length) choiceReasons.push({code:'DOCUMENTED_CUISINE_MATCH'});
     for (const c of preferredCategories) choiceReasons.push({code:'CATEGORY_PREFERENCE',category:c,citations:positives.filter(p => p.category === c)});
-    for (const f of features) if (observations[f].status === 'reported') choiceReasons.push({code:'REPORTED_FEATURE',feature:f,citations:observations[f].citations});
+    for (const f of features) if (observations[f].status === 'reported') choiceReasons.push({code:observations[f].google?'GOOGLE_DECLARED_FEATURE':'REPORTED_FEATURE',feature:f,citations:observations[f].citations});
     if (!preferredCategories.length) choiceReasons.push(...positives.filter(p => CATEGORIES.includes(p.category as Category)).map(p => ({code:'REPORT_STRENGTH',citations:[p]})));
     const catsWithEvidence = preferredCategories.filter(c => positives.some(p => p.category === c));
     const sum = catsWithEvidence.reduce((s,c) => add(s,categories![c].exact),rational('0'));
     const preference = catsWithEvidence.length ? {n:sum.n,d:sum.d * BigInt(catsWithEvidence.length)} : rational('0');
-    const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:'straight_line',cuisines:{values:types,source:str(google.source),observed_at:str(google.observed_at)},
+    const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:'straight_line',cuisines:{values:types,source:profile?.categories.source??str(google.source),observed_at:profile?.categories.observed_at??str(google.observed_at)},
+      practical:profile,specialties,usages,contradictions,opening:{status:request.visit_at?'scheduled_open':'not_requested',live:false,holiday_guarantee:false},
       scores:{quality:categories.quality.out,service:categories.service.out,ambiance:categories.ambiance.out,global:global.out},budget,budget_match:match,
       reasons:choiceReasons,reservations,features:observations,report:{id:row.report_id,generated_at:row.report_generated_at,language:row.language,freshness:'current',corpus:row.corpus}};
     candidates.push({proposal,global:global.exact,preference,matches:features.filter(f => observations[f].status === 'reported').length,band:0,preference_band:0});
@@ -274,6 +293,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     if (chosen.includes(alt) || compare(subtract(from.global,alt.global),rational(COMPARABLE_SCORE_GAP)) > 0 || alt.matches < from.matches
       || compare(subtract(from.preference,alt.preference),rational(COMPARABLE_SCORE_GAP)) > 0) continue;
     const base = {from_id:from.proposal.establishment_id,alternative_id:alt.proposal.establishment_id};
+    for(const feature of features)if(alt.proposal.features[feature]?.status==='reported'&&from.proposal.features[feature]?.status!=='reported')result.refinements.push({kind:'documented_feature',feature,...base});
     if (alt.proposal.distance_metres < from.proposal.distance_metres) result.refinements.push({kind:'closer',...base});
     const a = from.proposal.budget.establishment, b = alt.proposal.budget.establishment;
     if (alt.proposal.distance_metres > from.proposal.distance_metres + COMPARABLE_DISTANCE_METRES) continue;

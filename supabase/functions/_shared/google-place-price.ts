@@ -1,4 +1,5 @@
 import {googleMoneyRange} from './google-maps-prices.ts';
+import {placeProfile} from './google-place-profile.ts';
 
 export const PLACE_PRICE_ACTOR = 'compass~crawler-google-places';
 export const PLACE_PRICE_BUILD = '0.14.777';
@@ -109,8 +110,8 @@ export async function processPlacePrice(job:PriceJob,port:PricePort) {
       receipt={...receipt,...run.receipt};await action('run',{...run,receipt});datasetId=run.dataset_id;
       if(['FAILED','TIMED-OUT','ABORTED'].includes(run.status)) {await action('fail',{code:'PLACE_PRICE_PROVIDER_'+run.status});return 'failed';}
       if(run.status==='SUCCEEDED') {
-        const observation=placePriceObservation(await port.provider.dataset(datasetId),job);
-        await action('finish',{observation,receipt});return 'finished';
+        const items=await port.provider.dataset(datasetId),observation=placePriceObservation(items,job);
+        await action('finish',{observation,profile:placeProfile(items,job),receipt});return 'finished';
       }
     }
     await action('defer');return 'pending';

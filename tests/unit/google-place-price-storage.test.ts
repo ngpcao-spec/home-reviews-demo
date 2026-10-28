@@ -5,6 +5,7 @@ import type {PGlite} from '@electric-sql/pglite';
 import {recommendationDatabase} from '../fixtures/recommendation-sheet-database';
 import {recommendationPublication} from '../fixtures/recommendation-publication';
 import {placePriceInput,placePriceObservation} from '../../supabase/functions/_shared/google-place-price';
+import {placeProfile} from '../../supabase/functions/_shared/google-place-profile';
 let db:PGlite;
 const org='10000000-0000-4000-8000-000000000001',est='20000000-0000-4000-8000-000000000001',other='20000000-0000-4000-8000-000000000002';
 const identity={google_id:'123',place_id:'place',google_maps_url:'https://www.google.com/maps?cid=123',language:'vi' as const};
@@ -37,12 +38,42 @@ beforeAll(async()=>{
  await db.exec(readFileSync('supabase/migrations/20261028121845_recommendation_negative_weight_4.sql','utf8'));
  await db.exec(readFileSync('supabase/migrations/20261028133850_google_maps_price_provenance.sql','utf8'));
  await db.exec(readFileSync('supabase/migrations/20261028151639_google_place_price_jobs.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261028164404_google_place_practical_metadata.sql','utf8'));
 },60000);
 beforeEach(async()=>{vi.stubGlobal('fetch',vi.fn(()=>{throw Error('NETWORK_FORBIDDEN')}));await db.exec('begin;update private.google_place_price_config set enabled=true;');});
 afterEach(async()=>{await db.exec('rollback');expect(fetch).not.toHaveBeenCalled();vi.unstubAllGlobals();});afterAll(()=>db.close());
 async function publish(){const p=await recommendationPublication(3,{positive:1});await db.query('insert into public.current_report_publications select * from jsonb_populate_record(null::public.current_report_publications,$1)',[json({...p,updated_at:p.generated_at})]);}
 async function started(){const id=await enqueue();const j=await claim();expect(j?.id).toBe(id);expect(await action(id,'reserve',{input:placePriceInput(identity)})).toBe(true);return id;}
 async function bind(id:unknown){expect(await action(id,'run',{id:'run',dataset_id:'data',status:'SUCCEEDED',receipt:{usageTotalUsd:0.005}})).toBe(true);}
+const profile=()=>placeProfile([{cid:'123',placeId:'place',language:'vi',scrapedAt:'2026-10-28T14:51:44.560Z',reviews:[],categories:['Nhà hàng ý','Nhà hàng pizza'],additionalInfo:{Services:[{Delivery:false}]} }],identity);
+it('atomically saves the curated profile on the SAME completed call, preserves budget/scores/report and reattaches after publication',async()=>{
+ await publish();const before=await query("select jsonb_build_object('sheet',(select to_jsonb(s)-'metadata'-'updated_at' from public.restaurant_recommendation_sheets s),'reports',(select jsonb_agg(to_jsonb(p)) from public.current_report_publications p)) v");
+ const id=await started();await bind(id);await action(id,'finish',{observation:observation(),profile:profile(),receipt:{status:'SUCCEEDED'}});
+ expect(await query('select count(*)::int v from private.google_place_profiles')).toBe(1);
+ const stored=await query<Record<string,unknown>>("select metadata->'google_place_profile' v from public.restaurant_recommendation_sheets");expect(stored?.binding).toMatchObject({job_id:id,run_id:'run',dataset_id:'data'});
+ expect(await query('select public.store_google_place_profile($1,$2) v',[id,json(profile())])).toBe(true);
+ const after=await query("select jsonb_build_object('sheet',(select to_jsonb(s)-'metadata'-'updated_at' from public.restaurant_recommendation_sheets s),'reports',(select jsonb_agg(to_jsonb(p)) from public.current_report_publications p)) v");expect(after).toEqual(before);
+ const oldBudget=await budget();await db.exec("update public.current_report_publications set stale=true,stale_reason='CORPUS_CHANGED'");
+ expect(await query("select metadata->'google_place_profile' v from public.restaurant_recommendation_sheets")).toEqual(stored);expect(await budget()).toEqual(oldBudget);
+ expect(await query('select attempts v from private.google_place_price_jobs')).toBe(1);
+});
+it('allows enrichment from an already saved result only, never an unknown attempt, wrong identity/date or uncurated payload',async()=>{
+ const id=await started();await bind(id);await action(id,'finish',{observation:observation()});
+ for(const bad of [{...profile(),reviews:[]},{...profile(),identity:{...profile().identity,cid:'456'}},{...profile(),hours:{...profile().hours,observed_at:'2026-10-29T00:00:00Z'}}]){
+  await db.exec('savepoint invalid');await expect(query('select public.store_google_place_profile($1,$2) v',[id,json(bad)])).rejects.toThrow(/PLACE_PROFILE/);await db.exec('rollback to invalid');
+ }
+ await db.exec("update private.google_place_price_jobs set status='unknown'");await db.exec('savepoint invalid');
+ await expect(query('select public.store_google_place_profile($1,$2) v',[id,json(profile())])).rejects.toThrow('PLACE_PROFILE_CONFIRMED_RESULT_REQUIRED');await db.exec('rollback to invalid');
+ expect(await query('select count(*)::int v from private.google_place_profiles')).toBe(0);
+});
+it('does not open direct/private reads or content writes to end users and removes place content on establishment deletion',async()=>{
+ const id=await started();await bind(id);await action(id,'finish',{observation:observation(),profile:profile()});
+ for(const role of ['anon','authenticated']){
+  expect(await query("select has_function_privilege($1,'public.store_google_place_profile(uuid,jsonb)','execute') v",[role])).toBe(false);
+  expect(await query("select has_table_privilege($1,'private.google_place_profiles','select') v",[role])).toBe(false);
+ }
+ await db.query('delete from public.establishments where id=$1',[est]);expect(await query('select count(*)::int v from private.google_place_profiles')).toBe(0);expect(await query('select attempts v from private.google_place_price_jobs')).toBe(1);
+});
 it('enqueues after durable initial completion only; failure or reload cannot gate reviews or trigger price collection',async()=>{
  await db.exec(`insert into public.initial_import_jobs(status,establishment_id) values('running','${est}');`);
  expect(await query('select count(*)::int v from private.google_place_price_jobs')).toBe(0);
