@@ -1,4 +1,5 @@
 import {add, compare, exactJson, quotient, rational, subtract, type Rational} from './restaurant-recommendation-numbers.ts';
+import {googleMoneyRange,googlePriceLevel,type MoneyRange} from './google-maps-prices.ts';
 
 export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v1';
 export const COMPARABLE_SCORE_GAP = '0.10';
@@ -24,8 +25,8 @@ export type Score = {value: string; numerator: string; denominator: string};
 export type Citation = {report_id: string; section: 'positive_aspects' | 'reservations'; index: number; category: string; text: string; evidence_ids: string[]};
 export type Prices = {
   establishment: {status: 'known' | 'unknown'; source: string | null; observed_at: string | null; level: number | null;
-    range: {currency: string; minimum: number; maximum: number} | null; raw: Obj};
-  customer_spend_per_person: {source: string | null; status: string | null; ranges: {value: string; review_count: number}[]};
+    range: {currency: string; minimum: number; maximum: number} | null; raw: Obj;source_fields:string[];source_table:string|null;provider_scraped_at:string|null;missing_reason:string|null};
+  customer_spend_per_person: {source: string | null; status: string | null; observed_at: string | null; guaranteed_tariff: false; ranges: {value: string; review_count: number; parsed:MoneyRange; source_fields:string[]; period_start:string|null; period_end:string|null}[]};
 };
 export type Proposal = {
   establishment_id: string; name: string; distance_metres: number; distance_kind: 'straight_line';
@@ -134,34 +135,20 @@ function featureStatus(name: string, positives: Citation[], negatives: Citation[
   const no = [...negatives.filter(p => hasPhrase(p.text, name) || contrary(p)), ...positives.filter(p => hasPhrase(p.text, name) && (!affirmative(p.text) || contrary(p)))];
   return {status: yes.length ? no.length ? 'conflicted' : 'reported' : no.length ? 'conflicted' : 'not_documented', citations: [...yes, ...no]};
 }
-function priceLevel(raw: unknown, allowNumeric = true): number | null {
-  if (allowNumeric && typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= 4) return raw;
-  if (typeof raw !== 'string') return null;
-  if (allowNumeric && /^[0-4]$/.test(raw)) return Number(raw);
-  if (/^[$€₫]{1,4}$/.test(raw)) return raw.length;
-  const labels: Record<string, number> = {PRICE_LEVEL_FREE:0, PRICE_LEVEL_INEXPENSIVE:1, PRICE_LEVEL_MODERATE:2, PRICE_LEVEL_EXPENSIVE:3, PRICE_LEVEL_VERY_EXPENSIVE:4};
-  return Object.hasOwn(labels,raw) ? labels[raw] : null;
-}
 function priceRange(raw: unknown): Prices['establishment']['range'] {
-  // Only unambiguous closed, currency-labelled ranges; no FX or price estimates.
-  if (typeof raw === 'string') {
-    const m = /^(\d+(?:\.\d{1,2})?)\s*[-–—]\s*(\d+(?:\.\d{1,2})?)\s*(VND|USD|EUR|₫|€|\$)$/.exec(raw.trim());
-    if (!m || m[3] === '$') return null; // '$' alone has no reliable currency.
-    raw = {minimum:Number(m[1]),maximum:Number(m[2]),currency:m[3] === '₫' ? 'VND' : m[3] === '€' ? 'EUR' : m[3]};
-  }
-  const r = obj(raw);
-  return typeof r.minimum === 'number' && typeof r.maximum === 'number' && Number.isFinite(r.minimum) && Number.isFinite(r.maximum)
-    && r.minimum >= 0 && r.maximum >= r.minimum && typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency)
-    ? {minimum:r.minimum,maximum:r.maximum,currency:r.currency} : null;
+  const r=googleMoneyRange(raw);
+  return r.status==='parsed'&&r.bounds==='closed'&&r.currency!==null&&r.minimum!==null&&r.maximum!==null
+    ?{currency:r.currency,minimum:r.minimum,maximum:r.maximum}:null;
 }
 export function prices(metadata: Obj): Prices {
   const b = obj(metadata.budget), e = obj(b.establishment_price), c = obj(b.customer_spend_per_person);
   const trustworthy = e.source === 'google_maps_import' && e.status === 'provided' && typeof e.observed_at === 'string' && Number.isFinite(Date.parse(e.observed_at));
-  const level = trustworthy ? priceLevel(e.price_level) ?? priceLevel(e.price,false) : null;
+  const level = trustworthy ? googlePriceLevel(e.price_level) ?? googlePriceLevel(e.price,false) : null;
   const range = trustworthy ? priceRange(e.price_range) ?? priceRange(e.price) : null;
-  return {establishment:{status:level !== null || range !== null ? 'known' : 'unknown',level,range,source:str(e.source),observed_at:str(e.observed_at),raw:{price:e.price ?? null,price_level:e.price_level ?? null,price_range:e.price_range ?? null}},
-    customer_spend_per_person:{source:str(c.source),status:str(c.status),ranges:list(c.ranges).flatMap(x => {
-      const v = obj(x);return typeof v.value === 'string' && Number.isInteger(v.review_count) && Number(v.review_count) > 0 ? [{value:v.value,review_count:Number(v.review_count)}] : [];
+  return {establishment:{status:level !== null || range !== null ? 'known' : 'unknown',level,range,source:str(e.source),observed_at:str(e.observed_at),raw:{price:e.price ?? null,price_level:e.price_level ?? null,price_range:e.price_range ?? null},
+    source_fields:list(e.source_fields).filter((x):x is string=>typeof x==='string'),source_table:str(e.source_table),provider_scraped_at:str(e.provider_scraped_at),missing_reason:str(e.missing_reason)},
+    customer_spend_per_person:{source:str(c.source),status:str(c.status),observed_at:str(c.observed_at),guaranteed_tariff:false,ranges:list(c.ranges).flatMap(x => {
+      const v = obj(x);return typeof v.value === 'string' && Number.isInteger(v.review_count) && Number(v.review_count) > 0 ? [{value:v.value,review_count:Number(v.review_count),parsed:googleMoneyRange(v.value),source_fields:list(v.source_fields).filter((x):x is string=>typeof x==='string'),period_start:str(v.period_start),period_end:str(v.period_end)}] : [];
     })}};
 }
 function budgetMatch(p: Prices, b?: Budget): Proposal['budget_match'] | null {

@@ -104,6 +104,13 @@ describe('ApifyReviewProvider normalization', () => {
     })
     expect(result.reviews[0].externalReviewId).toBe('review-123')
   })
+  it('retains explicit place prices as well as the distinct client spending field, with no provider option change', () => {
+    const raw={...item,price:'₫₫',priceLevel:2,priceRange:'100-200 N ₫',reviewContext:{'Giá mỗi người':'300-400 N ₫'}};
+    const result=normalizeApifyDataset([raw],item.url);
+    expect(result.establishment.rawPlacePayload).toMatchObject({price:'₫₫',priceLevel:2,priceRange:'100-200 N ₫',scrapedAt:item.scrapedAt});
+    expect(result.reviews[0].reviewContext).toEqual({'Giá mỗi người':'300-400 N ₫'});expect(result.reviews[0].rawPayload).toEqual(raw);
+    expect(apifyActorInput({placeUrl:item.url,language:'vi',sort:'newest',limit:150})).not.toHaveProperty('scrapePlaceDetailPage');
+  })
 
   it('keeps the canonical Google Maps place name instead of a localized actor title', () => {
     const result = normalizeApifyDataset([{

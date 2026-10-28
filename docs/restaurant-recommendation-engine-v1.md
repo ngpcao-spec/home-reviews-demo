@@ -120,6 +120,9 @@ dans la demande. Pas de change, d’estimation, de dollar à devise supposée,
 de borne supérieure inventée ou d’interprétation de libellés ambigus. Sans donnée
 comparable, exclusion budgétaire ; sans contrainte, le prix inconnu est signalé.
 Les prix descriptifs bruts restent disponibles même si non normalisables.
+La récupération, les dates/provenances et les formats monétaires Google localisés
+sont détaillés dans [google-maps-prices.md](google-maps-prices.md). Les dépenses
+clients normalisées restent distinctes et ne satisfont jamais ce filtre.
 
 Un affinement est proposé uniquement vers un candidat encore disponible, ayant
 passé tous les critères et restant comparable aux scores/préférences : `closer`
