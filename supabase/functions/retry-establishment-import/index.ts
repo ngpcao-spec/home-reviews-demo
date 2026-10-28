@@ -17,7 +17,7 @@ Deno.serve(async (request) => {
       const { data: existing } = await client.from('initial_import_jobs')
         .select('id')
         .eq('establishment_id', body.establishmentId.trim())
-        .eq('status', 'failed')
+        .in('status', ['failed', 'completed', 'queued', 'running', 'retry'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -27,10 +27,10 @@ Deno.serve(async (request) => {
 
     const { data: job, error } = await client.rpc('retry_initial_import_job', { p_job_id: jobId })
     if (error || !job) {
-      const code = error?.message.includes('APIFY_START_OUTCOME_UNKNOWN')?'APIFY_START_OUTCOME_UNKNOWN':error?.message.includes('IMPORT_JOB_NOT_RETRYABLE')
-        ? 'IMPORT_JOB_NOT_RETRYABLE'
-        : 'IMPORT_RETRY_FAILED'
-      return json({ error: code }, ['IMPORT_JOB_NOT_RETRYABLE','APIFY_START_OUTCOME_UNKNOWN'].includes(code) ? 409 : 500)
+      const code = ['APIFY_START_OUTCOME_UNKNOWN', 'IMPORT_RESULT_NOT_CONFIRMED', 'REVIEW_COLLECTION_BUSY', 'IMPORT_JOB_NOT_RETRYABLE']
+        .find((value) => error?.message.includes(value)) ?? 'IMPORT_RETRY_FAILED'
+      console.error('IMPORT_MANUAL_RETRY_REJECTED', { jobId, code })
+      return json({ error: code }, code === 'IMPORT_RETRY_FAILED' ? 500 : 409)
     }
     return json({ importJobId: job.id, status: job.status })
   } catch (error) {

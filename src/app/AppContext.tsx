@@ -21,7 +21,7 @@ export interface AddEstablishmentResult {
   establishmentId?: string
   inserted?: number
   distribution?: { '1': number; '2': number; '3': number }
-  importStatus?: 'completed' | 'failed'
+  importStatus?: 'completed' | 'failed' | 'partial'
   retryable?: boolean
   nextSyncAt?: string
   negativeReviewCount?: number
@@ -109,6 +109,11 @@ interface EstablishmentRow {
   last_sync_at: string | null
   next_sync_at: string | null
   sync_status: 'pending' | 'syncing' | 'ok' | 'error'
+  initial_import_job_id?: string | null
+  review_collection_status?: 'unknown' | 'complete' | 'partial' | 'retrying'
+  review_collection_expected?: number | null
+  review_collection_unique?: number | null
+  review_collection_checked_at?: string | null
 }
 
 interface InitialImportJobRow {
@@ -313,6 +318,13 @@ function mapEstablishment(row: EstablishmentRow): Establishment {
     lastSyncedAt: row.last_sync_at ?? new Date().toISOString(),
     nextSyncAt: row.next_sync_at ?? undefined,
     syncStatus: row.sync_status,
+    initialImportJobId: row.initial_import_job_id ?? undefined,
+    reviewCollection: {
+      status: row.review_collection_status ?? 'unknown',
+      expected: row.review_collection_expected ?? undefined,
+      unique: row.review_collection_unique ?? undefined,
+      checkedAt: row.review_collection_checked_at ?? undefined,
+    },
   }
 }
 
@@ -479,7 +491,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     try {
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult, initialImportsResult] = await Promise.all([
-      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status').eq('active', true).order('created_at'),
+      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status,initial_import_job_id,review_collection_status,review_collection_expected,review_collection_unique,review_collection_checked_at').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('id,monitoring_interval_hours'),

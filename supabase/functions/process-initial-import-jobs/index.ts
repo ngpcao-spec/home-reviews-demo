@@ -138,7 +138,6 @@ async function createOrResumeEstablishment(
       rating: result.establishment.rating,
       total_reviews: result.establishment.totalReviews,
       photo_url: result.establishment.photo,
-      active: false,
       sync_status: 'syncing',
       sync_error: null,
       updated_at: new Date().toISOString(),
@@ -243,6 +242,7 @@ async function persistResult(
       distribution: ratingDistribution,
       importStatus: 'completed',
       reviewsTarget: job.reviews_target,
+      reportedGoogleTotal: fetched.establishment.rawPlacePayload?.reviewsCount ?? fetched.establishment.rawPlacePayload?.reviewsNumber ?? null,
     },
   }))
   if (finalized !== true) throw new Error('INITIAL_IMPORT_LEASE_LOST')
@@ -282,7 +282,7 @@ async function processApify(
    const normalized=normalizeApifyDataset(items,job.query,resolvedPlaceUrl??undefined)
    const reviews=prepareInitialReviews(normalized.reviews,job.reviews_target)
    await checkpoint(admin,job,worker,{reviewsFetched:reviews.length},config.leaseSeconds)
-   return persistResult(admin,job,worker,{...normalized,reviews,count:reviews.length,providerRequests:requests,initialLimit:job.reviews_target,initialFetched:reviews.length,checkpointReview:reviews[0]??null},config.leaseSeconds)
+   return persistResult(admin,{...job,provider_run_id:run.runId,provider_dataset_id:run.datasetId},worker,{...normalized,reviews,count:reviews.length,providerRequests:requests,initialLimit:job.reviews_target,initialFetched:reviews.length,checkpointReview:reviews[0]??null},config.leaseSeconds)
   },
   defer:async seconds=>{await continueJob(admin,job.id,worker,seconds);return {jobId:job.id,status:seconds?'deferred':'provider_running'}},
  })

@@ -179,4 +179,33 @@ describe('confirmation d’ajout d’un établissement', () => {
     expect(document.body).not.toHaveTextContent(/apify|upstream details|Notre système/i)
     expect(retryEstablishmentImport).toHaveBeenCalledTimes(1)
   })
+
+  it('signale un import techniquement terminé mais partiel et propose une nouvelle tentative manuelle', async () => {
+    initialImportJobs = [{
+      id: 'partial-job', organizationId: 'org', userId: 'user', query: 'https://maps.app.goo.gl/test',
+      expectedGoogleId: candidate.placeRef, status: 'completed', reviewsTarget: 150,
+      reviewsFetched: 5, reviewsInserted: 5, candidate,
+      result: { importStatus: 'partial', establishmentId: 'existing-place', inserted: 5 },
+      createdAt: '2026-10-28T04:12:43Z', updatedAt: '2026-10-28T04:12:56Z',
+    }]
+    renderWizard()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Notre système a rencontré un problème pour récupérer les avis.')
+    expect(screen.queryByText('✓ Établissement ajouté')).not.toBeInTheDocument()
+    expect(retryEstablishmentImport).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(retryEstablishmentImport).toHaveBeenCalledExactlyOnceWith('partial-job')
+    expect(addEstablishment).not.toHaveBeenCalled()
+  })
+
+  it('affiche les avis uniques reçus pendant une relance, pas le nombre total déjà stocké', async () => {
+    initialImportJobs = [{
+      id: 'running-job', organizationId: 'org', userId: 'user', query: 'https://maps.app.goo.gl/test',
+      expectedGoogleId: candidate.placeRef, status: 'running', reviewsTarget: 150,
+      reviewsFetched: 5, reviewsInserted: 150, candidate,
+      createdAt: '2026-10-28T04:12:43Z', updatedAt: '2026-10-28T04:12:56Z',
+    }]
+    renderWizard()
+    expect(await screen.findByText('5 / 150 avis importés')).toBeVisible()
+    expect(screen.queryByText('150 / 150 avis importés')).not.toBeInTheDocument()
+  })
 })

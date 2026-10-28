@@ -88,12 +88,12 @@ export function AddEstablishmentPage() {
       inserted: job.result?.inserted ?? job.reviewsInserted,
       negativeReviewCount: job.result?.negativeReviewCount,
       distribution: job.result?.distribution ?? { '1': 0, '2': 0, '3': 0 },
-      importStatus: job.status === 'completed' ? 'completed' : job.status === 'failed' ? 'failed' : undefined,
-      retryable: job.status === 'failed',
+      importStatus: job.status === 'completed' ? job.result?.importStatus ?? 'completed' : job.status === 'failed' ? 'failed' : undefined,
+      retryable: job.status === 'failed' || job.result?.importStatus === 'partial',
       nextSyncAt: job.result?.nextSyncAt,
     }
     setResult(jobResult)
-    setErrorCode(job.status === 'failed' ? job.errorCode ?? 'UNKNOWN' : '')
+    setErrorCode(job.status === 'failed' || job.result?.importStatus === 'partial' ? job.errorCode ?? 'IMPORT_COLLECTION_PARTIAL' : '')
     setStep(job.status === 'completed' || job.status === 'failed' ? 'success' : 'import')
   }, [initialImportJobs, messages])
 
@@ -162,7 +162,7 @@ export function AddEstablishmentPage() {
     ? Math.max(1, Math.round((new Date(result.nextSyncAt).getTime() - Date.now()) / 3_600_000))
     : monitoringIntervalHours
   const negativeReviewCount = result?.negativeReviewCount ?? result?.inserted ?? 0
-  const importFailed = result?.importStatus === 'failed' || result?.status === 'failed'
+  const importFailed = result?.importStatus === 'failed' || result?.importStatus === 'partial' || result?.status === 'failed'
 
   return <>
     <PageHeader title={messages.add.title} back />
@@ -222,7 +222,7 @@ export function AddEstablishmentPage() {
       <h2>{messages.add.importing}</h2>
       <p>{messages.add.importingBody}</p>
       <p className="import-background-note">{messages.add.importContinues}</p>
-      {currentJob && currentJob.reviewsFetched > 0 && <div className="import-progress-copy">{messages.add.importProgress.replace('{count}', String(currentJob.reviewsInserted)).replace('{target}', String(currentJob.reviewsTarget))}</div>}
+      {currentJob && currentJob.reviewsFetched > 0 && <div className="import-progress-copy">{messages.add.importProgress.replace('{count}', String(currentJob.reviewsFetched)).replace('{target}', String(currentJob.reviewsTarget))}</div>}
     </section>}
 
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
