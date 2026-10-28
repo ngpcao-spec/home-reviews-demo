@@ -20,7 +20,15 @@ create or replace function private.retention_sanitize_snapshot() returns trigger
 language plpgsql set search_path='' as $$
 begin
  if exists(select 1 from public.review_corpus_policy where enabled) then
-  new.raw_place_payload=private.google_price_fields_v1(new.raw_place_payload);
+  -- Inline the pure projection here: the ingestion trigger is SECURITY INVOKER
+  -- and must not require a new service-role grant on private helper functions.
+  select coalesce(jsonb_object_agg(key,case when key='priceRange' and jsonb_typeof(value)='object' then
+   (select coalesce(jsonb_object_agg(x.key,x.value),'{}') from jsonb_each(value) x
+    where x.key in('minimum','maximum') and jsonb_typeof(x.value)='number' or x.key='currency' and jsonb_typeof(x.value)='string')
+   else value end),'{}') into new.raw_place_payload
+  from jsonb_each(case when jsonb_typeof(new.raw_place_payload)='object' then new.raw_place_payload else '{}' end)
+  where key in('placeId','cid','scrapedAt','price','priceLevel','priceRange')
+   and (jsonb_typeof(value) in('string','number','null') or key='priceRange' and jsonb_typeof(value)='object');
  end if;
  return new;
 end $$;

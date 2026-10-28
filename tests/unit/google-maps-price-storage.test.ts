@@ -66,6 +66,14 @@ it('refreshes only the existing sheet budget after a snapshot, keeping stale sco
  expect((await db.query("select metadata#>>'{budget,establishment_price,price}' p from public.restaurant_recommendation_sheets")).rows[0].p).toBe('₫₫');
  expect((await db.query("select to_jsonb(s)-'metadata'-'updated_at' s from public.restaurant_recommendation_sheets s")).rows).toEqual(before);
 });
+it('allows the actual service-role ingestion trigger without granting private helper execution',async()=>{
+ await publish();await upgrade();
+ await db.exec('create trigger prices_sanitize before insert or update on public.establishment_snapshots for each row execute function private.retention_sanitize_snapshot();grant insert,select on public.establishment_snapshots to service_role;grant select on public.review_corpus_policy to service_role;set local role service_role');
+ await db.query('insert into public.establishment_snapshots(establishment_id,organization_id,captured_at,provider,raw_place_payload) values($1,$2,$3,$4,$5)',[est,org,'2026-10-28T00:00:00Z','apify',JSON.stringify({cid:'cid',price:'₫₫',text:'Removed'})]);
+ await db.exec('reset role');
+ expect((await db.query("select metadata#>>'{budget,establishment_price,price}' p from public.restaurant_recommendation_sheets")).rows[0].p).toBe('₫₫');
+ expect((await db.query("select has_function_privilege('service_role','private.google_price_fields_v1(jsonb)','EXECUTE') f")).rows[0].f).toBe(false);
+});
 it('preserves frozen spending on future publications without current-review contamination; functions remain private',async()=>{
  await upgrade();await db.exec(`insert into public.reviews(id,organization_id,establishment_id,review_context) values(gen_random_uuid(),'${org}','${est}','{"price_per_person":"900-1000 N ₫"}');`);await publish();
  const saved=(await db.query<{v:string}>("select metadata#>>'{budget,customer_spend_per_person,ranges,0,value}' v from public.restaurant_recommendation_sheets")).rows[0].v;
