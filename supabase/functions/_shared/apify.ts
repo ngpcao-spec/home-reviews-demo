@@ -295,6 +295,10 @@ export function normalizeApifyDataset(
     state: first.state,
     countryCode: first.countryCode,
     location: first.location,
+    // Place-level Google indications, not reviewContext customer spending.
+    price: first.price,
+    priceLevel: first.priceLevel,
+    priceRange: first.priceRange,
     scrapedAt: first.scrapedAt,
     language: first.language,
     inputStartUrl: first.inputStartUrl,
