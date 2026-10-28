@@ -52,7 +52,9 @@ revoke all on function private.persist_google_place_profile(uuid,jsonb) from pub
 -- Publication/price refreshes may rebuild metadata; always attach the same independent Google observation.
 create function private.attach_google_place_profile() returns trigger
 language plpgsql security definer set search_path='' as $$declare p jsonb;begin
- select profile into p from private.google_place_profiles where establishment_id=new.establishment_id and organization_id=new.organization_id;
+ select g.profile into p from private.google_place_profiles g join public.establishments e on e.id=g.establishment_id and e.organization_id=g.organization_id
+ where g.establishment_id=new.establishment_id and g.organization_id=new.organization_id
+ and g.profile#>>'{identity,cid}'=e.google_id and (e.place_id is null or g.profile#>>'{identity,place_id}'=e.place_id);
  if p is not null then new.metadata=jsonb_set(new.metadata,'{google_place_profile}',p);
  else new.metadata=new.metadata-'google_place_profile';end if;
  return new;

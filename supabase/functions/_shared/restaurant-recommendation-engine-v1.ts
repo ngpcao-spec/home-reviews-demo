@@ -61,9 +61,10 @@ function documentedTaxonomy(google:Obj,profile:PlaceProfile|null,kind:TaxonomyKi
  return placeCategories(labels)[kind];
 }
 function practicalProfile(row:SheetRow):PlaceProfile|null{
- const p=obj(row.metadata.google_place_profile),i=obj(p.identity),binding=obj(p.binding);
+ const p=obj(row.metadata.google_place_profile),i=obj(p.identity),binding=obj(p.binding),identity=obj(row.metadata.identity);
  return p.version===PLACE_PROFILE_VERSION&&binding.establishment_id===row.establishment_id&&binding.organization_id===row.organization_id
   &&i.source==='google_maps_place_details'&&typeof i.observed_at==='string'&&Number.isFinite(Date.parse(i.observed_at))
+  &&(!identity.google_id||i.cid===identity.google_id)&&(!identity.place_id||i.place_id===identity.place_id)
   &&p.categories&&p.hours&&p.attributes&&p.contacts ? p as PlaceProfile : null;
 }
 const canonical = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.map(x => JSON.parse(canonical(x))) : v && typeof v === 'object'

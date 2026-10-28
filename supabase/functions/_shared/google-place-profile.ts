@@ -42,7 +42,7 @@ export function placeProfile(items:unknown,identity:PriceIdentity,now=Date.now()
   if(!entries.has(k))entries.set(k,{group:label,label:name,value:v,source_fields:['additionalInfo.'+label+'.'+name]});
  }
  const facts:Record<string,{value:boolean|null;status:'declared'|'conflicted';evidence:ReturnType<typeof entries.values> extends IterableIterator<infer T>?T[]:never}>={};
- for(const entry of entries.values()){const id=placeFeature(entry.label);if(!id)continue;
+ for(const entry of entries.values()){const id=placeFeature(entry.label,entry.group);if(!id)continue;
   const fact=facts[id];if(fact){fact.evidence.push(entry);if(fact.value!==entry.value){fact.value=null;fact.status='conflicted';}}
   else facts[id]={value:entry.value,status:'declared',evidence:[entry]};
  }

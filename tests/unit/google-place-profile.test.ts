@@ -22,6 +22,10 @@ describe('curated Google place projection',()=>{
   expect(p.attributes.facts.quiet).toMatchObject({value:null,status:'conflicted'});expect(p.attributes.facts.vegan_options).toBeUndefined();
   expect(placeFeatureLabel('delivery','fr')).toBe('Livraison');expect(placeFeatureLabel('delivery','vi')).toBe('Giao hàng');
  });
+ it('does not convert popularity for a meal into a declared dining service',()=>{
+  expect(profile({additionalInfo:{'Nổi tiếng về':[{'Bữa sáng':true}]}}).attributes.facts.breakfast).toBeUndefined();
+  expect(profile({additionalInfo:{'Lựa chọn ăn uống':[{'Bữa sáng':false}]}}).attributes.facts.breakfast.value).toBe(false);
+ });
  it('retains source dates, raw non-translated prose, safe links only and no reviews, secondary images or whole payload',()=>{
   const p=profile({ownerDescription:'해변가앞 아름다운조명',description:'English presentation',imageUrl:'https://example.org/main.jpg',imageUrls:['secret'],menu:'https://example.org/menu',reserveTableUrl:'https://example.org/book',tableReservationLinks:[{url:'https://example.org/book'},{url:'javascript:alert(1)'}],peopleAlsoSearch:[{name:'secret'}]});
   expect(p.presentation.owner_description).toMatchObject({translated:false,language:null,kind:'commercial_presentation'});
@@ -71,6 +75,15 @@ describe('internal recommendation practical criteria',()=>{
   p.report_sections.reservations=negative;(p.publication!.derived.report as Record<string,unknown>).negative_aspects=negative;
   const r=run([p],{preferences:{features:['quiet']}});expect(r.proposals[0].features.quiet.status).toBe('conflicted');expect(r.proposals[0].contradictions[0].citations).toHaveLength(1);
   expect(run([p],{required_features:['quiet']}).proposals).toHaveLength(0);
+ });
+ it('refuses a practical identity different from the frozen restaurant identity before matching',()=>{
+  const p=sheet('a',{additionalInfo:{Services:[{Delivery:true}]}});(p.metadata.identity as Record<string,unknown>).google_id='456';
+  expect(run([p],{required_features:['delivery']}).proposals).toHaveLength(0);
+ });
+ it('keeps a positive report separate from an explicitly negative Google declaration',()=>{
+  const p=sheet('a',{additionalInfo:{Atmosphere:[{Quiet:false}]}});
+  const positive=[{category:'ambiance',text:'A quiet atmosphere.',evidence_ids:['a'.repeat(64)]}];p.report_sections.positive_aspects=positive;(p.publication!.derived.report as Record<string,unknown>).positive_aspects=positive;
+  const result=run([p],{preferences:{features:['quiet']}});expect(result.proposals[0].features.quiet.status).toBe('conflicted');expect(result.proposals[0].contradictions).toHaveLength(1);
  });
  it('requires a date with offset for schedule criteria, never infers calm/availability from popularity or a booking link',()=>{
   const p=sheet('a',{reserveTableUrl:'https://example.org/book',popularTimesHistogram:{Mo:[{hour:12,occupancyPercent:0}]}});

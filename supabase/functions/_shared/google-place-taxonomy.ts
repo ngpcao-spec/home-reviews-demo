@@ -69,5 +69,10 @@ export const PLACE_FEATURES:Record<string,{fr:string;vi:string;aliases:string[]}
  ['air_conditioning','Climatisation','Điều hòa',['air conditioning','climatisation','điều hòa']],
 ] as [string,string,string,string[]][]).map(([id,fr,vi,labels])=>[id,{fr,vi,aliases:[id,...labels]}]));
 const featureAliases=Object.fromEntries(Object.entries(PLACE_FEATURES).flatMap(([id,x])=>x.aliases.map(label=>[placeKey(label),id])));
-export const placeFeature=(label:string)=>Object.hasOwn(featureAliases,placeKey(label))?featureAliases[placeKey(label)]:null;
+export function placeFeature(label:string,group?:string){
+ const id=Object.hasOwn(featureAliases,placeKey(label))?featureAliases[placeKey(label)]:null;
+ // "Popular for breakfast" is not the same field as an explicitly served meal.
+ if(id&&['breakfast','brunch','lunch','dinner'].includes(id)&&group&&!['dining options','options de restauration','lựa chọn ăn uống'].map(placeKey).includes(placeKey(group)))return null;
+ return id;
+}
 export const placeFeatureLabel=(id:string,language:string)=>PLACE_FEATURES[id]?.[language==='vi'?'vi':'fr']??id;
