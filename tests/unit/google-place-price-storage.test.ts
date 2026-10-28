@@ -59,7 +59,7 @@ it('atomically saves the curated profile on the SAME completed call, preserves b
 });
 it('allows enrichment from an already saved result only, never an unknown attempt, wrong identity/date or uncurated payload',async()=>{
  const id=await started();await bind(id);await action(id,'finish',{observation:observation()});
- for(const bad of [{...profile(),reviews:[]},{...profile(),identity:{...profile().identity,cid:'456'}},{...profile(),hours:{...profile().hours,observed_at:'2026-10-29T00:00:00Z'}}]){
+ for(const bad of [{...profile(),reviews:[]},{...profile(),contacts:{...profile().contacts,whole_response:{reviews:[]}}},{...profile(),identity:{...profile().identity,cid:'456'}},{...profile(),hours:{...profile().hours,observed_at:'2026-10-29T00:00:00Z'}}]){
   await db.exec('savepoint invalid');await expect(query('select public.store_google_place_profile($1,$2) v',[id,json(bad)])).rejects.toThrow(/PLACE_PROFILE/);await db.exec('rollback to invalid');
  }
  await db.exec("update private.google_place_price_jobs set status='unknown'");await db.exec('savepoint invalid');

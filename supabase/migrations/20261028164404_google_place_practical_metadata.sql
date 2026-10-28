@@ -11,7 +11,7 @@ revoke all on private.google_place_profiles from public,anon,authenticated,servi
 
 create function private.persist_google_place_profile(p_job uuid,p_profile jsonb) returns boolean
 language plpgsql security definer set search_path='' as $$
-declare j private.google_place_price_jobs;e public.establishments;g text;v jsonb;binding jsonb;saved jsonb;begin
+declare j private.google_place_price_jobs;e public.establishments;g text;v jsonb;binding jsonb;saved jsonb;allowed text[];begin
  select * into j from private.google_place_price_jobs where id=p_job for update;
  if not found or j.status not in('completed','not_provided') or j.run_id is null or j.dataset_id is null
   or j.provider_status is distinct from 'SUCCEEDED' then raise exception 'PLACE_PROFILE_CONFIRMED_RESULT_REQUIRED';end if;
@@ -22,6 +22,15 @@ declare j private.google_place_price_jobs;e public.establishments;g text;v jsonb
   or octet_length(p_profile::text)>150000 or exists(select 1 from jsonb_object_keys(p_profile) k where k not in('version','identity','categories','hours','attributes','popularity','presentation','contacts')) then raise exception 'PLACE_PROFILE_SHAPE_INVALID';end if;
  foreach g in array array['identity','categories','hours','attributes','popularity','presentation','contacts'] loop
   v=p_profile->g;
+  allowed=case g
+   when 'identity' then array['name','address','neighborhood','street','city','postal_code','state','country_code','located_in','floor','plus_code','coordinates','cid','place_id','fid','google_maps_url']
+   when 'categories' then array['primary','raw','cuisines','specialties','usages','mappings','unrecognized']
+   when 'hours' then array['timezone','timezone_source','weekly','additional','temporarily_closed','permanently_closed','open_at_observation','live','holiday_exceptions_known']
+   when 'attributes' then array['entries','facts']
+   when 'popularity' then array['weekly','relative_to_own_peak','live','at_observation']
+   when 'presentation' then array['description','subtitle','owner_description']
+   when 'contacts' then array['phone','phone_unformatted','website','primary_photo_url','menu_links','reservation_links','service_links','menu_contents_known','reservation_availability_known'] end;
+  if exists(select 1 from jsonb_object_keys(v) k where not k=any(allowed||array['source','observed_at','collection_language','source_fields'])) then raise exception 'PLACE_PROFILE_SHAPE_INVALID';end if;
   if jsonb_typeof(v) is distinct from 'object' or v->>'source' is distinct from 'google_maps_place_details'
    or v->>'collection_language' is distinct from j.language
    or (v->>'observed_at')::timestamptz is distinct from (j.observation#>>'{raw,scrapedAt}')::timestamptz
