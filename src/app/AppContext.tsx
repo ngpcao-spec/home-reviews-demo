@@ -82,6 +82,7 @@ interface AppContextValue {
   resolveEstablishment: (input: string) => Promise<PlaceCandidate>
   addEstablishment: (input: string, candidate: PlaceCandidate) => Promise<AddEstablishmentResult>
   retryEstablishmentImport: (importJobId: string) => Promise<void>
+  reloadEstablishmentReviews: (establishmentId: string, requestId: string) => Promise<void>
   acknowledgeInitialImport: (importJobId: string) => Promise<void>
   refreshInitialImports: () => Promise<void>
   refreshEstablishment: (id: string) => Promise<void>
@@ -114,6 +115,11 @@ interface EstablishmentRow {
   review_collection_expected?: number | null
   review_collection_unique?: number | null
   review_collection_checked_at?: string | null
+  review_reload_job_id?: string | null
+  review_reload_request_id?: string | null
+  review_reload_status?: 'idle' | 'queued' | 'running' | 'failed' | 'completed'
+  review_reload_count?: number | null
+  review_reload_completed_at?: string | null
 }
 
 interface InitialImportJobRow {
@@ -319,6 +325,8 @@ function mapEstablishment(row: EstablishmentRow): Establishment {
     nextSyncAt: row.next_sync_at ?? undefined,
     syncStatus: row.sync_status,
     initialImportJobId: row.initial_import_job_id ?? undefined,
+    reviewReload: { jobId: row.review_reload_job_id ?? undefined, requestId: row.review_reload_request_id ?? undefined,
+      status: row.review_reload_status ?? 'idle', count: row.review_reload_count ?? undefined, completedAt: row.review_reload_completed_at ?? undefined },
     reviewCollection: {
       status: row.review_collection_status ?? 'unknown',
       expected: row.review_collection_expected ?? undefined,
@@ -491,12 +499,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     try {
     const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult, initialImportsResult] = await Promise.all([
-      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status,initial_import_job_id,review_collection_status,review_collection_expected,review_collection_unique,review_collection_checked_at').eq('active', true).order('created_at'),
+      supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status,initial_import_job_id,review_collection_status,review_collection_expected,review_collection_unique,review_collection_checked_at,review_reload_job_id,review_reload_request_id,review_reload_status,review_reload_count,review_reload_completed_at').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('organizations').select('id,monitoring_interval_hours'),
       supabase.from('profiles').select('preferred_language').eq('user_id', authUser?.id ?? '').maybeSingle(),
-      supabase.from('initial_import_jobs').select('id,organization_id,user_id,query,expected_google_id,establishment_id,status,reviews_target,reviews_fetched,reviews_inserted,error_code,candidate_snapshot,result,created_at,updated_at').is('acknowledged_at', null).order('created_at', { ascending: false }).limit(10),
+      supabase.from('initial_import_jobs').select('id,organization_id,user_id,query,expected_google_id,establishment_id,status,reviews_target,reviews_fetched,reviews_inserted,error_code,candidate_snapshot,result,created_at,updated_at').eq('request_kind', 'initial').is('acknowledged_at', null).order('created_at', { ascending: false }).limit(10),
     ])
     if (!current()) return
     if (!background) {
@@ -517,6 +525,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     organizationIds.current = (organizationResult.data as Array<{ id: string }>).map(org => org.id)
     analyticsSession(userId).configure(userId, organizationIds.current, (establishmentsResult.data as EstablishmentRow[]).map(e => e.id))
+    for (const row of establishmentsResult.data as EstablishmentRow[]) {
+      if (row.review_reload_completed_at) analyticsSession(userId).invalidateBefore(row.id, row.review_reload_completed_at)
+    }
     readyUser.current = userId
     setDataReady(true)
     setDataLoading(false)
@@ -892,6 +903,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await loadRealData({ background: true })
   }
 
+  const reloadEstablishmentReviews = async (establishmentId: string, requestId: string) => {
+    if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
+    const { data, error } = await supabase.functions.invoke<RetryImportPayload>('reload-establishment-reviews', {
+      body: { establishmentId, requestId },
+    })
+    if (error || !data?.importJobId) throw new Error('REVIEW_RELOAD_UNAVAILABLE')
+    await loadRealData({ background: true })
+  }
+
   const acknowledgeInitialImport = async (importJobId: string) => {
     if (demoMode) {
       setInitialImportJobs((items) => items.filter((item) => item.id !== importJobId))
@@ -1024,7 +1044,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     establishments, initialImportJobs, reviews, notifications, actions, toasts, demoMode, authReady, isAuthenticated: Boolean(authUser), dataLoading, dataReady, dataError, passwordRecovery, monitoringIntervalHours, preferredLanguage, currentUser,
     plan: demoPlan, aiUsage: demoMode ? actions.filter((action) => action.actionType === 'response_generated').length + 38 : actions.filter((action) => action.actionType === 'response_generated').length,
     markProcessed, reopenReview, generateResponse, saveReplyDraft, translateReply, logAction, markNotificationRead, markAllNotificationsRead,
-    resolveEstablishment, addEstablishment, retryEstablishmentImport, acknowledgeInitialImport, refreshInitialImports, refreshEstablishment, toggleMonitoring, removeEstablishment,
+    resolveEstablishment, addEstablishment, retryEstablishmentImport, reloadEstablishmentReviews, acknowledgeInitialImport, refreshInitialImports, refreshEstablishment, toggleMonitoring, removeEstablishment,
     injectNegativeReview, pushToast, retryData: loadRealData, updateMonitoringInterval, updatePreferredLanguage, completePasswordRecovery, signOut,
   }
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

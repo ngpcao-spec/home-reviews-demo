@@ -6,6 +6,26 @@ import { shabuReport } from '../../tests/fixtures/consultant-v5'
 const report=(language:'fr'|'vi'='vi')=>buildDemoHistoricalReport('artisan',[],language,4.8,1615)
 afterEach(()=>{vi.useRealTimers();resetAnalyticsCache()})
 describe('analytics session cache',()=>{
+  it('does not redisplay an old report returned by an HTTP read started before the replacement',async()=>{
+    const cache=new AnalyticsSessionCache()
+    let finish:(value:{report:ReturnType<typeof report>;revision:string})=>void=()=>{}
+    const pending=cache.load('historical:artisan:vi',()=>new Promise(resolve=>{finish=resolve}))
+    await Promise.resolve()
+    cache.invalidateBefore('artisan','2026-10-28T00:00:00Z')
+    finish({report:{...report(),generatedAt:'2026-10-01T00:00:00Z'},revision:'old'})
+    await pending
+    expect(cache.getSnapshot().entries['historical:artisan:vi'].report).toBeNull()
+  })
+  it('invalidates only reports preceding the selected restaurant reload, preserving other restaurants and newer reports',()=>{
+    const cache=new AnalyticsSessionCache()
+    cache.put('old-fr',{...report('fr'),generatedAt:'2026-10-01T00:00:00Z'})
+    cache.put('other',{...report(),establishmentId:'other',generatedAt:'2026-10-01T00:00:00Z'})
+    cache.put('new',{...report(),generatedAt:'2026-10-29T00:00:00Z'})
+    cache.invalidateBefore('artisan','2026-10-28T00:00:00Z')
+    expect(cache.getSnapshot().entries['old-fr'].report).toBeNull()
+    expect(cache.getSnapshot().entries['other'].report).not.toBeNull()
+    expect(cache.getSnapshot().entries['new'].report).not.toBeNull()
+  })
   it('repairs an old frontend projection of V5 at the same row ID and revision without generation',async()=>{
     const cache=new AnalyticsSessionCache()
     const old={...report(),reputation:undefined,consultant:undefined}

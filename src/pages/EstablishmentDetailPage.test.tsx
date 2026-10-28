@@ -38,6 +38,10 @@ vi.mock('../app/AppContext', () => ({
     }],
     notifications: [],
     monitoringIntervalHours: 3,
+    currentUser: { id: 'test-user' },
+    reloadEstablishmentReviews: vi.fn(),
+    refreshInitialImports: vi.fn(),
+    demoMode: false,
     removeEstablishment,
   }),
 }))
