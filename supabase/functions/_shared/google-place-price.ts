@@ -3,6 +3,9 @@ import {googleMoneyRange} from './google-maps-prices.ts';
 export const PLACE_PRICE_ACTOR = 'compass~crawler-google-places';
 export const PLACE_PRICE_BUILD = '0.14.777';
 export const PLACE_PRICE_ACTOR_ID = 'nwua9Gu5YrADL7ZDj';
+// Actor metadata minimalMaxTotalChargeUsd, verified before every new paid start.
+// This is a ceiling, not a fee or an estimate of the one-place run's cost.
+export const PLACE_PRICE_MAX_CHARGE_USD = 0.5;
 export type PriceIdentity = {google_id:string; place_id:string|null; google_maps_url:string; language:'fr'|'vi'};
 type Obj = Record<string,unknown>;
 const record = (x:unknown):Obj => x!==null && typeof x==='object' && !Array.isArray(x) ? x as Obj : {};
@@ -55,6 +58,7 @@ export function priceRun(payload:unknown):PriceRun {
 /** No SDK retries, redirect or implicit restart. The secret stays in server memory/headers. */
 export function placePriceProvider(token:string,network:typeof fetch=fetch) {
   if(!token.trim())throw Error('PLACE_PRICE_ACCESS_UNAVAILABLE');
+  let preflight:Obj|null=null;
   async function get(path:string,init:RequestInit={},timeout=30_000):Promise<unknown> {
     const response=await network('https://api.apify.com/v2'+path,{...init,redirect:'error',
       headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},signal:AbortSignal.timeout(timeout)});
@@ -62,13 +66,25 @@ export function placePriceProvider(token:string,network:typeof fetch=fetch) {
     return response.json();
   }
   return {
-    start:async(input:ReturnType<typeof placePriceInput>)=>priceRun(await get('/acts/'+PLACE_PRICE_ACTOR+'/runs?build='+PLACE_PRICE_BUILD+'&timeout=120&maxTotalChargeUsd=0.10', {method:'POST',body:JSON.stringify(input)})),
+    preflight:async()=>{
+      const data=record(record(await get('/acts/'+PLACE_PRICE_ACTOR)).data);
+      const entries=Array.isArray(data.pricingInfos)?data.pricingInfos.map(record).filter(p=>typeof p.startedAt==='string'&&Date.parse(p.startedAt)<=Date.now()).sort((a,b)=>Date.parse(String(b.startedAt))-Date.parse(String(a.startedAt))):[];
+      const minimum=entries[0]?.minimalMaxTotalChargeUsd;
+      if(data.id!==PLACE_PRICE_ACTOR_ID || typeof minimum!=='number' || !Number.isFinite(minimum) || minimum>PLACE_PRICE_MAX_CHARGE_USD)throw Error('PLACE_PRICE_PREFLIGHT_CHARGE_LIMIT_INVALID');
+      preflight={actor_id:data.id,minimum_max_total_charge_usd:minimum,max_total_charge_usd:PLACE_PRICE_MAX_CHARGE_USD,checked_at:new Date().toISOString()};
+      return preflight;
+    },
+    start:async(input:ReturnType<typeof placePriceInput>)=>{
+      if(!preflight)throw Error('PLACE_PRICE_PREFLIGHT_REQUIRED');
+      const run=priceRun(await get('/acts/'+PLACE_PRICE_ACTOR+'/runs?build='+PLACE_PRICE_BUILD+'&timeout=120&maxTotalChargeUsd='+PLACE_PRICE_MAX_CHARGE_USD, {method:'POST',body:JSON.stringify(input)}));
+      run.receipt={...run.receipt,preflight};return run;
+    },
     run:async(id:string)=>priceRun(await get('/actor-runs/'+encodeURIComponent(id)+'?waitForFinish=20')),
     dataset:async(id:string)=>get('/datasets/'+encodeURIComponent(id)+'/items?clean=true&format=json&limit=2'),
   };
 }
 
-export type PriceJob = PriceIdentity & {id:string;run_id:string|null;dataset_id:string|null;start_attempted_at:string|null;request_input:unknown};
+export type PriceJob = PriceIdentity & {id:string;run_id:string|null;dataset_id:string|null;start_attempted_at:string|null;request_input:unknown;receipt?:Obj};
 export interface PricePort {
   action(action:string,data?:Obj):Promise<boolean>;
   provider:ReturnType<typeof placePriceProvider>;
@@ -76,22 +92,25 @@ export interface PricePort {
 export async function processPlacePrice(job:PriceJob,port:PricePort) {
   const action=async(name:string,data:Obj={})=>{if(!await port.action(name,data))throw Error('PLACE_PRICE_LEASE_LOST');};
   let reserved=job.start_attempted_at!==null,runId=job.run_id,datasetId=job.dataset_id;
+  let receipt=record(job.receipt);
   try {
     const input=placePriceInput(job);
     if(!runId) {
       if(reserved)throw Error('PLACE_PRICE_OUTCOME_UNKNOWN');
+      await port.provider.preflight();
       await action('reserve',{input});reserved=true;
       const run=await port.provider.start(input);
+      receipt=run.receipt;
       await action('run',run);runId=run.id;datasetId=run.dataset_id;
     }
     for(let n=0;n<2;n++) {
       const run=await port.provider.run(runId);
       if(run.id!==runId || datasetId && run.dataset_id!==datasetId)throw Error('PLACE_PRICE_RUN_IDENTITY_MISMATCH');
-      await action('run',run);datasetId=run.dataset_id;
+      receipt={...receipt,...run.receipt};await action('run',{...run,receipt});datasetId=run.dataset_id;
       if(['FAILED','TIMED-OUT','ABORTED'].includes(run.status)) {await action('fail',{code:'PLACE_PRICE_PROVIDER_'+run.status});return 'failed';}
       if(run.status==='SUCCEEDED') {
         const observation=placePriceObservation(await port.provider.dataset(datasetId),job);
-        await action('finish',{observation,receipt:run.receipt});return 'finished';
+        await action('finish',{observation,receipt});return 'finished';
       }
     }
     await action('defer');return 'pending';
@@ -100,6 +119,7 @@ export async function processPlacePrice(job:PriceJob,port:PricePort) {
     if(reason==='PLACE_PRICE_LEASE_LOST')return 'lease_lost';
     // A response lost before its durable run binding consumes the attempt forever.
     const code=reserved && !runId ? 'PLACE_PRICE_OUTCOME_UNKNOWN' : /^PLACE_PRICE_[A-Z0-9_-]+$/.test(reason) ? reason : 'PLACE_PRICE_READ_FAILED';
+    console.warn('PLACE_PRICE_ATTEMPT_STOPPED',{job_id:job.id,code,diagnostic:/^PLACE_PRICE_[A-Z0-9_-]+$/.test(reason)?reason:'PLACE_PRICE_NETWORK_OR_RUNTIME_ERROR'});
     await port.action('fail',{code});return code;
   }
 }
