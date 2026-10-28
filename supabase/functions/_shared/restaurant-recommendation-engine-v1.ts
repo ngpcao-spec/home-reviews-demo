@@ -25,7 +25,8 @@ export type Score = {value: string; numerator: string; denominator: string};
 export type Citation = {report_id: string; section: 'positive_aspects' | 'reservations'; index: number; category: string; text: string; evidence_ids: string[]};
 export type Prices = {
   establishment: {status: 'known' | 'unknown'; source: string | null; observed_at: string | null; level: number | null;
-    range: {currency: string; minimum: number; maximum: number} | null; raw: Obj;source_fields:string[];source_table:string|null;provider_scraped_at:string|null;missing_reason:string|null};
+    range: {currency: string; minimum: number; maximum: number} | null; raw: Obj;source_fields:string[];source_table:string|null;provider_scraped_at:string|null;missing_reason:string|null;
+    label:string;unit:'per_person'|null;indicative:true;guaranteed_tariff:false};
   customer_spend_per_person: {source: string | null; status: string | null; observed_at: string | null; guaranteed_tariff: false; ranges: {value: string; review_count: number; parsed:MoneyRange; source_fields:string[]; period_start:string|null; period_end:string|null}[]};
 };
 export type Proposal = {
@@ -140,13 +141,15 @@ function priceRange(raw: unknown): Prices['establishment']['range'] {
   return r.status==='parsed'&&r.bounds==='closed'&&r.currency!==null&&r.minimum!==null&&r.maximum!==null
     ?{currency:r.currency,minimum:r.minimum,maximum:r.maximum}:null;
 }
-export function prices(metadata: Obj): Prices {
+export function prices(metadata: Obj,language='fr'): Prices {
   const b = obj(metadata.budget), e = obj(b.establishment_price), c = obj(b.customer_spend_per_person);
-  const trustworthy = e.source === 'google_maps_import' && e.status === 'provided' && typeof e.observed_at === 'string' && Number.isFinite(Date.parse(e.observed_at));
+  const trustworthy = ['google_maps_import','google_maps_place_details'].includes(String(e.source)) && e.status === 'provided' && typeof e.observed_at === 'string' && Number.isFinite(Date.parse(e.observed_at));
   const level = trustworthy ? googlePriceLevel(e.price_level) ?? googlePriceLevel(e.price,false) : null;
   const range = trustworthy ? priceRange(e.price_range) ?? priceRange(e.price) : null;
   return {establishment:{status:level !== null || range !== null ? 'known' : 'unknown',level,range,source:str(e.source),observed_at:str(e.observed_at),raw:{price:e.price ?? null,price_level:e.price_level ?? null,price_range:e.price_range ?? null},
-    source_fields:list(e.source_fields).filter((x):x is string=>typeof x==='string'),source_table:str(e.source_table),provider_scraped_at:str(e.provider_scraped_at),missing_reason:str(e.missing_reason)},
+    source_fields:list(e.source_fields).filter((x):x is string=>typeof x==='string'),source_table:str(e.source_table),provider_scraped_at:str(e.provider_scraped_at),missing_reason:str(e.missing_reason),
+    label:level!==null||range!==null ? str(e.price)??str(e.price_range)??str(e.price_level)??String(level) : language==='vi'?'Chưa có thông tin giá':'Prix non renseigné',
+    unit:trustworthy&&e.unit==='per_person'?'per_person':null,indicative:true,guaranteed_tariff:false},
     customer_spend_per_person:{source:str(c.source),status:str(c.status),observed_at:str(c.observed_at),guaranteed_tariff:false,ranges:list(c.ranges).flatMap(x => {
       const v = obj(x);return typeof v.value === 'string' && Number.isInteger(v.review_count) && Number(v.review_count) > 0 ? [{value:v.value,review_count:Number(v.review_count),parsed:googleMoneyRange(v.value),source_fields:list(v.source_fields).filter((x):x is string=>typeof x==='string'),period_start:str(v.period_start),period_end:str(v.period_end)}] : [];
     })}};
@@ -213,7 +216,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     else if (!inArea(point,distance,request.area)) reasons.push('OUTSIDE_AREA');
     const types = documentedCuisines(google);
     if (request.cuisines?.length && !request.cuisines.some(c => types.includes(cuisine(c)))) reasons.push(types.length ? 'CUISINE_MISMATCH' : 'CUISINE_NOT_DOCUMENTED');
-    const budget = prices(row.metadata), match = budgetMatch(budget,request.budget);
+    const budget = prices(row.metadata,language), match = budgetMatch(budget,request.budget);
     if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
     const positives = citations(row,'positive_aspects'), reservations = citations(row,'reservations');
     const observations = Object.fromEntries(features.map(f => [f,featureStatus(f,positives,reservations)]));

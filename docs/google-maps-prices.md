@@ -1,6 +1,6 @@
 # Prix Google Maps pour les fiches internes
 
-Correction préparée dans le code, sans collecte, appel IA ni régénération.
+Conservation des prix et collecte de fiche séparée de l'import des avis.
 Le moteur reste une interface interne non raccordée à HOME AI. Aucun changement
 des scores V2, des notes, du corpus, des langues ou du contenu des rapports.
 
@@ -110,15 +110,73 @@ de ces anciens parcours. Ne pas appliquer d'autres migrations locales ni appeler
 les workers pour vérifier un déploiement. Les données existantes ne peuvent pas être
 inventées : le bilan peut rester à zéro prix établissement après correction.
 
-## Collecte éventuelle, non exécutée
+## Collecte de fiche — livraison V1
 
-Si les prix d'établissement sont indispensables, préparer une collecte distincte
-des seules fiches déjà identifiées, sans avis supplémentaires. L'acteur de fiches
+L'acteur de fiches
 [`compass/crawler-google-places`](https://apify.com/compass/crawler-google-places)
 documente `price` ; son
 [schéma](https://apify.com/compass/crawler-google-places/input-schema) permet
-`maxReviews=0` et `scrapePlaceDetailPage`. Une proposition exacte doit utiliser les
-URLs/IDs existants, une fiche par URL, la langue choisie, aucun enrichissement de
-contacts/photos/IA. Cette possibilité ne garantit pas que Google retourne les prix.
-Présenter le périmètre et obtenir l'autorisation avant tout nouveau run. Aucun
-raccordement ou changement d'acteur n'est effectué par cette correction.
+`maxReviews=0` et `scrapePlaceDetailPage`. Le worker séparé
+`process-google-place-price-jobs` utilise le build testé `0.14.777`, une URL Google
+déjà identifiée, une fiche au maximum, la langue persistée, zéro avis/image et
+aucun enrichissement contacts/leads/IA. L'acteur de collecte des 150 avis, son
+entrée, les traductions et leur disponibilité ne changent pas.
+
+La migration `20261028151639_google_place_price_jobs.sql` crée une file privée,
+initialement désactivée. Un trigger de fin d'import initial peut y inscrire
+l'établissement ; une erreur est isolée et ne remet pas l'import en échec. Le
+rechargement manuel et les synchronisations ne créent pas de tentative de prix.
+Les recherches et publications de rapport lisent seulement les prix sauvegardés.
+
+Une contrainte unique par établissement empêche tout double envoi. Une réservation
+durable précède l'unique POST ; une interruption sans identifiant de run devient
+`unknown`, jamais un nouveau POST. Un run connu peut être relu avec GET. Un prix
+absent termine en `not_provided`, distinct de `failed` et `identity_mismatch`.
+Il n'existe aucun retry de collecte, même lorsque le fournisseur renvoie une
+erreur HTTP. Une réponse ambiguë exige une décision humaine. La concurrence est
+bornée à une collecte de prix et partage les slots fournisseur existants.
+
+Le réveil serveur immédiat et les continuations bornées traitent la file,
+application fermée. Le cron est un secours de **livraison de cette file** : il
+ne peut créer aucune demande ni recommencer une collecte terminée. Aucun
+rafraîchissement périodique de prix n'est programmé.
+
+Chaque réponse doit correspondre au CID, au Place ID lorsqu'il est connu et à
+la langue figée. Une fiche unique et `reviews: []` sont exigés. Les dates viennent
+de `scrapedAt`, jamais de la date de rattachement. Seuls prix, normalisation,
+identifiants et reçus techniques sont conservés, pas les publications clients,
+photos ou autres contenus de la fiche. Le libellé demeure disponible même s'il
+est ambigu. Devise et bornes ne sont normalisées que par le parseur strict.
+L'unité par personne exige un libellé explicite ou une observation Google Maps
+déjà vérifiée, réutilisée avec sa preuve ; elle n'est pas supposée à partir d'une
+simple fourchette. Ni un null ni un échec ne remplacent un ancien prix connu ni
+sa date réelle. La fourchette reste indicative, jamais un tarif garanti.
+
+Le budget des fiches est actualisé seul, sans recalcul, modification de statut
+ou référence de rapport. Les futures publications utilisent le même résolveur,
+avec les dépenses individuelles figées de leur propre corpus. Le moteur peut
+filtrer et diversifier sur les prix Google comparables sauvegardés, sans réseau.
+Les libellés inconnus sont `Prix non renseigné` / `Chưa có thông tin giá`.
+
+### Installation et retour arrière
+
+Après contrôles et fusion, appliquer **seulement** les deux migrations de prix
+de cette PR, dans l'ordre. Déployer les workers `process-initial-import-jobs`,
+`process-review-sync-jobs` (conservation des champs) et
+`process-google-place-price-jobs` (nouveau worker à authentification scheduler).
+L'installation n'inscrit ni ne réveille les établissements existants.
+
+```sql
+-- Activation après contrôle du déploiement, futures fins d'import seulement :
+update private.google_place_price_config set enabled=true where singleton;
+-- Reprise initiale autorisée : un appel service-only par établissement sans prix,
+-- en réutilisant d'abord toute observation payée validée par reuse_google_place_price.
+-- Ne jamais remettre attempts à zéro, ni vider les reçus pour réessayer.
+-- Arrêt des prochains envois (conserver le code et les données des tentatives) :
+update private.google_place_price_config set enabled=false where singleton;
+```
+
+Les données et le bilan par établissement demeurent privés, hors dépôt. Les
+tests réseau simulé, PostgreSQL embarqué et le rejeu du moteur ne sont pas une
+preuve de la couverture du fournisseur. Les résultats réels sont consignés
+séparément lors de la reprise autorisée.

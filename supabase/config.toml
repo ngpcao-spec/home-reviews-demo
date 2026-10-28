@@ -577,3 +577,7 @@ verify_jwt = false
 # Authenticated explicitly by requireUser/getUser and organization membership.
 [functions.parallel-reports]
 verify_jwt = false
+
+# Server scheduler token checked inside the handler; no user-facing API.
+[functions.process-google-place-price-jobs]
+verify_jwt = false
