@@ -3,8 +3,8 @@ set local lock_timeout='5s';
 set local statement_timeout='30s';
 
 -- This switch is enabled explicitly only after the server function is deployed.
-create table private.google_place_price_config(singleton boolean primary key default true check(singleton),enabled boolean not null default false);
-insert into private.google_place_price_config values(true,false);
+create table private.google_place_price_config(singleton boolean primary key default true check(singleton),enabled boolean not null default false,last_wake_at timestamptz);
+insert into private.google_place_price_config(singleton,enabled) values(true,false);
 create table private.google_place_price_jobs(
  id uuid primary key default gen_random_uuid(),
  establishment_id uuid unique references public.establishments(id) on delete set null,
@@ -64,8 +64,9 @@ create function private.refresh_place_price_sheet(p_est uuid) returns void langu
 $$;
 
 create function private.dispatch_google_place_price_queue() returns bigint language plpgsql security definer set search_path='' as $$
-declare rid bigint;ready timestamptz;begin
- if not exists(select 1 from private.google_place_price_config where enabled) or exists(select 1 from public.review_corpus_policy where paused or ingestions_paused) then return null;end if;
+declare rid bigint;ready timestamptz;last_wake timestamptz;begin
+ select last_wake_at into last_wake from private.google_place_price_config where enabled for update;
+ if not found or last_wake>clock_timestamp()-interval '1 second' or exists(select 1 from public.review_corpus_policy where paused or ingestions_paused) then return null;end if;
  select min(case when status='running' then lease_until else available_at end) into ready from private.google_place_price_jobs
   where status='queued' and available_at<=clock_timestamp()+interval '5 seconds' or status='running' and lease_until<clock_timestamp();
  if ready is null then return null;end if;
@@ -73,7 +74,7 @@ declare rid bigint;ready timestamptz;begin
   headers:=jsonb_build_object('Content-Type','application/json','x-home-reviews-scheduler',
    (select decrypted_secret from vault.decrypted_secrets where name='home_reviews_scheduler_token')),
   body:=jsonb_build_object('ready_at',ready),timeout_milliseconds:=180000) into rid;
- return rid;
+ update private.google_place_price_config set last_wake_at=clock_timestamp() where singleton;return rid;
 exception when others then raise warning 'PLACE_PRICE_WAKE_FAILED_QUEUE_RECOVERY';return null;
 end$$;
 create function private.place_price_ready_wake() returns trigger language plpgsql security definer set search_path='' as $$

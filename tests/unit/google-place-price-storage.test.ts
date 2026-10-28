@@ -48,6 +48,7 @@ it('enqueues after durable initial completion only; failure or reload cannot gat
  expect(await query('select count(*)::int v from private.google_place_price_jobs')).toBe(0);
  await db.exec("update public.initial_import_jobs set status='completed'");expect(await query('select count(*)::int v from private.google_place_price_jobs')).toBe(1);
  expect(await enqueue()).toBe(await enqueue());expect(await query('select count(*)::int v from private.google_place_price_jobs')).toBe(1);
+ expect(await query('select count(*)::int v from net.wakes')).toBe(1);
  await db.exec(`insert into public.initial_import_jobs(status,establishment_id,request_kind) values('running','${other}','reload');update public.initial_import_jobs set status='completed';`);
  expect(await query('select count(*)::int v from private.google_place_price_jobs')).toBe(1);
 });
