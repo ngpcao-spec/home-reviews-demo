@@ -32,8 +32,9 @@ describe('geography, explicit criteria and access',() => {
     expect(run([sheet('any')]).proposals).toHaveLength(1);
     const bbq=sheet('bbq-name');expect(run([bbq],{cuisines:['bbq']}).proposals).toHaveLength(0);
     (bbq.metadata.google_metadata as Record<string,unknown>).google_categories=['Nhà hàng món nướng'];
-    expect(ids(run([bbq],{cuisines:['bbq']}))).toEqual(['bbq-name']);
-    expect(run([bbq]).proposals[0].cuisines.values).toEqual(['barbecue']);
+    expect(ids(run([bbq],{specialties:['bbq']}))).toEqual(['bbq-name']);
+    expect(run([bbq]).proposals[0].cuisines.values).toEqual([]);
+    expect(run([bbq]).proposals[0].specialties).toEqual(['barbecue']);
   });
   it('never fills three places if only one or two candidates qualify',() => {
     expect(run([sheet('a')]).proposals).toHaveLength(1);expect(run([sheet('a'),sheet('b')]).proposals).toHaveLength(2);

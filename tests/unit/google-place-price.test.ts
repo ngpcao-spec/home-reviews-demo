@@ -31,6 +31,8 @@ it('reserves before its single POST and saves run binding, receipt and minimal o
  const h=harness();expect(await h.execute()).toBe('finished');expect(h.provider.start).toHaveBeenCalledTimes(1);
  expect(h.action.mock.calls.map(c=>c[0])).toEqual(['reserve','run','run','finish']);
  expect(h.action.mock.calls.at(-1)?.[1]).toMatchObject({observation:{raw:{price:item.price}},receipt:{usageTotalUsd:0.005}});
+ expect(h.action.mock.calls.at(-1)?.[1]).toMatchObject({profile:{version:'google-place-profile-v1',identity:{cid:'123',observed_at:item.scrapedAt}}});
+ expect(h.provider.dataset).toHaveBeenCalledTimes(1);
 });
 it('does not send a duplicate when reservation is refused or the start outcome is unknown',async()=>{
  const a=harness();a.action.mockResolvedValueOnce(false);await a.execute();expect(a.provider.start).not.toHaveBeenCalled();

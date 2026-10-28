@@ -1,0 +1,34 @@
+# Internal Google Maps practical metadata V1
+
+The existing one-place price call also returns practical information. Its input is unchanged: `maxReviews=0`, `maxImages=0`, one verified URL, the frozen import language, optional enrichments disabled. No search/report reads invoke a provider. No extra collection, translation, website/menu exploration, scheduled enrichment or public recommendation endpoint is introduced.
+
+## Storage and provenance
+
+`google-place-profile-v1` is an allowlist projection in `private.google_place_profiles`, also attached as `restaurant_recommendation_sheets.metadata.google_place_profile`. Groups are identity/location; all categories; weekly/additional hours and observed closure flags; boolean attributes; popularity; editorial/commercial presentation; contacts and links. Every group retains `google_maps_place_details`, the original `scrapedAt`, collection locale and source field paths. A server-generated binding records the establishment/organization, confirmed job, actor/build, run and dataset. The CID/place ID, locale and observation date must match the existing successful saved result and the establishment. An unknown attempt cannot supply a profile or be resubmitted by this feature.
+
+Only the service role may attach an already retrieved result. End users use the existing sheet/publication RLS and organization role check; there is no new public catalogue. A sheet trigger preserves the profile when future publications reconstruct metadata. Deleting an establishment deletes its profile. Scores, frozen report corpus, references, stale state, budget values and budget dates are not recomputed. Existing budget provenance remains authoritative, including per-person units only where independently confirmed.
+
+The transport projects the profile from the same dataset read before its existing atomic `finish`, preserving reservation, receipts, concurrency slots and consumed/unknown attempts. Older deployed callers can still finish without a profile. A guarded migration patch adds only persistence at finish; it fails if its expected function anchor differs.
+
+## Interpretation
+
+- Explicit FR/VI/EN category aliases separate cuisines, specialties and usages. All complementary categories participate. Multiple categories are allowed; a generic restaurant category implies no cuisine. Neither business names nor commercial descriptions provide inferred cuisine. Unrecognized labels remain in `raw`/`unrecognized`.
+- Boolean additional-info entries preserve their original group/label/value. Duplicates are collapsed. Recognized aliases yield true, false or unknown/conflicted; missing is never false. The mapping is in `google-place-taxonomy.ts`; unknown labels remain available without an invented feature. Facilities such as entrance/seating/parking accessibility remain separate facts.
+- Weekly intervals preserve raw strings and parse explicit FR/VI/EN weekdays, closures, 24-hour and overnight/split shifts. End minutes can exceed 1440. Previous-day spill is checked. Invalid or ambiguous intervals are unknown. Provider IANA timezones are retained; only the explicit single-zone `VN -> Asia/Ho_Chi_Minh` fallback is provided. Other missing timezones remain unknown. `visit_at` requires an offset. Scheduled opening is not live opening or a holiday guarantee. Additional kitchen/delivery schedules are distinct.
+- Popularity is a dated weekly histogram, relative to that establishment's own peak. It cannot prove quiet, capacity or a comparison between restaurants. Live popularity/open-at-scrape are explicitly historical snapshots.
+- Descriptions lack reliable source-language metadata in the inspected response. They remain untranslated with `language=null`, even if the collection locale is VI. Owner text is commercial presentation, not an independently verified service claim. No translation is requested. Recognized criterion labels and missing-price labels are localized FR/VI; original Google labels remain identifiable as source text.
+- Only existing URLs are retained for the main photo, menu and booking. No image is downloaded. Menu links do not assert dishes; reservation links do not assert availability or acceptance of reservations.
+
+## Recommendation interface
+
+`restaurant-recommendation-engine-v2` remains a pure internal library behind `readRestaurantRecommendations`, with no HTTP handler or HOME AI wiring. It keeps the exact `internal-recommendation-v2` score arithmetic, 0.10 comparable-score bands, distance/budget rules and maximum three results.
+
+Optional request fields: `cuisines`, `specialties`, `usages`, `required_features`, `preferences.features`, `visit_at` and `hours_kind` (venue/kitchen/delivery/takeaway/breakfast). Taxonomy filters and explicit feature requirements need documented matches; false, missing, conflicted or unsupported criteria cannot satisfy requirements. A missing soft preference never excludes a candidate. Recognized Google facts can refine choices within comparable-score groups. Matching reasons retain their Google source/date separately from cited report passages. Explicit observed closures are disclosed exclusions, not a claim of a live verification.
+
+The existing bounded report phrase matcher detects supported contradictions (including Google quiet versus cited report noise); it is not general language understanding. A conflict is exposed with both sources and does not satisfy a mandatory requirement. Scores do not change. Refinements require an actual comparable alternative and documented distance, budget or feature difference; a newly documented quiet option is not described as quantitatively quieter. Unsupported criteria are returned as notices. There is no inference of speed from service score or quiet from ambiance score.
+
+## Verification and delivery
+
+Offline tests execute the real migration with PGlite, test the pure parser/engine, confirm same-call persistence, idempotency, incompatible identity/date/unknown rejection, publication attachment, deletion, permissions and preservation. Private saved-dataset replay, field coverage, representative sheets and actual recommendation results stay outside the public repository. That replay establishes available data and deterministic selections, not current opening or live booking availability.
+
+Deploy only `20261028164404_google_place_practical_metadata.sql` and `process-google-place-price-jobs` from the merged commit. No other function requires redeployment; the internal recommendation library is delivered in the repository and remains unconnected. Backfill only the 21 verified saved datasets using `store_google_place_profile`; leave unavailable/unknown attempts unchanged. Rollback the future transport by restoring its prior worker (optional-profile database compatibility remains); retain projections and receipts. Do not reset jobs or recreate collections.
