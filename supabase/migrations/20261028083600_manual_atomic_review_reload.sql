@@ -96,10 +96,13 @@ create function private.assert_review_reload_idle(p_establishment uuid) returns 
 language plpgsql security definer set search_path='' as $$begin
  if exists(select 1 from public.historical_report_runs where establishment_id=p_establishment and status not in('completed','failed','cancelled','abandoned','superseded','invalid_output'))
  or exists(select 1 from public.analysis_jev_batch_runs b where establishment_id=p_establishment and
-  (b.armed or b.sol_request_count>0 and b.sol_receipt is null or exists(select 1 from public.analysis_jev_batch_tasks t
-   where t.run_id=b.id and t.request_count>0 and t.receipt is null)))
+  (b.armed or b.sol_request_count>0 and (nullif(b.sol_receipt,'null'::jsonb) is null or b.sol_receipt->>'http_status' is null
+    or b.status in('unknown','billing_uncertain')) or exists(select 1 from public.analysis_jev_batch_tasks t
+   where t.run_id=b.id and t.request_count>0 and (nullif(t.receipt,'null'::jsonb) is null or t.receipt->>'http_status' is null
+    or t.status in('unknown','billing_uncertain')))))
  or exists(select 1 from private.kh_en_experiments x where x.establishment_id=p_establishment and
-  (x.armed or exists(select 1 from private.kh_en_calls c where c.experiment_id=x.id and c.attempts>0 and c.state<>'received')))
+  (x.armed or exists(select 1 from private.kh_en_calls c where c.experiment_id=x.id and c.attempts>0 and
+   (c.state<>'received' or nullif(c.receipt,'null'::jsonb) is null or c.receipt->>'http_status' is null))))
  or exists(select 1 from private.review_display_receipts d join public.reviews r on r.id=d.review_id
   where r.establishment_id=p_establishment and d.status not in('completed','failed'))
  or exists(select 1 from public.review_sync_jobs s where s.establishment_id=p_establishment and
@@ -322,4 +325,5 @@ revoke all on function public.stage_review_reload(uuid,text,jsonb,jsonb),public.
  public.apply_review_reload(uuid,text),public.fail_review_reload(uuid,text,text,jsonb) from public,anon,authenticated;
 grant execute on function public.stage_review_reload(uuid,text,jsonb,jsonb),public.review_reload_stage_ready(uuid,text),
  public.apply_review_reload(uuid,text),public.fail_review_reload(uuid,text,text,jsonb) to service_role;
+notify pgrst,'reload schema';
 commit;

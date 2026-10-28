@@ -188,7 +188,7 @@ it('removes durable reports, recommendation sheets and experiment copies, retain
  await db.query("insert into public.restaurant_recommendation_sheets values($1,'vi')",[est]);
  await db.query("insert into private.kh_en_experiments(id,reference_report_id,establishment_id,armed,body,artifacts) values($1,$2,$3,false,'{\"old_text\":\"OLD REVIEW COPY\"}','{\"old_report\":\"OLD REPORT COPY\"}')",[experiment,report,est]);
  await db.query(`insert into private.kh_en_calls(experiment_id,phase,request_wire,request_sha256,state,attempts,receipt)
- values($1,'sol','OLD REVIEW COPY','requesthash','received',1,$2)`,[experiment,{raw_response_text:JSON.stringify({model:'gpt-6.1-sol',usage:{input_tokens:30,output_tokens:5},output:'OLD REPORT COPY'}),raw_response_sha256:'receipthash',provider_request_id:'native-id',duration_ms:123}]);
+ values($1,'sol','OLD REVIEW COPY','requesthash','received',1,$2)`,[experiment,{http_status:200,raw_response_text:JSON.stringify({model:'gpt-6.1-sol',usage:{input_tokens:30,output_tokens:5},output:'OLD REPORT COPY'}),raw_response_sha256:'receipthash',provider_request_id:'native-id',duration_ms:123}]);
  const j=await running();await stage(j);await apply(j.id);await db.exec('reset role');
  for(const table of ['current_report_publications','restaurant_recommendation_sheets','historical_report_runs'])expect((await db.query('select count(*)::int n from public.'+table+' where establishment_id=$1',[est])).rows[0].n).toBe(0);
  expect((await db.query('select count(*)::int n from private.kh_en_calls')).rows[0].n).toBe(0);
@@ -224,4 +224,11 @@ it('accepts a verifiable native zero-review place, while an empty/unidentifiable
  const bundle=await stage(j,zero as ReturnType<typeof items>);expect(bundle).toHaveLength(0);
  expect((await apply(j.id)).rows[0].r).toMatchObject({inserted:0,reload_replaced:true});
  expect((await db.query('select count(*)::int n from public.reviews where establishment_id=$1',[est])).rows[0].n).toBe(0);
+});
+
+it.each([null,{http_status:null,error:'network outcome unknown'}])('blocks consumed report attempts with an unknown native HTTP outcome %s',async receipt=>{
+ await seed();const run=crypto.randomUUID();
+ await db.query("insert into public.analysis_jev_batch_runs(id,organization_id,establishment_id,status,armed,sol_request_count,sol_receipt) values($1,$2,$3,'failed',false,1,$4)",[run,org,est,receipt]);
+ await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'RELOAD_GENERATION_OR_RESULT_PENDING');
+ expect((await db.query('select count(*)::int n from public.reviews where establishment_id=$1',[est])).rows[0].n).toBe(1);
 });
