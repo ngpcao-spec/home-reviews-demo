@@ -1,4 +1,4 @@
-import { CheckCircle2, Link2, LoaderCircle, MapPin, Search } from 'lucide-react'
+import { CheckCircle2, CircleAlert, Link2, LoaderCircle, MapPin, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApp, type AddEstablishmentResult } from '../app/AppContext'
@@ -19,28 +19,25 @@ interface AddWizardLocationState {
   }
 }
 
-function messageFor(error: unknown, messages: Messages): string {
-  const code = error instanceof Error ? error.message : 'UNKNOWN'
+function messageFor(code: string, messages: Messages): string {
   const errors = messages.add.errors
   const errorMessages: Record<string, string> = {
+    GOOGLE_MAPS_LINK_REQUIRED: messages.add.pasteLink,
     INVALID_GOOGLE_MAPS_LINK: errors.invalidLink,
     INVALID_INPUT: errors.invalidLink,
     ESTABLISHMENT_NOT_FOUND: errors.notFound,
     GOOGLE_MAPS_LINK_RESOLUTION_FAILED: errors.resolution,
     ESTABLISHMENT_ALREADY_ADDED: errors.duplicate,
-    OUTSCRAPER_UNAVAILABLE: errors.unavailable,
-    OUTSCRAPER_UPSTREAM_ERROR: errors.unavailable,
-    APIFY_UNAVAILABLE: errors.unavailable,
-    APIFY_RATE_LIMIT: errors.quota,
-    OUTSCRAPER_QUOTA_EXCEEDED: errors.quota,
-    OUTSCRAPER_BILLING_REQUIRED: errors.quota,
-    OUTSCRAPER_TIMEOUT: errors.timeout,
-    APIFY_TIMEOUT: errors.timeout,
     UNAUTHORIZED: errors.unauthorized,
     FORBIDDEN: errors.forbidden,
     ESTABLISHMENT_MISMATCH: errors.mismatch,
   }
-  return errorMessages[code] ?? errors.generic
+  // Provider codes remain internal; never render an upstream message verbatim.
+  return errorMessages[code] ?? messages.add.importError
+}
+
+function codeFor(error: unknown): string {
+  return error instanceof Error ? error.message : 'UNKNOWN'
 }
 
 export function AddEstablishmentPage() {
@@ -63,7 +60,8 @@ export function AddEstablishmentPage() {
   const [result, setResult] = useState<AddEstablishmentResult | undefined>(restored?.result)
   const [loading, setLoading] = useState(false)
   const [retrying, setRetrying] = useState(false)
-  const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState('')
+  const error = errorCode ? messageFor(errorCode, messages) : ''
   const currentJob = result?.importJobId
     ? initialImportJobs.find((job) => job.id === result.importJobId)
     : initialImportJobs[0]
@@ -90,12 +88,12 @@ export function AddEstablishmentPage() {
       inserted: job.result?.inserted ?? job.reviewsInserted,
       negativeReviewCount: job.result?.negativeReviewCount,
       distribution: job.result?.distribution ?? { '1': 0, '2': 0, '3': 0 },
-      importStatus: job.status === 'completed' ? 'completed' : job.status === 'failed' ? 'failed' : undefined,
-      retryable: job.status === 'failed',
+      importStatus: job.status === 'completed' ? job.result?.importStatus ?? 'completed' : job.status === 'failed' ? 'failed' : undefined,
+      retryable: job.status === 'failed' || job.result?.importStatus === 'partial',
       nextSyncAt: job.result?.nextSyncAt,
     }
     setResult(jobResult)
-    setError(job.status === 'failed' ? messageFor(new Error(job.errorCode ?? 'UNKNOWN'), messages) : '')
+    setErrorCode(job.status === 'failed' || job.result?.importStatus === 'partial' ? job.errorCode ?? 'IMPORT_COLLECTION_PARTIAL' : '')
     setStep(job.status === 'completed' || job.status === 'failed' ? 'success' : 'import')
   }, [initialImportJobs, messages])
 
@@ -106,9 +104,9 @@ export function AddEstablishmentPage() {
   }, [currentJob, refreshInitialImports, step])
 
   const search = async () => {
-    setError('')
+    setErrorCode('')
     if (!query.trim()) {
-      setError(messages.add.pasteLink)
+      setErrorCode('GOOGLE_MAPS_LINK_REQUIRED')
       return
     }
     setLoading(true)
@@ -117,7 +115,7 @@ export function AddEstablishmentPage() {
       setCandidate(found)
       setStep('confirm')
     } catch (searchError) {
-      setError(messageFor(searchError, messages))
+      setErrorCode(codeFor(searchError))
     } finally {
       setLoading(false)
     }
@@ -125,14 +123,14 @@ export function AddEstablishmentPage() {
 
   const confirm = async () => {
     if (!candidate) return
-    setError('')
+    setErrorCode('')
     setStep('import')
     try {
       const imported = await addEstablishment(query.trim(), candidate)
       setResult(imported)
-      setStep(imported.status === 'completed' ? 'success' : 'import')
+      setStep(imported.status === 'completed' || imported.status === 'failed' ? 'success' : 'import')
     } catch (importError) {
-      setError(messageFor(importError, messages))
+      setErrorCode(codeFor(importError))
       setStep('confirm')
     }
   }
@@ -140,14 +138,14 @@ export function AddEstablishmentPage() {
   const retryImport = async () => {
     if (!result?.importJobId) return
     setRetrying(true)
-    setError('')
+    setErrorCode('')
     try {
       await retryEstablishmentImport(result.importJobId)
       setResult((current) => current ? { ...current, status: 'queued', importStatus: undefined, retryable: false } : current)
       setStep('import')
       await refreshInitialImports()
     } catch (retryError) {
-      setError(messageFor(retryError, messages))
+      setErrorCode(codeFor(retryError))
     } finally {
       setRetrying(false)
     }
@@ -164,6 +162,7 @@ export function AddEstablishmentPage() {
     ? Math.max(1, Math.round((new Date(result.nextSyncAt).getTime() - Date.now()) / 3_600_000))
     : monitoringIntervalHours
   const negativeReviewCount = result?.negativeReviewCount ?? result?.inserted ?? 0
+  const importFailed = result?.importStatus === 'failed' || result?.importStatus === 'partial' || result?.status === 'failed'
 
   return <>
     <PageHeader title={messages.add.title} back />
@@ -213,8 +212,8 @@ export function AddEstablishmentPage() {
       </div>
       {error && <p className="field-error" role="alert">{error}</p>}
       <div className="button-row">
-        <button className="secondary-button" onClick={() => { setStep('input'); setCandidate(undefined); setError(''); navigate('/etablissements/ajouter', { replace: true, state: null }) }}>{messages.common.cancel}</button>
-        <button className="primary-button" onClick={() => void confirm()}>{messages.add.addPlace}</button>
+        <button className="secondary-button" onClick={() => { setStep('input'); setCandidate(undefined); setErrorCode(''); navigate('/etablissements/ajouter', { replace: true, state: null }) }}>{messages.common.cancel}</button>
+        <button className="primary-button" onClick={() => void confirm()}>{error ? messages.add.retryImport : messages.add.addPlace}</button>
       </div>
     </section>}
 
@@ -223,12 +222,12 @@ export function AddEstablishmentPage() {
       <h2>{messages.add.importing}</h2>
       <p>{messages.add.importingBody}</p>
       <p className="import-background-note">{messages.add.importContinues}</p>
-      {currentJob && currentJob.reviewsFetched > 0 && <div className="import-progress-copy">{messages.add.importProgress.replace('{count}', String(currentJob.reviewsInserted)).replace('{target}', String(currentJob.reviewsTarget))}</div>}
+      {currentJob && currentJob.reviewsFetched > 0 && <div className="import-progress-copy">{messages.add.importProgress.replace('{count}', String(currentJob.reviewsFetched)).replace('{target}', String(currentJob.reviewsTarget))}</div>}
     </section>}
 
     {step === 'success' && candidate && result && <section className="flow-card import-card card" aria-live="polite">
-      <span className="flow-icon success"><CheckCircle2 /></span>
-      <h2>✓ {messages.add.success}</h2>
+      <span className={`flow-icon${importFailed ? '' : ' success'}`}>{importFailed ? <CircleAlert /> : <CheckCircle2 />}</span>
+      <h2>{importFailed ? messages.add.importFailed : `✓ ${messages.add.success}`}</h2>
       <div className="confirm-place">
         <EstablishmentAvatar id={candidate.placeRef} name={candidate.name} photoUrl={candidate.photoUrl} large />
         <div>
@@ -236,16 +235,14 @@ export function AddEstablishmentPage() {
           <span className="rating-line"><em>{result.inserted??0} {messages.add.googleReviews}</em></span>
         </div>
       </div>
-      {result.importStatus === 'failed'
-        ? <p><strong>{messages.add.partialImport}</strong></p>
-        : <p><strong>{messages.add.imported.replace('{count}', String(negativeReviewCount))}</strong></p>}
-      {result.importStatus !== 'failed' && <p>
+      {!importFailed && <p><strong>{messages.add.imported.replace('{count}', String(negativeReviewCount))}</strong></p>}
+      {!importFailed && <p>
         {messages.add.monitoringEnabled}<br />
         {messages.add.monitoringEvery.replace('{hours}', String(monitoringIntervalHours))}<br />
         {messages.add.nextControl.replace('{hours}', String(nextCheckHours))}
       </p>}
-      {error && <p className="field-error" role="alert">{error}</p>}
-      {result.importStatus === 'failed' ? <button className="primary-button full-width" disabled={retrying} onClick={() => void retryImport()}>
+      {(error || importFailed) && <p className="field-error" role="alert">{error || messages.add.importError}</p>}
+      {importFailed ? <button className="primary-button full-width" disabled={retrying} onClick={() => void retryImport()}>
         {retrying ? <LoaderCircle className="spin" /> : null}
         {retrying ? messages.add.retrying : messages.add.retryImport}
       </button> : <div className="button-row">

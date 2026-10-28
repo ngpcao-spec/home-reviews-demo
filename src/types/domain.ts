@@ -17,6 +17,13 @@ export interface Establishment {
   lastSyncedAt: string
   nextSyncAt?: string
   syncStatus: 'pending' | 'syncing' | 'ok' | 'warning' | 'error'
+  initialImportJobId?: string
+  reviewCollection?: {
+    status: 'unknown' | 'complete' | 'partial' | 'retrying'
+    expected?: number
+    unique?: number
+    checkedAt?: string
+  }
 }
 
 export interface Review {

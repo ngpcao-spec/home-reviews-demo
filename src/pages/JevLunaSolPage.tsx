@@ -186,7 +186,7 @@ export function JlsPrioritizedExecutionStatus({data}:{data:NonNullable<JlsView["
   return <section className="card jev-card jls-prioritized"><h3>{fr?"Exécution déléguée — nouveau rapport vietnamien":"Chạy được ủy quyền — báo cáo tiếng Việt mới"}</h3>
     <p>{r?(fr?"Statut historique : ":"Trạng thái lịch sử: ")+r.status:(fr?"Mécanisme prêt — aucun GO enregistré":"Cơ chế sẵn sàng — chưa ghi nhận cho phép chạy")}</p>
     <p>{fr?"Un GO explicite dans ChatGPT autorisera une seule exécution. Aucune manipulation GitHub ou iPhone. L’ancien run et son consentement restent fermés.":"Cho phép rõ ràng trong ChatGPT sẽ cấp quyền chạy một lần. Không cần thao tác GitHub hay iPhone. Lần chạy và chấp thuận cũ vẫn đóng."}</p>
-    <p>{fr?"JEV, Luna, Apify : zéro nouvel appel. Sol : un appel maximum, aucun retry payant.":"JEV, Luna, Apify: không gọi thêm. Sol: tối đa một lần gọi, không gọi lại trả phí."}</p>
+    <p>{fr?"JEV, Luna : zéro nouvel appel ; aucune collecte d’avis. Sol : un appel maximum, aucun retry payant.":"JEV, Luna: không gọi thêm; không thu thập đánh giá. Sol: tối đa một lần gọi, không gọi lại trả phí."}</p>
     <p className="evidence-id">{data.protocol.id}<br/>{p.version}<br/>{data.protocol.sha256}</p>
     {r&&<><p>{fr?"Consentement spécifique expirant le":"Chấp thuận riêng hết hạn lúc"} {new Date(r.expires_at).toLocaleString(language)}</p><p>{fr?"Tentatives Sol réservées":"Số lần gọi Sol đã giữ chỗ"} : {data.task?.request_count??0} / 1</p></>}
     {r?.error_code&&<p role="alert">{r.error_code}</p>}
