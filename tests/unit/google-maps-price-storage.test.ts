@@ -36,6 +36,8 @@ it('future snapshots retain only explicit Google price and identity fields, with
  const saved=(await db.query<{p:Record<string,unknown>}>('select raw_place_payload p from public.establishment_snapshots')).rows[0].p;
  expect(saved).toEqual({cid:'cid',placeId:'place',price:'₫₫',priceLevel:2,priceRange:'100-200 N ₫',scrapedAt:'2026-10-26'});
  expect((await budget()).establishment_price).toMatchObject({price_level:2,price_range:'100-200 N ₫',source_table:'establishment_snapshots',status:'provided'});
+ const nested=(await db.query<{v:unknown}>('select private.google_price_fields_v1($1) v',[JSON.stringify({cid:'cid',priceRange:{minimum:100000,maximum:200000,currency:'VND',text:'Removed',reviews:['Removed']}})])).rows[0].v;
+ expect(nested).toEqual({cid:'cid',priceRange:{minimum:100000,maximum:200000,currency:'VND'}});
 });
 it('uses the last real known price with its date, refuses identity contradictions and does not infer from client spending',async()=>{
  await upgrade();

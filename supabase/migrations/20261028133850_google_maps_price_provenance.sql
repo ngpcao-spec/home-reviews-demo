@@ -6,13 +6,21 @@ lock table public.restaurant_recommendation_sheets in share row exclusive mode n
 
 -- Retain only Google identity, prices and observation date. In particular no
 -- review, author, translation, response or arbitrary place blob survives here.
+create function private.google_price_fields_v1(raw jsonb) returns jsonb
+language sql immutable set search_path='' as $$
+ select coalesce(jsonb_object_agg(key,case when key='priceRange' and jsonb_typeof(value)='object' then
+  (select coalesce(jsonb_object_agg(x.key,x.value),'{}') from jsonb_each(value) x
+   where x.key in('minimum','maximum') and jsonb_typeof(x.value)='number' or x.key='currency' and jsonb_typeof(x.value)='string')
+  else value end),'{}')
+ from jsonb_each(case when jsonb_typeof(raw)='object' then raw else '{}' end)
+ where key in('placeId','cid','scrapedAt','price','priceLevel','priceRange')
+  and (jsonb_typeof(value) in('string','number','null') or key='priceRange' and jsonb_typeof(value)='object')
+$$;
 create or replace function private.retention_sanitize_snapshot() returns trigger
 language plpgsql set search_path='' as $$
 begin
  if exists(select 1 from public.review_corpus_policy where enabled) then
-  select coalesce(jsonb_object_agg(key,value),'{}'::jsonb) into new.raw_place_payload
-  from jsonb_each(case when jsonb_typeof(new.raw_place_payload)='object' then new.raw_place_payload else '{}' end)
-  where key in('placeId','cid','price','priceLevel','priceRange','scrapedAt');
+  new.raw_place_payload=private.google_price_fields_v1(new.raw_place_payload);
  end if;
  return new;
 end $$;
@@ -36,11 +44,11 @@ begin
  -- Prefer the last actual price observation; a later null does not invent a
  -- refresh of an older price. Each price retains its real observation date.
  with observations as (
-  select p.raw_payload raw,p.provider_last_seen_at seen,p.id::text id,'review_provider_payloads' tab
+  select private.google_price_fields_v1(p.raw_payload) raw,p.provider_last_seen_at seen,p.id::text id,'review_provider_payloads' tab
   from public.review_provider_payloads p join public.reviews r on r.id=p.review_id
   where r.establishment_id=est and r.organization_id=org and p.provider='apify'
   union all
-  select s.raw_place_payload,s.captured_at,s.id::text,'establishment_snapshots'
+  select private.google_price_fields_v1(s.raw_place_payload),s.captured_at,s.id::text,'establishment_snapshots'
   from public.establishment_snapshots s where s.establishment_id=est and s.organization_id=org and s.provider='apify'
  ), matched as (
   select * from observations where (raw->>'placeId'=e.place_id or raw->>'cid'=e.google_id)
@@ -123,6 +131,6 @@ update public.restaurant_recommendation_sheets s set metadata=jsonb_set(s.metada
  private.recommendation_google_budget_v1(s.establishment_id,s.organization_id,p.source_bindings,p.scope->>'as_of')),updated_at=clock_timestamp()
 from public.current_report_publications p where p.establishment_id=s.establishment_id and p.language=s.language;
 
-revoke all on function private.recommendation_google_budget_v1(uuid,uuid,jsonb,text),private.recommendation_spend_context_v1(jsonb),private.retention_sanitize_snapshot(),private.refresh_recommendation_google_prices()
+revoke all on function private.recommendation_google_budget_v1(uuid,uuid,jsonb,text),private.recommendation_spend_context_v1(jsonb),private.retention_sanitize_snapshot(),private.refresh_recommendation_google_prices(),private.google_price_fields_v1(jsonb)
 from public,anon,authenticated,service_role;
 commit;
