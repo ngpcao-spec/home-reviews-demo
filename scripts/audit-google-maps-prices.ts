@@ -1,7 +1,7 @@
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve,relative,sep} from 'node:path';
 import {recommendationDatabase} from '../tests/fixtures/recommendation-sheet-database.ts';
-import {prices} from '../supabase/functions/_shared/restaurant-recommendation-engine-v1.ts';
+import {prices,recommendRestaurants,type SheetRow,type Point} from '../supabase/functions/_shared/restaurant-recommendation-engine-v1.ts';
 import {googleMoneyRange} from '../supabase/functions/_shared/google-maps-prices.ts';
 globalThis.fetch=(()=>{throw Error('NETWORK_FORBIDDEN')}) as typeof fetch;
 const [input,exactFile,out]=process.argv.slice(2);
@@ -36,9 +36,14 @@ await db.exec(readFileSync('supabase/migrations/20261028133850_google_maps_price
 if(JSON.stringify(before)!==JSON.stringify((await db.query(protectedSql)).rows))throw Error('PROTECTED_SHEET_FIELDS_CHANGED');
 if(JSON.stringify(pubs)!==JSON.stringify((await db.query('select md5(to_jsonb(p)::text) hash from public.current_report_publications p order by establishment_id,language')).rows))throw Error('REPORT_CHANGED');
 const results=[];
+const engineRows:SheetRow[]=[];
 for(const r of snapshot.rows){
  const record=(await db.query<{metadata:Obj}>('select metadata from public.restaurant_recommendation_sheets where establishment_id=$1',[r.establishment.id])).rows[0];
  const budget=record?prices(record.metadata):null;
+ if(record&&r.sheet&&r.publication){const p=r.publication;
+  engineRows.push({...r.sheet,metadata:record.metadata,calculation_text:exact.find(x=>x.report_id===r.sheet!.report_id)!.calculation_json,
+   publication:{...p,derived:(p.document as Obj).derived_report}} as unknown as SheetRow);
+ }
  const rawSpending=(r.observations??[]).flatMap(o=>{
   const context=o.raw.reviewContext as Obj|null;
   return Object.entries(context??{}).filter(([k,v])=>['giá mỗi người','prix par personne','price per person'].includes(k.toLowerCase())&&typeof v==='string').map(([key,value])=>({review_id:o.review_id,key,value,observed_at:o.observed_at,parsed:googleMoneyRange(value)}));
@@ -48,7 +53,10 @@ for(const r of snapshot.rows){
   raw_establishment_prices:(r.observations??[]).filter(o=>o.raw.price!==null&&o.raw.price!==undefined).length,raw_spending_reviews:new Set(rawSpending.map(x=>x.review_id)).size,raw_spending_labels:[...new Set(rawSpending.map(x=>x.value))],unparsed_spending_labels:missing.map(x=>x.value)};
  results.push(obj);
 }
-const summary={at:snapshot.at,migration:'20261028133850_google_maps_price_provenance.sql',mode:'offline replay only; not deployed',restaurants:results.length,sheets:before.length,
+const origin=(engineRows.find(r=>!r.stale)?.metadata.google_metadata as {coordinates:Point})?.coordinates;
+const budgetCheck=origin&&engineRows.length?recommendRestaurants(engineRows,engineRows[0].organization_id,engineRows[0].language,{origin,area:{kind:'radius',metres:100000},budget:{kind:'amount',currency:'VND',maximum:300000}}):null;
+if(budgetCheck?.proposals.length)throw Error('UNKNOWN_ESTABLISHMENT_PRICE_PASSED_BUDGET_FILTER');
+const summary={at:snapshot.at,migration:'20261028133850_google_maps_price_provenance.sql',mode:'offline replay only; not deployed',restaurants:results.length,sheets:before.length,actual_sheet_budget_filter_matches:budgetCheck?.proposals.length??null,
  known_establishment_prices:results.filter(r=>r.budget?.establishment.status==='known').length,raw_reviews:results.reduce((n,r)=>n+r.raw_reviews,0),raw_spending_reviews:results.reduce((n,r)=>n+r.raw_spending_reviews,0),
  frozen_spending_reviews:results.reduce((n,r)=>n+(r.budget?.customer_spend_per_person.ranges.reduce((s,x)=>s+x.review_count,0)??0),0),unparsed_labels:[...new Set(results.flatMap(r=>r.unparsed_spending_labels))],
  scores_reports_references_stale_preserved:true,provider_calls:0,results};
