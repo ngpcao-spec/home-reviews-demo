@@ -136,6 +136,15 @@ Il n'existe aucun retry de collecte, même lorsque le fournisseur renvoie une
 erreur HTTP. Une réponse ambiguë exige une décision humaine. La concurrence est
 bornée à une collecte de prix et partage les slots fournisseur existants.
 
+Avant la réservation, un GET des métadonnées de l'acteur vérifie son identité et
+le minimum publié de `maxTotalChargeUsd`. Le plafond est fixé à 0,50 USD,
+minimum annoncé par cet acteur ; il ne représente ni un tarif ni le coût prévu
+d'une fiche. Un minimum absent ou supérieur bloque avant tout POST. Le reçu
+conserve cette vérification et les consommations réellement retournées. Un
+échec après réservation garde son résultat inconnu et son diagnostic interne,
+sans nouveau départ. Une ancienne tentative inconnue n'est pas réarmée lors
+d'une correction de configuration.
+
 Le réveil serveur immédiat et les continuations bornées traitent la file,
 application fermée. Le cron est un secours de **livraison de cette file** : il
 ne peut créer aucune demande ni recommencer une collecte terminée. Aucun
