@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AddEstablishmentPage } from './AddEstablishmentPage'
+import { I18nProvider } from '../i18n'
+import type { InitialImportJob } from '../app/AppContext'
 
 const candidate = {
   placeRef: 'google-id',
@@ -29,6 +31,7 @@ const resolveEstablishment = vi.fn()
 const addEstablishment = vi.fn()
 const retryEstablishmentImport = vi.fn()
 let establishmentCount = 0
+let initialImportJobs: InitialImportJob[] = []
 
 vi.mock('../app/AppContext', () => ({
   useApp: () => ({
@@ -37,7 +40,7 @@ vi.mock('../app/AppContext', () => ({
     retryEstablishmentImport,
     acknowledgeInitialImport: vi.fn(),
     refreshInitialImports: vi.fn().mockResolvedValue(undefined),
-    initialImportJobs: [],
+    initialImportJobs,
     establishments: Array.from({ length: establishmentCount }, (_, index) => ({ id: `establishment-${index + 1}` })),
     notifications: [],
     plan: { maxEstablishments: 5 },
@@ -50,15 +53,17 @@ function Destination({ label }: { label: string }) {
   return <div>{label}:{location.search}</div>
 }
 
-function renderWizard(state?: unknown) {
+function renderWizard(state?: unknown, language: 'fr' | 'vi' = 'fr') {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: '/etablissements/ajouter', state }]}>
-      <Routes>
-        <Route path="/etablissements/ajouter" element={<AddEstablishmentPage />} />
-        <Route path="/avis" element={<Destination label="avis" />} />
-        <Route path="/etablissements" element={<Destination label="établissements" />} />
-      </Routes>
-    </MemoryRouter>,
+    <I18nProvider language={language}>
+      <MemoryRouter initialEntries={[{ pathname: '/etablissements/ajouter', state }]}>
+        <Routes>
+          <Route path="/etablissements/ajouter" element={<AddEstablishmentPage />} />
+          <Route path="/avis" element={<Destination label="avis" />} />
+          <Route path="/etablissements" element={<Destination label="établissements" />} />
+        </Routes>
+      </MemoryRouter>
+    </I18nProvider>,
   )
 }
 
@@ -78,6 +83,7 @@ describe('confirmation d’ajout d’un établissement', () => {
 
   beforeEach(() => {
     establishmentCount = 0
+    initialImportJobs = []
     resolveEstablishment.mockReset().mockResolvedValue(candidate)
     addEstablishment.mockReset().mockResolvedValue(successResult)
     retryEstablishmentImport.mockReset().mockResolvedValue({
@@ -139,5 +145,38 @@ describe('confirmation d’ajout d’un établissement', () => {
     expect(screen.getByText(/fermer l’application/)).toBeVisible()
     expect(addEstablishment).toHaveBeenCalledTimes(1)
     expect(screen.queryByPlaceholderText('Lien Google Maps')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['fr', 'Notre système a rencontré un problème pour récupérer les avis. Veuillez réessayer. Si le problème persiste, veuillez réessayer ultérieurement.', 'Réessayer'],
+    ['vi', 'Hệ thống gặp sự cố khi thu thập đánh giá. Vui lòng thử lại. Nếu sự cố vẫn tiếp diễn, vui lòng thử lại sau.', 'Thử lại'],
+  ] as const)('restaure un échec en %s sans afficher le fournisseur ni annoncer un succès', async (language, message, retry) => {
+    initialImportJobs = [{
+      id: 'failed-job', organizationId: 'org', userId: 'user', query: 'https://maps.app.goo.gl/test',
+      expectedGoogleId: candidate.placeRef, status: 'failed', reviewsTarget: 150,
+      reviewsFetched: 5, reviewsInserted: 5, errorCode: 'APIFY_START_OUTCOME_UNKNOWN',
+      candidate, createdAt: '2026-10-28T04:12:43Z', updatedAt: '2026-10-28T04:12:56Z',
+    }]
+    renderWizard(undefined, language)
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(document.body).not.toHaveTextContent(/apify|✓/i)
+    expect(retryEstablishmentImport).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: retry }))
+    expect(retryEstablishmentImport).toHaveBeenCalledExactlyOnceWith('failed-job')
+    expect(addEstablishment).not.toHaveBeenCalled()
+  })
+
+  it('actualise une erreur déjà affichée lorsque la langue du compte change', async () => {
+    const state = { addEstablishmentSuccess: { query: 'https://maps.app.goo.gl/test', candidate, result: { ...successResult, importJobId: 'failed-job', status: 'failed', importStatus: 'failed' } } }
+    const view = (language: 'fr' | 'vi') => <I18nProvider language={language}><MemoryRouter initialEntries={[{ pathname: '/etablissements/ajouter', state }]}><AddEstablishmentPage /></MemoryRouter></I18nProvider>
+    retryEstablishmentImport.mockRejectedValue(new Error('APIFY_RATE_LIMIT: upstream details'))
+    const mounted = render(view('fr'))
+    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Notre système a rencontré un problème pour récupérer les avis.')
+    mounted.rerender(view('vi'))
+    expect(screen.getByRole('alert')).toHaveTextContent('Hệ thống gặp sự cố khi thu thập đánh giá.')
+    expect(screen.getByRole('button', { name: 'Thử lại' })).toBeEnabled()
+    expect(document.body).not.toHaveTextContent(/apify|upstream details|Notre système/i)
+    expect(retryEstablishmentImport).toHaveBeenCalledTimes(1)
   })
 })
