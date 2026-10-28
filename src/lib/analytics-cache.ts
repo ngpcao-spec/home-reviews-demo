@@ -26,6 +26,7 @@ export class AnalyticsSessionCache {
   private pending = new Map<string, Promise<void>>()
   private scroll = new Map<string, number>()
   private retired = false
+  private replacementBarriers = new Map<string, string>()
   private generations = new Map<string, HistoricalGeneration<HistoricalReportRow>>()
   generation(key: string, create: () => HistoricalGeneration<HistoricalReportRow>) {
     let controller = this.generations.get(key)
@@ -54,6 +55,14 @@ export class AnalyticsSessionCache {
     const entries = Object.fromEntries(Object.entries(this.state.entries).filter(([, e]) => e.report).slice(-50))
     void writeAnalyticsCache(userId, organizationIds, { entries }, generation)
   }
+  invalidateBefore(establishmentId: string, replacedAt: string) {
+    this.replacementBarriers.set(establishmentId, replacedAt)
+    for (const [key, entry] of Object.entries(this.state.entries)) {
+      if (entry.report?.establishmentId === establishmentId && (!entry.report.generatedAt || Date.parse(entry.report.generatedAt) <= Date.parse(replacedAt))) {
+        this.put(key, null, replacedAt)
+      }
+    }
+  }
   getSnapshot = () => this.state
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private emit(state: Snapshot) { if (!this.retired) { this.state=state; this.listeners.forEach(listener=>listener()) } }
@@ -63,6 +72,10 @@ export class AnalyticsSessionCache {
     if (this.owner) saveUiState(this.owner.userId, 'analytics-selection', selection)
   }
   put(key: string, report: Report | null, revision = report?.generatedAt ?? '') {
+    const barrier = report && this.replacementBarriers.get(report.establishmentId)
+    if (report && barrier && (!report.generatedAt || Date.parse(report.generatedAt) <= Date.parse(barrier))) {
+      report = null; revision = barrier
+    }
     const previous=this.state.entries[key]
     this.emit({...this.state,entries:{...this.state.entries,[key]:{
       // A newer app may map the same database revision differently (e.g. V5).

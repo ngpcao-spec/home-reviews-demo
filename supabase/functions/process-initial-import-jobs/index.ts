@@ -23,6 +23,7 @@ import { dispatchImportCompletionNotifications } from '../_shared/import-complet
 import {collectionLanguage} from '../_shared/review-language.ts'
 import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
 import {advanceInitialApify} from '../_shared/initial-import-apify.ts'
+import {prepareManualReviewReload, ReviewReloadValidationError} from '../_shared/manual-review-reload.ts'
 
 interface InitialImportJob {
   id: string
@@ -39,6 +40,8 @@ interface InitialImportJob {
   provider_dataset_id: string | null
   provider_start_attempted_at?: string | null
   resolved_place_url: string | null
+  request_kind?: 'initial' | 'reload'
+  created_at: string
 }
 
 const workerId = () => `initial-import:${crypto.randomUUID()}`
@@ -279,6 +282,14 @@ async function processApify(
    try{items=await fetchApifyDataset(token,run.datasetId,()=>{requests++})}
    finally{if(requests)await checkpoint(admin,job,worker,{providerRequests:requests},config.leaseSeconds)}
    await phase(admin,job,worker,'retrieval_completed')
+   if(job.request_kind==='reload'){
+    const establishment=await requireSuccess<{id:string;organization_id:string;google_id:string;place_id:string|null}>(admin.from('establishments')
+     .select('id,organization_id,google_id,place_id').eq('id',job.establishment_id!).single())
+    const staged=prepareManualReviewReload(items,{...establishment,language:job.preferred_language,requested_at:job.created_at})
+    await requireSuccess(admin.rpc('stage_review_reload',{p_job:job.id,p_worker:worker,p_bundle:staged.bundle,p_summary:staged.summary}))
+    await phase(admin,job,worker,'persistence_started')
+    return requireSuccess(admin.rpc('apply_review_reload',{p_job:job.id,p_worker:worker}))
+   }
    const normalized=normalizeApifyDataset(items,job.query,resolvedPlaceUrl??undefined)
    const reviews=prepareInitialReviews(normalized.reviews,job.reviews_target)
    await checkpoint(admin,job,worker,{reviewsFetched:reviews.length},config.leaseSeconds)
@@ -342,10 +353,23 @@ async function processJob(
   try {
     await phase(admin,job,worker,'worker_started')
     await assertIngestionAllowed(admin)
+    if(job.request_kind==='reload'){
+      if(await requireSuccess<boolean>(admin.rpc('review_reload_stage_ready',{p_job:job.id,p_worker:worker}))){
+        return await requireSuccess(admin.rpc('apply_review_reload',{p_job:job.id,p_worker:worker}))
+      }
+      if(providerName()!=='apify')throw Error('RELOAD_PROVIDER_UNSUPPORTED')
+    }
     return providerName() === 'apify'
       ? await processApify(admin, job, worker, config)
       : await processDirect(admin, job, worker, config)
   } catch (error) {
+    if(job.request_kind==='reload'){
+      const code=error instanceof Error?error.message:'RELOAD_FAILED'
+      console.error('MANUAL_REVIEW_RELOAD_FAILED',job.id,code)
+      const status=await requireSuccess<string>(admin.rpc('fail_review_reload',{p_job:job.id,p_worker:worker,p_error:code,
+        p_summary:error instanceof ReviewReloadValidationError?error.summary:{}}))
+      return {jobId:job.id,status,error:code}
+    }
     const policy = retryPolicy(error, job.attempts, config.backoffSeconds)
     const resetProvider = policy.code.startsWith('APIFY_RUN_')
     const status = await requireSuccess<string>(admin.rpc('fail_initial_import_job', {

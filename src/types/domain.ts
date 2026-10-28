@@ -18,6 +18,7 @@ export interface Establishment {
   nextSyncAt?: string
   syncStatus: 'pending' | 'syncing' | 'ok' | 'warning' | 'error'
   initialImportJobId?: string
+  reviewReload?: { jobId?: string; requestId?: string; status: 'idle' | 'queued' | 'running' | 'failed' | 'completed'; count?: number; completedAt?: string }
   reviewCollection?: {
     status: 'unknown' | 'complete' | 'partial' | 'retrying'
     expected?: number

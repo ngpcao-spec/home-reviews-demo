@@ -1,5 +1,6 @@
 import { reputationFr } from './reputation'
 export const fr = {
+  reload: { emptySuccess: '0 avis disponibles. Aucun commentaire à analyser pour le moment.', title: 'Recharger tous les avis', description: 'Après validation des nouveaux avis, les anciens avis et traductions seront remplacés et les rapports liés seront supprimés. La fiche de l’établissement est conservée.', pending: 'Rechargement des avis en cours…', success: '{count} avis disponibles. Vous pouvez générer un nouveau rapport.' },
   reputation: reputationFr,
   nav: { home: 'Accueil', establishments: 'Établissements', reviews: 'Avis', analytics: 'Analyses', more: 'Plus' },
   common: { retry: 'Réessayer', cancel: 'Annuler', confirm: 'Confirmer', loading: 'Chargement…', viewAll: 'Voir tout', back: 'Retour', reviews: 'avis', establishments: 'établissements', delete: 'Supprimer', deleting: 'Suppression…' },

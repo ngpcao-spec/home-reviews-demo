@@ -1,0 +1,214 @@
+{
+  "columns": [
+    {
+      "type": "uuid",
+      "table": "kh_en_calls",
+      "column": "experiment_id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "kh_en_calls",
+      "column": "phase",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "kh_en_calls",
+      "column": "request_wire",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "kh_en_calls",
+      "column": "request_sha256",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "kh_en_calls",
+      "column": "state",
+      "schema": "private",
+      "default": "'prepared'::text"
+    },
+    {
+      "type": "integer",
+      "table": "kh_en_calls",
+      "column": "attempts",
+      "schema": "private",
+      "default": "0"
+    },
+    {
+      "type": "uuid",
+      "table": "kh_en_calls",
+      "column": "worker",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "kh_en_calls",
+      "column": "reserved_at",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "kh_en_calls",
+      "column": "finished_at",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "jsonb",
+      "table": "kh_en_calls",
+      "column": "receipt",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "uuid",
+      "table": "kh_en_experiments",
+      "column": "id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "uuid",
+      "table": "kh_en_experiments",
+      "column": "reference_report_id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "uuid",
+      "table": "kh_en_experiments",
+      "column": "establishment_id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "boolean",
+      "table": "kh_en_experiments",
+      "column": "armed",
+      "schema": "private",
+      "default": "false"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "kh_en_experiments",
+      "column": "created_at",
+      "schema": "private",
+      "default": "clock_timestamp()"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "kh_en_experiments",
+      "column": "expires_at",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "jsonb",
+      "table": "kh_en_experiments",
+      "column": "body",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "jsonb",
+      "table": "kh_en_experiments",
+      "column": "artifacts",
+      "schema": "private",
+      "default": "'{}'::jsonb"
+    },
+    {
+      "type": "uuid",
+      "table": "review_display_receipts",
+      "column": "id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "uuid",
+      "table": "review_display_receipts",
+      "column": "review_id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "language",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "source_sha256",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "status",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "worker_id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_display_receipts",
+      "column": "started_at",
+      "schema": "private",
+      "default": "clock_timestamp()"
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_display_receipts",
+      "column": "finished_at",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "model",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "jsonb",
+      "table": "review_display_receipts",
+      "column": "usage",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "provider_response_id",
+      "schema": "private",
+      "default": null
+    },
+    {
+      "type": "text",
+      "table": "review_display_receipts",
+      "column": "error_code",
+      "schema": "private",
+      "default": null
+    }
+  ]
+}

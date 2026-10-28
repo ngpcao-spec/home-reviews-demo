@@ -2,6 +2,7 @@ import type { Messages } from './fr'
 import { reputationVi } from './reputation'
 
 export const vi: Messages = {
+  reload: { emptySuccess: 'Có 0 đánh giá. Hiện chưa có bình luận để phân tích.', title: 'Tải lại toàn bộ đánh giá', description: 'Sau khi xác minh dữ liệu mới, các đánh giá và bản dịch cũ sẽ được thay thế, các báo cáo liên quan sẽ bị xóa. Thông tin cơ sở được giữ nguyên.', pending: 'Đang tải lại đánh giá…', success: 'Có {count} đánh giá. Bạn có thể tạo báo cáo mới.' },
   reputation: reputationVi,
   nav: { home: 'Trang chủ', establishments: 'Cơ sở', reviews: 'Đánh giá', analytics: 'Phân tích', more: 'Thêm' },
   common: { retry: 'Thử lại', cancel: 'Hủy', confirm: 'Xác nhận', loading: 'Đang tải…', viewAll: 'Xem tất cả', back: 'Quay lại', reviews: 'đánh giá', establishments: 'cơ sở', delete: 'Xóa', deleting: 'Đang xóa…' },

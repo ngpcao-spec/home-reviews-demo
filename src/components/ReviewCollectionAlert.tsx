@@ -35,7 +35,7 @@ export function ReviewCollectionAlert({ establishment }: { establishment: Establ
     }
   }
 
-  if (!partial && !pending) return null
+  if ((!partial && !pending) || ['queued','running','failed'].includes(establishment.reviewReload?.status ?? '')) return null
   return <section className="card sync-panel" aria-live="polite">
     {pending
       ? <div role="status"><LoaderCircle className="spin" /><p>{messages.add.importing}</p><p>{messages.add.importContinues}</p></div>

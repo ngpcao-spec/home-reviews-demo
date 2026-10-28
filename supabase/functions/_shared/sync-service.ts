@@ -124,7 +124,7 @@ async function finishRun(
   if (error) throw error
 }
 
-function reviewRow(
+export function reviewRow(
   establishment: Pick<EstablishmentRow, 'id' | 'organization_id'>,
   review: NormalizedReview,
   historicalImport: boolean,
