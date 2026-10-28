@@ -46,6 +46,11 @@ export function placeProfile(items:unknown,identity:PriceIdentity,now=Date.now()
   const fact=facts[id];if(fact){fact.evidence.push(entry);if(fact.value!==entry.value){fact.value=null;fact.status='conflicted';}}
   else facts[id]={value:entry.value,status:'declared',evidence:[entry]};
  }
+ // A free Wi-Fi declaration proves Wi-Fi presence, but its absence does not prove no Wi-Fi.
+ if(facts.free_wifi?.value===true){
+  if(!facts.wifi)facts.wifi={value:true,status:'declared',evidence:[...facts.free_wifi.evidence]};
+  else if(facts.wifi.value===false){facts.wifi={value:null,status:'conflicted',evidence:[...facts.wifi.evidence,...facts.free_wifi.evidence]};}
+ }
  const location=obj(x.location),latitude=location.lat,longitude=location.lng;
  const coordinates=typeof latitude==='number'&&typeof longitude==='number'&&Number.isFinite(latitude)&&Number.isFinite(longitude)&&Math.abs(latitude)<=90&&Math.abs(longitude)<=180?{latitude,longitude}:null;
  // This response has no description-language metadata. The collection locale is NOT a text-language assertion.

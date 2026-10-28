@@ -26,6 +26,11 @@ describe('curated Google place projection',()=>{
   expect(profile({additionalInfo:{'Nổi tiếng về':[{'Bữa sáng':true}]}}).attributes.facts.breakfast).toBeUndefined();
   expect(profile({additionalInfo:{'Lựa chọn ăn uống':[{'Bữa sáng':false}]}}).attributes.facts.breakfast.value).toBe(false);
  });
+ it('does not interpret the absence of free Wi-Fi as the absence of any Wi-Fi',()=>{
+  expect(profile({additionalInfo:{Amenities:[{'Free Wi-Fi':false}]}}).attributes.facts.wifi).toBeUndefined();
+  expect(profile({additionalInfo:{Amenities:[{'Free Wi-Fi':true}]}}).attributes.facts.wifi.value).toBe(true);
+  expect(profile({additionalInfo:{Amenities:[{'Free Wi-Fi':false},{'Wi-Fi':true}]}}).attributes.facts.wifi.value).toBe(true);
+ });
  it('retains source dates, raw non-translated prose, safe links only and no reviews, secondary images or whole payload',()=>{
   const p=profile({ownerDescription:'해변가앞 아름다운조명',description:'English presentation',imageUrl:'https://example.org/main.jpg',imageUrls:['secret'],menu:'https://example.org/menu',reserveTableUrl:'https://example.org/book',tableReservationLinks:[{url:'https://example.org/book'},{url:'javascript:alert(1)'}],peopleAlsoSearch:[{name:'secret'}]});
   expect(p.presentation.owner_description).toMatchObject({translated:false,language:null,kind:'commercial_presentation'});
