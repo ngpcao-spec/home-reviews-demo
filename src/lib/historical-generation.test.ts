@@ -1,7 +1,23 @@
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
 import { HistoricalGeneration,type GenerationReply,type HistoricalRun } from './historical-generation'
+import { historicalGenerationKeys } from './historical-generation-keys'
 const running=(patch:Partial<HistoricalRun>={}):HistoricalRun=>({establishment_id:'khouse',preferred_language:'vi',generation_id:'existing-generation',status:'running',progress:3,total_steps:6,resumable:false,error_code:null,...patch})
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve()}
+it('a committed reload isolates retired report intents; a cold-boot retry within the new corpus keeps its own intent',async()=>{
+ const previous=historicalGenerationKeys('khouse','vi'),fresh=historicalGenerationKeys('khouse','vi','2026-10-28T12:00:00Z')
+ const store=new Map<string,string|null>([[previous.storageKey+':intent','retired-request']])
+ expect(fresh.reportKey).toBe(previous.reportKey);expect(fresh.controllerKey).not.toBe(previous.controllerKey)
+ const f=setup();f.controller.dispose();f.deps.enqueue.mockRejectedValue(Error('lost response'))
+ const intent={read:()=>store.get(fresh.storageKey+':intent')??null,write:(id:string|null)=>{store.set(fresh.storageKey+':intent',id)}}
+ const first=new HistoricalGeneration({...f.deps,intent});first.attach();await flush()
+ expect(f.deps.enqueue).not.toHaveBeenCalled();await first.start()
+ const newId=store.get(fresh.storageKey+':intent');expect(newId).toMatch(/^[0-9a-f-]{36}$/)
+ expect(newId).not.toBe('retired-request');expect(store.get(previous.storageKey+':intent')).toBe('retired-request')
+ first.dispose();f.deps.enqueue.mockClear()
+ const next=new HistoricalGeneration({...f.deps,intent});next.attach();await flush();expect(f.deps.enqueue).not.toHaveBeenCalled()
+ await next.start();expect(f.deps.enqueue).toHaveBeenCalledWith(expect.objectContaining({request_id:newId}))
+ next.dispose()
+})
 it('explicit abandonment clears the stale intent and requires another click before a fresh full generation',async()=>{
  const f=setup(),abandon=vi.fn().mockResolvedValue(undefined);let stored:string|null='old-request';
  const intent={read:()=>stored,write:(id:string|null)=>{stored=id}}

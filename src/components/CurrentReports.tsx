@@ -19,11 +19,11 @@ export interface CurrentReportsView {
  request_run?:HistoricalRun|null;
  experimental:ParallelView['experimental'];run:ParallelView['run'];tasks:ParallelView['tasks'];operation:unknown
 }
-export function CurrentReports({establishmentId,account,enabled,languageKey,current,generating,generationRevision,generationAction,children}:{
+export function CurrentReports({establishmentId,account,enabled,languageKey,current,generating,generationRevision,generationAction,children,reloadCompletedAt}:{
  establishmentId:string;account:string;enabled:boolean;languageKey:string|null;current:HistoricalReport|null;generating:boolean;generationRevision?:string;
- generationAction:ReactNode;children:ReactNode}){
+ generationAction:ReactNode;children:ReactNode;reloadCompletedAt?:string}){
  const {language}=useI18n(),fr=language==='fr',[params,setParams]=useSearchParams(),comparison=params.get('comparison')??'';
- const q=useQuery<CurrentReportsView>({queryKey:['current-reports',account,establishmentId,languageKey,comparison],enabled:enabled&&!!languageKey,retry:false,
+ const q=useQuery<CurrentReportsView>({queryKey:['current-reports',account,establishmentId,languageKey,comparison,...(reloadCompletedAt?[reloadCompletedAt]:[])],enabled:enabled&&!!languageKey,retry:false,
   refetchInterval:query=>generating||[query.state.data?.request_run,query.state.data?.run].some(r=>r&&['queued','running','retry'].includes(r.status))?4000:query.state.data?.retention?30000:false,
   queryFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'read_current',establishment_id:establishmentId,...(comparison?{comparison_id:comparison}:{})}});if(r.error||!r.data||r.data.error)throw Error('CURRENT_REPORT_READ_FAILED');return r.data}})
  useEffect(()=>{if(enabled)void q.refetch()},[enabled,generationRevision]) // eslint-disable-line react-hooks/exhaustive-deps

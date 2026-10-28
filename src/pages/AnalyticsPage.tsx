@@ -46,7 +46,7 @@ export function AnalyticsPage() {
   const [requestVersion, setRequestVersion] = useState(0)
   const [demoFeedback, setDemoFeedback] = useState<HistoricalFeedback>(null)
   const generation = useHistoricalGeneration(cache, currentUser.id ?? currentUser.email, resolvedEstablishmentId, preferredLanguage,
-    !demoMode && periodMode === 'historical')
+    !demoMode && periodMode === 'historical', establishments.find(item=>item.id===resolvedEstablishmentId)?.reviewReload?.completedAt)
   const historicalGenerating = generation.phase === 'generating' || generation.phase === 'paused'
   const historicalFeedback = demoMode ? demoFeedback : generation.feedback === 'empty' ? 'empty' : generation.phase === 'failed' ? 'error' : generation.feedback
   const historicalProgress = generation.run?.progress_unit==='jev_batches'
@@ -185,7 +185,7 @@ export function AnalyticsPage() {
     {loading && <section className="weekly-report-state card" data-testid="analytics-initial-loading" aria-live="polite"><span className="weekly-report-spinner"/><p>{messages.reputation.loadingReport}</p></section>}
     {visibleError && <section className="weekly-report-state card" role="alert"><AlertTriangle/><p>{visibleError}</p><button className="secondary-button" onClick={() => setRequestVersion((value) => value + 1)}>{messages.common.retry}</button></section>}
 
-    {selected && periodMode === 'historical' && <CurrentReports key={`${currentUser.id??currentUser.email}:${selected.id}:${preferredLanguage}`} current={visibleHistoricalReport} account={currentUser.id??currentUser.email} establishmentId={selected.id} languageKey={preferredLanguage} generating={historicalGenerating} generationRevision={`${generation.phase}:${generation.run?.generation_id??""}`} generationAction={historicalAction} enabled={!demoMode&&!!supabase}><div className="weekly-report historical-report">
+    {selected && periodMode === 'historical' && <CurrentReports key={`${currentUser.id??currentUser.email}:${selected.id}:${preferredLanguage}`} current={visibleHistoricalReport} account={currentUser.id??currentUser.email} establishmentId={selected.id} languageKey={preferredLanguage} reloadCompletedAt={selected.reviewReload?.completedAt} generating={historicalGenerating} generationRevision={`${generation.phase}:${generation.run?.generation_id??""}`} generationAction={historicalAction} enabled={!demoMode&&!!supabase}><div className="weekly-report historical-report">
       <section className="weekly-report-hero card">
         {!visibleHistoricalReport?.consultant && <EstablishmentAvatar id={selected.id} name={selected.name} photoUrl={selected.photoUrl} large />}
         <div>
