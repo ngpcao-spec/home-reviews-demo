@@ -308,3 +308,14 @@ it.each([false,true])('blocks expired/deleted validated stages before any provid
  await reject("select public.review_reload_stage_ready($1,'worker')",[j.id],'RELOAD_VALIDATED_STAGE_EXPIRED');
  expect((await db.query('select external_review_id from public.reviews where establishment_id=$1',[est])).rows).toEqual([{external_review_id:'old'}]);
 });
+
+it('preserves the validation marker for a zero-review stage so its expiration cannot fall through to provider access',async()=>{
+ await seed();const j=await running();
+ const zero=[{cid:'fixture',placeId:'place-fixture',reviewsCount:0,language:'vi',scrapedAt:new Date().toISOString()}];
+ await stage(j,zero as ReturnType<typeof items>);
+ await db.query("select public.fail_review_reload($1,'worker','SYNTHETIC_DATABASE_ERROR')",[j.id]);await db.exec('reset role');
+ const saved=(await db.query('select reviews_fetched,result from public.initial_import_jobs where id=$1',[j.id])).rows[0];
+ expect(saved.reviews_fetched).toBe(0);expect(saved.result).toHaveProperty('validated_stage.sha256');
+ await db.query("update private.review_reload_staging set created_at=now()-interval '25 hours' where job_id=$1",[j.id]);await db.exec('select private.expire_review_reload_stages()');
+ await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'RELOAD_VALIDATED_STAGE_EXPIRED');
+});
