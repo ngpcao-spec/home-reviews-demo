@@ -29,6 +29,7 @@ export type Prices = {
 };
 export type Proposal = {
   establishment_id: string; name: string; distance_metres: number; distance_kind: 'straight_line';
+  cuisines: {values: string[]; source: string | null; observed_at: string | null};
   scores: Record<Category, Score> & {global: Score}; budget: Prices; budget_match: 'not_requested' | 'google_level' | 'google_range';
   reasons: {code: string; category?: Category; feature?: string; citations?: Citation[]}[]; reservations: Citation[];
   features: Record<string, {status: 'reported' | 'conflicted' | 'not_documented'; citations: Citation[]}>;
@@ -44,8 +45,22 @@ const obj = (v: unknown): Obj => v !== null && typeof v === 'object' && !Array.i
 const str = (v: unknown) => typeof v === 'string' ? v : null;
 const list = (v: unknown): unknown[] => Array.isArray(v) ? v : [];
 const key = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLowerCase().replace(/[_-]/g, ' ').replace(/\s+/g, ' ').trim();
-const cuisineAliases: Record<string, string> = {'italien':'italian', 'italienne':'italian', 'y':'italian', 'viet nam':'vietnamese', 'vietnamien':'vietnamese', 'vietnamienne':'vietnamese', 'hai san':'seafood', 'fruits de mer':'seafood', 'europeen':'european', 'europeenne':'european'};
-const cuisine = (s: string) => cuisineAliases[key(s)] ?? key(s);
+const cuisineAliases: Record<string, string> = {'italien':'italian', 'italienne':'italian', 'y':'italian', 'viet nam':'vietnamese', 'vietnamien':'vietnamese', 'vietnamienne':'vietnamese', 'hai san':'seafood', 'fruits de mer':'seafood', 'europeen':'european', 'europeenne':'european', 'grillades':'barbecue', 'mon nuong':'barbecue'};
+const categoryCuisines: Record<string,string> = Object.fromEntries([
+  ['italian',['italian restaurant','restaurant italien','nha hang y']],
+  ['vietnamese',['vietnamese restaurant','restaurant vietnamien','nha hang viet nam']],
+  ['seafood',['seafood restaurant','restaurant de fruits de mer','nha hang hai san']],
+  ['pizza',['pizza restaurant','pizzeria','nha hang pizza']],
+  ['european',['european restaurant','restaurant europeen','nha hang chau au']],
+  ['barbecue',['barbecue restaurant','restaurant de grillades','nha hang mon nuong','bbq']],
+  ['steak',['steak house','steakhouse','nha hang bit tet']],
+].flatMap(([value,labels]) => (labels as string[]).map(label => [label,value as string])));
+const cuisine = (s: string) => Object.hasOwn(cuisineAliases,key(s)) ? cuisineAliases[key(s)] : Object.hasOwn(categoryCuisines,key(s)) ? categoryCuisines[key(s)] : key(s);
+function documentedCuisines(google: Obj) {
+  if (google.source !== 'google_maps_import') return [];
+  return [...new Set([...list(google.cuisine_types).filter((x):x is string => typeof x === 'string').map(cuisine),
+    ...list(google.google_categories).filter((x):x is string => typeof x === 'string').flatMap(x => Object.hasOwn(categoryCuisines,key(x)) ? [categoryCuisines[key(x)]] : [])])].sort();
+}
 const canonical = (v: unknown): string => JSON.stringify(Array.isArray(v) ? v.map(x => JSON.parse(canonical(x))) : v && typeof v === 'object'
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, JSON.parse(canonical((v as Obj)[k]))])) : v);
 export function validPoint(p: Point) {return Number.isFinite(p?.latitude) && Number.isFinite(p?.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180;}
@@ -69,6 +84,7 @@ function validateRequest(r: Request) {
   }
   if (r.preferences?.categories?.some(c => !CATEGORIES.includes(c))) throw Error('INVALID_CATEGORY_PREFERENCE');
   if (r.cuisines?.some(c => !c.trim())) throw Error('INVALID_CUISINE');
+  if ([...(r.preferences?.features ?? []),...(r.required_features ?? [])].some(f => typeof f !== 'string' || !/^[a-z_]{1,40}$/.test(f))) throw Error('INVALID_FEATURE');
 }
 function inArea(p: Point, distance: number, area: Area) {
   if (area.kind === 'radius') return distance <= area.metres;
@@ -106,25 +122,25 @@ function containsPhrase(text: string, phrases: string[]) {
   return phrases.some(p => k.includes(' ' + p + ' '));
 }
 function hasPhrase(text: string, feature: string) {
-  return containsPhrase(text,featurePhrases[feature] ?? []);
+  return containsPhrase(text,Object.hasOwn(featurePhrases,feature) ? featurePhrases[feature] : []);
 }
 function affirmative(text: string) {
   const k = key(text).replace(/khong (gian|khi)/g, '');
   return !/\b(not|no|never|without|pas|sans|non|jamais|khong|chua|thieu)\b/.test(k);
 }
 function featureStatus(name: string, positives: Citation[], negatives: Citation[]): Proposal['features'][string] {
-  const contrary = (p: Citation) => containsPhrase(p.text,contraryPhrases[name] ?? []);
+  const contrary = (p: Citation) => containsPhrase(p.text,Object.hasOwn(contraryPhrases,name) ? contraryPhrases[name] : []);
   const yes = positives.filter(p => hasPhrase(p.text, name) && affirmative(p.text) && !contrary(p));
   const no = [...negatives.filter(p => hasPhrase(p.text, name) || contrary(p)), ...positives.filter(p => hasPhrase(p.text, name) && (!affirmative(p.text) || contrary(p)))];
   return {status: yes.length ? no.length ? 'conflicted' : 'reported' : no.length ? 'conflicted' : 'not_documented', citations: [...yes, ...no]};
 }
-function priceLevel(raw: unknown): number | null {
-  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= 4) return raw;
+function priceLevel(raw: unknown, allowNumeric = true): number | null {
+  if (allowNumeric && typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 && raw <= 4) return raw;
   if (typeof raw !== 'string') return null;
-  if (/^[0-4]$/.test(raw)) return Number(raw);
+  if (allowNumeric && /^[0-4]$/.test(raw)) return Number(raw);
   if (/^[$€₫]{1,4}$/.test(raw)) return raw.length;
   const labels: Record<string, number> = {PRICE_LEVEL_FREE:0, PRICE_LEVEL_INEXPENSIVE:1, PRICE_LEVEL_MODERATE:2, PRICE_LEVEL_EXPENSIVE:3, PRICE_LEVEL_VERY_EXPENSIVE:4};
-  return labels[raw] ?? null;
+  return Object.hasOwn(labels,raw) ? labels[raw] : null;
 }
 function priceRange(raw: unknown): Prices['establishment']['range'] {
   // Only unambiguous closed, currency-labelled ranges; no FX or price estimates.
@@ -141,7 +157,7 @@ function priceRange(raw: unknown): Prices['establishment']['range'] {
 export function prices(metadata: Obj): Prices {
   const b = obj(metadata.budget), e = obj(b.establishment_price), c = obj(b.customer_spend_per_person);
   const trustworthy = e.source === 'google_maps_import' && e.status === 'provided' && typeof e.observed_at === 'string' && Number.isFinite(Date.parse(e.observed_at));
-  const level = trustworthy ? priceLevel(e.price_level) ?? priceLevel(e.price) : null;
+  const level = trustworthy ? priceLevel(e.price_level) ?? priceLevel(e.price,false) : null;
   const range = trustworthy ? priceRange(e.price_range) ?? priceRange(e.price) : null;
   return {establishment:{status:level !== null || range !== null ? 'known' : 'unknown',level,range,source:str(e.source),observed_at:str(e.observed_at),raw:{price:e.price ?? null,price_level:e.price_level ?? null,price_range:e.price_range ?? null}},
     customer_spend_per_person:{source:str(c.source),status:str(c.status),ranges:list(c.ranges).flatMap(x => {
@@ -175,10 +191,13 @@ function bands<T>(items: T[], get: (v: T) => Rational): T[][] {
   }
   return result;
 }
-function bucket(p: Prices): string | null {
-  if (p.establishment.level !== null) return 'level:' + p.establishment.level;
-  const r = p.establishment.range;
-  return r ? `${r.currency}:${r.minimum}:${r.maximum}` : null;
+function comparableBudgets(a: Prices, b: Prices) {
+  return a.establishment.level !== null && b.establishment.level !== null || !!(a.establishment.range && b.establishment.range && a.establishment.range.currency === b.establishment.range.currency);
+}
+function distinctBudgets(a: Prices, b: Prices) {
+  if (a.establishment.level !== null && b.establishment.level !== null) return a.establishment.level !== b.establishment.level;
+  const x = a.establishment.range, y = b.establishment.range;
+  return !!(x && y && x.currency === y.currency && (x.maximum < y.minimum || y.maximum < x.minimum));
 }
 /** PURE internal domain function. Its inputs must be the RLS-authorized catalogue.
  * No storage mutation, supplier, LLM, geocoder, public handler or HOME AI call. */
@@ -188,7 +207,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
   const result: Result = {version:RECOMMENDATION_ENGINE_VERSION,comparable_score_gap:COMPARABLE_SCORE_GAP,proposals:[],excluded:[],notices:[],refinements:[]};
   const features = [...new Set([...(request.preferences?.features ?? []),...(request.required_features ?? [])])];
   const preferredCategories = [...new Set(request.preferences?.categories ?? [])];
-  const unknownFeatures = features.filter(f => !featurePhrases[f]);
+  const unknownFeatures = features.filter(f => !Object.hasOwn(featurePhrases,f));
   result.notices.push(...unknownFeatures.map(f => 'UNSUPPORTED_FEATURE:' + f));
   const authorised = rows.filter(r => r.organization_id === organization && r.language === language);
   const seen = new Set<string>(), duplicates = new Set<string>();
@@ -205,7 +224,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const distance = validPoint(point) ? distanceMetres(request.origin,point) : null;
     if (distance === null) reasons.push('MISSING_COORDINATES');
     else if (!inArea(point,distance,request.area)) reasons.push('OUTSIDE_AREA');
-    const types = list(google.cuisine_types).filter((x): x is string => typeof x === 'string').map(cuisine);
+    const types = documentedCuisines(google);
     if (request.cuisines?.length && !request.cuisines.some(c => types.includes(cuisine(c)))) reasons.push(types.length ? 'CUISINE_MISMATCH' : 'CUISINE_NOT_DOCUMENTED');
     const budget = prices(row.metadata), match = budgetMatch(budget,request.budget);
     if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
@@ -227,13 +246,14 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
       result.excluded.push({establishment_id:row.establishment_id,name,report_id:row.report_id,reasons});continue;
     }
     const choiceReasons: Proposal['reasons'] = [{code:'INTERNAL_V2_GLOBAL'},{code:'WITHIN_REQUESTED_AREA'}];
+    if (request.cuisines?.length) choiceReasons.push({code:'DOCUMENTED_CUISINE_MATCH'});
     for (const c of preferredCategories) choiceReasons.push({code:'CATEGORY_PREFERENCE',category:c,citations:positives.filter(p => p.category === c)});
     for (const f of features) if (observations[f].status === 'reported') choiceReasons.push({code:'REPORTED_FEATURE',feature:f,citations:observations[f].citations});
     if (!preferredCategories.length) choiceReasons.push(...positives.filter(p => CATEGORIES.includes(p.category as Category)).map(p => ({code:'REPORT_STRENGTH',citations:[p]})));
     const catsWithEvidence = preferredCategories.filter(c => positives.some(p => p.category === c));
     const sum = catsWithEvidence.reduce((s,c) => add(s,categories![c].exact),rational('0'));
     const preference = catsWithEvidence.length ? {n:sum.n,d:sum.d * BigInt(catsWithEvidence.length)} : rational('0');
-    const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:'straight_line',
+    const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:'straight_line',cuisines:{values:types,source:str(google.source),observed_at:str(google.observed_at)},
       scores:{quality:categories.quality.out,service:categories.service.out,ambiance:categories.ambiance.out,global:global.out},budget,budget_match:match,
       reasons:choiceReasons,reservations,features:observations,report:{id:row.report_id,generated_at:row.report_generated_at,language:row.language,freshness:'current',corpus:row.corpus}};
     candidates.push({proposal,global:global.exact,preference,matches:features.filter(f => observations[f].status === 'reported').length,band:0,preference_band:0});
@@ -246,16 +266,16 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
       ranked.push(...pg.sort((a,b) => a.proposal.distance_metres-b.proposal.distance_metres || cmpId(a,b)));
     });
   });
-  const remaining = [...ranked], chosen: Candidate[] = [], usedBudgets = new Set<string>();
+  const remaining = [...ranked], chosen: Candidate[] = [];
   while (remaining.length && chosen.length < 3) {
     const first = remaining[0];
     const comparable = remaining.filter(c => c.band === first.band && c.matches === first.matches && c.preference_band === first.preference_band
       && c.proposal.distance_metres <= first.proposal.distance_metres + COMPARABLE_DISTANCE_METRES);
-    const varied = comparable.find(c => {const b = bucket(c.proposal.budget);return b !== null && !usedBudgets.has(b);});
+    const represented = (c: Candidate) => chosen.some(x => comparableBudgets(c.proposal.budget,x.proposal.budget) && !distinctBudgets(c.proposal.budget,x.proposal.budget));
+    const varied = comparable.find(c => chosen.some(x => comparableBudgets(c.proposal.budget,x.proposal.budget)) && !represented(c));
     // Diversify only after the first choice; never prefer a known price merely because another is unknown.
-    const pick = chosen.length && bucket(first.proposal.budget) !== null && usedBudgets.has(bucket(first.proposal.budget)!) ? varied ?? first : first;
+    const pick = represented(first) ? varied ?? first : first;
     remaining.splice(remaining.indexOf(pick),1);chosen.push(pick);
-    const b = bucket(pick.proposal.budget);if (b !== null) usedBudgets.add(b);
   }
   result.proposals = chosen.map(c => c.proposal);
   if (result.proposals.some(p => p.budget.establishment.status === 'unknown')) result.notices.push('ESTABLISHMENT_BUDGET_UNKNOWN');

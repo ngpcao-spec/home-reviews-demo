@@ -30,6 +30,10 @@ describe('geography, explicit criteria and access',() => {
     const r=run([sheet('pizza-name'),sheet('documented',{cuisines:['italian']})],{cuisines:['italien']});
     expect(ids(r)).toEqual(['documented']);expect(r.excluded[0].reasons).toContain('CUISINE_NOT_DOCUMENTED');
     expect(run([sheet('any')]).proposals).toHaveLength(1);
+    const bbq=sheet('bbq-name');expect(run([bbq],{cuisines:['bbq']}).proposals).toHaveLength(0);
+    (bbq.metadata.google_metadata as Record<string,unknown>).google_categories=['Nhà hàng món nướng'];
+    expect(ids(run([bbq],{cuisines:['bbq']}))).toEqual(['bbq-name']);
+    expect(run([bbq]).proposals[0].cuisines.values).toEqual(['barbecue']);
   });
   it('never fills three places if only one or two candidates qualify',() => {
     expect(run([sheet('a')]).proposals).toHaveLength(1);expect(run([sheet('a'),sheet('b')]).proposals).toHaveLength(2);
@@ -81,6 +85,7 @@ describe('budget and supported refinements',() => {
     expect(ids(run([b],{budget:{kind:'amount',currency:'VND',maximum:200000}}))).toEqual(['range']);
     expect(run([b],{budget:{kind:'amount',currency:'USD',maximum:200000}}).proposals).toHaveLength(0);
     expect(prices({budget:{establishment_price:{source:'google_maps_import',status:'provided',observed_at:'2026-10-28',price_range:'10–20 $'}}}).establishment.status).toBe('unknown');
+    expect(prices({budget:{establishment_price:{source:'google_maps_import',status:'provided',observed_at:'2026-10-28',price:'2'}}}).establishment.level).toBeNull();
   });
   it('diversifies known budgets only among similarly scored, similarly located candidates',() => {
     const rows=[sheet('a',{level:2}),sheet('b',{level:2,latitude:12.0001}),sheet('c',{level:1,latitude:12.0002}),sheet('d',{level:3,latitude:12.0003})];
@@ -93,6 +98,11 @@ describe('budget and supported refinements',() => {
     const rows=[sheet('a',{level:3}),sheet('b',{level:2}),sheet('c',{level:1}),sheet('d',{level:0})];
     const r=run(rows);expect(r.refinements).toContainEqual({kind:'lower_price_level',from_id:'a',alternative_id:'d'});
     rows[3].stale=true;expect(run(rows).refinements.some(x => x.alternative_id==='d')).toBe(false);
+  });
+  it('does not call overlapping ranges or different currencies a demonstrated budget diversity',() => {
+    const ranges=[['a',100,200,'VND'],['b',110,210,'VND'],['c',10,20,'USD'],['d',300,400,'VND']] as const;
+    const rows=ranges.map(([id,minimum,maximum,currency],i) => {const r=sheet(id,{latitude:12+i*0.0001});(r.metadata.budget as Record<string,unknown>).establishment_price={source:'google_maps_import',status:'provided',observed_at:'2026-10-28',price_range:{minimum,maximum,currency}};return r;});
+    expect(ids(run(rows))).toEqual(['a','d','b']);
   });
 });
 describe('documented characteristics without semantic invention',() => {
@@ -115,5 +125,9 @@ describe('documented characteristics without semantic invention',() => {
       const r=run([sheet('a',{positive:text,category:'service'})],{required_features:['fast_service']});expect(ids(r)).toEqual(['a']);expect(r.proposals[0].features.fast_service.citations[0].text).toBe(text);
     }
     const vi=run([sheet('a',{positive:'Không gian yên tĩnh và có máy lạnh.',category:'ambiance'})],{required_features:['quiet','air_conditioning']});expect(ids(vi)).toEqual(['a']);
+  });
+  it('treats prototype names as unsupported criteria, without unsafe dictionary lookups',() => {
+    const r=run([sheet('a')],{preferences:{features:['constructor','__proto__']}});expect(ids(r)).toEqual(['a']);expect(r.notices).toContain('UNSUPPORTED_FEATURE:constructor');
+    expect(run([sheet('a')],{required_features:['__proto__']}).proposals).toHaveLength(0);
   });
 });

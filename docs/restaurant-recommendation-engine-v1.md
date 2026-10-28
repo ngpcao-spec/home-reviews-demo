@@ -55,6 +55,10 @@ jamais régénérée ou remise à jour. Les autres tenants/langues ne sont ni ex
 ni comptés dans les exclusions. Une fiche dupliquée est refusée.
 
 1. Appliquer strictement zone, cuisine et budget s’ils sont explicités.
+   Les cuisines viennent des champs Google explicites et de catégories exactes
+   FR/VI/EN reconnues (italien, vietnamien, fruits de mer, pizza, européen,
+   grillades, steak). « Restaurant », le nom commercial et les avis ne permettent
+   pas d’inventer une cuisine. Les libellés non reconnus restent non confirmés.
 2. Classer par le global V2 exact, jamais par les étoiles Google.
 3. **Seuil proposé : 0,10 point sur 6.** Trier par score exact, puis construire
    des groupes dont chaque membre est à au plus 0,10 du meilleur membre. Les
@@ -72,6 +76,8 @@ ni comptés dans les exclusions. Une fiche dupliquée est refusée.
    choix, sans préférer par principe un prix connu à un prix inconnu. C’est une
    marge de localisation documentée, pas une estimation de trajet. Les égalités
    finales utilisent l’identifiant stable ; aucun arrondi de score.
+   Deux fourchettes qui se recouvrent ou deux devises différentes ne démontrent
+   pas une diversité de budget ; aucune comparaison monétaire n’est inventée.
 6. Retourner au plus trois restaurants. Si moins de candidats conviennent,
    retourner moins de trois, éventuellement zéro, avec les exclusions pertinentes.
 
