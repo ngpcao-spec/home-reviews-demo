@@ -1,0 +1,95 @@
+import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {Link,Navigate} from 'react-router-dom';
+import {useApp} from '../app/AppContext';
+import {PageHeader} from '../components/ui/PageHeader';
+import {useI18n} from '../i18n';
+import {recommendationMessages,recommendationCuisineLabels} from '../i18n/recommendations';
+import {recommendationTestApi,type Proposal,type RecommendationTestInput,type RecommendationTestResponse} from '../lib/recommendation-test';
+import './RecommendationTestPage.css';
+
+export function RecommendationTestPage(){
+ const {currentUser,isAuthenticated,demoMode}=useApp(),{language}=useI18n(),m=recommendationMessages[language];
+ const [options,setOptions]=useState<RecommendationTestResponse|null>(null),[response,setResponse]=useState<RecommendationTestResponse|null>(null);
+ const [organization,setOrganization]=useState(''),[cuisine,setCuisine]=useState(''),[maximum,setMaximum]=useState(''),[service,setService]=useState(false);
+ const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ const epoch=useRef({value:0}).current,pending=useRef(false);
+ const errorText=(code:string)=>code==='UNAUTHORIZED'?m.auth:code==='FORBIDDEN'?m.forbidden:code==='INVALID_RECOMMENDATION_REQUEST'?m.invalid:code==='ACCOUNT_LANGUAGE_CHANGED'?m.languageChanged:m.unavailable;
+ useEffect(()=>{
+  const version=++epoch.value;pending.current=false;setBusy(false);setOptions(null);setResponse(null);setError('');setCuisine('');setLoading(true);
+  if(!isAuthenticated||demoMode){setError('UNAUTHORIZED');setLoading(false);return;}
+  void recommendationTestApi({action:'options',...(organization?{organization_id:organization}:{})}).then(data=>{
+   if(version!==epoch.value)return;
+   if(data.language!==language)throw Error('ACCOUNT_LANGUAGE_CHANGED');
+   setOptions(data);
+  }).catch(e=>{if(version===epoch.value)setError(e instanceof Error?e.message:'');}).finally(()=>{if(version===epoch.value)setLoading(false);});
+  return()=>{++epoch.value;};
+ },[currentUser.id,isAuthenticated,demoMode,language,organization,retry,epoch]);
+ const change=()=>{++epoch.value;pending.current=false;setBusy(false);setResponse(null);setError('');};
+ async function search(removeBudget=false){
+  if(!options||pending.current)return;
+  const value=maximum.trim();
+  if(!removeBudget&&value&&(!Number.isSafeInteger(Number(value))||Number(value)<0)){setError('INVALID_RECOMMENDATION_REQUEST');return;}
+  const version=++epoch.value;pending.current=true;setBusy(true);setResponse(null);setError('');
+  if(removeBudget)setMaximum('');
+  const input:RecommendationTestInput={action:'recommend',organization_id:options.organization_id,...(cuisine?{cuisine}:{}),
+   ...(!removeBudget&&value?{maximum_vnd:Number(value)}:{}),...(service?{service_priority:true}:{})};
+  try{
+   const data=await recommendationTestApi(input);
+   if(version!==epoch.value)return;
+   if(data.language!==language)throw Error('ACCOUNT_LANGUAGE_CHANGED');
+   if(!data.result)throw Error('RECOMMENDATION_TEST_UNAVAILABLE');
+   setResponse(data);
+  }catch(e){if(version===epoch.value)setError(e instanceof Error?e.message:'');}
+  finally{if(version===epoch.value){pending.current=false;setBusy(false);}}
+ }
+ const submit=(e:FormEvent)=>{e.preventDefault();void search();};
+ if(!isAuthenticated||demoMode)return <Navigate to="/connexion" replace/>;
+ return <><PageHeader title={m.title} back/><section className="recommendation-test" aria-busy={busy||loading}>
+  <header className="recommendation-intro"><span className="eyebrow">{m.private}</span><h1>{m.menu}</h1><p>{m.intro}</p><p className="recommendation-muted">{m.scope}</p></header>
+  {loading&&<p role="status">{m.loading}</p>}
+  {options&&<form className="recommendation-filters card" onSubmit={submit} noValidate>
+   {options.organizations.length>1&&<label>{m.organization}<select aria-label={m.organization} value={options.organization_id} onChange={e=>{change();setOrganization(e.target.value);}}>{options.organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>}
+   <details><summary>{m.filters}</summary><div className="recommendation-filter-fields">
+    <label>{m.cuisine}<select aria-label={m.cuisine} value={cuisine} onChange={e=>{change();setCuisine(e.target.value);}}><option value="">{m.allCuisines}</option>{options.cuisines.map(c=><option key={c} value={c}>{recommendationCuisineLabels[c]?.[language]??c}</option>)}</select></label>
+    <label>{m.maximum}<input aria-label={m.maximum} type="number" min="0" step="1" inputMode="numeric" value={maximum} onChange={e=>{change();setMaximum(e.target.value);}} placeholder="200000" aria-describedby="recommendation-budget-hint"/><small id="recommendation-budget-hint">{m.maximumHint}</small></label>
+    <label className="recommendation-check"><input type="checkbox" checked={service} onChange={e=>{change();setService(e.target.checked);}}/>{m.service}</label><small>{m.serviceHint}</small>
+   </div></details>
+   <button type="submit" className="primary-button full-width" disabled={busy||loading}>{busy?m.searching:m.search}</button>
+  </form>}
+  {error&&<div role="alert" className="recommendation-notice card"><p>{errorText(error)}</p>{isAuthenticated&&!demoMode&&<button className="secondary-button" onClick={()=>options?void search():setRetry(n=>n+1)}>{m.retry}</button>}</div>}
+  {response?.result&&<section aria-label={m.results} aria-live="polite">
+   <p className="recommendation-muted">{m.scale}</p>
+   {!response.result.proposals.length?<div className="recommendation-notice card"><h2>{m.empty}</h2>{maximum.trim()&&<><p>{m.budgetEmpty}</p><button className="secondary-button" onClick={()=>void search(true)} disabled={busy}>{m.removeBudget}</button></>}</div>
+    :<>{response.result.proposals.length<3&&<p className="recommendation-muted">{m.limited}</p>}<div className="recommendation-results">{response.result.proposals.map(p=><RecommendationCard key={p.establishment_id} proposal={p}/>)}</div></>}
+   {response.result.excluded.length>0&&<p className="recommendation-muted">{m.excluded} : {response.result.excluded.length}</p>}
+  </section>}
+ </section></>;
+}
+
+function RecommendationCard({proposal:p}:{proposal:Proposal}){
+ const {language}=useI18n(),m=recommendationMessages[language],locale=language==='vi'?'vi-VN':'fr-FR';
+ const score=(s:Proposal['scores']['global'])=>new Intl.NumberFormat(locale,{maximumFractionDigits:2}).format(Number(s.value));
+ const date=(s:string)=>new Date(s).toLocaleDateString(locale);
+ const price=p.budget.establishment,range=price.range;
+ const amount=(n:number)=>new Intl.NumberFormat(locale,{maximumFractionDigits:2}).format(n);
+ const chosen=p.reasons.find(r=>r.code==='CATEGORY_PREFERENCE'&&r.category==='service'&&r.citations?.length)
+  ??p.reasons.find(r=>r.code==='REPORT_STRENGTH'&&r.citations?.length);
+ const citation=chosen?.citations?.[0],caution=p.reservations[0];
+ const second=citation?chosen?.code==='CATEGORY_PREFERENCE'?m.serviceReason:m.reportReason:p.budget_match==='google_range'?m.budgetReason:p.cuisines.values.length?m.cuisineReason:m.corpusReason;
+ return <article className="recommendation-card card">
+  <header><div><h2>{p.name}</h2>{p.cuisines.values.length>0&&<p className="recommendation-muted">{p.cuisines.values.map(c=>recommendationCuisineLabels[c]?.[language]??c).join(' · ')}</p>}</div><div className="recommendation-global"><span>{m.global}</span><strong>{score(p.scores.global)}<small> / 6</small></strong></div></header>
+  <dl className="recommendation-scores">{(['quality','service','ambiance'] as const).map(c=><div key={c}><dt>{c==='quality'?m.quality:c==='service'?m.serviceScore:m.ambiance}</dt><dd>{score(p.scores[c])}<small> / 6</small></dd></div>)}</dl>
+  <section className="recommendation-price"><h3>{m.indicative}</h3><p>{range?`${amount(range.minimum)}–${amount(range.maximum)} ${range.currency}`:price.status==='known'?price.level!==null?`${m.level} : ${price.level}/4`:price.label:m.unknownPrice}{price.unit==='per_person'?` · ${m.perPerson}`:` · ${m.unitUnknown}`}</p><small>{m.notGuaranteed}</small></section>
+  <h3>{m.reasons}</h3><ul className="recommendation-reasons"><li>{m.scoreReason}</li><li>{second}{citation&&<blockquote className="recommendation-excerpt">{citation.text}</blockquote>}</li></ul>
+  {caution&&<section className="recommendation-caution"><h3>{m.caution}</h3><blockquote className="recommendation-excerpt">{caution.text}</blockquote></section>}
+  <p className="recommendation-report-date">{m.reportDate} {date(p.report.generated_at)}</p>
+  {p.report.freshness==='corpus_changed'&&<p className="recommendation-freshness">{m.stale}</p>}
+  <details className="recommendation-details"><summary>{m.details}</summary><div>
+   <p>{m.corpus} : {String(p.report.corpus.total_reviews)}</p>{price.status==='known'&&price.source&&<p>{m.source}{price.observed_at?` · ${m.observed.toLowerCase()} ${date(price.observed_at)}`:''}</p>}
+   <p>{price.unit_label} · {m.notGuaranteed}</p>
+   {(citation||caution)&&<><h3>{m.reportSource}</h3>{citation&&<blockquote>{citation.text}</blockquote>}{caution&&<blockquote>{caution.text}</blockquote>}</>}
+   <small>{m.reference} : {p.report.id}</small>
+  </div></details>
+  <Link className="secondary-button full-width recommendation-open" to={`/etablissements/${encodeURIComponent(p.establishment_id)}`}>{m.view}</Link>
+ </article>;
+}

@@ -8,6 +8,17 @@ permissions:
   contents: read
 
 jobs:
+  recommendations-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.recommendation.config.ts
   quality:
     runs-on: ubuntu-latest
     steps:
@@ -21,7 +32,7 @@ jobs:
         with:
           deno-version: v2.9.6
       - name: Type-check current report and internal recommendation modules without execution
-        run: deno check --no-config --no-lock --no-remote --node-modules-dir=manual supabase/functions/process-historical-report-jobs/index.ts supabase/functions/jev-batch-experiment/index.ts supabase/functions/process-jls-restaurant/index.ts supabase/functions/_shared/restaurant-recommendation-read-v1.ts
+        run: deno check --no-config --no-lock --no-remote --node-modules-dir=manual supabase/functions/process-historical-report-jobs/index.ts supabase/functions/jev-batch-experiment/index.ts supabase/functions/process-jls-restaurant/index.ts supabase/functions/test-restaurant-recommendations/index.ts
       - name: Type-check import and manual retry functions without execution
         run: deno check --no-config --no-lock --node-modules-dir=auto supabase/functions/process-initial-import-jobs/index.ts supabase/functions/process-review-sync-jobs/index.ts supabase/functions/retry-establishment-import/index.ts supabase/functions/reload-establishment-reviews/index.ts supabase/functions/process-google-place-price-jobs/index.ts
       - run: npm run lint

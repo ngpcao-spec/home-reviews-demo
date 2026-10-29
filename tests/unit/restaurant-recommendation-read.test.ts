@@ -12,7 +12,7 @@ function client(options: {role?: string; language?: string; fail?: boolean; page
     expect(url.searchParams.get('organization_id')).toBe(url.pathname.endsWith('/profiles') ? null : 'eq.org-a');
     const table=url.pathname.split('/').at(-1);
     const data=table==='organization_members' ? {role:options.role ?? 'manager'} : table==='profiles' ? {preferred_language:options.language ?? 'vi'}
-      : table==='establishments' ? [{id:'no-report',name:'Fixture without report',organization_id:'org-a'}]
+      : table==='establishments' ? [{id:'no-report',name:'Fixture without report',organization_id:'org-a'},...Array.from({length:options.pages?201:1},(_,i)=>({id:i<200?`0-${i}`:'200-0',name:'Fixture',organization_id:'org-a'}))].slice(Number(url.searchParams.get('offset')??0),Number(url.searchParams.get('offset')??0)+200)
       : options.fail ? {message:'read failed'} : Array.from({length:options.pages && url.searchParams.get('offset')==='0' ? 200 : 1},(_,i) => sheet(`${url.searchParams.get('offset')}-${i}`));
     return new Response(JSON.stringify(data),{status:options.fail && table==='restaurant_recommendation_sheets'?500:200,headers:{'content-type':'application/json'}});
   });

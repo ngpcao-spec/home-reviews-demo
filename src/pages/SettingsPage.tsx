@@ -9,6 +9,7 @@ import type { PreferredLanguage } from '../types/domain'
 import { Link } from 'react-router-dom'
 import { useJevAccess } from '../lib/use-jev-access'
 import { jevMessages } from '../i18n/jev'
+import { recommendationMessages } from '../i18n/recommendations'
 import {
   currentPushSubscription,
   disablePushNotifications,
@@ -159,6 +160,7 @@ export function SettingsPage() {
   <section className="settings-intro"><h1>{messages.settings.heading}</h1><p>{messages.settings.intro}</p></section>
   <section className="profile-card card"><div className="profile-avatar">{currentUser.avatarUrl ? <img src={currentUser.avatarUrl} alt="" referrerPolicy="no-referrer" /> : currentUser.initials}</div><div><h2>{currentUser.name}</h2><p>{currentUser.email}</p><span>{messages.settings.googleAccount}</span></div></section>
   {demoMode&&<div className="demo-banner"><Sparkles/><div><strong>{messages.settings.demo}</strong><span>{messages.settings.demoDetail}</span></div></div>}
+  {!demoMode&&<SettingsSection title={recommendationMessages[language].title}><Link className="setting-row clickable" to="/plus/recommandations"><div className="setting-icon"><Sparkles/></div><div><strong>{recommendationMessages[language].menu}</strong><span>{recommendationMessages[language].private}</span></div><ChevronRight/></Link></SettingsSection>}
   {jevAccess.data===true&&<SettingsSection title={jevMessages[language].experimental}><Link className="setting-row clickable" to="/plus/jev-benchmark"><div className="setting-icon"><Sparkles/></div><div><strong>{jevMessages[language].menu}</strong><span>Jev / GPT-6.1 Sol</span></div><ChevronRight/></Link></SettingsSection>}
   <SettingsSection title={messages.settings.account}><SettingLink icon={<User/>} title={messages.settings.profile} detail={messages.settings.profileDetail}/><button className="setting-row"><div className="setting-icon google-setting-icon">G</div><div><strong>{messages.settings.googleLogin}</strong><span>{messages.settings.googleLoginDetail}</span></div></button><button className="setting-row clickable danger" onClick={() => void disconnect()} disabled={signingOut}><div className="setting-icon"><LogOut/></div><div><strong>{signingOut ? '…' : messages.settings.signOut}</strong><span>{messages.settings.signOutDetail}</span></div><ChevronRight/></button></SettingsSection>
   <SettingsSection title={messages.language.settingTitle}><div className="settings-info card"><label htmlFor="preferred-language">{messages.language.settingDetail}</label><select id="preferred-language" className="monitoring-select" value={preferredLanguage ?? 'fr'} disabled={savingLanguage} onChange={(event) => void changeLanguage(event.target.value as PreferredLanguage)}><option value="fr">Français</option><option value="vi">Tiếng Việt</option></select></div></SettingsSection>

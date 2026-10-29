@@ -1,15 +1,15 @@
 # Moteur interne de recommandation V1
 
-Bibliothèque interne, sans endpoint ni catalogue public. La publication du site
-ne crée pas de service de recommandation : le lecteur reste destiné à un futur
-appelant serveur autorisé, sans raccordement HOME AI. Aucune nouvelle collecte,
+Moteur partagé avec l’écran privé `/plus/recommandations` et la fonction
+authentifiée `test-restaurant-recommendations`, sans catalogue public ni
+raccordement HOME AI. Aucune nouvelle collecte,
 traduction, appel IA ou génération. Aucun changement
 des fiches, scores, rapports, JEV, sélecteur, Sol, langues ou corpus des 150 avis.
 
 ## Interface interne
 
 `readRestaurantRecommendations(context, organizationId, request)` est destiné à
-un futur appelant serveur ayant obtenu `context` via `requireUser`. Il utilise
+un appelant serveur ayant obtenu `context` via `requireUser`. Il utilise
 uniquement `context.client`, jamais `admin` ni une clé service. L’appartenance
 owner/admin/manager est vérifiée, puis les politiques RLS existantes restreignent
 les deux tables. La langue est celle du profil ; aucune modification ni repli
@@ -123,7 +123,7 @@ dans la demande, **et une unité « par personne » confirmée**. Exemple :
 appels `amount` sans `unit` sont également traités comme des budgets par personne ;
 l’omission ne contourne pas ce contrôle. Les autres unités de demande sont refusées.
 
-Version du moteur : `restaurant-recommendation-engine-v3` (scores V2 inchangés).
+Version du moteur : `restaurant-recommendation-engine-v4` (scores V2 inchangés).
 Une unité est confirmée uniquement par un libellé explicite du champ de prix
 Google sauvegardé (FR/VI/EN), ou par une observation `google_maps_ui` sauvegardée,
 datée, dont l’URL identifie exactement l’établissement et dont le libellé explicite

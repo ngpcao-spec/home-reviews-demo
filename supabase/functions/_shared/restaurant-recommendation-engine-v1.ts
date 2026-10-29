@@ -3,7 +3,7 @@ import {PLACE_FEATURES,placeFeatureLabel,placeCategories,taxonomyValue,type Taxo
 import {scheduledOpening,PLACE_PROFILE_VERSION,type PlaceProfile} from './google-place-profile.ts';
 import {googleMoneyRange,googlePriceLevel,googlePerPersonPriceLabel,type MoneyRange} from './google-maps-prices.ts';
 
-export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v3';
+export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v4';
 export const COMPARABLE_SCORE_GAP = '0.10';
 export const COMPARABLE_DISTANCE_METRES = 250;
 export const CATEGORIES = ['quality', 'service', 'ambiance'] as const;
@@ -12,8 +12,8 @@ export type Point = {latitude: number; longitude: number};
 export type Area = {kind: 'radius'; metres: number} | {kind: 'bounds'; south: number; north: number; west: number; east: number};
 // Amount budgets are per person, including legacy requests that omit the unit.
 export type Budget = {kind: 'price_level'; allowed: number[]} | {kind: 'amount'; currency: string; maximum: number; minimum?: number; unit?: 'per_person'};
-export type Request = {
-  origin: Point; area: Area; cuisines?: string[]; specialties?: string[]; usages?: string[]; budget?: Budget;
+export type Request = ({origin: Point; area: Area; geography?:never} | {geography:'not_requested';origin?:never;area?:never}) & {
+  cuisines?: string[]; specialties?: string[]; usages?: string[]; budget?: Budget;
   visit_at?: string; hours_kind?: 'venue'|'kitchen'|'delivery'|'takeaway'|'breakfast';
   preferences?: {categories?: Category[]; features?: string[]}; required_features?: string[];
 };
@@ -34,7 +34,7 @@ export type Prices = {
   customer_spend_per_person: {source: string | null; status: string | null; observed_at: string | null; guaranteed_tariff: false; ranges: {value: string; review_count: number; parsed:MoneyRange; source_fields:string[]; period_start:string|null; period_end:string|null}[]};
 };
 export type Proposal = {
-  establishment_id: string; name: string; distance_metres: number; distance_kind: 'straight_line';
+  establishment_id: string; name: string; distance_metres: number|null; distance_kind: 'straight_line'|'not_requested';
   cuisines: {values: string[]; source: string | null; observed_at: string | null};
   scores: Record<Category, Score> & {global: Score}; budget: Prices; budget_match: 'not_requested' | 'google_level' | 'google_range';
   reasons: {code: string; category?: Category; feature?: string; citations?: Citation[]}[]; reservations: Citation[];
@@ -78,11 +78,15 @@ export function distanceMetres(a: Point, b: Point) {
   return 6371008.8 * 2 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, h))));
 }
 function validateRequest(r: Request) {
+  if(r.geography==='not_requested') {
+    if(r.origin!==undefined||r.area!==undefined)throw Error('INVALID_AREA');
+  } else {
   if (!validPoint(r.origin)) throw Error('POSITION_REQUIRED');
   if (r.area?.kind === 'radius') {if (!Number.isFinite(r.area.metres) || r.area.metres <= 0) throw Error('INVALID_AREA');}
   else if (r.area?.kind === 'bounds') {
     if (!validPoint({latitude:r.area.south,longitude:r.area.west}) || !validPoint({latitude:r.area.north,longitude:r.area.east}) || r.area.south > r.area.north) throw Error('INVALID_AREA');
   } else throw Error('AREA_REQUIRED');
+  }
   if (r.budget?.kind === 'price_level') {
     if (!r.budget.allowed.length || r.budget.allowed.some(x => !Number.isInteger(x) || x < 0 || x > 4)) throw Error('INVALID_BUDGET');
   } else if (r.budget) {
@@ -211,6 +215,11 @@ function validPublication(row: SheetRow) {
     && canonical(report.negative_aspects) === canonical(row.report_sections.reservations);
 }
 const cmpId = (a: Candidate, b: Candidate) => a.proposal.establishment_id < b.proposal.establishment_id ? -1 : a.proposal.establishment_id > b.proposal.establishment_id ? 1 : 0;
+// A neutral tie-break value is internal only; an absent user position is never returned as zero metres.
+const rankDistance = (c:Candidate) => c.proposal.distance_metres ?? 0;
+export function recommendationCuisineOptions(rows:SheetRow[],organization:string,language:string):string[] {
+  return [...new Set(rows.flatMap(row=>recommendRestaurants([row],organization,language,{geography:'not_requested'}).proposals.flatMap(p=>p.cuisines.values)))].sort();
+}
 function bands<T>(items: T[], get: (v: T) => Rational): T[][] {
   const sorted = [...items].sort((a,b) => -compare(get(a),get(b))), result: T[][] = [];
   for (const v of sorted) {
@@ -255,9 +264,11 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const opening=request.visit_at&&profile?scheduledOpening(profile,request.visit_at,request.hours_kind):null;
     if(request.visit_at&&opening!=='scheduled_open')reasons.push(opening==='scheduled_closed'?'OUTSIDE_DOCUMENTED_HOURS':'HOURS_NOT_VERIFIABLE');
     const point = obj(profile?.identity.coordinates??google.coordinates) as Point;
-    const distance = validPoint(point) ? distanceMetres(request.origin,point) : null;
-    if (distance === null) reasons.push('MISSING_COORDINATES');
-    else if (!inArea(point,distance,request.area)) reasons.push('OUTSIDE_AREA');
+    const distance = request.geography==='not_requested' ? null : validPoint(point) ? distanceMetres(request.origin,point) : null;
+    if(request.geography!=='not_requested') {
+      if (distance === null) reasons.push('MISSING_COORDINATES');
+      else if (!inArea(point,distance,request.area)) reasons.push('OUTSIDE_AREA');
+    }
     const types=documentedTaxonomy(google,profile,'cuisines'),specialties=documentedTaxonomy(google,profile,'specialties'),usages=documentedTaxonomy(google,profile,'usages');
     for(const [kind,values]of [['specialties',specialties],['usages',usages]] as const)if(request[kind]?.length&&!request[kind]!.some(c=>values.includes(taxonomyValue(kind,c)??key(c))))reasons.push(kind.toUpperCase()+'_NOT_CONFIRMED');
     if (request.cuisines?.length && !request.cuisines.some(c => types.includes(cuisine(c)))) reasons.push(types.length ? 'CUISINE_MISMATCH' : 'CUISINE_NOT_DOCUMENTED');
@@ -279,10 +290,10 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
       const sum = CATEGORIES.reduce((s,c) => add(s,categories![c].exact),rational('0'));
       if (compare({n:sum.n,d:sum.d * 3n},global.exact)) throw Error('INCONSISTENT_GLOBAL');
     } catch {reasons.push('MISSING_OR_INCONSISTENT_SCORES');}
-    if (reasons.length || !global || !categories || distance === null || match === null) {
+    if (reasons.length || !global || !categories || distance === null && request.geography!=='not_requested' || match === null) {
       result.excluded.push({establishment_id:row.establishment_id,name,report_id:row.report_id,reasons});continue;
     }
-    const choiceReasons: Proposal['reasons'] = [{code:'INTERNAL_V2_GLOBAL'},{code:'WITHIN_REQUESTED_AREA'}];
+    const choiceReasons: Proposal['reasons'] = [{code:'INTERNAL_V2_GLOBAL'},{code:request.geography==='not_requested'?'ACCESSIBLE_CATALOGUE':'WITHIN_REQUESTED_AREA'}];
     if (request.cuisines?.length) choiceReasons.push({code:'DOCUMENTED_CUISINE_MATCH'});
     for (const c of preferredCategories) choiceReasons.push({code:'CATEGORY_PREFERENCE',category:c,citations:positives.filter(p => p.category === c)});
     for (const f of features) if (observations[f].status === 'reported') choiceReasons.push({code:observations[f].google?'GOOGLE_DECLARED_FEATURE':'REPORTED_FEATURE',feature:f,citations:observations[f].citations});
@@ -290,7 +301,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const catsWithEvidence = preferredCategories.filter(c => positives.some(p => p.category === c));
     const sum = catsWithEvidence.reduce((s,c) => add(s,categories![c].exact),rational('0'));
     const preference = catsWithEvidence.length ? {n:sum.n,d:sum.d * BigInt(catsWithEvidence.length)} : rational('0');
-    const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:'straight_line',cuisines:{values:types,source:profile?.categories.source??str(google.source),observed_at:profile?.categories.observed_at??str(google.observed_at)},
+    const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:request.geography==='not_requested'?'not_requested':'straight_line',cuisines:{values:types,source:profile?.categories.source??str(google.source),observed_at:profile?.categories.observed_at??str(google.observed_at)},
       practical:profile,specialties,usages,contradictions,opening:{status:request.visit_at?'scheduled_open':'not_requested',live:false,holiday_guarantee:false},
       scores:{quality:categories.quality.out,service:categories.service.out,ambiance:categories.ambiance.out,global:global.out},budget,budget_match:match,
       reasons:choiceReasons,reservations,features:observations,report:{id:row.report_id,generated_at:row.report_generated_at,language:row.language,freshness:corpusChanged?'corpus_changed':'current',corpus:row.corpus}};
@@ -302,14 +313,14 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const matchCounts = [...new Set(group.map(c => c.matches))].sort((a,b) => b-a);
     for (const matches of matchCounts) bands(group.filter(c => c.matches === matches),c => c.preference).forEach((pg,preference_band) => {
       pg.forEach(c => {c.band=band;c.preference_band=preference_band;});
-      ranked.push(...pg.sort((a,b) => a.proposal.distance_metres-b.proposal.distance_metres || cmpId(a,b)));
+      ranked.push(...pg.sort((a,b) => rankDistance(a)-rankDistance(b) || cmpId(a,b)));
     });
   });
   const remaining = [...ranked], chosen: Candidate[] = [];
   while (remaining.length && chosen.length < 3) {
     const first = remaining[0];
     const comparable = remaining.filter(c => c.band === first.band && c.matches === first.matches && c.preference_band === first.preference_band
-      && c.proposal.distance_metres <= first.proposal.distance_metres + COMPARABLE_DISTANCE_METRES);
+      && rankDistance(c) <= rankDistance(first) + COMPARABLE_DISTANCE_METRES);
     const represented = (c: Candidate) => chosen.some(x => comparableBudgets(c.proposal.budget,x.proposal.budget) && !distinctBudgets(c.proposal.budget,x.proposal.budget));
     const varied = comparable.find(c => chosen.some(x => comparableBudgets(c.proposal.budget,x.proposal.budget)) && !represented(c));
     // Diversify only after the first choice; never prefer a known price merely because another is unknown.
@@ -324,9 +335,9 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
       || compare(subtract(from.preference,alt.preference),rational(COMPARABLE_SCORE_GAP)) > 0) continue;
     const base = {from_id:from.proposal.establishment_id,alternative_id:alt.proposal.establishment_id};
     for(const feature of features)if(alt.proposal.features[feature]?.status==='reported'&&from.proposal.features[feature]?.status!=='reported')result.refinements.push({kind:'documented_feature',feature,...base});
-    if (alt.proposal.distance_metres < from.proposal.distance_metres) result.refinements.push({kind:'closer',...base});
+    if (alt.proposal.distance_metres!==null && from.proposal.distance_metres!==null && alt.proposal.distance_metres < from.proposal.distance_metres) result.refinements.push({kind:'closer',...base});
     const a = from.proposal.budget.establishment, b = alt.proposal.budget.establishment;
-    if (alt.proposal.distance_metres > from.proposal.distance_metres + COMPARABLE_DISTANCE_METRES) continue;
+    if (rankDistance(alt) > rankDistance(from) + COMPARABLE_DISTANCE_METRES) continue;
     if (a.level !== null && b.level !== null && b.level < a.level) result.refinements.push({kind:'lower_price_level',...base});
     if (a.range && b.range && a.range.currency === b.range.currency && b.range.maximum < a.range.minimum) result.refinements.push({kind:'lower_price_range',...base});
   }
