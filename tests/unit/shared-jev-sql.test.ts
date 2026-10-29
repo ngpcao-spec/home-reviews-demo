@@ -17,7 +17,7 @@ const schema=JSON.parse(readFileSync('tests/fixtures/shared-jev-schema-before.js
 const definitions=JSON.parse(readFileSync('tests/fixtures/shared-jev-functions-before.json','utf8'));
 let db:PGlite,deny:ReturnType<typeof vi.spyOn>;
 const q=async<T=Record<string,unknown>>(sql:string,args:unknown[]=[])=> (await db.query<T>(sql,args)).rows;
-const rpc=async<T=Record<string,unknown>>(fn:string,args:unknown[])=> (await q<{v:T}>('select public.'+fn+'('+args.map((_,i)=>'$'+(i+1)).join(',')+') v',args))[0].v;
+const rpc=async<T=Record<string,unknown>>(fn:string,args:unknown[])=> (await q<{v:T}>('select to_jsonb(public.'+fn+'('+args.map((_,i)=>'$'+(i+1)).join(',')+')) v',args))[0].v;
 beforeAll(async()=>{
  deny=vi.spyOn(globalThis,'fetch').mockRejectedValue(Error('NETWORK_FORBIDDEN'));
  db=new PGlite({extensions:{pgcrypto}});await db.waitReady;
@@ -49,6 +49,12 @@ beforeAll(async()=>{
  await db.exec("create or replace function private.enqueue_review_ai() returns trigger language plpgsql as $$begin if new.historical_import then return new;end if;return new;end$$;create table public.test_dispatch(id uuid);create or replace function public.jev_batch_wake(p_run uuid) returns bigint language plpgsql as $$begin insert into public.test_dispatch values(p_run);return 1;end$$;");
  for(const guard of JSON.parse(readFileSync('tests/fixtures/shared-jev-report-guards-before.json','utf8'))){await db.exec(guard.definition);await db.exec(guard.trigger);}
  await db.exec(readFileSync('supabase/migrations/20261029042839_shared_jev_analysis.sql','utf8'));
+ await db.exec('create table public.profiles(user_id uuid,preferred_language text);');
+ // Empty legacy pipelines and inert retention/dispatch: no provider transport.
+ await db.exec("create table public.analysis_jls_sol_ready_operations(run_id uuid,request_count int,status text,receipt jsonb);create table public.analysis_jls_restaurant_runs(id uuid,status text);create table public.review_reply_drafts(review_id uuid,language text,ai_status text,draft_text text,ai_suggested_reply text);create function private.apply_recent_review_retention(uuid,timestamptz) returns void language sql as $$select$$;");
+ const autoDefinitions=JSON.parse(readFileSync('tests/fixtures/automatic-report-functions-before.json','utf8'));
+ await db.exec(autoDefinitions['public.enqueue_current_report']);
+ await db.exec(readFileSync('supabase/migrations/20261029081147_automatic_report_refresh.sql','utf8'));
  await db.exec('create trigger batch_frozen before update on public.analysis_jev_batch_runs for each row execute function public.guard_batch_frozen_data();create trigger task_frozen before update on public.analysis_jev_batch_tasks for each row execute function public.guard_batch_frozen_data();');
  const guards=JSON.parse(readFileSync('tests/fixtures/report-selector-functions-before.json','utf8'));
  await db.exec(guards.definitions.find((f:{name:string})=>f.name==='guard_report_request').definition);
@@ -58,11 +64,115 @@ beforeAll(async()=>{
  await q('insert into public.organizations(id) values($1)',[org]);
  await q("insert into public.establishments(id,organization_id,name,active) values($1,$2,'Synthetic fixture',true)",[est,org]);
  await q("insert into public.organization_members(organization_id,user_id,role) values($1,$2,'owner')",[org,actor]);
+ await q("insert into public.profiles values($1,'vi')",[actor]);
  await db.exec("insert into public.review_corpus_policy(id,enabled,paused,ingestions_paused) values(true,true,false,false);update private.shared_jev_runtime set enabled=true;");
 },60000);
 beforeEach(()=>db.exec('begin;set local role service_role'));
 afterEach(async()=>{await db.exec('rollback');expect(deny).not.toHaveBeenCalled();});
 afterAll(async()=>{await db.close();deny.mockRestore();});
+
+async function autoReference(n=100){
+ const s=await source(n);
+ for(const [i,r] of s.rows.entries())await q("insert into public.reviews(id,organization_id,establishment_id,external_review_id,rating,original_text,original_language,published_at) values($1,$2,$3,$4,5,$5,'vi','2026-01-01'::timestamptz+$6*interval '1 second')",[r.id,org,est,r.external_review_id,r.original_text,i]);
+ await q("update public.historical_report_runs set status='completed',created_at=clock_timestamp()-interval '1 day' where id=$1",[s.id]);
+ const report=crypto.randomUUID();
+ await q("insert into public.current_report_publications(establishment_id,organization_id,language,report_id,source_run_id,source_created_at,generated_at,scope,document,source_bindings,evidence_bindings,stale,provenance) select $1,$2,'vi',$3,$4,clock_timestamp()-interval '1 day',clock_timestamp()-interval '1 day',jsonb_build_object('policy_epoch',epoch,'review_count',$5::int),'{\"state\":\"completed\",\"controls\":{\"technical_checks_passed\":true}}',$6,'[]',false,'{}' from public.review_corpus_policy",[est,org,report,s.id,n,s.rows.map(r=>({id:r.id}))]);
+ await db.exec("insert into public.report_pipeline_settings(id,engine,jev_transport) values(true,'jev_sol_v2','batch_initial_v1') on conflict(id) do update set engine='jev_sol_v2',jev_transport='batch_initial_v1';update private.automatic_report_runtime set enabled=true;");
+ return {...s,report};
+}
+async function fresh(n:number,negative=0){
+ const ids=[];for(let i=0;i<n;i++){const id=crypto.randomUUID();ids.push(id);await q("insert into public.reviews(id,organization_id,establishment_id,external_review_id,rating,requires_attention,historical_import,original_text,published_at) values($1,$2,$3,$4,$5::smallint,$5::smallint<=3,true,null,clock_timestamp()-interval '1 hour'+$6*interval '1 second')",[id,org,est,'new-google-'+i,i<negative?3:5,i]);}return ids;
+}
+const counts=async()=> (await q<{v:{new_reviews:number;negative_reviews:number;threshold_met:boolean;reference_usable:boolean}}>("select private.report_refresh_counts($1,'vi') v",[est]))[0].v;
+const triggerAuto=async()=> (await q<{v:string}>("select private.maybe_refresh_report($1,'vi') v",[est]))[0].v;
+it.each([[2,2,false],[3,3,true],[24,2,false],[25,1,true],[25,0,true],[25,3,true],[8,3,true]])('automatic thresholds: %i new / %i low-star, including textless',async(n,neg,met)=>{
+ await autoReference();await fresh(n,neg);expect(await counts()).toMatchObject({new_reviews:n,negative_reviews:neg,threshold_met:met});
+ expect(await triggerAuto()).toBe(met?'enqueued':'below_threshold');
+ expect((await q("select * from public.report_generation_requests where origin='automatic_thresholds'")).length).toBe(met?1:0);
+ expect(await q('select * from public.analysis_jev_batch_tasks')).toHaveLength(0);
+});
+it('uses Google IDs across duplicate/internal-ID changes; text edits and identical reload are not new',async()=>{
+ const s=await autoReference(2);await q('update public.reviews set id=$1,original_text=$2 where id=$3',[crypto.randomUUID(),'Changed',s.rows[0].id]);
+ await q("insert into public.reviews(id,organization_id,establishment_id,external_review_id,rating,requires_attention,historical_import,published_at) values($1,$2,$3,$4,1,true,true,clock_timestamp()-interval '1 hour') on conflict(establishment_id,external_review_id) do nothing",[crypto.randomUUID(),org,est,s.rows[1].external_review_id]);
+ expect(await counts()).toMatchObject({new_reviews:0,negative_reviews:0});
+});
+it('excludes novelty rotated out of the latest 150 before the trigger',async()=>{
+ await autoReference(150);const ids=await fresh(25,2);await q("update public.reviews set published_at='2025-01-01' where id=$1",[ids[24]]);
+ expect(await counts()).toMatchObject({new_reviews:24,negative_reviews:2,threshold_met:false});expect(await triggerAuto()).toBe('below_threshold');
+});
+it('manual and automatic share the same enqueue in both orders, including reconnect/double trigger',async()=>{
+ await autoReference();await fresh(25,3);
+ const a=await rpc<{id:string}>('enqueue_current_report',[est,org,actor,'vi',crypto.randomUUID(),'gpt-6.1-sol',8]);
+ expect(await triggerAuto()).toBe('joined');expect(await triggerAuto()).toBe('already_authorized');
+ const b=await rpc<{id:string}>('enqueue_current_report',[est,org,actor,'vi',crypto.randomUUID(),'gpt-6.1-sol',8]);expect(b.id).toBe(a.id);
+ expect((await q("select * from public.historical_report_runs where status='queued'")).length).toBe(1);
+});
+it('a manual click joins an automatic request and retains pinned origin/version',async()=>{
+ await autoReference();await fresh(25);expect(await triggerAuto()).toBe('enqueued');
+ const a=(await q<{source_run_id:string}>("select * from public.report_generation_requests where origin='automatic_thresholds'"))[0];
+ const b=await rpc<{id:string}>('enqueue_current_report',[est,org,actor,'vi',crypto.randomUUID(),'gpt-6.1-sol',8]);expect(b.id).toBe(a.source_run_id);
+ expect(await q("select * from public.report_generation_requests where shared_jev_version='shared-jev-initial-v1' and origin='automatic_thresholds'")).toHaveLength(1);
+});
+it('failed or unknown automatic work keeps reference/counts and never authorizes a paid retry',async()=>{
+ const s=await autoReference();await fresh(25);expect(await triggerAuto()).toBe('enqueued');
+ await db.exec("update public.historical_report_runs set status='failed',error_code='REPORT_PREVIOUS_OUTCOME_UNCERTAIN' where status='queued'");
+ expect(await triggerAuto()).toBe('already_authorized');expect(await counts()).toMatchObject({new_reviews:25});
+ expect((await q<{report_id:string}>('select report_id from public.current_report_publications'))[0].report_id).toBe(s.report);
+ const state=await rpc<{state:string}>('read_report_refresh_state',[est,'vi']);expect(state.state).toBe('failed');
+});
+it('publication covers only its frozen Google IDs and keeps arrivals during generation',async()=>{
+ await autoReference();const first=await fresh(25);expect(await triggerAuto()).toBe('enqueued');
+ const a=(await q<{source_run_id:string}>("select * from public.report_generation_requests where origin='automatic_thresholds'"))[0];
+ const later=crypto.randomUUID();await q("insert into public.reviews(id,organization_id,establishment_id,external_review_id,rating,requires_attention,historical_import,published_at) values($1,$2,$3,'arrived-during-generation',1,true,true,clock_timestamp())",[later,org,est]);
+ const bindings=(await q<{id:string;external_review_id:string}>('select id,external_review_id from public.reviews where id<>$1',[later])).map(r=>({id:r.id,google_review_id_sha256:null}));
+ await q("update public.current_report_publications set report_id=$1,source_run_id=$2,scope=jsonb_set(scope,'{review_count}',to_jsonb($3::int)),source_bindings=$4,stale=true,stale_reason='CORPUS_CHANGED'",[crypto.randomUUID(),a.source_run_id,bindings.length,bindings]);
+ expect(first).toHaveLength(25);expect(await counts()).toMatchObject({new_reviews:1,negative_reviews:1});
+ await q("update public.historical_report_runs set status='completed' where id=$1",[a.source_run_id]);expect(await triggerAuto()).toBe('below_threshold');
+});
+it('enqueues remaining threshold arrivals only after the published source closes, once',async()=>{
+ await autoReference();const first=await fresh(25);expect(await triggerAuto()).toBe('enqueued');
+ const a=(await q<{source_run_id:string}>("select source_run_id from public.report_generation_requests where origin='automatic_thresholds'"))[0];
+ const bindings=await q<{id:string}>('select id from public.reviews');
+ for(let i=0;i<25;i++)await q("insert into public.reviews(id,organization_id,establishment_id,external_review_id,rating,published_at) values($1,$2,$3,$4,5,clock_timestamp())",[crypto.randomUUID(),org,est,'later-'+i]);
+ await q("update public.current_report_publications set report_id=$1,source_run_id=$2,scope=jsonb_set(scope,'{review_count}',to_jsonb($3::int)),source_bindings=$4",[crypto.randomUUID(),a.source_run_id,bindings.length,bindings]);
+ expect(first).toHaveLength(25);expect(await counts()).toMatchObject({new_reviews:25});
+ expect(await q("select * from public.historical_report_runs where status='queued'")).toHaveLength(1);
+ await q("update public.historical_report_runs set status='completed' where id=$1",[a.source_run_id]);
+ expect(await q("select * from public.historical_report_runs where status='queued'")).toHaveLength(1);
+ expect(await q("select * from public.report_generation_requests where origin='automatic_thresholds'")).toHaveLength(2);
+ expect(await triggerAuto()).toBe('already_authorized');
+});
+it('no usable reference, purged reference, or missing Google identity keeps first generation manual',async()=>{
+ await db.exec('update private.automatic_report_runtime set enabled=true');await fresh(25,3);expect(await triggerAuto()).toBe('manual_reference_required');
+ await autoReference(2);await q("update private.report_review_coverage set usable=false,missing_ids=1");expect(await triggerAuto()).toBe('manual_reference_required');
+ await db.exec('delete from public.current_report_publications');expect(await triggerAuto()).toBe('manual_reference_required');
+ expect(await q("select * from public.report_generation_requests where origin='automatic_thresholds'")).toHaveLength(0);
+});
+it('read state has no enqueue/dispatch and private counters are inaccessible to browser roles',async()=>{
+ await autoReference();await fresh(25);const before=await q('select * from public.test_dispatch');await rpc('read_report_refresh_state',[est,'vi']);expect(await q('select * from public.test_dispatch')).toEqual(before);
+ const grants=await q<{v:boolean}>("select has_function_privilege('authenticated','public.read_report_refresh_state(uuid,text)','execute') v");expect(grants[0].v).toBe(false);
+ await db.exec('set local role authenticated');await expect(rpc('read_report_refresh_state',[est,'vi'])).rejects.toThrow();
+});
+it('coalesces unplanned same-language sync comments without delaying a lone comment or overwriting a racing preparation',async()=>{
+ await autoReference(2);const ids=await fresh(3);await q("update public.reviews set original_text='Synthetic new comment',original_language='vi' where id=any($1)",[ids]);
+ const job=async(slice:string[],language='vi')=>{const id=crypto.randomUUID();await q("insert into public.review_sync_jobs(id,organization_id,establishment_id,status,collection_language) values($1,$2,$3,'completed',$4)",[id,org,est,language]);return (await q<{id:string}>('select private.enqueue_new_review_jev($1,$2) id',[id,slice]))[0].id;};
+ const first=await job(ids.slice(0,1));const [old]=await q<{snapshot:Parameters<typeof automaticJevSnapshot>[0];snapshot_sha256:string}>('select snapshot,snapshot_sha256 from public.analysis_jev_batch_runs where id=$1',[first]);
+ expect(await job(ids.slice(1))).toBe(first);
+ const before=await automaticJevSnapshot(old.snapshot);expect(await rpc('jev_shared_normalize_auto',[first,before,await directHash(before),old.snapshot_sha256])).toBe(false);
+ const [merged]=await q<{snapshot:Parameters<typeof automaticJevSnapshot>[0];snapshot_sha256:string}>('select snapshot,snapshot_sha256 from public.analysis_jev_batch_runs where id=$1',[first]);expect(merged.snapshot.reviews).toHaveLength(3);
+ const normalized=await automaticJevSnapshot(merged.snapshot);expect(await rpc('jev_shared_normalize_auto',[first,normalized,await directHash(normalized),merged.snapshot_sha256])).toBe(true);
+ expect(await job([ids[0]],'fr')).not.toBe(first);expect(await q('select * from public.analysis_jev_batch_tasks')).toHaveLength(0);
+});
+it('plans a single available textual comment immediately with the unchanged native batch planner',async()=>{
+ const auto=await source(1,'auto');const refs=await allocate(auto);expect(sharedMissingIds(refs)).toEqual([auto.rows[0].id]);
+ const plans=await sharedBatchPlans(auto.rows.map(r=>({review_id:r.id,text:r.analysis_text})),()=>100);expect(plans).toHaveLength(1);expect(plans[0].reviews).toBe(1);
+ expect(await rpc('jev_shared_plan_auto',[auto.id,plans])).toBe(true);expect(await rpc('jev_batch_claim_sol',[auto.id,'forbidden'])).toBe(false);
+});
+it('does not automatically authorize a report in a departed account language or after removal of authority',async()=>{
+ await autoReference();await fresh(25);await q("update public.profiles set preferred_language='fr'");expect(await triggerAuto()).toBe('not_eligible');
+ await q("update public.profiles set preferred_language='vi'");await db.exec('delete from public.organization_members');expect(await triggerAuto()).toBe('not_eligible');
+ expect(await q('select * from private.automatic_report_attempts')).toHaveLength(0);
+});
 async function source(n=4,mode='manual'){
  const rows=await Promise.all(Array.from({length:n},async(_,i)=>({id:crypto.randomUUID(),google_review_id:'google-'+i,organization_id:org,establishment_id:est,
   analysis_text:'Original '+i,original_text:'Original '+i,original_language:'vi',external_review_id:'google-'+i,rating:i%5+1,review_context:null,review_detailed_rating:null,published_at:null,

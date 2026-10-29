@@ -4,7 +4,7 @@ import {recommendRestaurants, type Request, type SheetRow} from './restaurant-re
 
 // Internal service interface for a future authenticated caller. No HTTP handler,
 // service-role query, RPC, new grant, deployment entry point or HOME AI wiring.
-export const RECOMMENDATION_SELECT = 'establishment_id,organization_id,language,report_id,source_run_id,report_generated_at,calculation_version,stale,stale_reason,corpus,metadata,report_sections,calculation_text:calculation::text,publication:current_report_publications!inner(report_id,source_run_id,organization_id,establishment_id,language,scope,stale,generated_at,derived:document->derived_report)';
+export const RECOMMENDATION_SELECT = 'establishment_id,organization_id,language,report_id,source_run_id,report_generated_at,calculation_version,stale,stale_reason,corpus,metadata,report_sections,calculation_text:calculation::text,publication:current_report_publications!inner(report_id,source_run_id,organization_id,establishment_id,language,scope,stale,stale_reason,generated_at,derived:document->derived_report)';
 export async function readRestaurantRecommendations(c: {client: AuthContext['client']; user: Pick<AuthContext['user'],'id'>}, organizationId: string, request: Request) {
   // c must come from requireUser(request), not from caller-supplied IDs/claims.
   await assertMembership(c.client,c.user.id,organizationId,['owner','admin','manager']);

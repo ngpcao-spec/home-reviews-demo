@@ -119,7 +119,7 @@ export interface BatchExperimentPort {
  sharedClaimSaved?(id:string,worker:string):Promise<BatchTask|null>;
  sharedRead?(consumer:string):Promise<SharedAnalysisRow[]>;
  sharedAllocate?(consumer:string,refs:unknown):Promise<{review_id:string;state:string;owned:boolean;task_id:string|null}[]>;
- sharedNormalizeAuto?(id:string,snapshot:unknown,sha:string):Promise<boolean>;
+ sharedNormalizeAuto?(id:string,snapshot:unknown,sha:string,expectedSha:string):Promise<boolean>;
  sharedPlanAuto?(id:string,plans:unknown):Promise<boolean>;
  sharedRefresh?(id:string):Promise<string>;
  load(id:string):Promise<{run:BatchRun;tasks:BatchTask[]}>;
@@ -176,7 +176,8 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   if(run.purpose==='new_reviews'){
    if(run.stage==='auto_prepare'){
     const snapshot=await automaticJevSnapshot(run.snapshot as unknown as Parameters<typeof automaticJevSnapshot>[0]);
-    check(port.sharedNormalizeAuto&&await port.sharedNormalizeAuto(id,snapshot,await directHash(snapshot)),'SHARED_JEV_AUTO_PREPARATION_FAILED');
+    check(port.sharedNormalizeAuto,'SHARED_JEV_AUTO_PREPARATION_FAILED');
+    if(!await port.sharedNormalizeAuto(id,snapshot,await directHash(snapshot),run.snapshot_sha256))return {phase:'new_reviews_changed',provider_calls:0};
     return {phase:'new_reviews_frozen',provider_calls:0};
    }
    if(run.stage==='auto_plan'){

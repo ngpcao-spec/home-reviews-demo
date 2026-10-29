@@ -14,7 +14,7 @@ it('returns a dated report whose source was purged without loading or starting t
  expect(r.experimental).toEqual(f.publication.row);expect(r.retention?.scope).toEqual(f.publication.scope);expect(r.run).toBeNull();expect(r.request_run).toBeNull();expect(r.provider_calls).toBe(0);
  expect(f.c.admin.rpc).toHaveBeenCalledWith('read_current_report_publication',{p_establishment:'est',p_language:'vi'});
  expect(f.adminReads).not.toContain('historical_report_runs');expect(f.clientReads).not.toContain('analysis_jev_batch_runs');expect(deny).not.toHaveBeenCalled();
- expect(f.c.admin.rpc.mock.calls.every(([name])=>['read_current_report_publication','read_retired_report_scope'].includes(name))).toBe(true);
+ expect(f.c.admin.rpc.mock.calls.every(([name])=>['read_current_report_publication','read_retired_report_scope','read_report_refresh_state'].includes(name))).toBe(true);
  }finally{deny.mockRestore();}
 });
 it('checks organization membership before reading publication or private source projection',async()=>{
