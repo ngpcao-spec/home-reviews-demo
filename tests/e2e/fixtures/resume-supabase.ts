@@ -68,6 +68,11 @@ export const supabase={
   channel:()=>({on(){return this},subscribe(){return this}}),removeChannel:async()=>undefined,
   functions:{invoke:async(name:string, options?:{body:Record<string,unknown>})=>{
     resumeHarness.invocations.push(name)
+    if(name==='test-restaurant-recommendations'&&localStorage.getItem('recommendation-test-fixture')==='true'){
+      if(localStorage.getItem('recommendation-case')==='forbidden')return{data:null,error:{context:new Response('{}',{status:403})}};
+      const {recommendationResponse}=await import('./recommendation-response');
+      return{data:recommendationResponse(options?.body??{}),error:null};
+    }
     if(name==='get-historical-report-status'){
       if(!navigator.onLine || localStorage.getItem('resume-offline')==='true')return{data:null,error:new Error('offline')}
       if(localStorage.getItem('server-owned-report-test')==='true')return {data:await (await fetch('/__test/historical-status')).json(),error:null}
