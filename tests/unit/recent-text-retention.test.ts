@@ -7,6 +7,8 @@ import {directHash} from '../../supabase/functions/_shared/jev-direct-categories
 import {analysisTextSha256} from '../../supabase/functions/_shared/analysis-text';
 import {analysisTextForReview} from '../../supabase/functions/_shared/analysis-text';
 import {prepareNativeLanguage} from '../fixtures/prepare-native-language';
+import {prepareIncrementalResult} from '../../supabase/functions/_shared/incremental-review-sync';
+import {reviewIngestionBundle} from '../../supabase/functions/_shared/sync-service';
 const fixture=JSON.parse(readFileSync('tests/fixtures/retention-production-definitions.json','utf8'));
 let db:PGlite;
 const org='10000000-0000-4000-8000-000000000001',est='20000000-0000-4000-8000-000000000001',user='30000000-0000-4000-8000-000000000001';
@@ -390,5 +392,87 @@ describe('native account language after complete reset',()=>{
   expect((await db.query("select pg_get_functiondef('public.read_current_report_publication(uuid,text)'::regprocedure) d")).rows[0].d).not.toContain('english');
   const id=(await insert('native','2020-01-01','Original русский')).rows[0].id;await google(id,'vi','Bản Google Việt');await google(id,'en','Unused English');await db.exec('set local role service_role');
   const s=(await db.query("select public.freeze_recent_review_source($1,$2,'vi',now()) s",[est,org])).rows[0].s as {analysis_text_policy:string;retention_frozen_rows:{review_translations:{language:string;source_text_sha256:string}[]}[]};expect(s.analysis_text_policy).toBe('account_google_or_original_v1');expect(s).not.toHaveProperty('retention_english_overrides');expect(s.retention_frozen_rows[0].review_translations.find(t=>t.language==='vi')?.source_text_sha256).toBe(await analysisTextSha256('Original русский'));
+ });
+});
+
+describe('atomic incremental sync with the retained native corpus',()=>{
+ const at='2026-10-28T12:00:00Z';
+ const item=(id:string,date=at)=>({cid:'fixture',reviewId:id,stars:5,text:'Original '+id,originalLanguage:'en',textTranslated:'Traduction '+id,translatedLanguage:'fr',publishedAtDate:date,language:'fr',scrapedAt:new Date().toISOString()});
+ const cp={google_id:'fixture',google_maps_url:'https://www.google.com/maps?cid=123',checkpoint_review_id:'known',checkpoint_review_at:at};
+ beforeEach(async()=>{
+  await prepareNativeLanguage(db,user);
+  await db.exec(`alter table public.establishments add column if not exists place_id text,add column if not exists review_reload_barrier_at timestamptz;
+   alter table public.organizations add column if not exists monitoring_interval_hours integer default 12;
+   create function public.review_sync_spread_offset(uuid,integer) returns interval language sql as $$select interval '0 seconds'$$;
+   create unique index if not exists offline_snapshot_source on public.establishment_snapshots(establishment_id,provider,source_run_id);`);
+  await db.exec(readFileSync('tests/fixtures/incremental-sync-completion.sql','utf8'));
+  // The test already owns a transaction; keep the migration body inside it.
+  await db.exec(readFileSync('supabase/migrations/20261029004621_incremental_review_sync.sql','utf8').replace(/^begin;$/m,'').replace(/^commit;$/m,''));
+ });
+ async function seed(n=1){
+  await db.exec("select set_config('home.retention_ingest','on',true)");
+  for(let i=1;i<n;i++)await insert('old-'+String(i).padStart(3,'0'),new Date(Date.parse(at)-i*86400000).toISOString(),'Stored '+i,i%5+1);
+  const rid=(await insert('known',at,'Stored original',5)).rows[0].id;
+  await db.query("insert into public.review_translations(review_id,language,translated_text) values($1,'fr','Stored translation')",[rid]);
+  await db.exec("select set_config('home.retention_ingest','',true)");
+  await db.query('select public.apply_recent_review_retention($1)',[est]);
+  await db.query('update public.establishments set last_review_id=$2,last_review_at=$3,initialized_at=now(),active=true where id=$1',[est,'known',at]);
+ }
+ async function job(){
+  const id=crypto.randomUUID();await db.query("insert into public.review_sync_jobs(id,organization_id,establishment_id,status,locked_by,lease_until,checkpoint_review_id,checkpoint_review_at,started_at) values($1,$2,$3,'running','worker',now()+interval '5 minutes','known',$4,now())",[id,org,est,at]);
+  await db.exec('set local role service_role');return id;
+ }
+ const requestInput={startUrls:[{url:cp.google_maps_url}],reviewsSort:'newest',reviewsOrigin:'google',language:'fr',maxReviews:150,reviewsStartDate:'2026-10-28T11:59:55.000Z'};
+ const reserve=(id:string,worker='worker')=>db.query('select public.reserve_incremental_review_sync($1,$2,$3,$4) ok',[id,worker,requestInput,'0.0.541']);
+ async function bind(id:string){
+  await db.query("update public.review_sync_jobs set pagination_cursor=$2 where id=$1",[id,JSON.stringify({provider:'apify',runId:'run',datasetId:'data',language:'fr'})]);
+ }
+ async function finish(id:string,items:Record<string,unknown>[],worker='worker'){
+  const run={runId:'run',datasetId:'data',status:'SUCCEEDED'},receipt={id:'run',actId:'Xb8osYTtOjlsgI6k9',buildId:'Wck4NsSOTMrHCVoAk',status:'SUCCEEDED'};
+  await db.query('select public.observe_incremental_review_sync($1,$2,$3,$4,$5)',[id,worker,'run',receipt,items.length]);
+  const p=prepareIncrementalResult(items,cp,run);
+  const bundle=reviewIngestionBundle({id:est,organization_id:org},p.reviews,false,'apify');
+  return (await db.query('select public.commit_incremental_review_sync($1,$2,$3,$4) r',[id,worker,bundle,{run_id:'run',dataset_id:'data',since:p.since,received:p.received,unique:p.unique,external_ids:p.external_ids,outside_window:p.outside_window,head_id:p.head.id,head_at:p.head.at,empty:p.empty,legacy_reused:false,place:p.page.establishment}])).rows[0].r as Record<string,unknown>;
+ }
+ const protectedRows=async()=> (await db.query("select jsonb_build_object('reviews',(select jsonb_agg(to_jsonb(r) order by id) from public.reviews r),'translations',(select jsonb_agg(to_jsonb(t) order by id) from public.review_translations t),'reports',(select jsonb_agg(to_jsonb(p) order by report_id) from public.current_report_publications p),'states',(select jsonb_agg(to_jsonb(s)) from public.review_corpus_states s),'snapshots',(select jsonb_agg(to_jsonb(s)) from public.establishment_snapshots s)) r")).rows[0].r;
+ it('zero novelty preserves originals/translations/report freshness and does not run retention or rewrite a snapshot',async()=>{
+  await seed();await datedPublication();const before=await protectedRows();const id=await job();expect((await reserve(id)).rows[0].ok).toBe(true);await bind(id);
+  expect(await finish(id,[{...item('known','2026-10-28T15:00:00Z'),text:'Supplier edited existing text',textTranslated:'Changed translation'}])).toMatchObject({received:1,unique:1,already_known:1,added:0,removed:0,head_at:'2026-10-28T12:00:00+00:00'});expect(await protectedRows()).toEqual(before);
+  expect((await db.query('select last_review_id,last_review_at::text,last_sync_at is not null checked from public.establishments')).rows[0]).toMatchObject({last_review_id:'known',checked:true});
+ });
+ it('a successful empty response advances verification only, never the publication checkpoint',async()=>{
+  await seed();const before=await protectedRows();const id=await job();await reserve(id);await bind(id);expect(await finish(id,[])).toMatchObject({received:0,added:0,removed:0,empty:true});expect(await protectedRows()).toEqual(before);
+ });
+ it('adds four new IDs, removes the four oldest out of 150, and keeps the retained known original/translation unchanged',async()=>{
+  await seed(150);const original=(await db.query("select to_jsonb(r) r from public.reviews r where external_review_id='known'")).rows[0].r;
+  const translation=(await db.query('select to_jsonb(t) r from public.review_translations t')).rows[0].r;
+  const id=await job();await reserve(id);await bind(id);const additions=Array.from({length:4},(_,i)=>item('new-'+i,new Date(Date.parse(at)+(i+1)*60000).toISOString()));
+  expect(await finish(id,[...additions,item('known')])).toMatchObject({received:5,unique:5,already_known:1,added:4,removed:4,retained:150});
+  expect((await db.query("select to_jsonb(r) r from public.reviews r where external_review_id='known'")).rows[0].r).toEqual(original);
+  expect((await db.query('select to_jsonb(t) r from public.review_translations t where id=$1',[translation.id])).rows[0].r).toEqual(translation);
+  expect((await db.query('select last_review_id from public.establishments')).rows[0].last_review_id).toBe('new-3');
+ },30000);
+ it('keeps same-timestamp unknown IDs, collapses duplicates and makes duplicate completion a read of its existing receipt',async()=>{
+  await seed();const id=await job();await reserve(id);await bind(id);const items=[item('known'),item('same-time'),item('same-time')];
+  const result=await finish(id,items);expect(result).toMatchObject({received:3,unique:2,already_known:1,added:1,removed:0,head_id:'known'});
+  const before=await protectedRows();expect(await finish(id,items)).toEqual(result);expect(await protectedRows()).toEqual(before);
+ });
+ it('reserves once, rejects another worker and resumes a known run without another provider reservation',async()=>{
+  await seed();const id=await job();expect((await reserve(id,'other')).rows[0].ok).toBe(false);expect((await reserve(id)).rows[0].ok).toBe(true);expect((await reserve(id)).rows[0].ok).toBe(false);await bind(id);
+  await db.query("update public.review_sync_jobs set lease_until=now()-interval '1 second' where id=$1",[id]);await db.query("select * from public.claim_review_sync_jobs('resumed')");
+  expect((await reserve(id,'resumed')).rows[0].ok).toBe(false);expect(await finish(id,[item('known'),item('same-time')],'resumed')).toMatchObject({added:1});
+ });
+ it('rolls insertion and checkpoint back when saving a dependent snapshot fails; its paid run stays bound',async()=>{
+  await seed();const id=await job();await reserve(id);await bind(id);await db.exec("reset role;create function public.reject_incremental_snapshot() returns trigger language plpgsql as $$begin raise exception 'SYNTHETIC_SAVE_FAILURE';end$$;create trigger reject_incremental_snapshot before insert on public.establishment_snapshots for each row execute function public.reject_incremental_snapshot();set local role service_role;");
+  await db.exec('savepoint failed');await expect(finish(id,[item('known'),item('new','2026-10-28T13:00:00Z')])).rejects.toThrow('SYNTHETIC_SAVE_FAILURE');await db.exec('rollback to failed');
+  expect((await db.query('select last_review_id from public.establishments')).rows[0].last_review_id).toBe('known');expect((await db.query("select count(*)::int n from public.reviews where external_review_id='new'")).rows[0].n).toBe(0);expect((await db.query('select apify_run_id,provider_requests,incremental_result from public.review_sync_jobs')).rows[0]).toMatchObject({apify_run_id:'run',provider_requests:1,incremental_result:null});
+ });
+ it('blocks missing checkpoints and late results after a reload, without republishing or resetting any report status',async()=>{
+  await seed();const id=await job();await db.query('update public.review_sync_jobs set checkpoint_review_at=null where id=$1',[id]);await db.exec('savepoint missing');await expect(reserve(id)).rejects.toThrow('SYNC_INCREMENTAL_CHECKPOINT_MISSING');await db.exec('rollback to missing');expect((await db.query('select provider_start_attempted_at from public.review_sync_jobs')).rows[0].provider_start_attempted_at).toBeNull();
+  await db.query('update public.review_sync_jobs set checkpoint_review_at=$2 where id=$1',[id,at]);await reserve(id);await bind(id);await db.query('update public.establishments set review_reload_barrier_at=clock_timestamp() where id=$1',[est]);
+  await db.exec('savepoint late');await expect(finish(id,[item('known')])).rejects.toThrow('SYNC_INCREMENTAL_OBSOLETE');await db.exec('rollback to late');
+ });
+ it('denies all new queue RPCs to end users',async()=>{
+  for(const role of ['anon','authenticated'])for(const signature of ['reserve_incremental_review_sync(uuid,text,jsonb,text)','observe_incremental_review_sync(uuid,text,text,jsonb,integer)','commit_incremental_review_sync(uuid,text,jsonb,jsonb)'])expect((await db.query("select has_function_privilege($1,'public.'||$2,'execute') allowed",[role,signature])).rows[0].allowed).toBe(false);
  });
 });
