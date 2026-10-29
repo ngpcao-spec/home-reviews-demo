@@ -2,20 +2,23 @@ import {describe,it,expect,vi} from 'vitest';
 import {currentHistoricalStatus} from './current-report-status.ts';
 const source={id:'source',establishment_id:'est',language:'vi',generation_id:'generation',status:'running',cursor:0,error_code:null,
  snapshot:{base:{analysis_version:8},reviews:Array.from({length:441},(_,i)=>({id:String(i),rating:5,original_text:'old Sol source',analysis_text:'old Sol source'}))}};
-function fixture(options:{published?:boolean;preparing?:boolean;unknown?:boolean;individual?:boolean;foreign?:boolean;abandoned?:boolean}={}){
+function fixture(options:{published?:boolean;preparing?:boolean;unknown?:boolean;individual?:boolean;foreign?:boolean;abandoned?:boolean;shared?:boolean}={}){
  const reads:{table:string;filters:Record<string,unknown>}[]=[];
  const db={from:(table:string)=>{const filters:Record<string,unknown>={};const query={select:()=>query,eq:(key:string,value:unknown)=>{filters[key]=value;return query;},
   then:(resolve:(v:unknown)=>unknown)=>Promise.resolve(result()).then(resolve),single:async()=>result(),maybeSingle:async()=>result()};
   function result(){reads.push({table,filters:{...filters}});if(Object.values(filters).includes(null))throw Error('NULL_INDIVIDUAL_RUN_LOOKUP');
-   const data=table==='report_generation_requests'?{id:'request',engine:'jev_sol_v2',jev_transport:options.individual?'individual':'batch_initial_v1',comparison_id:options.preparing?null:'report',created_at:'2026-10-24T10:00:02Z'}
+   const data=table==='report_generation_requests'?{id:'request',engine:'jev_sol_v2',jev_transport:options.individual?'individual':'batch_initial_v1',shared_jev_version:options.shared?'shared-jev-initial-v1':null,comparison_id:options.preparing?null:'report',created_at:'2026-10-24T10:00:02Z'}
     :table==='report_generation_abandonments'?(options.abandoned?{abandoned_at:'2026-10-24T12:00:00Z'}:null)
     :table==='analysis_parallel_reports'?{run_id:options.individual?'individual-run':null,current_source_run_id:options.foreign?'other-source':'source',configuration_version:options.individual?'old-v2':'jev-multi-review-initial-v1',state:options.published?'completed':'generating',error_code:null}
     :table==='analysis_jev_batch_runs'?{id:'batch-run',status:options.published?'completed':'running',stage:options.published?'validate_sol':'sol',completed_at:options.published?'2026-10-24T10:04:54Z':null,error_code:null,sol_request_count:1}
-    :table==='analysis_jev_batch_tasks'?Array.from({length:9},(_,i)=>({status:options.unknown&&i===0?'unknown':'completed',reviews:i===8?41:50}))
+    :table==='analysis_jev_batch_tasks'?options.shared?[]:Array.from({length:9},(_,i)=>({status:options.unknown&&i===0?'unknown':'completed',reviews:i===8?41:50}))
     :table==='analysis_jls_restaurant_runs'?{stage:'jev'}:[{status:'completed'},{status:'pending'}];return {data,error:null};}
-  return query;}};return {db:db as never,reads};
+  return query;},rpc:async()=>({data:{completed_reviews:3,total_reviews:4},error:null})};return {db:db as never,reads};
 }
 describe('normal button status uses the frozen current request transport',()=>{
+ it('shows ready shared analyses even when the report owns zero new native batches',async()=>{
+  const f=fixture({shared:true});expect(await currentHistoricalStatus(f.db,source)).toMatchObject({shared_jev:true,completed_reviews:3,total_reviews:4,progress:0,total_steps:0});
+ });
  it('projects an acknowledged abandonment without exposing partial results or offering a retry of consumed work',async()=>{
   const f=fixture({abandoned:true}),status=await currentHistoricalStatus(f.db,{...source,status:'failed'});
   expect(status).toMatchObject({abandoned:true,can_abandon:false,can_resume:false,resumable:false,progress:0,total_steps:null,error_code:'REPORT_GENERATION_ABANDONED'});

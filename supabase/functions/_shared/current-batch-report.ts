@@ -1,4 +1,5 @@
 // General current-request preparation. No supplier transport, import or prompt override.
+import {SHARED_JEV_VERSION} from './shared-jev-analysis.ts';
 import {z} from 'npm:zod@4.6.5';
 import {planInitialBatches,initialBatchIdentity,INITIAL_BATCH_CONTRACT,type TokenCounter} from './jev-review-batches.ts';
 import {directHash,DIRECT_DEFINITIONS} from './jev-direct-categories.ts';
@@ -9,7 +10,7 @@ import {SOL_SIZE_POLICY} from './jls-sol-size.ts';
 import {verifyParallelProtocol,type ParallelProtocol} from './parallel-report.ts';
 export const CURRENT_BATCH_VERSION='jev-current-batches-initial-v1';
 export const BATCH_TRANSPORT='batch_initial_v1';
-export async function currentBatchManifest(protocol:{body:ParallelProtocol;sha256:string},count:TokenCounter){
+export async function currentBatchManifest(protocol:{body:ParallelProtocol;sha256:string},count:TokenCounter,shared?:{missing_ids:string[]}){
  await verifyParallelProtocol(protocol.body,protocol.sha256);
  const p=protocol.body,d=p.current_delivery;
  if(!d||p.configuration.sol_wire_version!==COMPACT_SOL_WIRE||!p.configuration.evidence_selector)
@@ -18,7 +19,7 @@ export async function currentBatchManifest(protocol:{body:ParallelProtocol;sha25
  // Canonical order for every restaurant, never a special case for the reference corpus.
  const rows=p.source_snapshot.reviews.filter(r=>r.analysis_text).map(r=>({review_id:r.id,text:r.analysis_text!})).sort((a,b)=>a.review_id.localeCompare(b.review_id));
  if(!rows.length)throw Error('NO_TEXT_REVIEWS_AVAILABLE');
- const plans=[];for(const b of planInitialBatches(rows,count)){
+ const plans=[];for(const b of planInitialBatches(shared?rows.filter(r=>shared.missing_ids.includes(r.review_id)):rows,count)){
   const identity=await initialBatchIdentity(b);
   plans.push({number:b.number,reviews:b.review_ids.length,review_ids:b.review_ids,request_wire:JSON.stringify(b.payload),request_sha256:identity.request_sha256,
    mapping:b.mapping,preflight:b.preflight,identity});
@@ -33,7 +34,7 @@ export async function currentBatchManifest(protocol:{body:ParallelProtocol;sha25
   text:{format:{type:'json_schema',name:'jls_direct4_compact_sol_v1',strict:true,schema}}};
  const body={version:CURRENT_BATCH_VERSION,transport:BATCH_TRANSPORT,organization_id:p.organization_id,establishment_id:p.establishment_id,
   authority_user_id:p.authority_user_id,language:p.language,current_delivery:d,reference:p.reference,frozen_report:p.frozen_report,
-  snapshot:p.source_snapshot,snapshot_sha256:p.source_snapshot_sha256,source_protocol_sha256:protocol.sha256,plans,
+  ...(shared?{shared_jev_version:SHARED_JEV_VERSION}:{}),snapshot:p.source_snapshot,snapshot_sha256:p.source_snapshot_sha256,source_protocol_sha256:protocol.sha256,plans,
   configuration:{jev:INITIAL_BATCH_CONTRACT,selector,sol_wire:COMPACT_SOL_WIRE,
    sol_model:request.model,sol_reasoning:request.reasoning,sol_max_output_tokens:request.max_output_tokens},
   template:{statistics,packet:{language:p.language},request_json:JSON.stringify(request),...(selector.version===DIRECT_COVERAGE_VERSION?{}:{evidence_selector:selector})},max_new_jev_calls:plans.length,

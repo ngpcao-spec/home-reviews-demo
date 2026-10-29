@@ -16,7 +16,7 @@ import {COMPACT_SOL_WIRE,prepareCompactSolWire,verifyCompactSolWire,reconstructC
 import {evidenceSelectorBinding,verifyEvidenceSelector,type EvidenceSelectorVersion,type EvidenceSelectorBinding} from './report-evidence-selector.ts';
 export const PARALLEL_REPORT='jls-direct4-parallel-no-luna-v1';
 export const REFERENCE_DERIVATION='jls-direct4-reference-links-v1';
-type SourceReview=DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown};
+type SourceReview=DirectReportInput['snapshot']['body']['reviews'][number]&{google_review_id?:string;analysis_language:string|null;analysis_source:string;translation_provenance:unknown};
 export type ParallelHistory={id:string;organization_id:string;establishment_id:string;generation_id:string;status:string;snapshot:{reviews:Record<string,unknown>[];base:Record<string,unknown>}};
 export type ParallelCurrent={id:string;organization_id:string;establishment_id:string;generation_id:string;preferred_language:string;stored_reviews_count:number;source_fingerprint:string;[key:string]:unknown};
 export const CURRENT_V2='jev-short-sol-compact-v2';
@@ -34,7 +34,7 @@ export async function parallelProtocol(report:ParallelCurrent,history:ParallelHi
   const original=delivery?(r.original_text??r.text??''):r.original_text??'';
   if(typeof r.id!=='string'||typeof r.analysis_text!=='string'||typeof original!=='string'||
    !!String(original).trim()!==!!r.analysis_text.trim())throw Error('PARALLEL_SOURCE_TEXT_UNAVAILABLE');
-  return {id:r.id,organization_id:report.organization_id,establishment_id:report.establishment_id,rating:r.rating,
+  return {id:r.id,...(r.external_review_id?{google_review_id:r.external_review_id}:{}),organization_id:report.organization_id,establishment_id:report.establishment_id,rating:r.rating,
    original_text:original,original_text_sha256:await analysisTextSha256(String(original)),
    analysis_text:r.analysis_text.trim()?r.analysis_text:null,analysis_text_sha256:r.analysis_text.trim()?await analysisTextSha256(r.analysis_text):null,
    analysis_language:r.analysis_language,analysis_source:r.analysis_source,translation_provenance:{historical_run_id:history.id,source:r.analysis_source,original_language:r.original_language,frozen:true,provider_translation_id:null,...(r.analysis_translation_provenance&&typeof r.analysis_translation_provenance==='object'?r.analysis_translation_provenance:{} )},

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "current_dated_publication",
+    "table": "analysis_parallel_reports",
+    "trigger": "CREATE TRIGGER current_dated_publication AFTER INSERT OR UPDATE ON public.analysis_parallel_reports FOR EACH ROW EXECUTE FUNCTION private.capture_current_report_publication()",
+    "definition": "CREATE OR REPLACE FUNCTION private.capture_current_report_publication()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare sc public.report_corpus_scopes;created timestamptz;begin\n if new.current_source_run_id is not null and new.state='completed' and new.controls->>'technical_checks_passed'='true' then\n  select * into sc from public.report_corpus_scopes where source_run_id=new.current_source_run_id;\n  select created_at into created from public.historical_report_runs where id=new.current_source_run_id;\n  perform private.store_current_report_publication(to_jsonb(new),to_jsonb(sc),created);\n end if;return new;\nend $function$\n"
+  },
+  {
+    "name": "current_v2_publication_status",
+    "table": "analysis_parallel_reports",
+    "trigger": "CREATE TRIGGER current_v2_publication_status AFTER UPDATE OF derived_report, state ON public.analysis_parallel_reports FOR EACH ROW EXECUTE FUNCTION sync_current_v2_generation()",
+    "definition": "CREATE OR REPLACE FUNCTION public.sync_current_v2_generation()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare pair public.analysis_parallel_reports;st text;ec text;begin\n if tg_table_name='analysis_parallel_reports' then pair=new;st=new.state;ec=new.error_code;\n else select * into pair from public.analysis_parallel_reports where run_id=new.id;st=new.status;ec=new.error_code;end if;\n if pair.current_source_run_id is null then return new;end if;\n if st in('blocked','billing_uncertain','authorization_expired','invalid_output') then\n  update public.historical_report_runs set status='failed',error_code=coalesce(ec,st),last_error=coalesce(ec,st),locked_by=null,lease_until=null,completed_at=now(),updated_at=now() where id=pair.current_source_run_id and status in('queued','running','retry');\n elsif pair.derived_report is not null and st in('completed','needs_review') then\n  update public.historical_report_runs set status='completed',error_code=ec,last_error=ec,locked_by=null,lease_until=null,completed_at=now(),updated_at=now() where id=pair.current_source_run_id and status in('queued','running','retry');\n end if;return new;end $function$\n"
+  },
+  {
+    "name": "parallel_history_immutable",
+    "table": "analysis_parallel_reports",
+    "trigger": "CREATE TRIGGER parallel_history_immutable BEFORE DELETE OR UPDATE ON public.analysis_parallel_reports FOR EACH ROW EXECUTE FUNCTION guard_parallel_history()",
+    "definition": "CREATE OR REPLACE FUNCTION public.guard_parallel_history()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$begin if tg_op='DELETE' and current_user in('postgres','supabase_admin') and current_setting('home.retention_maintenance',true)='on' then return old;end if;\n if tg_op='DELETE' then raise exception 'IMMUTABLE_HISTORY';end if;\n if old.derived_report is not null or old.raw_response is not null or old.imported_derivative_id is not null then raise exception 'IMMUTABLE_HISTORY';end if;\n if (to_jsonb(new)-array['state','error_code','raw_response','original_report','derived_report','corrections','controls','statistics','usage','generated_at'])<>(to_jsonb(old)-array['state','error_code','raw_response','original_report','derived_report','corrections','controls','statistics','usage','generated_at']) then raise exception 'IMMUTABLE_SOURCE';end if;return new;\nend $function$\n"
+  },
+  {
+    "name": "recent_text_publication",
+    "table": "analysis_parallel_reports",
+    "trigger": "CREATE TRIGGER recent_text_publication BEFORE INSERT OR UPDATE ON public.analysis_parallel_reports FOR EACH ROW EXECUTE FUNCTION private.retention_publication_guard()",
+    "definition": "CREATE OR REPLACE FUNCTION private.retention_publication_guard()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare p public.review_corpus_policy;sc public.report_corpus_scopes;begin\n if current_setting('home.retention_maintenance',true)='on' then return new;end if;\n select * into p from public.review_corpus_policy where id for share;\n if not p.enabled then return new;end if;\n select * into sc from public.report_corpus_scopes where source_run_id=new.current_source_run_id;\n if sc.source_run_id is null or sc.policy_epoch<>p.epoch then raise exception 'RETAINED_CURRENT_SOURCE_REQUIRED';end if;\n if new.state in('completed','needs_review') and (sc.stale or sc.fingerprint<>public.review_corpus_fingerprint(new.establishment_id)) then\n  new.state='blocked';new.error_code='CORPUS_CHANGED_DURING_GENERATION';new.derived_report=null;\n end if;return new;\nend $function$\n"
+  },
+  {
+    "name": "retention_transition_guard",
+    "table": "analysis_parallel_reports",
+    "trigger": "CREATE TRIGGER retention_transition_guard BEFORE INSERT OR DELETE OR UPDATE ON public.analysis_parallel_reports FOR EACH STATEMENT EXECUTE FUNCTION retention_write_guard()",
+    "definition": "CREATE OR REPLACE FUNCTION public.retention_write_guard()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO ''\nAS $function$\ndeclare p public.review_corpus_policy;begin\n if current_user in('postgres','supabase_admin') and current_setting('home.retention_maintenance',true)='on' then return null;end if;\n select * into p from public.review_corpus_policy where id for share;\n if p.paused then raise exception 'RETENTION_TRANSITION_ACTIVE';end if;\n if tg_table_schema||'.'||tg_table_name=any(p.retired_relations) then raise exception 'REPORT_PIPELINE_RETIRED';end if;\n if p.ingestions_paused and tg_table_name in('reviews','review_translations','review_provider_payloads','review_reply_drafts','initial_import_jobs','review_sync_jobs','sync_runs','establishment_snapshots') then raise exception 'RETENTION_INGESTION_PAUSED';end if;\n return null;\nend $function$\n"
+  }
+]
