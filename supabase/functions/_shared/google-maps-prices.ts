@@ -2,6 +2,11 @@
 export type MoneyRange = {status:'parsed'|'unparsed';currency:string|null;minimum:number|null;maximum:number|null;bounds:'closed'|'above'|'below'|'unknown'};
 const unknown = (): MoneyRange => ({status:'unparsed',currency:null,minimum:null,maximum:null,bounds:'unknown'});
 const normal = (s:string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').toLowerCase().trim();
+const perPersonSuffix = /\s*(?:\bper person|\bpar personne|\bmoi nguoi|\/\s*(?:nguoi|personne|person))\s*$/;
+/** Explicit Google price label only; neither a unit flag nor customer spending proves this. */
+export function googlePerPersonPriceLabel(raw:unknown):raw is string {
+  return typeof raw==='string' && perPersonSuffix.test(normal(raw)) && googleMoneyRange(raw).status==='parsed';
+}
 function amount(s:string,currency:string,inherit=1): {value:number;unit:number}|null {
   const m=/^([\d.,\s]+?)\s*(n|tr|k|nghin|ngan|trieu|thousand|million)?$/i.exec(s.trim());
   if(!m)return null;
@@ -35,7 +40,7 @@ export function googleMoneyRange(raw:unknown):MoneyRange {
   if(currencies.size!==1 || /[$£₩¥]/.test(text.replace(/\b(?:USD|KRW|JPY|GBP)\b/g,'')))return unknown();
   const currency=[...currencies][0];
   text=normal(text.replace(/\b(?:VND|USD|EUR|KRW|JPY|THB|SGD|AUD|CAD|GBP|CNY)\b/g,'').replace(/[₫€]/g,''));
-  text=text.replace(/\s*(?:per person|par personne|moi nguoi)\s*$/,'').trim();
+  text=text.replace(perPersonSuffix,'').trim();
   const open=/^(tren|plus de|over|more than|>|duoi|moins de|under|less than|<)\s+(.+)$/.exec(text);
   if(open){const a=amount(open[2],currency);if(!a)return unknown();const above=['tren','plus de','over','more than','>'].includes(open[1]);
     return {status:'parsed',currency,minimum:above?a.value:null,maximum:above?null:a.value,bounds:above?'above':'below'};}

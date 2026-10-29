@@ -1,16 +1,17 @@
 import {add, compare, exactJson, quotient, rational, subtract, type Rational} from './restaurant-recommendation-numbers.ts';
 import {PLACE_FEATURES,placeFeatureLabel,placeCategories,taxonomyValue,type TaxonomyKind} from './google-place-taxonomy.ts';
 import {scheduledOpening,PLACE_PROFILE_VERSION,type PlaceProfile} from './google-place-profile.ts';
-import {googleMoneyRange,googlePriceLevel,type MoneyRange} from './google-maps-prices.ts';
+import {googleMoneyRange,googlePriceLevel,googlePerPersonPriceLabel,type MoneyRange} from './google-maps-prices.ts';
 
-export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v2';
+export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v3';
 export const COMPARABLE_SCORE_GAP = '0.10';
 export const COMPARABLE_DISTANCE_METRES = 250;
 export const CATEGORIES = ['quality', 'service', 'ambiance'] as const;
 export type Category = typeof CATEGORIES[number];
 export type Point = {latitude: number; longitude: number};
 export type Area = {kind: 'radius'; metres: number} | {kind: 'bounds'; south: number; north: number; west: number; east: number};
-export type Budget = {kind: 'price_level'; allowed: number[]} | {kind: 'amount'; currency: string; maximum: number; minimum?: number};
+// Amount budgets are per person, including legacy requests that omit the unit.
+export type Budget = {kind: 'price_level'; allowed: number[]} | {kind: 'amount'; currency: string; maximum: number; minimum?: number; unit?: 'per_person'};
 export type Request = {
   origin: Point; area: Area; cuisines?: string[]; specialties?: string[]; usages?: string[]; budget?: Budget;
   visit_at?: string; hours_kind?: 'venue'|'kitchen'|'delivery'|'takeaway'|'breakfast';
@@ -29,7 +30,7 @@ export type Citation = {report_id: string; section: 'positive_aspects' | 'reserv
 export type Prices = {
   establishment: {status: 'known' | 'unknown'; source: string | null; observed_at: string | null; level: number | null;
     range: {currency: string; minimum: number; maximum: number} | null; raw: Obj;source_fields:string[];source_table:string|null;provider_scraped_at:string|null;missing_reason:string|null;
-    label:string;unit:'per_person'|null;indicative:true;guaranteed_tariff:false};
+    label:string;unit:'per_person'|null;unit_status:'confirmed'|'unknown';unit_label:string;indicative:true;guaranteed_tariff:false};
   customer_spend_per_person: {source: string | null; status: string | null; observed_at: string | null; guaranteed_tariff: false; ranges: {value: string; review_count: number; parsed:MoneyRange; source_fields:string[]; period_start:string|null; period_end:string|null}[]};
 };
 export type Proposal = {
@@ -85,7 +86,8 @@ function validateRequest(r: Request) {
   if (r.budget?.kind === 'price_level') {
     if (!r.budget.allowed.length || r.budget.allowed.some(x => !Number.isInteger(x) || x < 0 || x > 4)) throw Error('INVALID_BUDGET');
   } else if (r.budget) {
-    if (r.budget.kind !== 'amount' || !/^[A-Z]{3}$/.test(r.budget.currency) || !Number.isFinite(r.budget.maximum) || r.budget.maximum < 0
+    if (r.budget.kind !== 'amount' || r.budget.unit !== undefined && r.budget.unit !== 'per_person'
+      || !/^[A-Z]{3}$/.test(r.budget.currency) || !Number.isFinite(r.budget.maximum) || r.budget.maximum < 0
       || r.budget.minimum !== undefined && (!Number.isFinite(r.budget.minimum) || r.budget.minimum < 0 || r.budget.minimum > r.budget.maximum)) throw Error('INVALID_BUDGET');
   }
   if (r.preferences?.categories?.some(c => !CATEGORIES.includes(c))) throw Error('INVALID_CATEGORY_PREFERENCE');
@@ -154,15 +156,39 @@ function priceRange(raw: unknown): Prices['establishment']['range'] {
   return r.status==='parsed'&&r.bounds==='closed'&&r.currency!==null&&r.minimum!==null&&r.maximum!==null
     ?{currency:r.currency,minimum:r.minimum,maximum:r.maximum}:null;
 }
+function confirmedPriceUnit(e:Obj,range:Prices['establishment']['range']):'per_person'|null {
+  if (!range || e.unit != null && e.unit !== 'per_person') return null;
+  const samePrice = (label:unknown) => {
+    if (!googlePerPersonPriceLabel(label)) return false;
+    const r=googleMoneyRange(label);
+    return r.bounds==='closed' && r.currency===range.currency && r.minimum===range.minimum && r.maximum===range.maximum;
+  };
+  if ([e.price,e.price_range].some(samePrice)) return 'per_person';
+  // A saved Google Maps observation must quote this price and identify this establishment.
+  const proof=obj(e.unit_evidence);
+  if (proof.source!=='google_maps_ui' || !samePrice(proof.label) || typeof proof.observed_at!=='string'
+    || !Number.isFinite(Date.parse(proof.observed_at)) || typeof proof.url!=='string') return null;
+  try {
+    const url=new URL(proof.url);
+    if (url.protocol!=='https:' || !['www.google.com','maps.google.com'].includes(url.hostname)
+      || url.username || url.password || url.port || !/^\/maps(?:\/|$)/.test(url.pathname)) return null;
+    const cid=typeof e.google_id==='string' && /^\d+$/.test(e.google_id) ? e.google_id : null;
+    const placeId=typeof e.place_id==='string' && e.place_id ? e.place_id : null;
+    const savedCid=url.searchParams.get('cid'),savedPlaceId=url.searchParams.get('query_place_id');
+    if (savedCid!==null && savedCid!==cid || savedPlaceId!==null && savedPlaceId!==placeId) return null;
+    return savedCid!==null || savedPlaceId!==null ? 'per_person' : null;
+  } catch {return null;}
+}
 export function prices(metadata: Obj,language='fr'): Prices {
   const b = obj(metadata.budget), e = obj(b.establishment_price), c = obj(b.customer_spend_per_person);
   const trustworthy = ['google_maps_import','google_maps_place_details'].includes(String(e.source)) && e.status === 'provided' && typeof e.observed_at === 'string' && Number.isFinite(Date.parse(e.observed_at));
   const level = trustworthy ? googlePriceLevel(e.price_level) ?? googlePriceLevel(e.price,false) : null;
   const range = trustworthy ? priceRange(e.price_range) ?? priceRange(e.price) : null;
+  const unit = trustworthy ? confirmedPriceUnit(e,range) : null;
   return {establishment:{status:level !== null || range !== null ? 'known' : 'unknown',level,range,source:str(e.source),observed_at:str(e.observed_at),raw:{price:e.price ?? null,price_level:e.price_level ?? null,price_range:e.price_range ?? null},
     source_fields:list(e.source_fields).filter((x):x is string=>typeof x==='string'),source_table:str(e.source_table),provider_scraped_at:str(e.provider_scraped_at),missing_reason:str(e.missing_reason),
     label:level!==null||range!==null ? str(e.price)??str(e.price_range)??str(e.price_level)??String(level) : language==='vi'?'Chưa có thông tin giá':'Prix non renseigné',
-    unit:trustworthy&&e.unit==='per_person'?'per_person':null,indicative:true,guaranteed_tariff:false},
+    unit,unit_status:unit?'confirmed':'unknown',unit_label:unit ? language==='vi'?'Mỗi người':'Par personne' : language==='vi'?'Chưa rõ đơn vị':'Unité inconnue',indicative:true,guaranteed_tariff:false},
     customer_spend_per_person:{source:str(c.source),status:str(c.status),observed_at:str(c.observed_at),guaranteed_tariff:false,ranges:list(c.ranges).flatMap(x => {
       const v = obj(x);return typeof v.value === 'string' && Number.isInteger(v.review_count) && Number(v.review_count) > 0 ? [{value:v.value,review_count:Number(v.review_count),parsed:googleMoneyRange(v.value),source_fields:list(v.source_fields).filter((x):x is string=>typeof x==='string'),period_start:str(v.period_start),period_end:str(v.period_end)}] : [];
     })}};
@@ -171,7 +197,7 @@ function budgetMatch(p: Prices, b?: Budget): Proposal['budget_match'] | null {
   if (!b) return 'not_requested';
   if (b.kind === 'price_level') return p.establishment.level !== null && b.allowed.includes(p.establishment.level) ? 'google_level' : null;
   const r = p.establishment.range;
-  return r && r.currency === b.currency && r.maximum <= b.maximum && r.minimum >= (b.minimum ?? 0) ? 'google_range' : null;
+  return p.establishment.unit==='per_person' && r && r.currency === b.currency && r.maximum <= b.maximum && r.minimum >= (b.minimum ?? 0) ? 'google_range' : null;
 }
 function validPublication(row: SheetRow) {
   const p = row.publication;
@@ -236,7 +262,8 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     for(const [kind,values]of [['specialties',specialties],['usages',usages]] as const)if(request[kind]?.length&&!request[kind]!.some(c=>values.includes(taxonomyValue(kind,c)??key(c))))reasons.push(kind.toUpperCase()+'_NOT_CONFIRMED');
     if (request.cuisines?.length && !request.cuisines.some(c => types.includes(cuisine(c)))) reasons.push(types.length ? 'CUISINE_MISMATCH' : 'CUISINE_NOT_DOCUMENTED');
     const budget = prices(row.metadata,language), match = budgetMatch(budget,request.budget);
-    if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
+    if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN'
+      : request.budget?.kind==='amount' && budget.establishment.unit!=='per_person' ? 'BUDGET_UNIT_UNCONFIRMED' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
     const positives = citations(row,'positive_aspects'), reservations = citations(row,'reservations');
     const observations=Object.fromEntries(features.map(f=>[f,combinedFeature(f,profile,positives,reservations,language)]));
     const contradictions=Object.keys(featurePhrases).map(f=>({feature:f,...combinedFeature(f,profile,positives,reservations,language)})).filter(x=>x.status==='conflicted'&&x.google&&x.citations.length).map(x=>({feature:x.feature,google:x.google,citations:x.citations}));

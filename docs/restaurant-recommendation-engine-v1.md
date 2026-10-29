@@ -1,7 +1,9 @@
 # Moteur interne de recommandation V1
 
-Préparation de code uniquement. Aucun endpoint, catalogue public, déploiement,
-HOME AI, nouvelle collecte, traduction, appel IA ou génération. Aucun changement
+Bibliothèque interne, sans endpoint ni catalogue public. La publication du site
+ne crée pas de service de recommandation : le lecteur reste destiné à un futur
+appelant serveur autorisé, sans raccordement HOME AI. Aucune nouvelle collecte,
+traduction, appel IA ou génération. Aucun changement
 des fiches, scores, rapports, JEV, sélecteur, Sol, langues ou corpus des 150 avis.
 
 ## Interface interne
@@ -116,9 +118,27 @@ dans le budget. Les dépenses clients ne sont pas un tarif garanti.
 Un budget de niveau filtre seulement des niveaux Google explicites (0–4,
 symboles ou énumérations reconnus). Un budget monétaire filtre seulement une
 fourchette d’établissement fermée, avec devise explicite et entièrement comprise
-dans la demande. Pas de change, d’estimation, de dollar à devise supposée,
+dans la demande, **et une unité « par personne » confirmée**. Exemple :
+`{kind:'amount',currency:'VND',maximum:200000,unit:'per_person'}`. Les anciens
+appels `amount` sans `unit` sont également traités comme des budgets par personne ;
+l’omission ne contourne pas ce contrôle. Les autres unités de demande sont refusées.
+
+Version du moteur : `restaurant-recommendation-engine-v3` (scores V2 inchangés).
+Une unité est confirmée uniquement par un libellé explicite du champ de prix
+Google sauvegardé (FR/VI/EN), ou par une observation `google_maps_ui` sauvegardée,
+datée, dont l’URL identifie exactement l’établissement et dont le libellé explicite
+correspond à la même devise et aux mêmes bornes. Un simple `unit:'per_person'`,
+une dépense client, une note ou un passage de rapport ne suffisent pas.
+Un libellé/une provenance non reconnu ou ambigu laisse l’unité inconnue.
+La sortie conserve `unit:null`, `unit_status:'unknown'` et un `unit_label` dans la
+langue du compte (« Unité inconnue » / « Chưa rõ đơn vị ») ; l’exclusion interne
+est `BUDGET_UNIT_UNCONFIRMED`. Les prix restent indicatifs et non garantis.
+
+Pas de change, d’estimation, de dollar à devise supposée,
 de borne supérieure inventée ou d’interprétation de libellés ambigus. Sans donnée
-comparable, exclusion budgétaire ; sans contrainte, le prix inconnu est signalé.
+comparable, exclusion budgétaire ; sans contrainte, un prix ou une unité inconnus
+n’excluent pas un restaurant. Les niveaux de prix, scores, départages par service
+et règles de diversité restent inchangés.
 Les prix descriptifs bruts restent disponibles même si non normalisables.
 La récupération, les dates/provenances et les formats monétaires Google localisés
 sont détaillés dans [google-maps-prices.md](google-maps-prices.md). Les dépenses
