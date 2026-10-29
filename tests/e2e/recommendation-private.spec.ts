@@ -12,6 +12,7 @@ for(const language of ['fr','vi'] as const){
   await page.getByRole('button',{name:search,exact:true}).click();
   await expect(page.locator('.recommendation-card')).toHaveCount(3);
   await expect(page.locator('.recommendation-freshness')).toHaveCount(1);
+  await expect(page.locator('.recommendation-freshness')).toHaveText(language==='fr'?'À actualiser : le corpus a évolué depuis ce rapport.':'Cần cập nhật: tập đánh giá đã thay đổi từ khi lập báo cáo.');
   await expect(page.getByText(language==='fr'?'Scores internes pondérés de 0 à 6, distincts des étoiles Google.':'Điểm nội bộ có trọng số từ 0 đến 6, khác với sao Google.')).toBeVisible();
   await expect(page.locator('.recommendation-card').first().getByText(language==='fr'?'par personne':'mỗi người',{exact:false}).first()).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
