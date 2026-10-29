@@ -61,7 +61,7 @@ it('refuses a missing/raised charge floor before reservation and never retries t
 it('uses saved place price in budget filtering, remains indicative, localizes missing values and never calls a provider',()=>{
  const network=vi.fn(()=>{throw Error('NETWORK_FORBIDDEN')});vi.stubGlobal('fetch',network);
  try{
- const saved={establishment_price:{source:'google_maps_place_details',status:'provided',observed_at:item.scrapedAt,price:item.price,unit:'per_person'},customer_spend_per_person:{ranges:[]}};
+ const saved={establishment_price:{source:'google_maps_place_details',status:'provided',observed_at:item.scrapedAt,price:item.price+' /người',unit:'per_person'},customer_spend_per_person:{ranges:[]}};
  const p=prices({budget:saved},'vi');expect(p.establishment).toMatchObject({status:'known',unit:'per_person',guaranteed_tariff:false,range:{currency:'VND',minimum:100000,maximum:200000}});
  expect(prices({},'fr').establishment.label).toBe('Prix non renseigné');expect(prices({},'vi').establishment.label).toBe('Chưa có thông tin giá');
  const row=recommendationSheet('a');row.metadata.budget=saved;

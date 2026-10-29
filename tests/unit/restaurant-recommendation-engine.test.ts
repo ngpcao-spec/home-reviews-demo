@@ -90,7 +90,7 @@ describe('budget and supported refinements',() => {
   it('distinguishes levels, closed currency ranges and client spending without FX or a currency guess',() => {
     const a=sheet('level',{level:2});expect(ids(run([a],{budget:{kind:'price_level',allowed:[1,2]}}))).toEqual(['level']);
     expect(run([a],{budget:{kind:'amount',currency:'USD',maximum:50}}).proposals).toHaveLength(0);
-    const b=sheet('range');(b.metadata.budget as Record<string,unknown>).establishment_price={source:'google_maps_import',status:'provided',observed_at:'2026-10-28T00:00:00Z',price_range:'100000–200000 VND'};
+    const b=sheet('range');(b.metadata.budget as Record<string,unknown>).establishment_price={source:'google_maps_import',status:'provided',observed_at:'2026-10-28T00:00:00Z',price_range:'100000–200000 VND par personne'};
     expect(ids(run([b],{budget:{kind:'amount',currency:'VND',maximum:200000}}))).toEqual(['range']);
     expect(run([b],{budget:{kind:'amount',currency:'USD',maximum:200000}}).proposals).toHaveLength(0);
     expect(prices({budget:{establishment_price:{source:'google_maps_import',status:'provided',observed_at:'2026-10-28',price_range:'10–20 $'}}}).establishment.status).toBe('unknown');

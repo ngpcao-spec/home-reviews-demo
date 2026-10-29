@@ -28,6 +28,8 @@ describe('observed Google structured spending labels',()=>{
   const q={origin:{latitude:12,longitude:109},area:{kind:'radius' as const,metres:1000},budget:{kind:'amount' as const,currency:'VND',maximum:300000}};
   expect(recommendRestaurants([row],'org-a','vi',q).proposals).toEqual([]);
   (row.metadata.budget as Record<string,unknown>).establishment_price={price:'100-200 N ₫',status:'provided',source:'google_maps_import',observed_at:'2026-10-28'};
+  expect(recommendRestaurants([row],'org-a','vi',q).proposals).toHaveLength(0);
+  (row.metadata.budget as Record<string,unknown>).establishment_price={price:'100-200 N ₫/người',status:'provided',source:'google_maps_import',observed_at:'2026-10-28'};
   expect(recommendRestaurants([row],'org-a','vi',q).proposals).toHaveLength(1);
   (row.metadata.budget as Record<string,unknown>).establishment_price={price:'Trên 1.000.000 ₫',status:'provided',source:'google_maps_import',observed_at:'2026-10-28'};
   expect(recommendRestaurants([row],'org-a','vi',q).proposals).toHaveLength(0);
