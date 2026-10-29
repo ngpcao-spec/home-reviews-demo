@@ -6,6 +6,7 @@ import {prepareHistoricalSnapshot,type HistoricalJob} from './historical-report-
 import {parallelProtocol,CURRENT_V2,type ParallelCurrent,type ParallelHistory} from './parallel-report.ts';
 import {currentBatchManifest,BATCH_TRANSPORT} from './current-batch-report.ts';
 import {localHybridTokens} from './jev-hybrid-evidence.ts';
+import {sharedJevIdentities,sharedMissingIds,SHARED_JEV_VERSION} from './shared-jev-analysis.ts';
 import {requestEvidenceSelector} from './report-evidence-selector.ts';
 export const CURRENT_REPORT_CODE='bdbc5d541968adf8810cdea90fdd24f26cb1ca97';
 export async function currentReportProtocol(run:HistoricalJob){
@@ -45,7 +46,15 @@ export async function processCurrentReportPreparation(admin:SupabaseClient,run:H
     if(wake.error)console.warn('CURRENT_BATCH_PREPARATION_WAKE_FAILED_CRON_RECOVERY');
     return {phase:'protocol_certified',provider_calls:0};
    }
-   const manifest=await currentBatchManifest(p,localHybridTokens);
+   let shared:undefined|{missing_ids:string[]};
+   if(run.shared_jev_version){
+    if(run.shared_jev_version!==SHARED_JEV_VERSION)throw Error('SHARED_JEV_VERSION_UNKNOWN');
+    const refs=await sharedJevIdentities(p.body.source_snapshot.reviews);
+    const allocated=await admin.rpc('jev_shared_allocate',{p_consumer:run.id,p_refs:refs});
+    if(allocated.error)throw Error('SHARED_JEV_ALLOCATION_FAILED');
+    shared={missing_ids:sharedMissingIds(allocated.data)};
+   }
+   const manifest=await currentBatchManifest(p,localHybridTokens,shared);
    const r=await admin.rpc('jev_batch_create_current',{p_source:run.id,p_manifest:manifest.body,p_sha:manifest.sha256});
    if(r.error||!r.data)throw Error('CURRENT_BATCH_QUEUE_FAILED');
    return {phase:'current_batches_queued',batch_run_id:r.data,provider_calls:0};

@@ -4,6 +4,7 @@ export type Category = 'food' | 'service' | 'atmosphere' | 'other'
 export type Sentiment = 'positive' | 'negative'
 export interface ReputationReview {
   id: string
+  external_review_id?:string
   rating: number
   original_text: string | null
   original_language?:string|null

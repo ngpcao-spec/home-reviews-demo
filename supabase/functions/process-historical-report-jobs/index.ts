@@ -42,8 +42,8 @@ Deno.serve(async request => {
   const {data:jobs,error} = await admin.rpc('claim_historical_report_jobs',{p_worker_id:worker,p_limit:HISTORICAL_REPORT_CONCURRENCY})
   if (error) { console.error('HISTORICAL_CLAIM_FAILED'); return json({error:'HISTORICAL_CLAIM_FAILED'},500) }
   const list=jobs as HistoricalJob[]??[];
-  const bindings=list.length?await admin.from('report_generation_requests').select('id,source_run_id,engine,jev_transport,evidence_selector_version,evidence_selector_sha256,comparison_id').in('source_run_id',list.map(r=>r.id)):{data:[],error:null};
+  const bindings=list.length?await admin.from('report_generation_requests').select('id,source_run_id,engine,jev_transport,shared_jev_version,evidence_selector_version,evidence_selector_sha256,comparison_id').in('source_run_id',list.map(r=>r.id)):{data:[],error:null};
   if(bindings.error)return json({error:'CURRENT_REPORT_BINDING_UNAVAILABLE'},500);
-  const results = await Promise.all(list.map(run=>{const b=bindings.data?.find(b=>b.source_run_id===run.id);return b?.engine==='jev_sol_v2'?processCurrentReportPreparation(admin,{...run,engine:b.engine,jev_transport:b.jev_transport,evidence_selector_version:b.evidence_selector_version,evidence_selector_sha256:b.evidence_selector_sha256,request_id:b.id,v2_report_id:b.comparison_id},worker):processHistoricalRun(admin,{...run,...(b?{request_id:b.id}:{} )},worker)}))
+  const results = await Promise.all(list.map(run=>{const b=bindings.data?.find(b=>b.source_run_id===run.id);return b?.engine==='jev_sol_v2'?processCurrentReportPreparation(admin,{...run,engine:b.engine,jev_transport:b.jev_transport,shared_jev_version:b.shared_jev_version,evidence_selector_version:b.evidence_selector_version,evidence_selector_sha256:b.evidence_selector_sha256,request_id:b.id,v2_report_id:b.comparison_id},worker):processHistoricalRun(admin,{...run,...(b?{request_id:b.id}:{} )},worker)}))
   return json({claimed:results.length,results})
 })

@@ -17,6 +17,7 @@ import {freshEnglishAnalysisInputs} from './analysis-text-overrides-server.ts'
 type Draft = { language: string; ai_status: string; draft_text: string | null; ai_suggested_reply: string | null }
 type InputReview = ReputationReview & { review_translations?:ProviderTranslation[];review_reply_drafts: Draft[]; ai_suggested_reply?: string; ai_suggested_reply_language?: string; reply_draft_text?: string; reply_draft_language?: string; ai_status?: string }
 export interface HistoricalJob {
+  shared_jev_version?:string|null;
   engine?:'sol_legacy'|'jev_sol_v2';jev_transport?:'individual'|'batch_initial_v1';evidence_selector_version?:string;evidence_selector_sha256?:string;request_id?:string;requested_by?:string;v2_report_id?:string|null;
   id:string; generation_id:string; establishment_id:string; organization_id:string; language:'fr'|'vi'; status:string; model:string;
   cursor:number; ai_calls:number; input_tokens:number; output_tokens:number; attempt_count:number;
@@ -57,7 +58,7 @@ export async function prepareHistoricalSnapshot(admin:SupabaseClient, run:Histor
           const hasDraft = r.reply_draft_text !== null && r.reply_draft_text !== undefined
           const ready = localized ? localized.ai_status === 'completed' && Boolean((localized.draft_text ?? localized.ai_suggested_reply)?.trim())
             : r.ai_status === 'completed' && languageOf(hasDraft ? r.reply_draft_language : r.ai_suggested_reply_language) === language && Boolean((hasDraft ? r.reply_draft_text : r.ai_suggested_reply)?.trim())
-          reviews.push({id:r.id,rating:r.rating,original_text:r.original_text,text:r.text,published_at:r.published_at,historical_import:r.historical_import,has_negative_feedback:r.has_negative_feedback,status:r.status,review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,ready,...(ANALYSIS_VERSION>=7?{original_language:r.original_language,...(resolved?.[index]??analysisTextForReview(r))}:{}),...(ANALYSIS_VERSION===8?{normalized_category_ratings:normalizeCategoryRatings(r.review_detailed_rating)}:{})})
+          reviews.push({id:r.id,...(run.shared_jev_version?{external_review_id:r.external_review_id}:{}),rating:r.rating,original_text:r.original_text,text:r.text,published_at:r.published_at,historical_import:r.historical_import,has_negative_feedback:r.has_negative_feedback,status:r.status,review_detailed_rating:r.review_detailed_rating,review_context:r.review_context,ready,...(ANALYSIS_VERSION>=7?{original_language:r.original_language,...(resolved?.[index]??analysisTextForReview(r))}:{}),...(ANALYSIS_VERSION===8?{normalized_category_ratings:normalizeCategoryRatings(r.review_detailed_rating)}:{})})
         }
         if ((data?.length ?? 0)<500) break
       }

@@ -1,5 +1,6 @@
 /** Client observer only. The server owns scheduling, steps, retries and completion. */
 export interface HistoricalRun {
+  shared_jev?:boolean
   request_id?:string;engine?:'sol_legacy'|'jev_sol_v2';comparison_id?:string|null;stage?:string
   source_run_id?:string;jev_transport?:'individual'|'batch_initial_v1';created_at?:string;completed_at?:string|null
   progress_unit?:'jev_batches'|'steps';completed_reviews?:number;total_reviews?:number;batch_run_id?:string;unknown_batches?:number;sol_attempts?:number;can_resume?:boolean

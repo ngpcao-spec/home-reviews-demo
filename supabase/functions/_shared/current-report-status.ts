@@ -4,7 +4,7 @@ import type {SupabaseClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {historicalRunStatus} from './historical-run-status.ts';
 type Run=Parameters<typeof historicalRunStatus>[0]&{id:string;created_at?:string;completed_at?:string|null};
 export async function currentHistoricalStatus(admin:SupabaseClient,run:Run){
- const b=await admin.from('report_generation_requests').select('id,engine,comparison_id,jev_transport,created_at').eq('source_run_id',run.id).maybeSingle();if(b.error)throw Error('REPORT_RUN_READ_FAILED');
+ const b=await admin.from('report_generation_requests').select('id,engine,comparison_id,jev_transport,shared_jev_version,created_at').eq('source_run_id',run.id).maybeSingle();if(b.error)throw Error('REPORT_RUN_READ_FAILED');
  if(b.data?.engine!=='jev_sol_v2')return {...historicalRunStatus(run),...(b.data?{request_id:b.data.id,engine:b.data.engine}:{})};
  const abandoned=await admin.from('report_generation_abandonments').select('abandoned_at').eq('request_id',b.data.id).maybeSingle();
  if(abandoned.error)throw Error('REPORT_RUN_READ_FAILED');
@@ -25,12 +25,16 @@ export async function currentHistoricalStatus(admin:SupabaseClient,run:Run){
    const t=await admin.from('analysis_jev_batch_tasks').select('status,reviews').eq('run_id',r.data.id);
    if(t.error)throw Error('REPORT_RUN_READ_FAILED');
    const complete=t.data.filter(t=>t.status==='completed');
+   const shared=b.data.shared_jev_version?await admin.rpc('jev_shared_read',{p_consumer:run.id}):null;
+   if(shared?.error)throw Error('REPORT_RUN_READ_FAILED');
+   const reused=shared?.data as {state:string}[]|undefined;
    const published=['completed','needs_review'].includes(p.data.state),failed=['blocked','invalid_output','billing_uncertain','authorization_expired'].includes(r.data.status);
    const status=published?'completed':failed?'failed':run.status;
    return {...base,...binding,status,error_code:r.data.error_code??p.data.error_code??run.error_code,
     stage:published?'completed':r.data.stage,progress:complete.length,total_steps:t.data.length,progress_unit:'jev_batches',
     batch_run_id:r.data.id,completed_at:r.data.completed_at??binding.completed_at,
-    completed_reviews:complete.reduce((sum,t)=>sum+t.reviews,0),total_reviews:t.data.reduce((sum,t)=>sum+t.reviews,0),
+    shared_jev:!!b.data.shared_jev_version,
+    completed_reviews:reused?reused.filter(x=>x.state==='ready').length:complete.reduce((sum,t)=>sum+t.reviews,0),total_reviews:reused?reused.length:t.data.reduce((sum,t)=>sum+t.reviews,0),
     unknown_batches:t.data.filter(t=>t.status==='unknown').length,sol_attempts:r.data.sol_request_count,
     can_abandon:status==='failed'&&r.data.armed===false,
     can_resume:status==='running'&&r.data.armed===true&&Date.parse(r.data.expires_at)>Date.now()};

@@ -8,11 +8,14 @@ import {evidenceSelectorBinding,verifyEvidenceSelector,selectReportEvidence,type
 import {prepareCompactSolWire,reconstructCompactSolResponse} from './parallel-sol-wire.ts';
 import {validateParallelReport} from './parallel-report.ts';
 import {solRequestSize,SOL_SIZE_POLICY} from './jls-sol-size.ts';
+import {sharedJevIdentity,sharedJevIdentities,sharedMissingIds,sharedBatchPlans,automaticJevSnapshot,SHARED_JEV_VERSION,type SharedAnalysisRow} from './shared-jev-analysis.ts';
+import {localHybridTokens} from './jev-hybrid-evidence.ts';
 export const BATCH_EXPERIMENT='jev-multi-review-initial-v1';
 export interface BatchTask {id:string;number:number;reviews:number;status:string;request_count:number;request_wire:string;request_sha256:string;
  mapping:InitialBatch['mapping'];receipt:Record<string,unknown>|null;receipt_sha256:string|null;projection?:BatchProjection;historical_source:unknown}
 export interface BatchRun {id:string;organization_id:string;establishment_id:string;report_id:string;baseline_report_id:string|null;current_source_run_id?:string|null;stage:string;status:string;armed:boolean;
- snapshot:Omit<DirectReportInput['snapshot']['body'],'reviews'>&{reviews:(DirectReportInput['snapshot']['body']['reviews'][number]&{analysis_language:string|null;analysis_source:string;translation_provenance:unknown})[]};snapshot_sha256:string;template:Record<string,any>;max_new_jev_calls:number;
+ purpose?:'report'|'new_reviews';shared_jev_version?:string|null;
+ snapshot:Omit<DirectReportInput['snapshot']['body'],'reviews'>&{reviews:(DirectReportInput['snapshot']['body']['reviews'][number]&{google_review_id?:string;analysis_language:string|null;analysis_source:string;translation_provenance:unknown})[]};snapshot_sha256:string;template:Record<string,any>;max_new_jev_calls:number;
  draft?:BatchDraft;draft_sha256?:string;envelope?:BatchEnvelope;envelope_sha256?:string;sol_receipt?:Record<string,any>;sol_receipt_sha256?:string;sol_request_count:number}
 export interface BatchProjection {parent_receipt_sha256:string;question_mapping_sha256:string;rows:ReturnType<typeof parseInitialBatchResponse>['rows'];
  usage:ReturnType<typeof parseInitialBatchResponse>['usage'];usage_is_historical:boolean;native_classifications:number}
@@ -45,11 +48,28 @@ export async function validateBatchTask(run:BatchRun,task:BatchTask):Promise<Bat
  return {parent_receipt_sha256:task.receipt_sha256!,question_mapping_sha256:await directHash(task.mapping),rows:parsed.rows,
    usage:parsed.usage,usage_is_historical:task.historical_source!==null,native_classifications:parsed.received_classifications};
 }
-export async function batchSolDraft(run:BatchRun,tasks:BatchTask[]){
+export async function batchSolDraft(run:BatchRun,tasks:BatchTask[],shared?:SharedAnalysisRow[]){
  check(await directHash(run.snapshot)===run.snapshot_sha256,'BATCH_SNAPSHOT_CHANGED');
  const expected=run.snapshot.reviews.filter(r=>r.analysis_text).map(r=>r.id),rows:DirectReportInput['dataset']['body']['reviews']=[];
  const ordered=[...tasks].sort((a,b)=>a.number-b.number),seen=new Set<string>(),classification_sources=[];
- for(const t of ordered){
+ if(run.shared_jev_version){
+  check(run.shared_jev_version===SHARED_JEV_VERSION&&shared,'SHARED_JEV_VERSION_OR_RESULTS_REQUIRED');
+  for(const r of run.snapshot.reviews){
+   if(!r.analysis_text)continue;
+   const x=shared.find(x=>x.review_id===r.id),identity=await sharedJevIdentity(r);
+   check(x?.state==='ready'&&x.task_id&&x.receipt_sha256&&x.request_sha256&&x.source_review_id&&x.result&&
+    await directHash(x.result)===x.result_sha256&&directCanonical(x.identity)===directCanonical(identity),'SHARED_JEV_RESULT_INCOMPATIBLE');
+   check(!seen.has(r.id),'BATCH_REVIEW_DUPLICATED_ACROSS_LOTS');seen.add(r.id);
+   const result=x.result as DirectReportInput['dataset']['body']['reviews'][number]['result'];
+   rows.push({review_id:r.id,organization_id:run.organization_id,establishment_id:run.establishment_id,analysis_text:r.analysis_text,
+    analysis_text_sha256:r.analysis_text_sha256!,analysis_language:r.analysis_language??'und',result,result_sha256:x.result_sha256!,
+    raw_response_text:JSON.stringify(result.raw_response),response_raw_sha256:await analysisTextSha256(JSON.stringify(result.raw_response)),
+    translation_source:r.analysis_source,translation_provenance:r.translation_provenance,receipt_id:x.task_id});
+   classification_sources.push({review_id:r.id,batch_task_id:x.task_id,native_question_keys:x.question_keys,receipt_sha256:x.receipt_sha256,
+    shared_identity_sha256:identity!.sha256,source_review_id:x.source_review_id,request_sha256:x.request_sha256});
+  }
+  check(shared.length===seen.size,'SHARED_JEV_FOREIGN_RESULT');
+ }else for(const t of ordered){
   check(t.status==='completed'&&t.projection,'BATCH_INCOMPLETE_NO_SOL');
   const projection=await validateBatchTask(run,t);
   check(directCanonical(projection)===directCanonical(t.projection),'BATCH_PROJECTION_CHANGED');
@@ -96,6 +116,12 @@ export async function measureBatchSolDraft(draft:BatchDraft){
 export async function batchSolEnvelope(run:BatchRun,tasks:BatchTask[]){return await measureBatchSolDraft(await batchSolDraft(run,tasks));}
 export type BatchEnvelope=Awaited<ReturnType<typeof batchSolEnvelope>>;
 export interface BatchExperimentPort {
+ sharedClaimSaved?(id:string,worker:string):Promise<BatchTask|null>;
+ sharedRead?(consumer:string):Promise<SharedAnalysisRow[]>;
+ sharedAllocate?(consumer:string,refs:unknown):Promise<{review_id:string;state:string;owned:boolean;task_id:string|null}[]>;
+ sharedNormalizeAuto?(id:string,snapshot:unknown,sha:string):Promise<boolean>;
+ sharedPlanAuto?(id:string,plans:unknown):Promise<boolean>;
+ sharedRefresh?(id:string):Promise<string>;
  load(id:string):Promise<{run:BatchRun;tasks:BatchTask[]}>;
  claim(id:string,worker:string):Promise<BatchTask|null>;
  receive(task:string,worker:string,receipt:unknown,sha:string):Promise<boolean>;
@@ -134,7 +160,39 @@ export function batchJevAccounting(tasks:BatchTask[]){
 }
 export async function processBatchExperiment(port:BatchExperimentPort,id:string,keys:{jev:string;sol:string},http:typeof fetch){
  const {run,tasks}=await port.load(id),worker=crypto.randomUUID();let providerCalls=0;
- if(!run.armed||run.status!=='running')return {phase:'saved_or_disarmed',provider_calls:0};
+ if(!run.armed||run.status!=='running'){
+  if(run.shared_jev_version===SHARED_JEV_VERSION&&tasks.some(t=>t.status==='received')&&port.sharedClaimSaved){
+   const t=await port.sharedClaimSaved(id,worker);
+   if(t){
+    try{const projection=await validateBatchTask(run,t);check(await port.project(t.id,worker,projection,await directHash(projection)),'BATCH_PROJECTION_SAVE_FAILED');}
+    catch(e){const body={error_code:errorCode(e)};await port.project(t.id,worker,body,await directHash(body),errorCode(e));}
+    return {phase:'late_receipt_validated_no_rearm',provider_calls:0};
+   }
+  }
+  return {phase:'saved_or_disarmed',provider_calls:0};
+ }
+ if(run.shared_jev_version){
+  check(run.shared_jev_version===SHARED_JEV_VERSION,'SHARED_JEV_VERSION_UNKNOWN');
+  if(run.purpose==='new_reviews'){
+   if(run.stage==='auto_prepare'){
+    const snapshot=await automaticJevSnapshot(run.snapshot as unknown as Parameters<typeof automaticJevSnapshot>[0]);
+    check(port.sharedNormalizeAuto&&await port.sharedNormalizeAuto(id,snapshot,await directHash(snapshot)),'SHARED_JEV_AUTO_PREPARATION_FAILED');
+    return {phase:'new_reviews_frozen',provider_calls:0};
+   }
+   if(run.stage==='auto_plan'){
+    check(port.sharedAllocate&&port.sharedPlanAuto,'SHARED_JEV_PORT_REQUIRED');
+    const allocated=await port.sharedAllocate(id,await sharedJevIdentities(run.snapshot.reviews)),missing=sharedMissingIds(allocated);
+    const plans=await sharedBatchPlans(run.snapshot.reviews.filter(r=>missing.includes(r.id)).map(r=>({review_id:r.id,text:r.analysis_text!})),localHybridTokens);
+    check(await port.sharedPlanAuto(id,plans),'SHARED_JEV_AUTO_PLAN_FAILED');return {phase:'new_reviews_queued',provider_calls:0};
+   }
+   check(['jev','shared_wait'].includes(run.stage),'SHARED_JEV_AUTOMATIC_SOL_FORBIDDEN');
+  }
+  if(['jev','shared_wait'].includes(run.stage)){
+   check(port.sharedRefresh,'SHARED_JEV_PORT_REQUIRED');
+   const stage=await port.sharedRefresh(id);
+   if(stage!==run.stage||stage==='shared_wait')return {phase:'shared_analyses_wait_or_ready',provider_calls:0};
+  }
+ }
  // Reject an unknown or tampered frozen selector before any JEV reservation,
  // not only later when constructing the Sol dossier.
  await batchSelector(run);
@@ -161,7 +219,8 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   return {phase:'saved_jev_reused_and_mapped',provider_calls:0};
  }
  if(run.stage==='prepare_evidence'){
-  const b=await batchSolDraft(run,tasks);check(await port.draft(id,b,await directHash(b)),'BATCH_DRAFT_SAVE_FAILED');
+  const shared=run.shared_jev_version?await port.sharedRead?.(run.current_source_run_id!):undefined;
+  const b=await batchSolDraft(run,tasks,shared);check(await port.draft(id,b,await directHash(b)),'BATCH_DRAFT_SAVE_FAILED');
   return {phase:'compact_sol_draft_saved',provider_calls:0};
  }
  if(run.stage==='measure_sol'){
@@ -193,7 +252,8 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
  const receipt=run.sol_receipt;
  check(await directHash(receipt)===run.sol_receipt_sha256&&receipt.request_sha256===envelope.request_sha256,'BATCH_SOL_RECEIPT_CHANGED');
  const jev=batchJevAccounting(tasks);
- const usage:Record<string,unknown>={jev,luna_calls:0,apify_calls:0};
+ const usage:Record<string,unknown>={jev,...(run.shared_jev_version?{shared_jev:{version:run.shared_jev_version,analysed_text_reviews:envelope.counts.total_reviews,
+  own_batch_reviews:tasks.reduce((n,t)=>n+t.reviews,0),reused_reviews:envelope.counts.total_reviews-tasks.reduce((n,t)=>n+t.reviews,0),reused_usage_billed_again:false}}:{}),luna_calls:0,apify_calls:0};
  let status='invalid_output',error:string|undefined,result:Record<string,unknown>={};
  try{
   if(!receipt.raw_response_text){status='billing_uncertain';throw Error('BATCH_SOL_OUTCOME_UNKNOWN_NO_RETRY');}

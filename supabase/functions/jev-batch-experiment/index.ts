@@ -31,6 +31,12 @@ Deno.serve(async request=>{
   if(typeof body.run_id!=='string')throw Error('BATCH_RUN_REQUIRED');
   const rpc=async(name:string,args:Record<string,unknown>)=>{const r=await admin.rpc(name,args);if(r.error)throw Error(name.toUpperCase()+'_FAILED');return r.data;};
   const port:BatchExperimentPort={
+   sharedClaimSaved:(id,w)=>rpc('jev_shared_claim_saved',{p_run:id,p_worker:w}),
+   sharedRead:consumer=>rpc('jev_shared_read',{p_consumer:consumer}),
+   sharedAllocate:(consumer,refs)=>rpc('jev_shared_allocate',{p_consumer:consumer,p_refs:refs}),
+   sharedNormalizeAuto:(id,snapshot,sha)=>rpc('jev_shared_normalize_auto',{p_run:id,p_snapshot:snapshot,p_sha:sha}),
+   sharedPlanAuto:(id,plans)=>rpc('jev_shared_plan_auto',{p_run:id,p_plans:plans}),
+   sharedRefresh:id=>rpc('jev_shared_refresh',{p_run:id}),
    load:async id=>{const [r,t]=await Promise.all([admin.from('analysis_jev_batch_runs').select('*').eq('id',id).single(),admin.from('analysis_jev_batch_tasks').select('*').eq('run_id',id).order('number')]);if(r.error||t.error)throw Error('BATCH_LOAD_FAILED');return {run:r.data,tasks:t.data};},
    claim:(id,w)=>rpc('jev_batch_claim',{p_run:id,p_worker:w}),
    receive:(t,w,b,s)=>saveBatchReceipt(rpc,t,w,b,s),
@@ -45,7 +51,7 @@ Deno.serve(async request=>{
    const at=performance.now(),{run,tasks}=await port.load(body.run_id);
    if(run.status!=='completed'||!run.envelope)throw Error('BATCH_COMPLETED_SAVED_SOURCE_REQUIRED');
    const saved=run.envelope;
-   const result=body.action==='audit_saved_draft'?await batchSolDraft(run,tasks):await measureBatchSolDraft(saved);
+   const result=body.action==='audit_saved_draft'?await batchSolDraft(run,tasks,run.shared_jev_version?await port.sharedRead!(run.current_source_run_id!):undefined):await measureBatchSolDraft(saved);
    return json({provider_calls:0,new_runs:0,stage:body.action,request_sha256:result.request_sha256,
     matches_saved:result.request_sha256===saved.request_sha256&&await directHash(result.evidence)===await directHash(saved.evidence),wall_ms:performance.now()-at});
   }
@@ -55,7 +61,7 @@ Deno.serve(async request=>{
    .catch(async e=>{
     const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'BATCH_STEP_FAILED_NO_RETRY';
     const r=await admin.from('analysis_jev_batch_runs').select('stage').eq('id',body.run_id).single();
-    if(['prepare_evidence','measure_sol'].includes(r.data?.stage))await rpc('jev_batch_stop',{p_run:body.run_id,p_error:code});
+    if(['auto_prepare','auto_plan','prepare_evidence','measure_sol'].includes(r.data?.stage))await rpc('jev_batch_stop',{p_run:body.run_id,p_error:code});
     console.error('BATCH_STEP_STOPPED_RECEIPTS_RETAINED_NO_RETRY',code);
    }));
   return json({accepted:true,automatic_retry:false},202);

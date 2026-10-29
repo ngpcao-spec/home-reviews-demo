@@ -1,0 +1,4282 @@
+{
+  "columns": [
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "source_relation",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "source_key",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "phase",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "provider_attempt_ledger",
+      "column": "organization_id",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "provider_attempt_ledger",
+      "column": "establishment_id",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "provider",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "model",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "provider_attempt_ledger",
+      "column": "attempts",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "outcome",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "request_sha256",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "receipt_sha256",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "provider_request_id",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "provider_attempt_ledger",
+      "column": "input_tokens",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "provider_attempt_ledger",
+      "column": "output_tokens",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "provider_attempt_ledger",
+      "column": "cache_read_tokens",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "provider_attempt_ledger",
+      "column": "cache_write_tokens",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "numeric",
+      "table": "provider_attempt_ledger",
+      "column": "duration_ms",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "boolean",
+      "table": "provider_attempt_ledger",
+      "column": "usage_complete",
+      "schema": "private",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "provider_attempt_ledger",
+      "column": "started_at",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "provider_attempt_ledger",
+      "column": "completed_at",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "provider_attempt_ledger",
+      "column": "recorded_at",
+      "schema": "private",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "provider_attempt_ledger",
+      "column": "accounting_scope",
+      "schema": "private",
+      "default": "'native_attempt'::text",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retention_rebuild_requests",
+      "column": "request_id",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retired_generation_keys",
+      "column": "request_id",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retired_generation_keys",
+      "column": "source_run_id",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "retired_generation_keys",
+      "column": "retired_at",
+      "schema": "private",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retired_generation_keys",
+      "column": "policy_epoch",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retired_report_scopes",
+      "column": "establishment_id",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "retired_report_scopes",
+      "column": "language",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retired_report_scopes",
+      "column": "organization_id",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "retired_report_scopes",
+      "column": "report_id",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "retired_report_scopes",
+      "column": "source_run_id",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "retired_report_scopes",
+      "column": "generated_at",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "retired_report_scopes",
+      "column": "review_count",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "retired_report_scopes",
+      "column": "period_start",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "retired_report_scopes",
+      "column": "period_end",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "retired_report_scopes",
+      "column": "retired_at",
+      "schema": "private",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "retired_report_scopes",
+      "column": "reason",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "review_seen_keys",
+      "column": "establishment_id",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_seen_keys",
+      "column": "external_key_sha256",
+      "schema": "private",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_seen_keys",
+      "column": "first_published_at",
+      "schema": "private",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_seen_keys",
+      "column": "first_seen_at",
+      "schema": "private",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_runs",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_runs",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_runs",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_runs",
+      "column": "baseline_report_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_runs",
+      "column": "report_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "configuration_version",
+      "schema": "public",
+      "default": "'jev-multi-review-initial-v1'::text",
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_runs",
+      "column": "snapshot",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "snapshot_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_runs",
+      "column": "template",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "manifest_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "source_manifest_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "authorization_evidence",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "analysis_jev_batch_runs",
+      "column": "armed",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_runs",
+      "column": "expires_at",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "analysis_jev_batch_runs",
+      "column": "max_new_jev_calls",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "status",
+      "schema": "public",
+      "default": "'running'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "stage",
+      "schema": "public",
+      "default": "'jev'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "error_code",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "analysis_jev_batch_runs",
+      "column": "sol_request_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "sol_worker",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_runs",
+      "column": "sol_lease_until",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_runs",
+      "column": "envelope",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "envelope_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_runs",
+      "column": "sol_receipt",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "sol_receipt_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_runs",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_runs",
+      "column": "completed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_runs",
+      "column": "current_source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_runs",
+      "column": "manifest",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_runs",
+      "column": "draft",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_runs",
+      "column": "draft_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_runs",
+      "column": "draft_created_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_runs",
+      "column": "envelope_prepared_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_tasks",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_tasks",
+      "column": "run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_jev_batch_tasks",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "analysis_jev_batch_tasks",
+      "column": "number",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "analysis_jev_batch_tasks",
+      "column": "reviews",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "request_wire",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "request_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_tasks",
+      "column": "mapping",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_tasks",
+      "column": "preflight",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "status",
+      "schema": "public",
+      "default": "'pending'::text",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "analysis_jev_batch_tasks",
+      "column": "request_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "worker",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_tasks",
+      "column": "lease_until",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_tasks",
+      "column": "receipt",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "receipt_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_tasks",
+      "column": "projection",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "projection_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "error_code",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_jev_batch_tasks",
+      "column": "historical_source",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_tasks",
+      "column": "reserved_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_jev_batch_tasks",
+      "column": "completed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "analysis_jev_batch_tasks",
+      "column": "input_tokens",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "analysis_jev_batch_tasks",
+      "column": "output_tokens",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "double precision",
+      "table": "analysis_jev_batch_tasks",
+      "column": "duration_ms",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "served_model",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_jev_batch_tasks",
+      "column": "provider_request_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "authority_user_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "reference_report_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "reference_generation_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "body",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_launch_preparations",
+      "column": "current_source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "reference_report_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "reference_generation_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_parallel_reports",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_parallel_reports",
+      "column": "configuration_version",
+      "schema": "public",
+      "default": "'jls-direct4-parallel-no-luna-v1'::text",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "protocol_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_parallel_reports",
+      "column": "corpus_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "source_report",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "source_reviews",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "imported_derivative_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "source_archive_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "raw_response",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "original_report",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "derived_report",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "corrections",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "controls",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "statistics",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "analysis_parallel_reports",
+      "column": "usage",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "analysis_parallel_reports",
+      "column": "state",
+      "schema": "public",
+      "default": "'queued'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "analysis_parallel_reports",
+      "column": "error_code",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_parallel_reports",
+      "column": "generated_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "analysis_parallel_reports",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "analysis_parallel_reports",
+      "column": "current_source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "current_report_publications",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "current_report_publications",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "current_report_publications",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "current_report_publications",
+      "column": "report_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "current_report_publications",
+      "column": "source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "current_report_publications",
+      "column": "source_created_at",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "current_report_publications",
+      "column": "generated_at",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "current_report_publications",
+      "column": "scope",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "current_report_publications",
+      "column": "document",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "current_report_publications",
+      "column": "source_bindings",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "current_report_publications",
+      "column": "evidence_bindings",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "current_report_publications",
+      "column": "stale",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "current_report_publications",
+      "column": "stale_reason",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "current_report_publications",
+      "column": "provenance",
+      "schema": "public",
+      "default": "'{}'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "current_report_publications",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "establishments",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "establishments",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "name",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "google_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "place_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "google_maps_url",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "address",
+      "schema": "public",
+      "default": "''::text",
+      "nullable": false
+    },
+    {
+      "type": "numeric(2,1)",
+      "table": "establishments",
+      "column": "rating",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "establishments",
+      "column": "total_reviews",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "photo_url",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "boolean",
+      "table": "establishments",
+      "column": "active",
+      "schema": "public",
+      "default": "true",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "initialized_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "last_sync_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "last_review_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "last_review_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "sync_status",
+      "schema": "public",
+      "default": "'pending'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "sync_error",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "next_sync_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "last_sync_status",
+      "schema": "public",
+      "default": "'pending'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "last_sync_error",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "establishments",
+      "column": "sync_lock_token",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "sync_locked_until",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "reporting_started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "establishments",
+      "column": "initial_import_job_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "collection_language",
+      "schema": "public",
+      "default": "'fr'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "review_collection_status",
+      "schema": "public",
+      "default": "'unknown'::text",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "establishments",
+      "column": "review_collection_expected",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "establishments",
+      "column": "review_collection_unique",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "review_collection_checked_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "establishments",
+      "column": "review_reload_job_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "establishments",
+      "column": "review_reload_request_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "establishments",
+      "column": "review_reload_status",
+      "schema": "public",
+      "default": "'idle'::text",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "establishments",
+      "column": "review_reload_count",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "review_reload_completed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "establishments",
+      "column": "review_reload_barrier_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "historical_report_runs",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "historical_report_runs",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "historical_report_runs",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "historical_report_runs",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "historical_report_runs",
+      "column": "generation_id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "historical_report_runs",
+      "column": "status",
+      "schema": "public",
+      "default": "'running'::text",
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "historical_report_runs",
+      "column": "snapshot",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "historical_report_runs",
+      "column": "findings",
+      "schema": "public",
+      "default": "'[]'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "cursor",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "input_tokens",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "output_tokens",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "ai_calls",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "historical_report_runs",
+      "column": "lease_until",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "historical_report_runs",
+      "column": "locked_by",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "historical_report_runs",
+      "column": "error_code",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "historical_report_runs",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "rejected_findings_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "historical_report_runs",
+      "column": "token_usage_complete",
+      "schema": "public",
+      "default": "true",
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "historical_report_runs",
+      "column": "classifications",
+      "schema": "public",
+      "default": "'[]'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "historical_report_runs",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "historical_report_runs",
+      "column": "requested_by",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "historical_report_runs",
+      "column": "started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "historical_report_runs",
+      "column": "completed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "total_steps",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "attempt_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "historical_report_runs",
+      "column": "next_retry_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "historical_report_runs",
+      "column": "last_error",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "historical_report_runs",
+      "column": "lease_recovery_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "historical_report_runs",
+      "column": "model",
+      "schema": "public",
+      "default": "'gpt-5.6-terra'::text",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "initial_import_jobs",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "initial_import_jobs",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "initial_import_jobs",
+      "column": "user_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "query",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "expected_google_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "initial_import_jobs",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "preferred_language",
+      "schema": "public",
+      "default": "'fr'::text",
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "initial_import_jobs",
+      "column": "candidate_snapshot",
+      "schema": "public",
+      "default": "'{}'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "status",
+      "schema": "public",
+      "default": "'queued'::text",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "initial_import_jobs",
+      "column": "reviews_target",
+      "schema": "public",
+      "default": "150",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "initial_import_jobs",
+      "column": "reviews_fetched",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "initial_import_jobs",
+      "column": "reviews_inserted",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "initial_import_jobs",
+      "column": "provider_requests",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "provider_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "provider_dataset_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "initial_import_jobs",
+      "column": "attempts",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "available_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "lease_until",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "locked_by",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "error_code",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "initial_import_jobs",
+      "column": "result",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "acknowledged_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "finished_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "resolved_place_url",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "worker_started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "provider_start_attempted_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "provider_started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "provider_run_saved_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "provider_finished_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "provider_finished_observed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "provider_status",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "retrieval_started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "retrieval_completed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "persistence_started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "persistence_completed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "initial_import_jobs",
+      "column": "phase_events",
+      "schema": "public",
+      "default": "'[]'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "initial_import_jobs",
+      "column": "provider_attempt_history",
+      "schema": "public",
+      "default": "'[]'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "initial_import_jobs",
+      "column": "resolution_diagnostic_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "initial_import_jobs",
+      "column": "wake_requested_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "initial_import_jobs",
+      "column": "wake_request_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "initial_import_jobs",
+      "column": "wake_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "wake_error",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "initial_import_jobs",
+      "column": "request_kind",
+      "schema": "public",
+      "default": "'initial'::text",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "initial_import_jobs",
+      "column": "request_key",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "organization_members",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "organization_members",
+      "column": "user_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "organization_members",
+      "column": "role",
+      "schema": "public",
+      "default": "'viewer'::text",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "organization_members",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "organizations",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "organizations",
+      "column": "name",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "organizations",
+      "column": "created_by",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "organizations",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "organizations",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "smallint",
+      "table": "organizations",
+      "column": "monitoring_interval_hours",
+      "schema": "public",
+      "default": "12",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_corpus_scopes",
+      "column": "source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_corpus_scopes",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_corpus_scopes",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_corpus_scopes",
+      "column": "policy_epoch",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_corpus_scopes",
+      "column": "as_of",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_corpus_scopes",
+      "column": "cutoff",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid[]",
+      "table": "report_corpus_scopes",
+      "column": "review_ids",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "report_corpus_scopes",
+      "column": "review_count",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_corpus_scopes",
+      "column": "period_start",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_corpus_scopes",
+      "column": "period_end",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_corpus_scopes",
+      "column": "fingerprint",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "report_corpus_scopes",
+      "column": "stale",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_corpus_scopes",
+      "column": "stale_reason",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_abandonments",
+      "column": "request_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_abandonments",
+      "column": "source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_abandonments",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_abandonments",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_abandonments",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_abandonments",
+      "column": "abandoned_by",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_generation_abandonments",
+      "column": "abandoned_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_abandonments",
+      "column": "reason",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "report_generation_abandonments",
+      "column": "acknowledged_possible_previous_charge",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_requests",
+      "column": "id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_requests",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_requests",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_requests",
+      "column": "authority_user_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_requests",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_requests",
+      "column": "engine",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_requests",
+      "column": "source_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "report_generation_requests",
+      "column": "comparison_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_generation_requests",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_requests",
+      "column": "jev_transport",
+      "schema": "public",
+      "default": "'individual'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_requests",
+      "column": "evidence_selector_version",
+      "schema": "public",
+      "default": "'jls-direct4-negative-mixed-coverage-v1'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_generation_requests",
+      "column": "evidence_selector_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "report_pipeline_settings",
+      "column": "id",
+      "schema": "public",
+      "default": "true",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_pipeline_settings",
+      "column": "engine",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "report_pipeline_settings",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_pipeline_settings",
+      "column": "reason",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_pipeline_settings",
+      "column": "jev_transport",
+      "schema": "public",
+      "default": "'individual'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "report_pipeline_settings",
+      "column": "evidence_selector_version",
+      "schema": "public",
+      "default": "'jls-direct4-negative-mixed-coverage-v1'::text",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "review_corpus_policy",
+      "column": "id",
+      "schema": "public",
+      "default": "true",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_corpus_policy",
+      "column": "version",
+      "schema": "public",
+      "default": "'latest_reviews_150_v1'::text",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "review_corpus_policy",
+      "column": "paused",
+      "schema": "public",
+      "default": "true",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "review_corpus_policy",
+      "column": "enabled",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "review_corpus_policy",
+      "column": "max_text_reviews",
+      "schema": "public",
+      "default": "150",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "review_corpus_policy",
+      "column": "months",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_corpus_policy",
+      "column": "timezone",
+      "schema": "public",
+      "default": "'Asia/Ho_Chi_Minh'::text",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "review_corpus_policy",
+      "column": "epoch",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_corpus_policy",
+      "column": "activated_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text[]",
+      "table": "review_corpus_policy",
+      "column": "retired_relations",
+      "schema": "public",
+      "default": "'{}'::text[]",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_corpus_policy",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "review_corpus_policy",
+      "column": "ingestions_paused",
+      "schema": "public",
+      "default": "true",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_corpus_policy",
+      "column": "backup_verified_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "review_sync_jobs",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "review_sync_jobs",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "review_sync_jobs",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "status",
+      "schema": "public",
+      "default": "'queued'::text",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "scheduled_for",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "available_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "review_sync_jobs",
+      "column": "attempts",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "review_sync_jobs",
+      "column": "claim_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "lease_until",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "locked_by",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "pagination_cursor",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "checkpoint_review_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "checkpoint_review_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "head_review_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "head_review_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "review_sync_jobs",
+      "column": "provider_requests",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "review_sync_jobs",
+      "column": "reviews_fetched",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "integer",
+      "table": "review_sync_jobs",
+      "column": "reviews_inserted",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "error_code",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "started_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "finished_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "collection_language",
+      "schema": "public",
+      "default": "'fr'::text",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_sync_jobs",
+      "column": "provider_start_attempted_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "apify_run_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "apify_dataset_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "incremental_version",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "review_sync_jobs",
+      "column": "incremental_input",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "review_sync_jobs",
+      "column": "incremental_identity",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "review_sync_jobs",
+      "column": "incremental_build",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "review_sync_jobs",
+      "column": "incremental_receipt",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "review_sync_jobs",
+      "column": "incremental_received",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "review_sync_jobs",
+      "column": "incremental_result",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "review_translations",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "review_translations",
+      "column": "review_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_translations",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_translations",
+      "column": "translated_text",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_translations",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "review_translations",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "review_translations",
+      "column": "source_text_sha256",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "uuid",
+      "table": "reviews",
+      "column": "id",
+      "schema": "public",
+      "default": "gen_random_uuid()",
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "reviews",
+      "column": "organization_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "uuid",
+      "table": "reviews",
+      "column": "establishment_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "external_review_id",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "author_name",
+      "schema": "public",
+      "default": "'Client Google'::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "author_image",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "smallint",
+      "table": "reviews",
+      "column": "rating",
+      "schema": "public",
+      "default": null,
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "text",
+      "schema": "public",
+      "default": "''::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "published_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "review_url",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "owner_response",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "boolean",
+      "table": "reviews",
+      "column": "requires_attention",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "reviews",
+      "column": "requires_ai_analysis",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "status",
+      "schema": "public",
+      "default": "'new'::text",
+      "nullable": false
+    },
+    {
+      "type": "boolean",
+      "table": "reviews",
+      "column": "historical_import",
+      "schema": "public",
+      "default": "false",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "created_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "updated_at",
+      "schema": "public",
+      "default": "now()",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_summary",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_suggested_reply",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_detected_language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "ai_analyzed_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_status",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_error",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_model",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "ai_input_tokens",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "ai_output_tokens",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "ai_reasoning_tokens",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "ai_total_tokens",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "ai_attempt_count",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "jsonb",
+      "table": "reviews",
+      "column": "ai_error_history",
+      "schema": "public",
+      "default": "'[]'::jsonb",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_last_rejected_summary",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_last_rejected_reply",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_last_rejected_language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_validation_error",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "original_text",
+      "schema": "public",
+      "default": "''::text",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "original_language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "ai_suggested_reply_language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "reply_draft_text",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "reply_draft_language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "reply_draft_updated_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "reviews",
+      "column": "reply_draft_version",
+      "schema": "public",
+      "default": "0",
+      "nullable": false
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "translated_reply_text",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "translated_reply_language",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "translated_from_draft_updated_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "bigint",
+      "table": "reviews",
+      "column": "translated_from_draft_version",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "translated_reply_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "source_provider",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "provider_publish_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "numeric",
+      "table": "reviews",
+      "column": "provider_rating",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "likes_count",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "reviews",
+      "column": "review_context",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "reviews",
+      "column": "review_detailed_rating",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "visited_in",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "jsonb",
+      "table": "reviews",
+      "column": "review_image_urls",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "response_from_owner_text",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "response_from_owner_date",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "reviewer_id",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "reviewer_url",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "integer",
+      "table": "reviews",
+      "column": "reviewer_number_of_reviews",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "reviewer_photo_url",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "boolean",
+      "table": "reviews",
+      "column": "is_local_guide",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "review_origin",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "provider_scraped_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "boolean",
+      "table": "reviews",
+      "column": "has_negative_feedback",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "negative_feedback_summary",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "timestamp with time zone",
+      "table": "reviews",
+      "column": "negative_feedback_checked_at",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "negative_feedback_model",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    },
+    {
+      "type": "text",
+      "table": "reviews",
+      "column": "negative_feedback_status",
+      "schema": "public",
+      "default": null,
+      "nullable": true
+    }
+  ],
+  "constraints": [
+    {
+      "name": "analysis_jev_batch_runs_baseline_report_id_configuration_ve_key",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "UNIQUE (baseline_report_id, configuration_version, source_manifest_sha256)"
+    },
+    {
+      "name": "analysis_jev_batch_runs_check",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "CHECK ((snapshot_sha256 = jls_restaurant_hash(snapshot)))"
+    },
+    {
+      "name": "analysis_jev_batch_runs_configuration_version_check",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "CHECK ((configuration_version = 'jev-multi-review-initial-v1'::text))"
+    },
+    {
+      "name": "analysis_jev_batch_runs_current_source_run_id_key",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "UNIQUE (current_source_run_id)"
+    },
+    {
+      "name": "analysis_jev_batch_runs_max_new_jev_calls_check",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "CHECK ((max_new_jev_calls >= 0))"
+    },
+    {
+      "name": "analysis_jev_batch_runs_pkey",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "analysis_jev_batch_runs_report_id_key",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "UNIQUE (report_id)"
+    },
+    {
+      "name": "analysis_jev_batch_runs_sol_request_count_check",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "CHECK (((sol_request_count >= 0) AND (sol_request_count <= 1)))"
+    },
+    {
+      "name": "batch_origin",
+      "table": "analysis_jev_batch_runs",
+      "schema": "public",
+      "definition": "CHECK ((((baseline_report_id IS NOT NULL) AND (current_source_run_id IS NULL)) OR ((baseline_report_id IS NULL) AND (current_source_run_id IS NOT NULL))))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((request_sha256 = encode(digest(request_wire, 'sha256'::text), 'hex'::text)))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_check1",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK (((receipt IS NULL) OR (receipt_sha256 = jls_restaurant_hash(receipt))))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_check2",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK (((projection IS NULL) OR (projection_sha256 = jls_restaurant_hash(projection))))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_duration_ms_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((duration_ms >= (0)::double precision))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_input_tokens_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((input_tokens >= 0))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_number_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((number > 0))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_output_tokens_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((output_tokens >= 0))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_pkey",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_request_count_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK (((request_count >= 0) AND (request_count <= 1)))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_reviews_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((reviews > 0))"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_run_id_number_key",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "UNIQUE (run_id, number)"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_run_id_request_sha256_key",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "UNIQUE (run_id, request_sha256)"
+    },
+    {
+      "name": "analysis_jev_batch_tasks_status_check",
+      "table": "analysis_jev_batch_tasks",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'reserved'::text, 'received'::text, 'completed'::text, 'invalid_output'::text, 'unknown'::text])))"
+    },
+    {
+      "name": "analysis_parallel_launch_prep_organization_id_reference_rep_key",
+      "table": "analysis_parallel_launch_preparations",
+      "schema": "public",
+      "definition": "UNIQUE (organization_id, reference_report_id, reference_generation_id, sha256)"
+    },
+    {
+      "name": "analysis_parallel_launch_preparations_current_source_run_id_key",
+      "table": "analysis_parallel_launch_preparations",
+      "schema": "public",
+      "definition": "UNIQUE (current_source_run_id)"
+    },
+    {
+      "name": "analysis_parallel_launch_preparations_pkey",
+      "table": "analysis_parallel_launch_preparations",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "analysis_parallel_launch_preparations_sha256_check",
+      "table": "analysis_parallel_launch_preparations",
+      "schema": "public",
+      "definition": "CHECK ((sha256 ~ '^[a-f0-9]{64}$'::text))"
+    },
+    {
+      "name": "parallel_preparation_source_required",
+      "table": "analysis_parallel_launch_preparations",
+      "schema": "public",
+      "definition": "CHECK (((reference_report_id IS NOT NULL) OR (current_source_run_id IS NOT NULL))) NOT VALID"
+    },
+    {
+      "name": "analysis_parallel_reports_check",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "CHECK ((corpus_sha256 = jls_restaurant_hash(source_reviews)))"
+    },
+    {
+      "name": "analysis_parallel_reports_check1",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "CHECK (((protocol_id IS NULL) = (run_id IS NULL)))"
+    },
+    {
+      "name": "analysis_parallel_reports_current_source_run_id_key",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "UNIQUE (current_source_run_id)"
+    },
+    {
+      "name": "analysis_parallel_reports_imported_derivative_id_key",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "UNIQUE (imported_derivative_id)"
+    },
+    {
+      "name": "analysis_parallel_reports_language_check",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "CHECK ((language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "analysis_parallel_reports_organization_id_reference_report__key",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "UNIQUE (organization_id, reference_report_id, reference_generation_id, language, configuration_version)"
+    },
+    {
+      "name": "analysis_parallel_reports_pkey",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "analysis_parallel_reports_protocol_id_key",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "UNIQUE (protocol_id)"
+    },
+    {
+      "name": "analysis_parallel_reports_run_id_key",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "UNIQUE (run_id)"
+    },
+    {
+      "name": "parallel_source_required",
+      "table": "analysis_parallel_reports",
+      "schema": "public",
+      "definition": "CHECK (((reference_report_id IS NOT NULL) OR (current_source_run_id IS NOT NULL) OR (configuration_version = 'jev-multi-review-initial-v1'::text))) NOT VALID"
+    },
+    {
+      "name": "current_report_publications_language_check",
+      "table": "current_report_publications",
+      "schema": "public",
+      "definition": "CHECK ((language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "current_report_publications_pkey",
+      "table": "current_report_publications",
+      "schema": "public",
+      "definition": "PRIMARY KEY (establishment_id, language)"
+    },
+    {
+      "name": "establishments_collection_language_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK ((collection_language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "establishments_google_maps_url_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK (((google_maps_url ~ '^https://(www\\.)?google\\.[^/]+/maps'::text) OR (google_maps_url ~ '^https://maps\\.app\\.goo\\.gl/'::text)))"
+    },
+    {
+      "name": "establishments_last_sync_status_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK ((last_sync_status = ANY (ARRAY['pending'::text, 'syncing'::text, 'ok'::text, 'error'::text])))"
+    },
+    {
+      "name": "establishments_organization_google_id_key",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "UNIQUE (organization_id, google_id)"
+    },
+    {
+      "name": "establishments_pkey",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "establishments_rating_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK (((rating >= (0)::numeric) AND (rating <= (5)::numeric)))"
+    },
+    {
+      "name": "establishments_review_collection_expected_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK (((review_collection_expected >= 0) AND (review_collection_expected <= 150)))"
+    },
+    {
+      "name": "establishments_review_collection_status_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK ((review_collection_status = ANY (ARRAY['unknown'::text, 'complete'::text, 'partial'::text, 'retrying'::text])))"
+    },
+    {
+      "name": "establishments_review_collection_unique_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK (((review_collection_unique >= 0) AND (review_collection_unique <= 150)))"
+    },
+    {
+      "name": "establishments_review_reload_status_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK ((review_reload_status = ANY (ARRAY['idle'::text, 'queued'::text, 'running'::text, 'failed'::text, 'completed'::text])))"
+    },
+    {
+      "name": "establishments_sync_status_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK ((sync_status = ANY (ARRAY['pending'::text, 'syncing'::text, 'ok'::text, 'error'::text])))"
+    },
+    {
+      "name": "establishments_total_reviews_check",
+      "table": "establishments",
+      "schema": "public",
+      "definition": "CHECK ((total_reviews >= 0))"
+    },
+    {
+      "name": "historical_report_runs_attempt_count_check",
+      "table": "historical_report_runs",
+      "schema": "public",
+      "definition": "CHECK ((attempt_count >= 0))"
+    },
+    {
+      "name": "historical_report_runs_language_check",
+      "table": "historical_report_runs",
+      "schema": "public",
+      "definition": "CHECK ((language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "historical_report_runs_model_check",
+      "table": "historical_report_runs",
+      "schema": "public",
+      "definition": "CHECK ((length(btrim(model)) > 0))"
+    },
+    {
+      "name": "historical_report_runs_pkey",
+      "table": "historical_report_runs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "historical_report_runs_rejected_findings_count_check",
+      "table": "historical_report_runs",
+      "schema": "public",
+      "definition": "CHECK ((rejected_findings_count >= 0))"
+    },
+    {
+      "name": "historical_report_runs_status_check",
+      "table": "historical_report_runs",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'retry'::text, 'completed'::text, 'failed'::text])))"
+    },
+    {
+      "name": "initial_import_jobs_attempts_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((attempts >= 0))"
+    },
+    {
+      "name": "initial_import_jobs_expected_google_id_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((char_length(expected_google_id) >= 2))"
+    },
+    {
+      "name": "initial_import_jobs_pkey",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "initial_import_jobs_preferred_language_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((preferred_language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "initial_import_jobs_provider_requests_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((provider_requests >= 0))"
+    },
+    {
+      "name": "initial_import_jobs_query_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK (((char_length(query) >= 2) AND (char_length(query) <= 500)))"
+    },
+    {
+      "name": "initial_import_jobs_request_kind_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((request_kind = ANY (ARRAY['initial'::text, 'reload'::text])))"
+    },
+    {
+      "name": "initial_import_jobs_reviews_fetched_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((reviews_fetched >= 0))"
+    },
+    {
+      "name": "initial_import_jobs_reviews_inserted_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((reviews_inserted >= 0))"
+    },
+    {
+      "name": "initial_import_jobs_reviews_target_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK (((reviews_target >= 1) AND (reviews_target <= 500)))"
+    },
+    {
+      "name": "initial_import_jobs_status_check",
+      "table": "initial_import_jobs",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'retry'::text, 'completed'::text, 'failed'::text])))"
+    },
+    {
+      "name": "organization_members_pkey",
+      "table": "organization_members",
+      "schema": "public",
+      "definition": "PRIMARY KEY (organization_id, user_id)"
+    },
+    {
+      "name": "organization_members_role_check",
+      "table": "organization_members",
+      "schema": "public",
+      "definition": "CHECK ((role = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text, 'viewer'::text])))"
+    },
+    {
+      "name": "organizations_monitoring_interval_hours_check",
+      "table": "organizations",
+      "schema": "public",
+      "definition": "CHECK ((monitoring_interval_hours = ANY (ARRAY[1, 3, 6, 12, 24])))"
+    },
+    {
+      "name": "organizations_name_check",
+      "table": "organizations",
+      "schema": "public",
+      "definition": "CHECK (((char_length(name) >= 1) AND (char_length(name) <= 120)))"
+    },
+    {
+      "name": "organizations_pkey",
+      "table": "organizations",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "report_corpus_scopes_pkey",
+      "table": "report_corpus_scopes",
+      "schema": "public",
+      "definition": "PRIMARY KEY (source_run_id)"
+    },
+    {
+      "name": "report_corpus_scopes_review_count_check",
+      "table": "report_corpus_scopes",
+      "schema": "public",
+      "definition": "CHECK (((review_count >= 1) AND (review_count <= 150)))"
+    },
+    {
+      "name": "report_generation_abandonmen_acknowledged_possible_previo_check",
+      "table": "report_generation_abandonments",
+      "schema": "public",
+      "definition": "CHECK (acknowledged_possible_previous_charge)"
+    },
+    {
+      "name": "report_generation_abandonments_language_check",
+      "table": "report_generation_abandonments",
+      "schema": "public",
+      "definition": "CHECK ((language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "report_generation_abandonments_pkey",
+      "table": "report_generation_abandonments",
+      "schema": "public",
+      "definition": "PRIMARY KEY (request_id)"
+    },
+    {
+      "name": "report_generation_abandonments_reason_check",
+      "table": "report_generation_abandonments",
+      "schema": "public",
+      "definition": "CHECK ((reason = 'restart_from_zero'::text))"
+    },
+    {
+      "name": "report_generation_abandonments_source_run_id_key",
+      "table": "report_generation_abandonments",
+      "schema": "public",
+      "definition": "UNIQUE (source_run_id)"
+    },
+    {
+      "name": "report_generation_requests_comparison_id_key",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "UNIQUE (comparison_id)"
+    },
+    {
+      "name": "report_generation_requests_engine_check",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "CHECK ((engine = ANY (ARRAY['sol_legacy'::text, 'jev_sol_v2'::text])))"
+    },
+    {
+      "name": "report_generation_requests_evidence_selector_sha256_check",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "CHECK ((evidence_selector_sha256 ~ '^[0-9a-f]{64}$'::text))"
+    },
+    {
+      "name": "report_generation_requests_evidence_selector_version_check",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "CHECK ((evidence_selector_version = ANY (ARRAY['jls-direct4-negative-mixed-coverage-v1'::text, 'sol-evidence-single-negative-source-completion-proposal-v1'::text, 'sol-evidence-started-source-mixed-completion-v1'::text])))"
+    },
+    {
+      "name": "report_generation_requests_jev_transport_check",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "CHECK ((jev_transport = ANY (ARRAY['individual'::text, 'batch_initial_v1'::text])))"
+    },
+    {
+      "name": "report_generation_requests_language_check",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "CHECK ((language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "report_generation_requests_pkey",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "report_generation_requests_source_run_id_key",
+      "table": "report_generation_requests",
+      "schema": "public",
+      "definition": "UNIQUE (source_run_id)"
+    },
+    {
+      "name": "report_pipeline_settings_engine_check",
+      "table": "report_pipeline_settings",
+      "schema": "public",
+      "definition": "CHECK ((engine = ANY (ARRAY['sol_legacy'::text, 'jev_sol_v2'::text])))"
+    },
+    {
+      "name": "report_pipeline_settings_evidence_selector_version_check",
+      "table": "report_pipeline_settings",
+      "schema": "public",
+      "definition": "CHECK ((evidence_selector_version = ANY (ARRAY['jls-direct4-negative-mixed-coverage-v1'::text, 'sol-evidence-single-negative-source-completion-proposal-v1'::text, 'sol-evidence-started-source-mixed-completion-v1'::text])))"
+    },
+    {
+      "name": "report_pipeline_settings_id_check",
+      "table": "report_pipeline_settings",
+      "schema": "public",
+      "definition": "CHECK (id)"
+    },
+    {
+      "name": "report_pipeline_settings_jev_transport_check",
+      "table": "report_pipeline_settings",
+      "schema": "public",
+      "definition": "CHECK ((jev_transport = ANY (ARRAY['individual'::text, 'batch_initial_v1'::text])))"
+    },
+    {
+      "name": "report_pipeline_settings_pkey",
+      "table": "report_pipeline_settings",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "review_corpus_policy_id_check",
+      "table": "review_corpus_policy",
+      "schema": "public",
+      "definition": "CHECK (id)"
+    },
+    {
+      "name": "review_corpus_policy_max_text_reviews_check",
+      "table": "review_corpus_policy",
+      "schema": "public",
+      "definition": "CHECK ((max_text_reviews = 150))"
+    },
+    {
+      "name": "review_corpus_policy_months_check",
+      "table": "review_corpus_policy",
+      "schema": "public",
+      "definition": "CHECK ((months IS NULL))"
+    },
+    {
+      "name": "review_corpus_policy_pkey",
+      "table": "review_corpus_policy",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "review_sync_jobs_attempts_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((attempts >= 0))"
+    },
+    {
+      "name": "review_sync_jobs_claim_count_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((claim_count >= 0))"
+    },
+    {
+      "name": "review_sync_jobs_collection_language_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((collection_language = ANY (ARRAY['fr'::text, 'vi'::text])))"
+    },
+    {
+      "name": "review_sync_jobs_pkey",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "review_sync_jobs_provider_requests_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((provider_requests >= 0))"
+    },
+    {
+      "name": "review_sync_jobs_reviews_fetched_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((reviews_fetched >= 0))"
+    },
+    {
+      "name": "review_sync_jobs_reviews_inserted_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((reviews_inserted >= 0))"
+    },
+    {
+      "name": "review_sync_jobs_status_check",
+      "table": "review_sync_jobs",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'retry'::text, 'completed'::text, 'dead'::text])))"
+    },
+    {
+      "name": "review_translations_language_check",
+      "table": "review_translations",
+      "schema": "public",
+      "definition": "CHECK ((language = ANY (ARRAY['fr'::text, 'vi'::text, 'en'::text])))"
+    },
+    {
+      "name": "review_translations_pkey",
+      "table": "review_translations",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "review_translations_review_id_language_key",
+      "table": "review_translations",
+      "schema": "public",
+      "definition": "UNIQUE (review_id, language)"
+    },
+    {
+      "name": "review_translations_source_text_sha256_check",
+      "table": "review_translations",
+      "schema": "public",
+      "definition": "CHECK ((source_text_sha256 ~ '^[0-9a-f]{64}$'::text))"
+    },
+    {
+      "name": "reviews_ai_attempt_count_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK ((ai_attempt_count >= 0))"
+    },
+    {
+      "name": "reviews_ai_rating_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK ((((rating >= 1) AND (rating <= 3)) OR ((ai_summary IS NULL) AND (ai_suggested_reply IS NULL) AND (ai_detected_language IS NULL) AND (ai_analyzed_at IS NULL) AND (ai_status IS NULL) AND (ai_error IS NULL))))"
+    },
+    {
+      "name": "reviews_ai_status_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((ai_status IS NULL) OR (ai_status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text]))))"
+    },
+    {
+      "name": "reviews_ai_token_counts_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK ((((ai_input_tokens IS NULL) OR (ai_input_tokens >= 0)) AND ((ai_output_tokens IS NULL) OR (ai_output_tokens >= 0)) AND ((ai_reasoning_tokens IS NULL) OR (ai_reasoning_tokens >= 0)) AND ((ai_total_tokens IS NULL) OR (ai_total_tokens >= 0))))"
+    },
+    {
+      "name": "reviews_attention_rule",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((((rating >= 1) AND (rating <= 3)) AND requires_attention AND (requires_ai_analysis OR historical_import)) OR ((rating = ANY (ARRAY[4, 5])) AND (NOT requires_attention) AND (NOT requires_ai_analysis))))"
+    },
+    {
+      "name": "reviews_establishment_external_review_id_key",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "UNIQUE (establishment_id, external_review_id)"
+    },
+    {
+      "name": "reviews_negative_feedback_status_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((negative_feedback_status IS NULL) OR (negative_feedback_status = ANY (ARRAY['processing'::text, 'completed'::text, 'failed'::text]))))"
+    },
+    {
+      "name": "reviews_pkey",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "name": "reviews_rating_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((rating >= 1) AND (rating <= 5)))"
+    },
+    {
+      "name": "reviews_reply_draft_text_length",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((reply_draft_text IS NULL) OR (char_length(reply_draft_text) <= 4000)))"
+    },
+    {
+      "name": "reviews_reply_draft_version_nonnegative",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK ((reply_draft_version >= 0))"
+    },
+    {
+      "name": "reviews_source_provider_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((source_provider IS NULL) OR (source_provider = ANY (ARRAY['apify'::text, 'outscraper'::text, 'mock'::text]))))"
+    },
+    {
+      "name": "reviews_status_check",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK ((status = ANY (ARRAY['new'::text, 'to_process'::text, 'processed'::text, 'ignored'::text])))"
+    },
+    {
+      "name": "reviews_translated_reply_text_length",
+      "table": "reviews",
+      "schema": "public",
+      "definition": "CHECK (((translated_reply_text IS NULL) OR (char_length(translated_reply_text) <= 4000)))"
+    },
+    {
+      "name": "provider_attempt_ledger_attempts_check",
+      "table": "provider_attempt_ledger",
+      "schema": "private",
+      "definition": "CHECK ((attempts > 0))"
+    },
+    {
+      "name": "provider_attempt_ledger_pkey",
+      "table": "provider_attempt_ledger",
+      "schema": "private",
+      "definition": "PRIMARY KEY (source_relation, source_key, phase)"
+    },
+    {
+      "name": "retention_rebuild_requests_pkey",
+      "table": "retention_rebuild_requests",
+      "schema": "private",
+      "definition": "PRIMARY KEY (request_id)"
+    },
+    {
+      "name": "retired_generation_keys_pkey",
+      "table": "retired_generation_keys",
+      "schema": "private",
+      "definition": "PRIMARY KEY (request_id)"
+    },
+    {
+      "name": "retired_report_scopes_pkey",
+      "table": "retired_report_scopes",
+      "schema": "private",
+      "definition": "PRIMARY KEY (establishment_id, language)"
+    },
+    {
+      "name": "review_seen_keys_external_key_sha256_check",
+      "table": "review_seen_keys",
+      "schema": "private",
+      "definition": "CHECK ((length(external_key_sha256) = 64))"
+    },
+    {
+      "name": "review_seen_keys_pkey",
+      "table": "review_seen_keys",
+      "schema": "private",
+      "definition": "PRIMARY KEY (establishment_id, external_key_sha256)"
+    }
+  ]
+}
