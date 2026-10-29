@@ -54,7 +54,7 @@ export async function processCurrentReportPreparation(admin:SupabaseClient,run:H
     if(allocated.error)throw Error('SHARED_JEV_ALLOCATION_FAILED');
     shared={missing_ids:sharedMissingIds(allocated.data)};
    }
-   const manifest=await currentBatchManifest(p,localHybridTokens,shared);
+   const manifest=shared?await currentBatchManifest(p,localHybridTokens,shared):await currentBatchManifest(p,localHybridTokens);
    const r=await admin.rpc('jev_batch_create_current',{p_source:run.id,p_manifest:manifest.body,p_sha:manifest.sha256});
    if(r.error||!r.data)throw Error('CURRENT_BATCH_QUEUE_FAILED');
    return {phase:'current_batches_queued',batch_run_id:r.data,provider_calls:0};
