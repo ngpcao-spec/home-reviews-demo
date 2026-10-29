@@ -166,6 +166,10 @@ export function reviewRow(
   }
 }
 
+export function reviewIngestionBundle(establishment:Pick<EstablishmentRow,'id'|'organization_id'>,reviews:NormalizedReview[],historicalImport:boolean,provider:GoogleReviewsResult['provider']){
+ return reviewsForPersistence(reviews).map(review=>({row:reviewRow(establishment,review,historicalImport,provider),translations:translationLanguage(review.translatedLanguage)&&review.translatedText?.trim()?[{language:translationLanguage(review.translatedLanguage),translated_text:review.translatedText}]:[],raw_payload:review.rawPayload??{}}));
+}
+
 export async function insertReviews(
   admin: SupabaseClient,
   establishment: Pick<EstablishmentRow, 'id' | 'organization_id'>,
@@ -176,7 +180,7 @@ export async function insertReviews(
   if (!reviews.length) return 0
   const policy=await readReviewPolicy(admin);
   if(policy.enabled){
-    const bundle=reviewsForPersistence(reviews).map(review=>({row:reviewRow(establishment,review,historicalImport,provider),translations:translationLanguage(review.translatedLanguage)&&review.translatedText?.trim()?[{language:translationLanguage(review.translatedLanguage),translated_text:review.translatedText}]:[],raw_payload:review.rawPayload??{}}));
+    const bundle=reviewIngestionBundle(establishment,reviews,historicalImport,provider);
     const r=await admin.rpc('ingest_recent_reviews',{p_establishment:establishment.id,p_organization:establishment.organization_id,p_bundle:bundle,p_provider:provider});if(r.error)throw Error('RECENT_REVIEWS_INGEST_FAILED:'+r.error.message);return r.data.inserted;
   }
   const validReviews = Array.from(

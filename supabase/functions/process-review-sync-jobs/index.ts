@@ -5,6 +5,7 @@ import {collectionLanguage,type ProviderLanguage} from '../_shared/review-langua
 import {
   apifyToken,
   insertReviews,
+  reviewIngestionBundle,
   fetchIncrementalPage,
   persistEstablishmentSnapshot,
   preferredLanguageForOrganization,
@@ -15,8 +16,7 @@ import {
   apifyRunFinished,
   apifyRunSucceeded,
   fetchApifyDataset,
-  getApifyRun,
-  normalizeApifyDataset,
+  getApifyRunDetails,
   startApifyRun,
 } from '../_shared/apify.ts'
 import {
@@ -24,6 +24,8 @@ import {
   mapWithConcurrency,
   retryPolicy,
 } from '../_shared/sync-queue.ts'
+
+import {incrementalSince,prepareIncrementalResult,incrementalRunReceipt,assertIncrementalReceipt,INCREMENTAL_SYNC_VERSION,INCREMENTAL_ACTOR_BUILD,INCREMENTAL_LIMIT} from '../_shared/incremental-review-sync.ts'
 
 interface SyncJob {
   id: string
@@ -41,6 +43,8 @@ interface SyncJob {
   head_review_at: string | null
   google_id: string
   google_maps_url: string
+  incremental_version?:string|null
+  incremental_input?:Record<string,unknown>|null
 }
 
 const workerId = () => `worker:${crypto.randomUUID()}`
@@ -100,11 +104,20 @@ async function processApifyJob(
 ) {
   const token = apifyToken()
   await assertIngestionAllowed(admin)
-  const frozen=await requireSuccess<{collection_language:'fr'|'vi';provider_start_attempted_at:string|null;apify_run_id:string|null;apify_dataset_id:string|null}>(admin.from('review_sync_jobs').select('collection_language,provider_start_attempted_at,apify_run_id,apify_dataset_id').eq('id',job.id).single())
+  const frozen=await requireSuccess<{collection_language:'fr'|'vi';provider_start_attempted_at:string|null;apify_run_id:string|null;apify_dataset_id:string|null;incremental_version:string|null;incremental_input:Record<string,unknown>|null}>(admin.from('review_sync_jobs').select('collection_language,provider_start_attempted_at,apify_run_id,apify_dataset_id,incremental_version,incremental_input').eq('id',job.id).single())
   Object.assign(job,frozen)
   let cursor = parseApifyCursor(job.pagination_cursor)??(job.apify_run_id&&job.apify_dataset_id?{provider:'apify' as const,runId:job.apify_run_id,datasetId:job.apify_dataset_id,language:job.collection_language}:null)
   if(cursor&&cursor.language!==job.collection_language)throw Error('SYNC_PROVIDER_LANGUAGE_CHANGED')
   if(!cursor&&job.provider_start_attempted_at)throw Error('APIFY_START_OUTCOME_UNKNOWN')
+  if(cursor&&(job.apify_run_id&&job.apify_run_id!==cursor.runId||job.apify_dataset_id&&job.apify_dataset_id!==cursor.datasetId))throw Error('SYNC_INCREMENTAL_RUN_IDENTITY_CHANGED')
+  if(cursor&&(!job.apify_run_id||!job.apify_dataset_id)){
+    const saved=await requireSuccess<boolean>(admin.rpc('checkpoint_review_sync_job',{p_job_id:job.id,p_worker_id:worker,p_pagination_cursor:JSON.stringify(cursor),p_head_review_id:job.head_review_id,p_head_review_at:job.head_review_at,p_provider_requests:0,p_reviews_fetched:0,p_reviews_inserted:0,p_lease_seconds:config.leaseSeconds}))
+    if(saved!==true)throw Error('SYNC_LEASE_LOST')
+    job.apify_run_id=cursor.runId;job.apify_dataset_id=cursor.datasetId
+  }
+  const since=incrementalSince(job)
+  if(job.incremental_version&&job.incremental_version!==INCREMENTAL_SYNC_VERSION)throw Error('SYNC_INCREMENTAL_VERSION_UNKNOWN')
+  if(job.incremental_input&&job.incremental_input.reviewsStartDate!==since)throw Error('SYNC_INCREMENTAL_INPUT_MISMATCH')
   if (!cursor) {
     const providerToken = `${worker}:${job.id}:apify-start`
     const slotDeadline = performance.now() + config.providerSlotWaitMs
@@ -127,11 +140,13 @@ async function processApifyJob(
         placeUrl: job.google_maps_url,
         language,
         sort: 'newest',
-        limit: 150,
-      },undefined,async()=>{
-        const reserved=await requireSuccess<boolean>(admin.rpc('reserve_review_sync_start',{p_job:job.id,p_worker:worker}))
+        limit: INCREMENTAL_LIMIT,
+        since,
+        build:INCREMENTAL_ACTOR_BUILD,
+      },undefined,async(input)=>{
+        const reserved=await requireSuccess<boolean>(admin.rpc('reserve_incremental_review_sync',{p_job:job.id,p_worker:worker,p_input:input,p_build:INCREMENTAL_ACTOR_BUILD}))
         if(reserved!==true)throw Error('SYNC_APIFY_START_ALREADY_RESERVED')
-        job.provider_start_attempted_at=new Date().toISOString()
+        job.provider_start_attempted_at=new Date().toISOString();job.incremental_version=INCREMENTAL_SYNC_VERSION;job.incremental_input=input
       })
       cursor = { provider: 'apify', runId: run.runId, datasetId: run.datasetId, language }
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
@@ -158,7 +173,11 @@ async function processApifyJob(
     return { jobId: job.id, status: 'provider_started', providerRequests: 1 }
   }
 
-  const run = await getApifyRun(token, cursor.runId)
+  const {run,native}=await getApifyRunDetails(token,cursor.runId)
+  if(run.runId!==cursor.runId||run.datasetId!==cursor.datasetId)throw Error('SYNC_INCREMENTAL_RUN_IDENTITY_CHANGED')
+  const receipt=incrementalRunReceipt(native)
+  const observed=await requireSuccess<boolean>(admin.rpc('observe_incremental_review_sync',{p_job:job.id,p_worker:worker,p_run:cursor.runId,p_receipt:receipt,p_received:null}))
+  if(observed!==true)throw Error('SYNC_LEASE_LOST')
   if (!apifyRunFinished(run.status)) {
     await continueJob(admin, job.id, worker, 5)
     return { jobId: job.id, status: 'provider_running', providerRequests: 0 }
@@ -179,37 +198,22 @@ async function processApifyJob(
   }
 
   const items = await fetchApifyDataset(token, cursor.datasetId)
-  const page = normalizeApifyDataset(items, job.google_maps_url)
-  const first = page.reviews[0]
-  const headReviewId = job.head_review_id ?? first?.externalReviewId ?? null
-  const headReviewAt = job.head_review_at ?? first?.publishedAt ?? null
-  const inserted = await insertReviews(admin, {
-    id: job.establishment_id,
-    organization_id: job.organization_id,
-  }, page.reviews, false, page.provider)
-  await persistEstablishmentSnapshot(admin, {
-    id: job.establishment_id,
-    organization_id: job.organization_id,
-  }, page.provider, page.establishment, `sync:${job.id}:${cursor.runId}`)
-  const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
-    p_job_id: job.id,
-    p_worker_id: worker,
-    p_pagination_cursor: JSON.stringify(cursor),
-    p_head_review_id: headReviewId,
-    p_head_review_at: headReviewAt,
-    p_provider_requests: 0,
-    p_reviews_fetched: page.reviews.length,
-    p_reviews_inserted: inserted,
-    p_lease_seconds: config.leaseSeconds,
+  const recorded=await requireSuccess<boolean>(admin.rpc('observe_incremental_review_sync',{p_job:job.id,p_worker:worker,p_run:cursor.runId,p_receipt:receipt,p_received:items.length}))
+  if(recorded!==true)throw Error('SYNC_LEASE_LOST')
+  assertIncrementalReceipt(receipt)
+  const plan=prepareIncrementalResult(items,job,run,!job.incremental_version)
+  const bundle=reviewIngestionBundle({id:job.establishment_id,organization_id:job.organization_id},plan.reviews,false,'apify')
+  const result=await requireSuccess<Record<string,unknown>>(admin.rpc('commit_incremental_review_sync',{
+    p_job:job.id,p_worker:worker,p_bundle:bundle,p_result:{
+      run_id:cursor.runId,dataset_id:cursor.datasetId,receipt,since:plan.since,
+      received:plan.received,unique:plan.unique,external_ids:plan.external_ids,outside_window:plan.outside_window,
+      head_id:plan.head.id,head_at:plan.head.at,legacy_reused:plan.legacy,empty:plan.empty,
+      place:plan.page.establishment,
+    },
   }))
-  if (saved !== true) throw new Error('SYNC_LEASE_LOST')
-  const completed = await requireSuccess(admin.rpc('complete_review_sync_job', {
-    p_job_id: job.id,
-    p_worker_id: worker,
-    p_synced_at: new Date().toISOString(),
-  }))
-  if (completed !== true) throw new Error('SYNC_LEASE_LOST')
-  return { jobId: job.id, status: 'completed', providerRequests: 0 }
+  if(!result)throw Error('SYNC_LEASE_LOST')
+  return {jobId:job.id,status:'completed',providerRequests:0,...result}
+
 }
 
 async function processJob(
@@ -236,7 +240,7 @@ async function processJob(
         p_job_id: job.id,
         p_worker_id: worker,
         p_error_code: policy.code,
-        p_retryable: policy.retryable&&!policy.code.startsWith('APIFY_RUN_'),
+        p_retryable: policy.retryable&&!policy.code.startsWith('APIFY_RUN_')&&!policy.code.startsWith('SYNC_INCREMENTAL_'),
         p_max_attempts: config.maxAttempts,
         p_backoff_seconds: policy.backoffSeconds,
       }))

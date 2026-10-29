@@ -37,6 +37,7 @@ export interface ApifyReviewRequest {
   sort: 'newest' | 'lowest_rating'
   limit?: number
   since?: string
+  build?: string
 }
 
 const isRecord = (value: unknown): value is JsonRecord =>
@@ -157,7 +158,7 @@ export async function startApifyRun(
   token: string,
   request: ApifyReviewRequest,
   observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
-  beforeStart?:()=>Promise<void>,
+  beforeStart?:(input:ReturnType<typeof apifyActorInput>)=>Promise<void>,
 ): Promise<ApifyRunState> {
   collectionLanguage(request.language)
   if (!token.trim()) throw new ApifyError('APIFY_TOKEN_MISSING', 503)
@@ -168,9 +169,10 @@ export async function startApifyRun(
     ? Math.min(10, Math.max(0.1, configuredChargeLimit))
     : 1
   observe?.('run_start')
-  await beforeStart?.()
+  if(request.build&&!/^\d+\.\d+\.\d+$/.test(request.build))throw new ApifyError('APIFY_BUILD_INVALID',400)
+  await beforeStart?.(apifyActorInput({...request,placeUrl:resolvedUrl}))
   console.info('GOOGLE_REVIEWS_FETCH_STARTED',{language:request.language})
-  const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}`, {
+  const payload = await apiJson(token, `/acts/${APIFY_ACTOR}/runs?maxTotalChargeUsd=${maxTotalChargeUsd}${request.build?'&build='+request.build:''}`, {
     method: 'POST',
     headers: apiHeaders(token, true),
     body: JSON.stringify(apifyActorInput({ ...request, placeUrl: resolvedUrl })),
@@ -182,6 +184,12 @@ export async function getApifyRun(token: string, runId: string,waitSeconds=0): P
   const bounded=Math.min(20,Math.max(0,Math.floor(waitSeconds)))
   const payload = await apiJson(token, `/actor-runs/${encodeURIComponent(runId)}${bounded?'?waitForFinish='+bounded:''}`,{},30_000)
   return runFromPayload(payload)
+}
+
+/** Same single GET as getApifyRun; expose native accounting/stop metadata to the sync receipt. */
+export async function getApifyRunDetails(token:string,runId:string){
+ const payload=await apiJson(token,`/actor-runs/${encodeURIComponent(runId)}`)
+ return {run:runFromPayload(payload),native:isRecord(payload.data)?payload.data:payload}
 }
 
 export function apifyRunFinished(status: string): boolean {
