@@ -91,7 +91,7 @@ async function manualQueue(s:Awaited<ReturnType<typeof source>>){
 }
 it('installs without enqueuing work or modifying any supplier receipt',async()=>{
  expect(await q('select * from public.test_dispatch')).toEqual([]);expect(await q('select * from private.shared_jev_analyses')).toEqual([]);
- for(const role of ['anon','authenticated'])for(const fn of ['jev_shared_allocate(uuid,jsonb)','jev_shared_read(uuid)','jev_shared_plan_auto(uuid,jsonb)','jev_shared_refresh(uuid)'])expect((await q('select has_function_privilege($1,$2,\'execute\') ok',[role,'public.'+fn]))[0].ok).toBe(false);
+ for(const role of ['anon','authenticated'])for(const fn of ['jev_shared_allocate(uuid,jsonb)','jev_shared_read(uuid)','jev_shared_progress(uuid)','jev_shared_plan_auto(uuid,jsonb)','jev_shared_refresh(uuid)'])expect((await q('select has_function_privilege($1,$2,\'execute\') ok',[role,'public.'+fn]))[0].ok).toBe(false);
 });
 it('146 saved plus 4 new analyses plans exactly four; all saved plans zero',async()=>{
  const s=await source(150),a=await allocate(s);expect(sharedMissingIds(a)).toHaveLength(150);
@@ -100,6 +100,7 @@ it('146 saved plus 4 new analyses plans exactly four; all saved plans zero',asyn
  expect(sharedMissingIds(await allocate(s))).toHaveLength(4);
  await q("update private.shared_jev_analyses set state='ready',result='{}',result_sha256=public.jls_restaurant_hash('{}')");
  expect(sharedMissingIds(await allocate(s))).toEqual([]);
+ expect(await rpc('jev_shared_progress',[s.id])).toEqual({completed_reviews:150,total_reviews:150,unknown_reviews:0,failed_reviews:0});
 });
 it('coordinates automatic/manual consumers on the same Google IDs without a second owner',async()=>{
  const auto=await source(4,'auto');expect(sharedMissingIds(await allocate(auto))).toHaveLength(4);

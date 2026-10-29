@@ -13,7 +13,7 @@ function fixture(options:{published?:boolean;preparing?:boolean;unknown?:boolean
     :table==='analysis_jev_batch_runs'?{id:'batch-run',status:options.published?'completed':'running',stage:options.published?'validate_sol':'sol',completed_at:options.published?'2026-10-24T10:04:54Z':null,error_code:null,sol_request_count:1}
     :table==='analysis_jev_batch_tasks'?options.shared?[]:Array.from({length:9},(_,i)=>({status:options.unknown&&i===0?'unknown':'completed',reviews:i===8?41:50}))
     :table==='analysis_jls_restaurant_runs'?{stage:'jev'}:[{status:'completed'},{status:'pending'}];return {data,error:null};}
-  return query;},rpc:async()=>({data:[{state:'ready'},{state:'ready'},{state:'ready'},{state:'pending'}],error:null})};return {db:db as never,reads};
+  return query;},rpc:async()=>({data:{completed_reviews:3,total_reviews:4},error:null})};return {db:db as never,reads};
 }
 describe('normal button status uses the frozen current request transport',()=>{
  it('shows ready shared analyses even when the report owns zero new native batches',async()=>{

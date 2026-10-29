@@ -102,6 +102,17 @@ end $$;
 revoke all on function public.jev_shared_read(uuid) from public,anon,authenticated;
 grant execute on function public.jev_shared_read(uuid) to service_role;
 
+-- UI polling reads counters only; it must not deserialize every native result.
+create function public.jev_shared_progress(p_consumer uuid) returns jsonb language plpgsql set search_path='' as $$
+begin
+ if current_user<>'service_role' then raise exception 'FORBIDDEN';end if;
+ return (select jsonb_build_object('total_reviews',count(*),'completed_reviews',count(*) filter(where a.state='ready'),
+  'unknown_reviews',count(*) filter(where a.state='unknown'),'failed_reviews',count(*) filter(where a.state in('failed','expired')))
+ from private.shared_jev_consumers c join private.shared_jev_analyses a using(identity_sha256) where c.consumer_id=p_consumer and c.expires_at>clock_timestamp());
+end $$;
+revoke all on function public.jev_shared_progress(uuid) from public,anon,authenticated;
+grant execute on function public.jev_shared_progress(uuid) to service_role;
+
 create function public.jev_shared_allocate(p_consumer uuid,p_refs jsonb) returns jsonb language plpgsql set search_path='' as $$
 declare src jsonb;r jsonb;x jsonb;key text;a private.shared_jev_analyses;t record;expiry timestamptz;begin
  if current_user<>'service_role' then raise exception 'FORBIDDEN';end if;
