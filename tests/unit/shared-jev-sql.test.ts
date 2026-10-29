@@ -55,6 +55,7 @@ beforeAll(async()=>{
  const autoDefinitions=JSON.parse(readFileSync('tests/fixtures/automatic-report-functions-before.json','utf8'));
  await db.exec(autoDefinitions['public.enqueue_current_report']);
  await db.exec(readFileSync('supabase/migrations/20261029081147_automatic_report_refresh.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261029084010_retire_obsolete_report_refresh_checks.sql','utf8'));
  await db.exec('create trigger batch_frozen before update on public.analysis_jev_batch_runs for each row execute function public.guard_batch_frozen_data();create trigger task_frozen before update on public.analysis_jev_batch_tasks for each row execute function public.guard_batch_frozen_data();');
  const guards=JSON.parse(readFileSync('tests/fixtures/report-selector-functions-before.json','utf8'));
  await db.exec(guards.definitions.find((f:{name:string})=>f.name==='guard_report_request').definition);
@@ -152,6 +153,18 @@ it('read state has no enqueue/dispatch and private counters are inaccessible to 
  await autoReference();await fresh(25);const before=await q('select * from public.test_dispatch');await rpc('read_report_refresh_state',[est,'vi']);expect(await q('select * from public.test_dispatch')).toEqual(before);
  const grants=await q<{v:boolean}>("select has_function_privilege('authenticated','public.read_report_refresh_state(uuid,text)','execute') v");expect(grants[0].v).toBe(false);
  await db.exec('set local role authenticated');await expect(rpc('read_report_refresh_state',[est,'vi'])).rejects.toThrow();
+});
+it('retires a check whose reference disappeared during reload without starting a first report',async()=>{
+ await autoReference();await fresh(25);await db.exec("insert into private.automatic_report_checks values('"+est+"','vi');delete from public.current_report_publications");
+ expect(await triggerAuto()).toBe('manual_reference_required');expect(await q('select * from private.automatic_report_checks')).toHaveLength(0);
+ expect(await q('select * from private.automatic_report_attempts')).toHaveLength(0);
+});
+it('retires an already-consumed check while retaining the durable no-retry fence',async()=>{
+ await autoReference();await fresh(25);expect(await triggerAuto()).toBe('enqueued');
+ await db.exec("update public.historical_report_runs set status='failed' where status='queued'");
+ await q("insert into private.automatic_report_checks values($1,'vi')",[est]);
+ expect(await triggerAuto()).toBe('already_authorized');expect(await q('select * from private.automatic_report_checks')).toHaveLength(0);
+ expect(await q("select * from private.automatic_report_attempts where state='blocked'")).toHaveLength(1);
 });
 it('coalesces unplanned same-language sync comments without delaying a lone comment or overwriting a racing preparation',async()=>{
  await autoReference(2);const ids=await fresh(3);await q("update public.reviews set original_text='Synthetic new comment',original_language='vi' where id=any($1)",[ids]);

@@ -72,7 +72,8 @@ rights, missing scores, closure and all other eligibility checks remain in force
 
 ## Delivery
 
-Apply only `20261029081147_automatic_report_refresh.sql`, then deploy the merged
+Apply `20261029081147_automatic_report_refresh.sql` and
+`20261029084010_retire_obsolete_report_refresh_checks.sql`, then deploy the merged
 sources used by `jev-batch-experiment` (four-argument normalization),
 `process-historical-report-jobs`, `process-jls-restaurant`,
 `generate-historical-report`, `get-historical-report-status`, `parallel-reports`,
