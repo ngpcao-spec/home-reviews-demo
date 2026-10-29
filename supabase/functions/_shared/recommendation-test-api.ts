@@ -34,7 +34,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    if(membership.error)throw Error('RECOMMENDATION_READ_FAILED');
    const organizations=(membership.data??[]).flatMap(m=>{
     const org=m.organization as unknown as {id:string;name:string}|null;
-    return m.user_id===context.user.id && ['owner','admin','manager'].includes(m.role) && org?.id===m.organization_id && uuid.test(org.id)
+    return org && m.user_id===context.user.id && ['owner','admin','manager'].includes(m.role) && org.id===m.organization_id && uuid.test(org.id)
      ?[{id:org.id,name:org.name}]:[];
    });
    const organizationId=input.organization_id??organizations[0]?.id;
