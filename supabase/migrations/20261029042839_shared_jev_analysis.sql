@@ -245,6 +245,36 @@ end $$;
 revoke all on function private.enqueue_new_review_jev(uuid,uuid[]) from public,anon,authenticated;
 grant execute on function private.enqueue_new_review_jev(uuid,uuid[]) to service_role;
 
+-- Preserve reusable legacy classifications just before their disposable source
+-- is retired by normal rotation/supersession. No analysis or deployment backfill.
+create function private.preserve_retiring_shared_jev(p_source uuid) returns void language plpgsql security definer set search_path='' as $$
+declare b public.analysis_jev_batch_runs;x record;identity jsonb;key text;begin
+ select * into b from public.analysis_jev_batch_runs where current_source_run_id=p_source;
+ if b.id is null then return;end if;
+ perform pg_advisory_xact_lock(hashtextextended('shared-jev:'||b.establishment_id::text,0));
+ for x in select t.id task_id,t.request_sha256,t.receipt_sha256,rv.value source,pr.value projected,r.external_review_id
+  from public.analysis_jev_batch_tasks t cross join lateral jsonb_array_elements(t.projection->'rows') pr(value)
+  join lateral jsonb_array_elements(b.snapshot->'reviews') rv(value) on rv.value->>'id'=pr.value->>'review_id'
+  join public.reviews r on r.id=(rv.value->>'id')::uuid and r.organization_id=b.organization_id and r.establishment_id=b.establishment_id
+  where t.run_id=b.id and t.status='completed' and t.receipt->>'served_model'='jev-1.13.0'
+   and public.jls_restaurant_hash(t.projection)=t.projection_sha256 and t.projection->>'parent_receipt_sha256'=t.receipt_sha256
+   and public.jls_restaurant_hash(t.request_wire::jsonb#>'{state,consignes_communes}')='3a82a9c032217a0d10ba8a9ceccdafb71bc702366145d5837a324af580c20d22'
+   and t.request_wire::jsonb#>>array['state','avis','review_'||r.id::text]=rv.value->>'analysis_text'
+   and nullif(r.external_review_id,'') is not null
+ loop
+  identity=jsonb_build_object('version','shared-jev-initial-v1','model','jev-1.13.0',
+   'configuration_sha256','14c20d5525a70b200a711a41ae5e281ea64eaac910196d0a733bed64701930e3',
+   'instructions_sha256','3a82a9c032217a0d10ba8a9ceccdafb71bc702366145d5837a324af580c20d22','parser','jev-direct-categories-parser-v1.1-rounding',
+   'organization_id',b.organization_id,'establishment_id',b.establishment_id,'google_review_id',x.external_review_id,
+   'analysis_text_sha256',encode(extensions.digest(x.source->>'analysis_text','sha256'),'hex'),'analysis_language',coalesce(x.source->>'analysis_language','und'));
+  key=public.jls_restaurant_hash(identity);
+  insert into private.shared_jev_analyses(identity_sha256,organization_id,establishment_id,google_review_id,identity,owner_consumer,task_id,source_review_id,state,result,result_sha256,receipt_sha256,request_sha256,question_keys)
+   values(key,b.organization_id,b.establishment_id,x.external_review_id,identity,p_source,x.task_id,(x.source->>'id')::uuid,'ready',x.projected->'result',public.jls_restaurant_hash(x.projected->'result'),x.receipt_sha256,x.request_sha256,x.projected->'question_keys') on conflict do nothing;
+ end loop;
+end $$;
+revoke all on function private.preserve_retiring_shared_jev(uuid) from public,anon,authenticated;
+grant execute on function private.preserve_retiring_shared_jev(uuid) to service_role;
+
 create function public.jev_shared_normalize_auto(p_run uuid,p_snapshot jsonb,p_sha text) returns boolean language plpgsql set search_path='' as $$
 declare b public.analysis_jev_batch_runs;x jsonb;r jsonb;begin
  if current_user<>'service_role' or public.jls_restaurant_hash(p_snapshot) is distinct from p_sha then raise exception 'FORBIDDEN';end if;
@@ -338,7 +368,7 @@ declare d text;a text;begin
  if exists(select 1 from public.report_generation_requests where source_run_id=p_source and shared_jev_version is not null)
  and exists(select 1 from public.analysis_jev_batch_tasks bt join public.analysis_jev_batch_runs br on br.id=bt.run_id where br.current_source_run_id=p_source and bt.request_count=1 and bt.receipt is null and bt.lease_until>clock_timestamp()) then return false;end if; '||a);
  a='delete from public.report_corpus_scopes where source_run_id=p_source;';
- d=replace(d,a,'delete from private.shared_jev_consumers where consumer_id=p_source; '||a);execute d;
+ d=replace(d,a,'perform private.preserve_retiring_shared_jev(p_source);delete from private.shared_jev_consumers where consumer_id=p_source; '||a);execute d;
 
  d=pg_get_functiondef('private.store_current_report_publication(jsonb,jsonb,timestamptz,boolean)'::regprocedure);
  a='if is_stale and not p_recovery then return false;end if;';
@@ -431,7 +461,11 @@ declare r record;prior text;begin
  update private.shared_jev_analyses a set state='expired',updated_at=clock_timestamp() where state='pending' and created_at+interval '24 hours'<=clock_timestamp()
   and not exists(select 1 from public.analysis_jev_batch_tasks where id=a.task_id and status in('received','completed'));
  delete from private.shared_jev_analyses a where state='ready' and not exists(select 1 from private.shared_jev_consumers c where c.identity_sha256=a.identity_sha256)
-  and not exists(select 1 from public.reviews live where live.establishment_id=a.establishment_id and live.external_review_id=a.google_review_id);
+  and not exists(select 1 from public.reviews live where live.establishment_id=a.establishment_id and live.external_review_id=a.google_review_id
+   and (a.identity->>'analysis_text_sha256'=encode(extensions.digest(coalesce(nullif(live.original_text,''),live.text,''),'sha256'),'hex')
+    or exists(select 1 from public.review_translations tr where tr.review_id=live.id and tr.language in('fr','vi')
+     and tr.source_text_sha256=encode(extensions.digest(coalesce(nullif(live.original_text,''),live.text,''),'sha256'),'hex')
+     and a.identity->>'analysis_text_sha256'=encode(extensions.digest(tr.translated_text,'sha256'),'hex'))));
  for r in select s.id from public.historical_report_runs s join public.report_generation_requests q on q.source_run_id=s.id
   where q.shared_jev_version is not null and s.created_at+interval '24 hours'<=clock_timestamp()
  loop perform private.retention_retire_source(r.id,'SHARED_FROZEN_DATA_EXPIRED');end loop;

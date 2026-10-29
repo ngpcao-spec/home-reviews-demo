@@ -238,3 +238,17 @@ it('the real publication triggers permit a pinned rotated corpus, mark it dated/
  expect(await q('select stale from public.current_report_publications')).toEqual([{stale:true}]);
  expect((await q('select jsonb_array_length(source_bindings) n from public.current_report_publications'))[0].n).toBe(4);
 });
+it('preserves provably compatible legacy native results before disposable-source retirement',async()=>{
+ const s=await source(4),{run}=await manualQueue(s),t=await rpc<BatchTask>('jev_batch_claim',[run,'worker']);
+ const raw=JSON.stringify(mockBatchJevResponse(JSON.parse(t.request_wire))),receipt={request_sha256:t.request_sha256,http_status:200,error:null,raw_response_text:raw,raw_response_sha256:await analysisTextSha256(raw),served_model:'jev-1.13.0',usage:{input_tokens:101,output_tokens:202}};
+ await rpc('jev_batch_receive',[t.id,'worker',receipt,await directHash(receipt)]);
+ const received=await rpc<BatchTask>('jev_batch_claim',[run,'projector']),[br]=await q<BatchRun>('select * from public.analysis_jev_batch_runs where id=$1',[run]),projection=await validateBatchTask(br,received);
+ await rpc('jev_batch_save_projection',[t.id,'projector',projection,await directHash(projection),null]);
+ // Simulate an existing pre-feature projection: only the shared index is absent.
+ await q('delete from private.shared_jev_analyses');
+ for(const r of s.rows)await q("insert into public.reviews(id,organization_id,establishment_id,external_review_id,rating,requires_attention,historical_import,original_text,original_language,published_at) values($1,$2,$3,$4,$5,$6,true,$7,'vi',clock_timestamp())",[r.id,org,est,r.google_review_id,r.rating,r.rating<=3,r.original_text]);
+ await q('select private.preserve_retiring_shared_jev($1)',[s.id]);
+ expect((await q('select state,source_review_id from private.shared_jev_analyses')).every(x=>x.state==='ready'&&s.rows.some(r=>r.id===x.source_review_id))).toBe(true);
+ const next=await source(4);expect(sharedMissingIds(await allocate(next))).toEqual([]);
+ expect((await q('select count(*)::int n from public.analysis_jev_batch_tasks'))[0].n).toBe(1);
+});

@@ -37,7 +37,9 @@ again. The full report corpus supplies counts and selection, not just new texts.
 
 Completed legacy native batches are adopted lazily only if Google linkage,
 exact input/language, initial common instructions, served model and immutable
-projection/receipt are provable. No global backfill is installed. An unprovable
+projection/receipt are provable. Normal source retirement also preserves proven
+classifications of still-live review IDs before deleting the disposable batch.
+No global backfill is installed. An unprovable
 old result is not treated as compatible. Failed/unknown identities block rather
 than silently allocating another attempt. Saved received responses are validated
 without another HTTP call; a late saved response can be projected without
