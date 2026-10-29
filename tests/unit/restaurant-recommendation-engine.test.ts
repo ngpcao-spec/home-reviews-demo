@@ -42,6 +42,14 @@ describe('geography, explicit criteria and access',() => {
   });
 });
 describe('frozen V2 scores, freshness and report evidence',() => {
+  it('retains coherent dated scores when only the corpus changed, with an explicit freshness notice',()=>{
+    const a=sheet('dated',{stale:true});a.stale_reason='CORPUS_CHANGED';a.publication!.stale_reason='CORPUS_CHANGED';
+    const before=structuredClone(a),r=run([a]);expect(r.proposals).toHaveLength(1);
+    expect(r.proposals[0].report).toMatchObject({id:a.report_id,generated_at:a.report_generated_at,freshness:'corpus_changed',corpus:a.corpus});
+    expect(r.proposals[0].reasons).toContainEqual({code:'DATED_REPORT_NEW_REVIEWS_NOT_COVERED'});expect(a).toEqual(before);
+    a.publication!.stale_reason='PUBLICATION_INVALID';expect(run([a]).proposals).toHaveLength(0);
+    a.publication!.stale_reason='CORPUS_CHANGED';a.calculation_text='{}';expect(run([a]).proposals).toHaveLength(0);
+  });
   it('excludes stale, invalid, missing-score and old-version sheets with explicit reasons',() => {
     const old=sheet('old');old.calculation_version='internal-recommendation-v1';const missing=sheet('missing');missing.calculation_text='{}';
     const mismatch=sheet('mismatch');mismatch.publication!.report_id='other';const noPoint=sheet('no-point');noPoint.metadata.google_metadata={};

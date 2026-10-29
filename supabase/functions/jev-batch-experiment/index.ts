@@ -34,7 +34,7 @@ Deno.serve(async request=>{
    sharedClaimSaved:(id,w)=>rpc('jev_shared_claim_saved',{p_run:id,p_worker:w}),
    sharedRead:consumer=>rpc('jev_shared_read',{p_consumer:consumer}),
    sharedAllocate:(consumer,refs)=>rpc('jev_shared_allocate',{p_consumer:consumer,p_refs:refs}),
-   sharedNormalizeAuto:(id,snapshot,sha)=>rpc('jev_shared_normalize_auto',{p_run:id,p_snapshot:snapshot,p_sha:sha}),
+   sharedNormalizeAuto:(id,snapshot,sha,expectedSha)=>rpc('jev_shared_normalize_auto',{p_run:id,p_snapshot:snapshot,p_sha:sha,p_expected_sha:expectedSha}),
    sharedPlanAuto:(id,plans)=>rpc('jev_shared_plan_auto',{p_run:id,p_plans:plans}),
    sharedRefresh:id=>rpc('jev_shared_refresh',{p_run:id}),
    load:async id=>{const [r,t]=await Promise.all([admin.from('analysis_jev_batch_runs').select('*').eq('id',id).single(),admin.from('analysis_jev_batch_tasks').select('*').eq('run_id',id).order('number')]);if(r.error||t.error)throw Error('BATCH_LOAD_FAILED');return {run:r.data,tasks:t.data};},

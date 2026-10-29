@@ -7,6 +7,12 @@ import {CurrentReports,type CurrentReportsView} from './CurrentReports'
 import {parallelPresentationRow} from '../../tests/fixtures/parallel-presentation'
 const mock=vi.hoisted(()=>({invoke:vi.fn()}));vi.mock('../lib/supabase',()=>({supabase:{functions:{invoke:mock.invoke}}}))
 afterEach(()=>{cleanup();mock.invoke.mockReset()})
+it.each(['fr','vi'] as const)('shows refresh counts and localized automatic failure without technical details (%s)',async(language)=>{
+ draw(language,'jev_sol_v2','/analyses',{refresh:{enabled:true,reference_usable:true,reference_report_id:'dated',new_reviews:24,negative_reviews:2,threshold_met:false,state:'failed',origin:'automatic_thresholds',request_id:'auto'}});
+ expect(await screen.findByRole('region',{name:language==='fr'?'Actualisation du rapport':'Cập nhật báo cáo'})).toHaveTextContent('24');
+ expect(screen.getByText(language==='fr'?/Aucun nouvel essai automatique/:/Không tự động thử lại/)).toBeVisible();
+ expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
+});
 function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',initial='/analyses',extra:Partial<CurrentReportsView>={}){
  const row=parallelPresentationRow(language);row.current_source_run_id='source';
  const data={routing:{engine,updated_at:'2026-10-23'},legacy_report:null,versions:[{id:row.id,current_source_run_id:'source',created_at:'2026-10-23',generated_at:'2026-10-23',state:'completed'}],experimental:row,run:null,tasks:[],operation:null,...extra} satisfies CurrentReportsView;

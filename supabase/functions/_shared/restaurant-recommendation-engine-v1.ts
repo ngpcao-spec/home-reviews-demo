@@ -22,7 +22,7 @@ export type SheetRow = {
   report_generated_at: string; calculation_version: string; stale: boolean; stale_reason: string | null;
   corpus: Obj; metadata: Obj; report_sections: Obj; calculation_text: string;
   publication: {report_id: string; source_run_id: string; organization_id: string; establishment_id: string; language: string;
-    scope: Obj; stale: boolean; generated_at: string; derived: Obj} | null;
+    scope: Obj; stale: boolean; stale_reason?:string|null; generated_at: string; derived: Obj} | null;
 };
 export type Score = {value: string; numerator: string; denominator: string};
 export type Citation = {report_id: string; section: 'positive_aspects' | 'reservations'; index: number; category: string; text: string; evidence_ids: string[]};
@@ -41,7 +41,7 @@ export type Proposal = {
   practical:PlaceProfile|null; specialties:string[]; usages:string[];
   opening:{status:'not_requested'|'scheduled_open'; live:false; holiday_guarantee:false};
   contradictions:{feature:string; google:unknown; citations:Citation[]}[];
-  report: {id: string; generated_at: string; language: string; freshness: 'current'; corpus: Obj};
+  report: {id: string; generated_at: string; language: string; freshness: 'current'|'corpus_changed'; corpus: Obj};
 };
 type Candidate = {proposal: Proposal; global: Rational; preference: Rational; matches: number; band: number; preference_band: number};
 export type Result = {
@@ -221,7 +221,8 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const name = str(identity.name) ?? row.establishment_id;
     if (!validPublication(row) || identity.establishment_id !== row.establishment_id || identity.organization_id !== organization) reasons.push('INVALID_OR_MISMATCHED_REPORT');
     if (duplicates.has(row.establishment_id)) reasons.push('DUPLICATE_SHEET');
-    if (row.stale || row.publication?.stale) reasons.push('STALE_SHEET');
+    const corpusChanged=!!(row.stale||row.publication?.stale)&&(!row.stale||row.stale_reason==='CORPUS_CHANGED')&&(!row.publication?.stale||(row.publication.stale_reason??row.stale_reason)==='CORPUS_CHANGED');
+    if ((row.stale || row.publication?.stale)&&!corpusChanged) reasons.push('STALE_SHEET');
     if (row.calculation_version !== 'internal-recommendation-v2') reasons.push('UNSUPPORTED_SCORE_VERSION');
     const profile=practicalProfile(row);
     if(profile?.hours.permanently_closed===true||profile?.hours.temporarily_closed===true)reasons.push('GOOGLE_CLOSURE_OBSERVED');
@@ -265,7 +266,8 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     const proposal: Proposal = {establishment_id:row.establishment_id,name,distance_metres:distance,distance_kind:'straight_line',cuisines:{values:types,source:profile?.categories.source??str(google.source),observed_at:profile?.categories.observed_at??str(google.observed_at)},
       practical:profile,specialties,usages,contradictions,opening:{status:request.visit_at?'scheduled_open':'not_requested',live:false,holiday_guarantee:false},
       scores:{quality:categories.quality.out,service:categories.service.out,ambiance:categories.ambiance.out,global:global.out},budget,budget_match:match,
-      reasons:choiceReasons,reservations,features:observations,report:{id:row.report_id,generated_at:row.report_generated_at,language:row.language,freshness:'current',corpus:row.corpus}};
+      reasons:choiceReasons,reservations,features:observations,report:{id:row.report_id,generated_at:row.report_generated_at,language:row.language,freshness:corpusChanged?'corpus_changed':'current',corpus:row.corpus}};
+    if(corpusChanged)proposal.reasons.push({code:'DATED_REPORT_NEW_REVIEWS_NOT_COVERED'});
     candidates.push({proposal,global:global.exact,preference,matches:features.filter(f => observations[f].status === 'reported').length,band:0,preference_band:0});
   }
   const ranked: Candidate[] = [];

@@ -57,6 +57,8 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
   c.admin.rpc('read_retired_report_scope',{p_establishment:e.data.id,p_organization:org,p_language:language})]);
   if(state.error||scope.error||retired.error)throw Error('REVIEW_SCOPE_READ_FAILED');retention={policy,state:state.data,scope:scope.data,retired:retired.data};
  }
- return {retention,routing:routing.data,current_transport:request.data?.jev_transport??routing.data.jev_transport??'individual',request_run,legacy_report:policy.enabled?null:legacy.data,versions:policy.enabled?[]:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
+ const refresh=policy.enabled?await c.admin.rpc('read_report_refresh_state',{p_establishment:e.data.id,p_language:language}):{data:null,error:null};
+ if(refresh.error)throw Error('REPORT_REFRESH_STATE_READ_FAILED');
+ return {refresh:refresh.data,retention,routing:routing.data,current_transport:request.data?.jev_transport??routing.data.jev_transport??'individual',request_run,legacy_report:policy.enabled?null:legacy.data,versions:policy.enabled?[]:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
 }
 
