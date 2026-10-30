@@ -34,7 +34,7 @@ describe('faithful presentation of saved AI reference choices, with no provider'
  it('preserves the entire qualifier and does not infer recurrence from two evidence associations',()=>{
   const f=fixture(),result=f.render(['score_global'],'reservation_quality');
   expect(result.caution?.text).toContain('mais reste satisfait');expect(result.caution?.text).toContain('deux reproches différents');
-  expect(result.caution?.notes).toEqual(['recurrence_not_established']);expect(result.caution).not.toHaveProperty('recurring');
+  expect(result.caution?.notes).toEqual(['recurrence_requires_source_check']);expect(result.caution).not.toHaveProperty('recurring');
  });
  it.each(['fr','vi'] as const)('attributes quiet to the exact saved Google declaration in %s without fabricating a report source',language=>{
   const f=fixture(language),reason=f.render(['feature_quiet']).reasons[0];

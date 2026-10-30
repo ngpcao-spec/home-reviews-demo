@@ -113,7 +113,7 @@ function RecommendationCard({proposal:p,selection}:{proposal:Proposal;selection?
 
 function ExplanationNotes({explanation}:{explanation:AiExplanation}){
  const {language}=useI18n(),m=recommendationMessages[language];
- return <>{explanation.notes?.map(note=><p className="recommendation-source-note" key={note}>{note==='google_not_noise_measurement'?m.googleLimit:note==='recurrence_not_established'?m.recurrenceLimit:m.sourceUnavailable}</p>)}</>;
+ return <>{explanation.notes?.map(note=><p className="recommendation-source-note" key={note}>{note==='google_not_noise_measurement'?m.googleLimit:note==='recurrence_requires_source_check'?m.recurrenceLimit:m.sourceUnavailable}</p>)}</>;
 }
 function ExplanationDetails({explanation:e,label}:{explanation:AiExplanation;label:string}){
  const {language}=useI18n(),m=recommendationMessages[language],locale=language==='vi'?'vi-VN':'fr-FR';

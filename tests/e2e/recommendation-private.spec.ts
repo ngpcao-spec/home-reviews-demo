@@ -68,7 +68,7 @@ for(const language of ['fr','vi'] as const){
   const card=page.locator('.recommendation-ai .recommendation-card').filter({hasText:'Restaurant témoin 1'});
   await expect(card).toContainText(language==='fr'?'Les plats sont appréciés':'Các món ăn được khách khen');
   await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'davantage d’espace':'thêm không gian');
-  await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'à elle seule':'Chỉ riêng');
+  await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'Le nombre de références':'Số tham chiếu');
   await expect(card).toContainText(language==='fr'?'ne constitue pas un constat des avis':'không phải kết luận từ các đánh giá');
   await card.getByText(language==='fr'?'Détails et sources':'Chi tiết và nguồn',{exact:true}).click();
   const sources=card.locator('.recommendation-bound-source');
