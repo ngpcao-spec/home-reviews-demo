@@ -34,7 +34,7 @@ export function RecommendationTestPage(){
   const version=++epoch.value;pending.current=version;setBusy(true);setComparing(compare);setResponse(null);setError('');
   if(removeBudget)setMaximum('');
   const input:RecommendationTestInput={action:compare?'compare':'recommend',organization_id:options.organization_id,...(cuisine?{cuisine}:{}),
-   ...(compare?{preference_mode:'free_text_v2' as const}:{}),
+   ...(compare?{preference_mode:'report_facts_v3' as const}:{}),
    ...(required.length?{required_features:required}:{}),...(compare&&preference.trim()?{preference:preference.trim()}:{}),
    ...(!removeBudget&&value?{maximum_vnd:Number(value)}:{}),...(service?{service_priority:true}:{})};
   try{

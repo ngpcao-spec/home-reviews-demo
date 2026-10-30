@@ -3,7 +3,7 @@ import {recommendRestaurants,recommendationCuisineOptions,type Request} from '..
 import {prepareAi,renderChoices,validateChoices} from '../../../supabase/functions/_shared/recommendation-ai';
 import {placeProfile} from '../../../supabase/functions/_shared/google-place-profile';
 export function recommendationResponse(body:Record<string,unknown>){
- if(body.action==='compare'&&body.preference_mode!=='free_text_v2')throw Error('Updated comparison client required');
+ if(body.action==='compare'&&body.preference_mode!=='report_facts_v3')throw Error('Updated comparison client required');
  const language=localStorage.getItem('review-details-language')==='fr'?'fr':'vi',org='org-account-a';
  const rows=[recommendationSheet('place-account-a',{score:'5.3',cuisines:['indian'],reservation:language==='fr'?'Un témoignage évoque une attente prolongée.':'Một khách cho biết đã chờ lâu.'}),
   recommendationSheet('place-account-b',{score:'5.25',cuisines:['italian'],category:'service',positive:language==='fr'?'Le personnel est décrit comme accueillant.':'Nhân viên được nhận xét thân thiện.'}),
@@ -29,7 +29,7 @@ export function recommendationResponse(body:Record<string,unknown>){
  const request:Request={geography:'not_requested',...(body.cuisine?{cuisines:[String(body.cuisine)]}:{}),...(body.maximum_vnd!==undefined?{budget:{kind:'amount',currency:'VND',unit:'per_person',maximum:Number(body.maximum_vnd)}}:{}),...(body.service_priority?{preferences:{categories:['service']}}:{})};
  const result=recommendRestaurants(catalogue,org,language,request);
  const aiCase=localStorage.getItem('recommendation-ai-case'),prepared=prepareAi({rows:catalogue,organizationId:org,language,establishments:[]},request,String(body.preference??''));
- const choices=result.proposals.slice(0,2).reverse().map(p=>({id:p.establishment_id,reason_refs:sourceCase&&p.establishment_id===rows[0].establishment_id?['feature_quiet','strength_quality']:['score_global'],caution_ref:sourceCase&&p.establishment_id===rows[0].establishment_id?'reservation_ambiance':p.reservations.length?'reservation_'+p.reservations[0].category:null}));
+ const choices=result.proposals.slice(0,2).reverse().map(p=>({id:p.establishment_id,reason_refs:sourceCase&&p.establishment_id===rows[0].establishment_id?['feature_quiet','strength_quality_0']:['score_global'],caution_ref:sourceCase&&p.establishment_id===rows[0].establishment_id?'reservation_ambiance_1':p.reservations.length?'reservation_'+p.reservations[0].category+'_'+p.reservations[0].index:null}));
  const comparison=body.action==='compare'?{status:aiCase==='invalid'?'fallback':aiCase==='cached'?'cached':aiCase==='pending'?'pending':'completed',model:'gpt-6.1-sol',attempt_id:'00000000-0000-4000-8000-000000000001',candidate_count:catalogue.length,selections:aiCase==='invalid'||aiCase==='pending'?[]:renderChoices(validateChoices({choices},prepared),prepared),metrics:{input_tokens:123,output_tokens:25,cache_read_tokens:0,cache_write_tokens:null,duration_ms:500,cost_usd:null,cost_kind:'unavailable',model:'gpt-6.1-sol',provider_request_id:'fixture'}}:undefined;
  return body.action==='options'?common:{...common,result,...(comparison?{comparison}:{})};
 }

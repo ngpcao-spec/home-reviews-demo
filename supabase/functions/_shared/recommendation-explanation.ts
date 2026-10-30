@@ -21,11 +21,11 @@ const reportSources=(p:Proposal,citations:Citation[]):ExplanationSource[]=>citat
 
 /** Presentation only, after selection/reference validation. Never used to build the model request or rank candidates.
  * The model selected a reference, not the prose rendered here. All prose is copied from its bound saved source. */
-export function explainSavedReference(p:Proposal,ref:string,label:string,source:unknown,language:'fr'|'vi'):AiExplanation{
+export function explainSavedReference(p:Proposal,ref:string,label:string,source:unknown,language:'fr'|'vi',reportPoints?:Citation[]):AiExplanation{
  const base={ref,text:label,source},vi=language==='vi';
  if(ref.startsWith('strength_')||ref.startsWith('reservation_')){
-  const reservation=ref.startsWith('reservation_'),category=ref.slice(reservation?12:9);
-  const available=reservation?p.reservations:p.reasons.flatMap(r=>r.citations??[]);
+  const reservation=ref.startsWith('reservation_'),category=ref.slice(reservation?12:9).replace(/_\d+$/,'');
+  const available=reportPoints??(reservation?p.reservations:p.reasons.flatMap(r=>r.citations??[]));
   const citations=boundCitations(p,source,available).filter(c=>c.category===category&&c.section===(reservation?'reservations':'positive_aspects'));
   return citations.length?{...base,text:citations[0].text,display_kind:'report_extract',sources:reportSources(p,citations),notes:reservation?['recurrence_requires_source_check']:[]}
    :{...base,display_kind:'source_unavailable',sources:[],notes:['source_unavailable']};

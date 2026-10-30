@@ -81,12 +81,12 @@ describe('authenticated recommendation endpoint',()=>{
  it('calls the AI only for an explicit compare, under the same organization/session and frozen rows',async()=>{
   const f=fixture({ai:true});await f.send({action:'options'});await f.send({action:'recommend',preference:'en famille'});
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
-  const r=await(await f.send({action:'compare',preference_mode:'free_text_v2',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
+  const r=await(await f.send({action:'compare',preference_mode:'report_facts_v3',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledTimes(1);
  });
- it('rejects a cached V1 page before any catalogue read, reservation or text transmission, preserving classic searches',async()=>{
+ it.each([undefined,'free_text_v2'])('rejects an old page mode %s before any catalogue read, reservation or text transmission, preserving classic searches',async mode=>{
   const f=fixture({ai:true}),text='Je ne cherche pas forcément le calme.';
-  const r=await f.send({action:'compare',preference:text});expect(r.status).toBe(409);expect(await r.json()).toEqual({error:'RECOMMENDATION_CLIENT_UPDATE_REQUIRED'});
+  const r=await f.send({action:'compare',preference:text,...(mode?{preference_mode:mode}:{})});expect(r.status).toBe(409);expect(await r.json()).toEqual({error:'RECOMMENDATION_CLIENT_UPDATE_REQUIRED'});
   expect(f.requests.some(u=>u.pathname.endsWith('/restaurant_recommendation_sheets'))).toBe(false);
   expect(f.reserve).not.toHaveBeenCalled();expect(f.provider).not.toHaveBeenCalled();
   expect((await f.send({action:'recommend'})).status).toBe(200);
@@ -94,24 +94,24 @@ describe('authenticated recommendation endpoint',()=>{
  it.each(['fr','vi'] as const)('sends the whole %s request with its negation only after compare and does not echo or persist it',async language=>{
   const f=fixture({ai:true,language}),text=language==='fr'?'Je ne cherche pas forcément le calme.\nSans musique en direct, si possible.':'Không nhất thiết yên tĩnh; nếu được, không có nhạc sống.';
   await f.send({action:'recommend',preference:text});expect(f.provider).not.toHaveBeenCalled();
-  const response=await f.send({action:'compare',preference_mode:'free_text_v2',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
+  const response=await f.send({action:'compare',preference_mode:'report_facts_v3',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
   const sent=JSON.parse(JSON.parse(String(f.provider.mock.calls[0][1]!.body)).input);
   expect(sent.natural_language_request).toBe(text);expect(data).not.toHaveProperty('interpreted_preferences');
   expect(JSON.stringify(data)).not.toContain(text);expect(JSON.stringify(f.finish.mock.calls)).not.toContain(text);
  });
  it('refuses foreign organization, unsupported requirements and personal contact data before reserving an AI attempt',async()=>{
   const f=fixture({ai:true});
-  for(const body of [{action:'compare',preference_mode:'free_text_v2',organization_id:other},{action:'compare',preference_mode:'free_text_v2',required_features:['invented']},{action:'compare',preference_mode:'free_text_v2',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
+  for(const body of [{action:'compare',preference_mode:'report_facts_v3',organization_id:other},{action:'compare',preference_mode:'report_facts_v3',required_features:['invented']},{action:'compare',preference_mode:'report_facts_v3',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
  });
  it('does not confirm an unknown mandatory feature and returns the ordinary empty engine result',async()=>{
-  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'free_text_v2',required_features:['quiet']})).json();
+  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'report_facts_v3',required_features:['quiet']})).json();
   expect(r.result.proposals).toEqual([]);expect(r.comparison.status).toBe('fallback');expect(f.provider).not.toHaveBeenCalled();
  });
  it('does not return candidate data after permissions are revoked during the single provider attempt',async()=>{
   const options={ai:true,role:'manager'},f=fixture(options),native=f.provider.getMockImplementation()!;
   f.provider.mockImplementation(async(...args)=>{const response=await native(...args);options.role='viewer';return response;});
-  const r=await f.send({action:'compare',preference_mode:'free_text_v2',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
+  const r=await f.send({action:'compare',preference_mode:'report_facts_v3',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledWith('attempt-offline','obsolete',null,expect.any(Object),'FORBIDDEN');
  });
 });

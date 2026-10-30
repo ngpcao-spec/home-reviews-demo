@@ -73,9 +73,9 @@ for(const language of ['fr','vi'] as const){
   for(const excerpt of await card.locator('.recommendation-saved-excerpt').all())expect(await excerpt.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
   await card.getByText(language==='fr'?'Détails et sources':'Chi tiết và nguồn',{exact:true}).click();
   const sources=card.locator('.recommendation-bound-source');
-  await expect(sources).toHaveCount(3);await expect(sources).toContainText(['feature_quiet','strength_quality','reservation_ambiance']);
-  await expect(sources.filter({hasText:'reservation_ambiance'})).not.toContainText(language==='fr'?'attente':'thời gian chờ');
-  await expect(sources.filter({hasText:'reservation_ambiance'})).toContainText('report-place-account-a');
+  await expect(sources).toHaveCount(3);await expect(sources).toContainText(['feature_quiet','strength_quality_0','reservation_ambiance_1']);
+  await expect(sources.filter({hasText:'reservation_ambiance_1'})).not.toContainText(language==='fr'?'attente':'thời gian chờ');
+  await expect(sources.filter({hasText:'reservation_ambiance_1'})).toContainText('report-place-account-a');
   await expect(sources.filter({hasText:'feature_quiet'})).toContainText('additionalInfo.Bầu không khí.Yên tĩnh');
   await expect(sources.getByRole('link')).toHaveAttribute('href','https://www.google.com/maps?cid=123');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);

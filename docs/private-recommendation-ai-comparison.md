@@ -1,5 +1,7 @@
 # Comparaison privée de sélection assistée par IA
 
+> Historique V2, remplacé pour les nouvelles comparaisons par [les fiches de rapport V3](private-recommendation-report-facts-v3.md). Les descriptions ci-dessous de l'absence de prose transmise et du marqueur `free_text_v2` concernent exclusivement l'ancienne version.
+
 La page `/#/plus/recommandations` conserve sa recherche déterministe et ajoute
 un bouton explicite FR/VI de comparaison. Aucun appel au chargement, au changement
 de filtre, ni via « Proposer des restaurants ». Aucun raccordement HOME AI.

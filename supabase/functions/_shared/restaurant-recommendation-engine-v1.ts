@@ -23,7 +23,7 @@ export type SheetRow = {
   report_generated_at: string; calculation_version: string; stale: boolean; stale_reason: string | null;
   corpus: Obj; metadata: Obj; report_sections: Obj; calculation_text: string;
   publication: {report_id: string; source_run_id: string; organization_id: string; establishment_id: string; language: string;
-    scope: Obj; stale: boolean; stale_reason?:string|null; generated_at: string; derived: Obj} | null;
+    scope: Obj; stale: boolean; stale_reason?:string|null; generated_at: string; derived: Obj; evidence_bindings?:unknown; source_bindings?:unknown} | null;
 };
 export type Score = {value: string; numerator: string; denominator: string};
 export type Citation = {report_id: string; section: 'positive_aspects' | 'reservations'; index: number; category: string; text: string; evidence_ids: string[]};

@@ -17,12 +17,12 @@ function fixture(language:'fr'|'vi'='fr',quiet:boolean=true){
  row.metadata.google_place_profile={...placeProfile([{cid:'123',placeId:'place-123',language,scrapedAt:'2026-10-28T01:02:03Z',reviews:[],additionalInfo:{'Bầu không khí':[{'Yên tĩnh':quiet}]}}],{google_id:'123',place_id:'place-123',google_maps_url:'https://www.google.com/maps/search/?api=1&query_place_id=place-123',language}),binding:{establishment_id:row.establishment_id,organization_id:row.organization_id}};
  const catalogue={organizationId:row.organization_id,language,rows:[row],establishments:[{id:row.establishment_id,name:'Synthetic',organization_id:row.organization_id}]};
  const prepared=prepareAi(catalogue,{geography:'not_requested'},'Éviter le bruit et les problèmes de cuisson récurrents.');
- const render=(reasons:string[],caution:string|null='reservation_ambiance')=>renderChoices(validateChoices({choices:[{id:row.establishment_id,reason_refs:reasons,caution_ref:caution}]},prepared),prepared)[0];
+ const render=(reasons:string[],caution:string|null='reservation_ambiance_2')=>renderChoices(validateChoices({choices:[{id:row.establishment_id,reason_refs:reasons,caution_ref:caution}]},prepared),prepared)[0];
  return {row,catalogue,prepared,render};
 }
 describe('faithful presentation of saved AI reference choices, with no provider',()=>{
  it('replaces the generic category label with the exact bound report excerpt, not generated prose',()=>{
-  const f=fixture(),result=f.render(['strength_quality']);
+  const f=fixture(),result=f.render(['strength_quality_0']);
   expect(result.reasons[0]).toMatchObject({text:'Le poulet et sa sauce sont appréciés.',display_kind:'report_extract',sources:[{kind:'report',report_id:f.row.report_id,category:'quality',section:'positive_aspects',index:0,evidence_ids:['a'.repeat(64)]}]});
  });
  it('uses the selected ambiance caution and its source, never the first unrelated service reservation',()=>{
@@ -32,7 +32,7 @@ describe('faithful presentation of saved AI reference choices, with no provider'
   expect(JSON.stringify(result.caution)).not.toContain('attente');
  });
  it('preserves the entire qualifier and does not infer recurrence from two evidence associations',()=>{
-  const f=fixture(),result=f.render(['score_global'],'reservation_quality');
+  const f=fixture(),result=f.render(['score_global'],'reservation_quality_1');
   expect(result.caution?.text).toContain('mais reste satisfait');expect(result.caution?.text).toContain('deux reproches différents');
   expect(result.caution?.notes).toEqual(['recurrence_requires_source_check']);expect(result.caution).not.toHaveProperty('recurring');
  });
@@ -54,7 +54,7 @@ describe('faithful presentation of saved AI reference choices, with no provider'
   expect(rendered.text).toContain('contradictoires');expect(rendered.sources?.map(s=>s.kind)).toEqual(['google_maps','report']);
  });
  it('does not reattach a report reference to another report, category, index or evidence set',()=>{
-  const f=fixture(),p=f.prepared.proposals[0],fact=f.prepared.facts.get(f.row.establishment_id)!.find(x=>x.ref==='reservation_quality')!;
+  const f=fixture(),p=f.prepared.proposals[0],fact=f.prepared.facts.get(f.row.establishment_id)!.find(x=>x.ref==='reservation_quality_1')!;
   for(const change of [{report_id:'another-report'},{section:'positive_aspects'},{index:99},{evidence_ids:['f'.repeat(64)]}]){
    const bindings=structuredClone(fact.source) as Record<string,unknown>[];Object.assign(bindings[0],change);
    const result=explainSavedReference(p,fact.ref,fact.label,bindings,'fr');expect(result.display_kind).toBe('source_unavailable');expect(result.sources).toEqual([]);
@@ -73,10 +73,10 @@ describe('faithful presentation of saved AI reference choices, with no provider'
  });
  it('keeps exact scores, selected references, rankings and model request bytes unchanged during rendering',()=>{
   const f=fixture(),request=JSON.stringify(f.prepared.request),proposals=structuredClone(f.prepared.proposals);
-  const result=f.render(['score_service','strength_quality'],'reservation_quality');
-  expect(result.reasons.map(r=>r.ref)).toEqual(['score_service','strength_quality']);expect(result.caution?.ref).toBe('reservation_quality');
+  const result=f.render(['score_service','strength_quality_0'],'reservation_quality_1');
+  expect(result.reasons.map(r=>r.ref)).toEqual(['score_service','strength_quality_0']);expect(result.caution?.ref).toBe('reservation_quality_1');
   expect(result.reasons[0].sources?.[0]).toMatchObject({kind:'internal_score',category:'service',score:f.prepared.proposals[0].scores.service.value});
   expect(f.prepared.proposals).toEqual(proposals);expect(JSON.stringify(f.prepared.request)).toBe(request);
-  expect(request).not.toContain('Le poulet');expect(request).not.toContain('Un client a reçu');
+  expect(request).toContain('Le poulet');expect(request).toContain('Un client a reçu');
  });
 });
