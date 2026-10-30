@@ -2,7 +2,7 @@ import type {AuthContext} from './auth.ts';
 import {recommendationCuisineOptions,type Request as RecommendationRequest} from './restaurant-recommendation-engine-v1.ts';
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
-import {AI_FEATURES,aiHash,compareAi,featureOption,preferenceSignals,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,featureOption,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
 type Context={client:AuthContext['client'];admin?:AuthContext['admin'];user:Pick<AuthContext['user'],'id'|'is_anonymous'>};
@@ -11,15 +11,16 @@ const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status
 function criteria(raw:unknown) {
   if(!raw || typeof raw!=='object'||Array.isArray(raw))throw Error('INVALID_RECOMMENDATION_REQUEST');
   const b=raw as Record<string,unknown>;
-  if(Object.keys(b).some(k=>!['action','organization_id','cuisine','maximum_vnd','service_priority','preference','required_features'].includes(k))
+  if(Object.keys(b).some(k=>!['action','organization_id','cuisine','maximum_vnd','service_priority','preference','required_features','preference_mode'].includes(k))
     || !['options','recommend','compare'].includes(String(b.action))
     || b.organization_id!==undefined && (typeof b.organization_id!=='string'||!uuid.test(b.organization_id))
     || b.cuisine!==undefined && (typeof b.cuisine!=='string'||!b.cuisine||b.cuisine.length>80)
     || b.maximum_vnd!==undefined && (typeof b.maximum_vnd!=='number'||!Number.isSafeInteger(b.maximum_vnd)||b.maximum_vnd<0)
     || b.service_priority!==undefined && typeof b.service_priority!=='boolean'
     || b.required_features!==undefined && !validAiFeatures(b.required_features)
-    || b.preference!==undefined && (typeof b.preference!=='string'||b.preference.length>500||/[\u0000-\u001f]|https?:\/\/|www\.|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\+?\d[\s().-]*){8,}/i.test(b.preference)))throw Error('INVALID_RECOMMENDATION_REQUEST');
-  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[]};
+    || b.preference_mode!==undefined && b.preference_mode!=='free_text_v2')throw Error('INVALID_RECOMMENDATION_REQUEST');
+  if(b.preference!==undefined)b.preference=checkedRecommendationPreference(b.preference);
+  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'};
 }
 export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort}) {
  return async(request:Request):Promise<Response>=>{
@@ -32,6 +33,9 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    if(text.length>8192)return reply({error:'INVALID_RECOMMENDATION_REQUEST'},413);
    let raw:unknown;try{raw=JSON.parse(text);}catch{throw Error('INVALID_RECOMMENDATION_REQUEST');}
    const input=criteria(raw);
+   // Old cached pages promised that free text would not leave HOME Reviews.
+   // Require the updated client contract before reading a catalogue or reserving a paid attempt.
+   if(input.action==='compare'&&input.preference_mode!=='free_text_v2')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
    const membership=await context.client.from('organization_members').select('user_id,organization_id,role,organization:organizations!inner(id,name)')
     .eq('user_id',context.user.id).in('role',['owner','admin','manager']).order('organization_id');
    if(membership.error)throw Error('RECOMMENDATION_READ_FAILED');
@@ -66,12 +70,10 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    // Membership, language and corpus are checked again before returning any comparison (including fallback).
    const current=await readRestaurantRecommendationCatalogue(context,organizationId);
    if(await aiHash(current)!==snapshot)return reply({error:'RECOMMENDATION_DATA_CHANGED'},409);
-   const categoryLabels=catalogue.language==='vi'?{service:'Phục vụ',quality:'Chất lượng món ăn',ambiance:'Không gian'}:{service:'Service',quality:'Qualité des plats',ambiance:'Ambiance'};
-   const interpreted_preferences=preferenceSignals(input.preference??'').map(id=>({id,label:categoryLabels[id as keyof typeof categoryLabels]??featureOption(id,catalogue.language).label}));
-   return reply({...common,result,comparison,interpreted_preferences});
+   return reply({...common,result,comparison});
   }catch(error){
    const message=error instanceof Error?error.message:'';
-   const status=message==='UNAUTHORIZED'?401:message==='FORBIDDEN'?403:message==='INVALID_RECOMMENDATION_REQUEST'?400:500;
+   const status=message==='UNAUTHORIZED'?401:message==='FORBIDDEN'?403:message==='INVALID_RECOMMENDATION_REQUEST'?400:message==='RECOMMENDATION_CLIENT_UPDATE_REQUIRED'?409:500;
    const code=status===500?'RECOMMENDATION_TEST_UNAVAILABLE':message;
    if(status===500)console.warn('Recommendation test read failed',{code});
    return reply({error:code},status);

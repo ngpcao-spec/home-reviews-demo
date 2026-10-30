@@ -15,7 +15,7 @@ export function RecommendationTestPage(){
  const [preference,setPreference]=useState(''),[required,setRequired]=useState<string[]>([]),[comparing,setComparing]=useState(false);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  const epoch=useRef({value:0}).current,pending=useRef<number|null>(null);
- const errorText=(code:string)=>code==='UNAUTHORIZED'?m.auth:code==='FORBIDDEN'?m.forbidden:code==='INVALID_RECOMMENDATION_REQUEST'?m.invalid:code==='ACCOUNT_LANGUAGE_CHANGED'?m.languageChanged:m.unavailable;
+ const errorText=(code:string)=>code==='UNAUTHORIZED'?m.auth:code==='FORBIDDEN'?m.forbidden:code==='INVALID_RECOMMENDATION_REQUEST'?m.invalid:code==='RECOMMENDATION_CLIENT_UPDATE_REQUIRED'?m.updateRequired:code==='ACCOUNT_LANGUAGE_CHANGED'?m.languageChanged:m.unavailable;
  useEffect(()=>{
   const version=++epoch.value;pending.current=null;setBusy(false);setComparing(false);setOptions(null);setResponse(null);setError('');setCuisine('');setRequired([]);setPreference('');setLoading(true);
   if(!isAuthenticated||demoMode){setError('UNAUTHORIZED');setLoading(false);return;}
@@ -34,6 +34,7 @@ export function RecommendationTestPage(){
   const version=++epoch.value;pending.current=version;setBusy(true);setComparing(compare);setResponse(null);setError('');
   if(removeBudget)setMaximum('');
   const input:RecommendationTestInput={action:compare?'compare':'recommend',organization_id:options.organization_id,...(cuisine?{cuisine}:{}),
+   ...(compare?{preference_mode:'free_text_v2' as const}:{}),
    ...(required.length?{required_features:required}:{}),...(compare&&preference.trim()?{preference:preference.trim()}:{}),
    ...(!removeBudget&&value?{maximum_vnd:Number(value)}:{}),...(service?{service_priority:true}:{})};
   try{
@@ -58,7 +59,7 @@ export function RecommendationTestPage(){
     <label className="recommendation-check"><input type="checkbox" checked={service} onChange={e=>{change();setService(e.target.checked);}}/>{m.service}</label><small>{m.serviceHint}</small>
     <fieldset className="recommendation-required"><legend>{m.mandatory}</legend><p className="recommendation-muted">{m.mandatoryHint}</p>{options.features?.map(f=><label className="recommendation-check" key={f.id}><input type="checkbox" checked={required.includes(f.id)} onChange={e=>{change();setRequired(e.target.checked?[...required,f.id]:required.filter(id=>id!==f.id));}}/>{f.label}</label>)}</fieldset>
    </div></details>
-   <label>{m.preference}<textarea aria-label={m.preference} value={preference} maxLength={500} placeholder={m.preferencePlaceholder} onChange={e=>{change();setPreference(e.target.value);}}/><small>{m.preferenceHint} {m.interpretationHint}</small></label>
+   <label>{m.preference}<textarea aria-label={m.preference} value={preference} maxLength={500} placeholder={m.preferencePlaceholder} onChange={e=>{change();setPreference(e.target.value);}}/><small>{m.preferenceHint} {m.freeTextHint}</small></label>
    <button type="submit" className="primary-button full-width" disabled={busy||loading}>{busy&&!comparing?m.searching:m.search}</button>
    <button type="button" className="secondary-button full-width recommendation-compare" disabled={busy||loading} onClick={()=>void search(false,true)}>{comparing?m.comparing:m.compare}</button><small>{m.aiHint} {m.aiLimited}</small>
   </form>}
@@ -70,7 +71,6 @@ export function RecommendationTestPage(){
     :<>{response.result.proposals.length<3&&<p className="recommendation-muted">{m.limited}</p>}<div className="recommendation-results">{response.result.proposals.map(p=><RecommendationCard key={p.establishment_id} proposal={p}/>)}</div></>}
    {response.result.excluded.length>0&&<p className="recommendation-muted">{m.excluded} : {response.result.excluded.length}</p>}
    {response.comparison&&<section className="recommendation-ai" aria-label={m.aiSelection}><h2>{m.aiSelection}</h2>
-    {preference.trim()&&<p className="recommendation-muted">{m.interpreted} : {response.interpreted_preferences?.length?response.interpreted_preferences.map(p=>p.label).join(' · '):m.noneInterpreted}</p>}
     {['completed','cached'].includes(response.comparison.status)?<>{response.comparison.status==='cached'&&<p className="recommendation-muted">{m.aiCached}</p>}<p className="recommendation-muted">{m.aiSource}</p><div className="recommendation-results">{response.comparison.selections.map(s=><RecommendationCard key={s.proposal.establishment_id} proposal={s.proposal} selection={s}/>)}</div></>
      :<p className="recommendation-notice card" role="status">{response.comparison.status==='pending'?m.aiPending:m.aiFallback}</p>}
     <details className="recommendation-details"><summary>{m.aiMetrics}</summary><p>{m.aiModel} : {response.comparison.model}</p>{response.comparison.metrics&&<><p>{m.aiTokens} : {response.comparison.metrics.input_tokens??'—'} / {response.comparison.metrics.output_tokens??'—'}</p><p>{m.aiCache} : {response.comparison.metrics.cache_read_tokens??'—'} / {response.comparison.metrics.cache_write_tokens??'—'}</p><p>{m.aiDuration} : {response.comparison.metrics.duration_ms} ms</p><p>{response.comparison.metrics.cost_usd===null?m.aiUnknownCost:`${response.comparison.metrics.cost_usd} USD`}</p></>}</details>

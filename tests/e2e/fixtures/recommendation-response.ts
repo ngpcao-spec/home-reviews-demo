@@ -1,6 +1,7 @@
 import {recommendationSheet} from '../../fixtures/restaurant-recommendation-catalogue';
 import {recommendRestaurants,recommendationCuisineOptions,type Request} from '../../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
 export function recommendationResponse(body:Record<string,unknown>){
+ if(body.action==='compare'&&body.preference_mode!=='free_text_v2')throw Error('Updated comparison client required');
  const language=localStorage.getItem('review-details-language')==='fr'?'fr':'vi',org='org-account-a';
  const rows=[recommendationSheet('place-account-a',{score:'5.3',cuisines:['indian'],reservation:language==='fr'?'Un témoignage évoque une attente prolongée.':'Một khách cho biết đã chờ lâu.'}),
   recommendationSheet('place-account-b',{score:'5.25',cuisines:['italian'],category:'service',positive:language==='fr'?'Le personnel est décrit comme accueillant.':'Nhân viên được nhận xét thân thiện.'}),
