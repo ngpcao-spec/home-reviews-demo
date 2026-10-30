@@ -44,6 +44,24 @@ for(const language of ['fr','vi'] as const){
   await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');await page.getByRole('button',{name:search,exact:true}).click();
   await expect(page.locator('.recommendation-card')).toHaveCount(1);
  });
+ test(`explicit AI comparison only, two selections and mobile sources ${language}`,async({page},testInfo)=>{
+  await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
+  const compare=language==='fr'?'Comparer avec l’IA':'So sánh với AI',preference=language==='fr'?'Qu’est-ce qui compte pour vous ?':'Điều gì quan trọng với bạn?';
+  await expect(page.getByRole('button',{name:compare,exact:true})).toBeVisible();
+  await page.getByLabel(preference,{exact:true}).fill(language==='fr'?'Repas en famille':'Dùng bữa gia đình');
+  await expect(page.locator('.recommendation-ai')).toHaveCount(0);
+  await page.getByRole('button',{name:search,exact:true}).click();await expect(page.locator('.recommendation-ai')).toHaveCount(0);
+  await page.getByRole('button',{name:compare,exact:true}).click();await expect(page.locator('.recommendation-ai .recommendation-card')).toHaveCount(2);
+  await expect(page.locator('.recommendation-ai')).toContainText(language==='fr'?'Score interne documenté.':'Điểm nội bộ đã lưu.');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.locator('.recommendation-ai .recommendation-card').first().screenshot({path:testInfo.outputPath('ai-selection-card.png')});
+ });
+ test(`invalid AI keeps the existing engine ${language}`,async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('recommendation-ai-case','invalid'));
+  await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
+  await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
+  await expect(page.locator('.recommendation-card')).toHaveCount(3);await expect(page.locator('.recommendation-ai')).toContainText(language==='fr'?'classement du moteur conservé':'giữ xếp hạng');
+ });
  test(`localized access refusal without private results ${language}`,async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('recommendation-case','forbidden'));
   await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');

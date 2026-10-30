@@ -1,6 +1,10 @@
 # Écran privé de test des recommandations
 
 Route protégée : `/#/plus/recommandations`, accessible depuis « Plus » en FR/VI.
+Le parcours classique décrit ci-dessous reste lecteur. L'option explicite
+`action:'compare'` est décrite séparément dans
+[private-recommendation-ai-comparison.md](private-recommendation-ai-comparison.md) :
+elle seule peut réserver un appel IA et écrire son reçu privé.
 Point d’entrée : `test-restaurant-recommendations`, JWT vérifié par la plateforme
 puis `requireUser` / `auth.getUser`. Les comptes anonymes sont refusés. Les rôles
 owner/admin/manager sont conservés, conformément aux RLS des publications et fiches.

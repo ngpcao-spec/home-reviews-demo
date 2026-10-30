@@ -2,23 +2,26 @@ import type {AuthContext} from './auth.ts';
 import {recommendationCuisineOptions,type Request as RecommendationRequest} from './restaurant-recommendation-engine-v1.ts';
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
+import {AI_FEATURES,aiHash,compareAi,featureOption,preferenceSignals,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
-type Context={client:AuthContext['client'];user:Pick<AuthContext['user'],'id'|'is_anonymous'>};
+type Context={client:AuthContext['client'];admin?:AuthContext['admin'];user:Pick<AuthContext['user'],'id'|'is_anonymous'>};
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...corsHeaders,'Content-Type':'application/json','Cache-Control':'private, no-store','Vary':'Authorization, Origin'}});
 function criteria(raw:unknown) {
   if(!raw || typeof raw!=='object'||Array.isArray(raw))throw Error('INVALID_RECOMMENDATION_REQUEST');
   const b=raw as Record<string,unknown>;
-  if(Object.keys(b).some(k=>!['action','organization_id','cuisine','maximum_vnd','service_priority'].includes(k))
-    || !['options','recommend'].includes(String(b.action))
+  if(Object.keys(b).some(k=>!['action','organization_id','cuisine','maximum_vnd','service_priority','preference','required_features'].includes(k))
+    || !['options','recommend','compare'].includes(String(b.action))
     || b.organization_id!==undefined && (typeof b.organization_id!=='string'||!uuid.test(b.organization_id))
     || b.cuisine!==undefined && (typeof b.cuisine!=='string'||!b.cuisine||b.cuisine.length>80)
     || b.maximum_vnd!==undefined && (typeof b.maximum_vnd!=='number'||!Number.isSafeInteger(b.maximum_vnd)||b.maximum_vnd<0)
-    || b.service_priority!==undefined && typeof b.service_priority!=='boolean')throw Error('INVALID_RECOMMENDATION_REQUEST');
-  return b as {action:'options'|'recommend';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean};
+    || b.service_priority!==undefined && typeof b.service_priority!=='boolean'
+    || b.required_features!==undefined && !validAiFeatures(b.required_features)
+    || b.preference!==undefined && (typeof b.preference!=='string'||b.preference.length>500||/[\u0000-\u001f]|https?:\/\/|www\.|[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\+?\d[\s().-]*){8,}/i.test(b.preference)))throw Error('INVALID_RECOMMENDATION_REQUEST');
+  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[]};
 }
-export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>) {
+export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort}) {
  return async(request:Request):Promise<Response>=>{
   if(request.method==='OPTIONS')return reply({});
   if(request.method!=='POST')return reply({error:'METHOD_NOT_ALLOWED'},405);
@@ -42,12 +45,30 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    const catalogue=await readRestaurantRecommendationCatalogue(context,organizationId);
    const cuisines=recommendationCuisineOptions(catalogue.rows,organizationId,catalogue.language);
    if(input.cuisine&&!cuisines.includes(input.cuisine))throw Error('INVALID_RECOMMENDATION_REQUEST');
-   const common={api_version:RECOMMENDATION_TEST_API_VERSION,language:catalogue.language,organization_id:organizationId,organizations,cuisines};
+   const supported=prepareAi(catalogue,{geography:'not_requested'},'').proposals;
+   const features=AI_FEATURES.filter(f=>supported.some(p=>p.features[f]?.status==='reported')).map(f=>featureOption(f,catalogue.language));
+   const common={api_version:RECOMMENDATION_TEST_API_VERSION,language:catalogue.language,organization_id:organizationId,organizations,cuisines,features};
    if(input.action==='options')return reply(common);
    const query:RecommendationRequest={geography:'not_requested',...(input.cuisine?{cuisines:[input.cuisine]}:{}),
+    ...(input.required_features?.length?{required_features:[...input.required_features].sort()}:{}),
     ...(input.maximum_vnd!==undefined?{budget:{kind:'amount',currency:'VND',maximum:input.maximum_vnd,unit:'per_person'}}:{}),
     ...(input.service_priority?{preferences:{categories:['service']}}:{})};
-   return reply({...common,result:recommendFromCatalogue(catalogue,query)});
+   const result=recommendFromCatalogue(catalogue,query);
+   if(input.action!=='compare')return reply({...common,result});
+   if(!dependencies)return reply({...common,result,comparison:{status:'fallback',notice:'AI_UNAVAILABLE',model:'gpt-6.1-sol',candidate_count:0,selections:[]}});
+   const access=organizations;
+   const snapshot=await aiHash(catalogue);
+   const comparison=await compareAi({catalogue,query,preference:(input.preference??'').trim().normalize('NFC'),userId:context.user.id,access,port:dependencies.port(context,organizationId),key:dependencies.key(),http:dependencies.http,
+    unchanged:async()=>{
+     const current=await readRestaurantRecommendationCatalogue(context,organizationId);
+     return await aiHash(current)===snapshot;
+    }});
+   // Membership, language and corpus are checked again before returning any comparison (including fallback).
+   const current=await readRestaurantRecommendationCatalogue(context,organizationId);
+   if(await aiHash(current)!==snapshot)return reply({error:'RECOMMENDATION_DATA_CHANGED'},409);
+   const categoryLabels=catalogue.language==='vi'?{service:'Phục vụ',quality:'Chất lượng món ăn',ambiance:'Không gian'}:{service:'Service',quality:'Qualité des plats',ambiance:'Ambiance'};
+   const interpreted_preferences=preferenceSignals(input.preference??'').map(id=>({id,label:categoryLabels[id as keyof typeof categoryLabels]??featureOption(id,catalogue.language).label}));
+   return reply({...common,result,comparison,interpreted_preferences});
   }catch(error){
    const message=error instanceof Error?error.message:'';
    const status=message==='UNAUTHORIZED'?401:message==='FORBIDDEN'?403:message==='INVALID_RECOMMENDATION_REQUEST'?400:500;
