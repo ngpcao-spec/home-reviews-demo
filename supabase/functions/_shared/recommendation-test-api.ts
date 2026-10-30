@@ -70,6 +70,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    // Membership, language and corpus are checked again before returning any comparison (including fallback).
    const current=await readRestaurantRecommendationCatalogue(context,organizationId);
    if(await aiHash(current)!==snapshot)return reply({error:'RECOMMENDATION_DATA_CHANGED'},409);
+   console.info('RECOMMENDATION_COMPARISON_RESPONSE',{attempt_id:comparison.attempt_id??null,status:comparison.status,model:comparison.model,candidate_count:comparison.candidate_count});
    return reply({...common,result,comparison});
   }catch(error){
    const message=error instanceof Error?error.message:'';

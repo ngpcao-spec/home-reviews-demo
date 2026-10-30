@@ -143,3 +143,14 @@ Retour arrière : masquer le bouton et redéployer l'ancienne fonction de lectur
 Conserver la table de tentatives pour préserver les consommations/inconnus ; ne
 pas supprimer les empreintes pour forcer une nouvelle tentative. Aucun avis,
 rapport, score, import ou réglage de génération n'est modifié par cette option.
+## Affichage des références choisies
+
+The provider selects IDs and reason/caution references, not free-form explanations. `renderChoices` resolves those validated references against the same proposal's saved sources after selection, including on a compatible cache hit. It never changes the request, selector, scores, native choices or attempt ownership.
+
+Report excerpts are bound by report ID, section, index and evidence IDs; every matching excerpt remains accessible in Details. The primary excerpt is the first saved point of that selected category, not a newly generated AI justification. Cautions and Details use the selected reference rather than an unrelated first reservation. The UI does not add a caution when the selection has none.
+
+Google declarations retain their raw label, field, observation date and an identity-matching Maps link when available. A quiet declaration is attributed to Google, not to reviews or an acoustic measurement. A count of report points/evidence references does not establish recurring incidents. A missing or incompatible detailed source stays unavailable; it is not silently replaced.
+
+Completed, cached, pending and fallback results have explicit localized origin labels. Cached usage refers to the original native receipt, not new consumption. A privacy-safe response log records attempt ID/status/model/candidate count for future provenance. Historical cache hits before this instrumentation cannot be reconstructed from the native receipt alone. No preference text or source prose is added to these logs or provider requests.
+
+Unit/mobile fixtures use synthetic data and mocked replies. Private saved-response replays and nominative audits remain outside the repository. They establish presentation/source fidelity, not semantic suitability of the model's choices.
