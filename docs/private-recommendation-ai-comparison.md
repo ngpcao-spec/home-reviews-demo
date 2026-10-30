@@ -6,7 +6,7 @@ de filtre, ni via « Proposer des restaurants ». Aucun raccordement HOME AI.
 
 ## Modèle et données
 
-Version : `recommendation-ai-reference-selection-v1`. Modèle : `gpt-6.1-sol`,
+Version : `recommendation-ai-free-text-reference-selection-v2`. Modèle : `gpt-6.1-sol`,
 Responses API, effort faible, sortie JSON stricte, `store:false`, aucun outil,
 1 800 tokens de sortie maximum, HTTP borné à 45 secondes. L'accès serveur existant
 est réutilisé ; aucune clé dans le navigateur. Ce modèle déjà accessible dans le
@@ -27,25 +27,48 @@ choisir un autre ordre selon les préférences parmi ces seuls candidats.
 Cuisine, budget VND par personne et caractéristiques obligatoires cochées sont
 des contraintes serveur. Une donnée absente ou contradictoire ne les valide pas.
 Le texte libre est explicitement une **préférence**, limité à 500 caractères ;
-il ne remplace pas les contrôles d'exigences. Il est projeté localement sur un
-vocabulaire fermé FR/VI/EN issu des caractéristiques connues et des trois rubriques.
-Seuls ces codes, jamais le texte libre, sont transmis. Les négations et détails
-non reconnus ne sont pas interprétés, et l'écran affiche les critères reconnus.
-Cette limite de V1 est explicite : aucune promesse d'interprétation libre générale.
+il ne remplace pas les contrôles d'exigences. **La demande entière est transmise**
+dans `natural_language_request`, sans filtrage par mots-clés, suppression de négation
+ou vocabulaire d'entrée fermé. Accents, ponctuation et paragraphes sont préservés
+(trim/NFC uniquement). Le modèle doit interpréter portée des négations, nuances,
+alternatives, priorités et conditions. Les instructions techniques restent séparées
+du JSON utilisateur. Comprendre une préférence ne crée pas une preuve : un besoin
+non documenté ne peut pas être présenté comme satisfait.
+Le bouton actualisé envoie `preference_mode:'free_text_v2'`. Une ancienne page
+en cache, dont l'information de confidentialité disait que le texte n'était pas
+transmis, est refusée avec HTTP 409 **avant lecture du catalogue, réservation et
+appel**. L'utilisateur doit actualiser la page ; les recherches classiques restent
+compatibles. Ce marqueur ne remplace jamais les contrôles d'authentification/droits.
 Aucune géolocalisation. Prix sans
 unité confirmée admis sans budget, mais jamais confirmés pour un budget/personne.
 
-La fiche envoyée contient uniquement l'identifiant du candidat et des faits
+La fiche candidat envoyée contient uniquement l'identifiant du candidat et des faits
 typés : scores figés, cuisines normalisées, fourchette/devise/unité, caractéristiques
-Google et observations reconnues par le moteur, signaux positifs/réserves par
+Google déjà normalisées et observations reconnues par le moteur, signaux positifs/réserves par
 rubrique du rapport, références, date et fraîcheur. Le nombre de références est
 fourni sans en déduire une fréquence de clients ou une gravité. Aucune prose des
 avis/rapports, nom de personne, contact, adresse, description commerciale ou photo.
+Les caractéristiques déjà normalisées (musique en direct, terrasse, etc.) ne sont
+plus limitées aux neuf choix du formulaire obligatoire. Cela élargit les faits
+disponibles sans ajouter de nouveau classement ni inférer de caractéristique.
+La provenance est mutualisée par fiche ; les références natives restent côté
+serveur. Le dossier demeure limité à vingt candidats et 200 000 octets de requête
+complète, sortie exclue, très en dessous du contexte documenté du modèle. Dépassement :
+repli sans appel ni troncature. Un cas synthétique de vingt fiches riches est vérifié.
 Les points thématiques fins qui ne sont pas structurés ne sont pas transmis :
 cette limite protège les données personnelles et évite d'inventer des thèmes.
-Le champ utilisateur refuse contacts, liens et caractères de contrôle ; l'écran
-demande de ne pas y saisir de données personnelles. Les noms éventuellement saisis
-ne peuvent pas être transmis, puisqu'aucun fragment de texte libre n'est envoyé.
+Le champ utilisateur est distinct de ces fiches : il est transmis uniquement au
+clic explicite. Les contacts, liens, présentations nominatives explicites et
+caractères de contrôle dangereux sont refusés côté serveur **avant réservation**,
+y compris si le helper est appelé directement. L'écran demande de n'inclure aucune
+donnée personnelle. Ces contrôles locaux ne constituent pas un détecteur universel
+de noms dans du texte libre. Aucune identité de compte ni prose d'avis/rapport
+n'est ajoutée à la demande. Les identifiants natifs de preuves restent côté serveur ;
+le modèle utilise leurs références de faits, avec type/date de source.
+
+`store:false` empêche le stockage applicatif demandé via Responses ; ce paramètre
+n'est pas une garantie générale de rétention fournisseur nulle. Aucun réglage de
+compte OpenAI n'est modifié (voir https://developers.openai.com/api/docs/guides/your-data).
 
 ## Justifications contrôlables
 
@@ -54,7 +77,9 @@ et une référence de vigilance si elle existe. Elle ne renvoie ni score modifi�
 ni affirmation libre. Le serveur vérifie l'identité, les doublons, l'appartenance
 des références au candidat et leur polarité. Il restitue leurs libellés FR/VI
 fidèles. Les sources restent rattachées au même rapport/corpus que les scores.
-Une réserve ne peut servir de raison positive. Un signal Google contradictoire
+Une réserve ne peut servir de raison positive. Une caractéristique explicitement
+négative peut étayer une préférence d'évitement ; son libellé conserve le « non »,
+sans en déduire une propriété opposée. Un signal Google contradictoire
 ne peut devenir une exigence confirmée. Les données et préférences sont déclarées
 non fiables dans les consignes ; aucun outil n'est disponible au modèle.
 
@@ -71,13 +96,17 @@ d'invocateur sont exécutables uniquement par `service_role` pour réserver puis
 finaliser. Les données de catalogue continuent à être lues par le client utilisateur
 et ses RLS, jamais par l'admin. L'appartenance est aussi vérifiée à la réservation.
 
-Une empreinte lie configuration/prompts/modèle, demande normalisée, langue,
+Une empreinte lie configuration/prompts/modèle, **texte entier** normalisé, langue,
 données, organisation, utilisateur et accès. La réservation durable précède le
 seul envoi HTTP. Un verrou transactionnel sérialise la réservation ; une seule
 comparaison en vol par organisation. Doubles clics, reconnexions et appels concurrents
 rejoignent la tentative. Une réservation abandonnée est traitée comme inconnue
 après deux minutes. Elle ne peut jamais être renvoyée avec la même empreinte.
 Une autre demande peut être tentée après ce délai, sans rejouer la précédente.
+Les variantes « je cherche le calme », « je ne cherche pas le calme » et « pas
+forcément le calme » ont des empreintes différentes. La version V2 ne réutilise
+pas les réponses V1 qui avaient perdu une partie du texte. Les anciennes tentatives,
+y compris inconnues, restent conservées, sans purge ni renvoi.
 
 Le cache conserve seulement les identifiants/références validés et les mesures,
 aucun texte de préférence ni requête/réponse complète. Les échecs, invalides et
@@ -93,13 +122,18 @@ de sa tentative initiale, sans nouvelle consommation.
 
 ## Validation et déploiement
 
-Tests hors réseau : moteur commun et limite vingt, budgets/unités, contraintes
+Tests hors réseau : transmission exacte FR/VI/EN/autres langues, négations,
+conditions, paragraphes, injection laissée dans les données, absence du texte
+dans cache/journaux, moteur commun et limite vingt, budgets/unités, contraintes
 inconnues, références étrangères, doublons, polarité et vigilance, cache, accès,
 réponse tardive, interruption, quota HTTP, reçu non sauvegardé. Tests PostgreSQL
 locaux des droits, réservations, concurrence, consommation et réexécution. Tests
 mobile FR/VI 390 et 360 px avec réponses simulées et réseau externe bloqué.
+Ils vérifient le raccordement et les protections, **pas la qualité réelle de la
+compréhension du modèle** : aucun appel IA n'est exécuté pendant cette livraison.
 
-Après CI : intégrer le commit, appliquer **uniquement** cette migration, déployer
+La migration V1 existe déjà ; **aucune nouvelle migration n'est nécessaire** pour
+le texte libre V2. Après CI : intégrer le commit, déployer
 `test-restaurant-recommendations` avec JWT vérifié et ses dépendances, puis Pages.
 Vérifier les sources/versions, le refus sans authentification et zéro nouvelle
 tentative de comparaison. Ne jamais cliquer « Comparer avec l'IA » en production

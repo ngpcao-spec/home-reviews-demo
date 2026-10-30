@@ -48,11 +48,15 @@ for(const language of ['fr','vi'] as const){
   await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
   const compare=language==='fr'?'Comparer avec l’IA':'So sánh với AI',preference=language==='fr'?'Qu’est-ce qui compte pour vous ?':'Điều gì quan trọng với bạn?';
   await expect(page.getByRole('button',{name:compare,exact:true})).toBeVisible();
-  await page.getByLabel(preference,{exact:true}).fill(language==='fr'?'Repas en famille':'Dùng bữa gia đình');
+  const text=language==='fr'?'Pas forcément calme, mais sans musique en direct.':'Không nhất thiết yên tĩnh, nhưng không có nhạc sống.';
+  await page.getByLabel(preference,{exact:true}).fill(text);
+  await expect(page.getByText(language==='fr'?/Votre demande complète, négations et nuances comprises/:/Chỉ gửi toàn bộ yêu cầu, gồm phủ định và sắc thái/)).toBeVisible();
   await expect(page.locator('.recommendation-ai')).toHaveCount(0);
   await page.getByRole('button',{name:search,exact:true}).click();await expect(page.locator('.recommendation-ai')).toHaveCount(0);
   await page.getByRole('button',{name:compare,exact:true}).click();await expect(page.locator('.recommendation-ai .recommendation-card')).toHaveCount(2);
   await expect(page.locator('.recommendation-ai')).toContainText(language==='fr'?'Score interne documenté.':'Điểm nội bộ đã lưu.');
+  await expect(page.getByLabel(preference,{exact:true})).toHaveValue(text);
+  await expect(page.locator('.recommendation-ai')).not.toContainText(language==='fr'?'Préférences reconnues':'Mong muốn đã nhận diện');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.locator('.recommendation-ai .recommendation-card').first().screenshot({path:testInfo.outputPath('ai-selection-card.png')});
  });
