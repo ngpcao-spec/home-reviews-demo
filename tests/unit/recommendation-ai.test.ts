@@ -90,5 +90,9 @@ describe('bounded AI comparison using the existing engine',()=>{
  it('requires no calls with no candidates, unavailable key or over-limit context',async()=>{
   const f=fixture(0);expect((await compareAi(f.args)).notice).toBe('NO_CANDIDATES');expect(f.http).not.toHaveBeenCalled();
   const g=fixture();expect((await compareAi({...g.args,key:''})).notice).toBe('AI_UNAVAILABLE');expect(g.port.reserve).not.toHaveBeenCalled();
+  const h=fixture(),source=h.catalogue.rows[0];
+  const positives=source.report_sections.positive_aspects as {evidence_ids:string[]}[];positives[0].evidence_ids=Array(1500).fill('a'.repeat(64));
+  (source.publication!.derived.report as Record<string,unknown>).positive_aspects=positives;
+  expect((await compareAi(h.args)).notice).toBe('CONTEXT_LIMIT');expect(h.port.reserve).not.toHaveBeenCalled();expect(h.http).not.toHaveBeenCalled();
  });
 });

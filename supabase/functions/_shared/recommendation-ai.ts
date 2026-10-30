@@ -128,6 +128,7 @@ export async function compareAi(args:{catalogue:Catalogue;query:EngineRequest;pr
   const chunks=raw.output.flatMap((v:{type?:string;content?:{type?:string;text?:string}[]})=>v.type==='message'&&Array.isArray(v.content)?v.content:[]);
   if(chunks.length!==1||chunks[0].type!=='output_text'||typeof chunks[0].text!=='string')throw Error('INVALID_OUTPUT');
   choices=validateChoices(JSON.parse(chunks[0].text),prepared);
+  state='obsolete';
   if(!await args.unchanged()){state='obsolete';choices=null;throw Error('SOURCE_OR_ACCESS_CHANGED');}
   state='succeeded';
  }catch(e){error=e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'PROVIDER_OUTCOME_UNKNOWN';metrics.duration_ms=httpDuration??Date.now()-start;choices=null;}

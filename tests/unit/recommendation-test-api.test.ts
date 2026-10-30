@@ -93,4 +93,10 @@ describe('authenticated recommendation endpoint',()=>{
   const f=fixture({ai:true}),r=await(await f.send({action:'compare',required_features:['quiet']})).json();
   expect(r.result.proposals).toEqual([]);expect(r.comparison.status).toBe('fallback');expect(f.provider).not.toHaveBeenCalled();
  });
+ it('does not return candidate data after permissions are revoked during the single provider attempt',async()=>{
+  const options={ai:true,role:'manager'},f=fixture(options),native=f.provider.getMockImplementation()!;
+  f.provider.mockImplementation(async(...args)=>{const response=await native(...args);options.role='viewer';return response;});
+  const r=await f.send({action:'compare',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
+  expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledWith('attempt-offline','obsolete',null,expect.any(Object),'FORBIDDEN');
+ });
 });
