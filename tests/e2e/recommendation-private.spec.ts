@@ -70,6 +70,7 @@ for(const language of ['fr','vi'] as const){
   await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'davantage d’espace':'thêm không gian');
   await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'Le nombre de références':'Số tham chiếu');
   await expect(card).toContainText(language==='fr'?'ne constitue pas un constat des avis':'không phải kết luận từ các đánh giá');
+  for(const excerpt of await card.locator('.recommendation-saved-excerpt').all())expect(await excerpt.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
   await card.getByText(language==='fr'?'Détails et sources':'Chi tiết và nguồn',{exact:true}).click();
   const sources=card.locator('.recommendation-bound-source');
   await expect(sources).toHaveCount(3);await expect(sources).toContainText(['feature_quiet','strength_quality','reservation_ambiance']);

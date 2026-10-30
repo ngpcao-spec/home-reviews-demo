@@ -17,6 +17,8 @@ export function recommendationResponse(body:Record<string,unknown>){
  rows[0].stale=true;rows[0].stale_reason='CORPUS_CHANGED';rows[0].publication!.stale=true;rows[0].publication!.stale_reason='CORPUS_CHANGED';
  const sourceCase=localStorage.getItem('recommendation-ai-case')==='sources';
  if(sourceCase){
+  const positives=[{category:'quality',text:language==='fr'?'Les plats sont appréciés dans les témoignages. Le poulet est décrit comme tendre ; la sauce est relevée et équilibrée. Une boisson à la mangue et un dessert au chocolat sont cités.':'Các món ăn được khách khen. Thịt gà được nhận xét mềm, nước sốt đậm vị và cân bằng. Đồ uống xoài và món tráng miệng sô-cô-la được nhắc cụ thể.',evidence_ids:['a'.repeat(64)]}];
+  rows[0].report_sections.positive_aspects=positives;(rows[0].publication!.derived.report as Record<string,unknown>).positive_aspects=positives;
   const reservations=[{category:'service',text:language==='fr'?'Une attente est signalée.':'Có phản ánh về thời gian chờ.',evidence_ids:['b'.repeat(64)]},
    {category:'ambiance',text:language==='fr'?'Un client souhaiterait davantage d’espace, tout en appréciant le cadre.':'Một khách mong có thêm không gian, dù vẫn khen khung cảnh.',evidence_ids:['c'.repeat(64)]}];
   rows[0].report_sections.reservations=reservations;(rows[0].publication!.derived.report as Record<string,unknown>).negative_aspects=reservations;
