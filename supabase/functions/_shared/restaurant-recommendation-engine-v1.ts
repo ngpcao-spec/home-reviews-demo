@@ -240,6 +240,13 @@ function distinctBudgets(a: Prices, b: Prices) {
 /** PURE internal domain function. Its inputs must be the RLS-authorized catalogue.
  * No storage mutation, supplier, LLM, geocoder, public handler or HOME AI call. */
 export function recommendRestaurants(rows: SheetRow[], organization: string, language: string, request: Request): Result {
+  return selectRestaurants(rows,organization,language,request,3);
+}
+/** Same eligibility, exact score bands, service ties and price diversity; bounded private AI input. */
+export function shortlistRestaurants(rows:SheetRow[],organization:string,language:string,request:Request):Result {
+  return selectRestaurants(rows,organization,language,request,20);
+}
+function selectRestaurants(rows: SheetRow[], organization: string, language: string, request: Request, limit:number): Result {
   validateRequest(request);
   if (!organization || !['fr','vi'].includes(language)) throw Error('AUTHORIZED_CONTEXT_REQUIRED');
   const result: Result = {version:RECOMMENDATION_ENGINE_VERSION,comparable_score_gap:COMPARABLE_SCORE_GAP,proposals:[],excluded:[],notices:[],refinements:[]};
@@ -317,7 +324,7 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
     });
   });
   const remaining = [...ranked], chosen: Candidate[] = [];
-  while (remaining.length && chosen.length < 3) {
+  while (remaining.length && chosen.length < limit) {
     const first = remaining[0];
     const comparable = remaining.filter(c => c.band === first.band && c.matches === first.matches && c.preference_band === first.preference_band
       && rankDistance(c) <= rankDistance(first) + COMPARABLE_DISTANCE_METRES);

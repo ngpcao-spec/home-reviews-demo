@@ -5,7 +5,7 @@ import {recommendationTestHandler} from '../../supabase/functions/_shared/recomm
 import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalogue';
 const org='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 const user='33333333-3333-4333-8333-333333333333';
-function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;failed?:boolean;rows?:ReturnType<typeof recommendationSheet>[];memberships?:boolean}={}){
+function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;failed?:boolean;rows?:ReturnType<typeof recommendationSheet>[];memberships?:boolean;ai?:boolean}={}){
  const language=options.language??'vi';
  const rows=(options.rows??[recommendationSheet('a',{category:'service',cuisines:['indian'],positive:'Phục vụ chu đáo.'}),recommendationSheet('b')]).map(r=>{
   r.organization_id=org;r.language=language;Object.assign(r.metadata.identity as object,{organization_id:org});
@@ -24,9 +24,12 @@ function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;fa
    :table==='restaurant_recommendation_sheets'?rows:[];
   return new Response(JSON.stringify(data),{status:options.failed&&table==='restaurant_recommendation_sheets'?500:200,headers:{'content-type':'application/json'}});
  }));
- const handler=recommendationTestHandler(requireUser);
+ const reserve=vi.fn(async()=>({id:'attempt-offline',owned:true,state:'dispatched',selection:null,metrics:null}));
+ const finish=vi.fn(async()=>{});
+ const provider=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({choices:[{id:rows[0].establishment_id,reason_refs:['score_global'],caution_ref:null}]})}]}]})));
+ const handler=recommendationTestHandler(requireUser,options.ai?{key:()=> 'offline-placeholder',http:provider,port:()=>({reserve,finish})}:undefined);
  const send=(body:unknown,authenticated=true,method='POST')=>handler(new Request('https://fixture.invalid/functions/v1/test-restaurant-recommendations',{method,headers:authenticated?{Authorization:'Bearer caller-token'}:{},...(method==='POST'?{body:JSON.stringify(body)}:{})}));
- return{rows,requests,auths,send};
+ return{rows,requests,auths,send,reserve,finish,provider};
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('authenticated recommendation endpoint',()=>{
@@ -74,5 +77,26 @@ describe('authenticated recommendation endpoint',()=>{
   const f=fixture({failed:true}),r=await f.send({action:'recommend'});expect(r.status).toBe(500);
   expect(await r.json()).toEqual({error:'RECOMMENDATION_TEST_UNAVAILABLE'});
   expect((await f.send({},true,'GET')).status).toBe(405);expect((await f.send({},false,'OPTIONS')).status).toBe(200);
+ });
+ it('calls the AI only for an explicit compare, under the same organization/session and frozen rows',async()=>{
+  const f=fixture({ai:true});await f.send({action:'options'});await f.send({action:'recommend',preference:'en famille'});
+  expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
+  const r=await(await f.send({action:'compare',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
+  expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledTimes(1);
+ });
+ it('refuses foreign organization, unsupported requirements and personal contact data before reserving an AI attempt',async()=>{
+  const f=fixture({ai:true});
+  for(const body of [{action:'compare',organization_id:other},{action:'compare',required_features:['invented']},{action:'compare',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
+  expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
+ });
+ it('does not confirm an unknown mandatory feature and returns the ordinary empty engine result',async()=>{
+  const f=fixture({ai:true}),r=await(await f.send({action:'compare',required_features:['quiet']})).json();
+  expect(r.result.proposals).toEqual([]);expect(r.comparison.status).toBe('fallback');expect(f.provider).not.toHaveBeenCalled();
+ });
+ it('does not return candidate data after permissions are revoked during the single provider attempt',async()=>{
+  const options={ai:true,role:'manager'},f=fixture(options),native=f.provider.getMockImplementation()!;
+  f.provider.mockImplementation(async(...args)=>{const response=await native(...args);options.role='viewer';return response;});
+  const r=await f.send({action:'compare',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
+  expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledWith('attempt-offline','obsolete',null,expect.any(Object),'FORBIDDEN');
  });
 });

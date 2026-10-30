@@ -1,8 +1,9 @@
 import {supabase} from './supabase';
 import type {Result,Proposal} from '../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
+import type {AiComparison} from '../../supabase/functions/_shared/recommendation-ai-contract';
 export type {Proposal};
-export type RecommendationTestInput={action:'options'|'recommend';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean};
-export type RecommendationTestResponse={api_version:string;language:'fr'|'vi';organization_id:string;organizations:{id:string;name:string}[];cuisines:string[];result?:Result};
+export type RecommendationTestInput={action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[]};
+export type RecommendationTestResponse={api_version:string;language:'fr'|'vi';organization_id:string;organizations:{id:string;name:string}[];cuisines:string[];features?:{id:string;label:string}[];interpreted_preferences?:{id:string;label:string}[];result?:Result;comparison?:AiComparison};
 export async function recommendationTestApi(body:RecommendationTestInput):Promise<RecommendationTestResponse>{
  if(!supabase)throw Error('UNAUTHORIZED');
  const {data,error}=await supabase.functions.invoke('test-restaurant-recommendations',{body});

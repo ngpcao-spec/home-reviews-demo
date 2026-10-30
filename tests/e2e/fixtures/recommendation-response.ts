@@ -15,5 +15,7 @@ export function recommendationResponse(body:Record<string,unknown>){
  const catalogue=localStorage.getItem('recommendation-case')==='limited'?rows.slice(0,1):rows;
  const common={api_version:'recommendation-test-v1',language,organization_id:org,organizations:[{id:org,name:'Organisation témoin'}],cuisines:recommendationCuisineOptions(catalogue,org,language)};
  const request:Request={geography:'not_requested',...(body.cuisine?{cuisines:[String(body.cuisine)]}:{}),...(body.maximum_vnd!==undefined?{budget:{kind:'amount',currency:'VND',unit:'per_person',maximum:Number(body.maximum_vnd)}}:{}),...(body.service_priority?{preferences:{categories:['service']}}:{})};
- return body.action==='options'?common:{...common,result:recommendRestaurants(catalogue,org,language,request)};
+ const result=recommendRestaurants(catalogue,org,language,request);
+ const comparison=body.action==='compare'?{status:localStorage.getItem('recommendation-ai-case')==='invalid'?'fallback':'completed',model:'gpt-6.1-sol',candidate_count:catalogue.length,selections:result.proposals.slice(0,2).reverse().map(p=>({proposal:p,reasons:[{ref:'score_global',text:language==='fr'?'Score interne documenté.':'Điểm nội bộ đã lưu.',source:{report_id:p.report.id}}],caution:null})),metrics:{input_tokens:123,output_tokens:25,cache_read_tokens:0,cache_write_tokens:null,duration_ms:500,cost_usd:null,cost_kind:'unavailable',model:'gpt-6.1-sol',provider_request_id:'fixture'}}:undefined;
+ return body.action==='options'?common:{...common,result,...(comparison?{comparison}:{})};
 }
