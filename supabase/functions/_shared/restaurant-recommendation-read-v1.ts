@@ -3,7 +3,7 @@ import {assertMembership} from './auth.ts';
 import {recommendRestaurants, type Request, type SheetRow} from './restaurant-recommendation-engine-v1.ts';
 
 // Caller-scoped SELECTs only. No service-role query, RPC, provider or HOME AI wiring.
-export const RECOMMENDATION_SELECT = 'establishment_id,organization_id,language,report_id,source_run_id,report_generated_at,calculation_version,stale,stale_reason,corpus,metadata,report_sections,calculation_text:calculation::text,publication:current_report_publications!inner(report_id,source_run_id,organization_id,establishment_id,language,scope,stale,stale_reason,generated_at,derived:document->derived_report)';
+export const RECOMMENDATION_SELECT = 'establishment_id,organization_id,language,report_id,source_run_id,report_generated_at,calculation_version,stale,stale_reason,corpus,metadata,report_sections,calculation_text:calculation::text,publication:current_report_publications!inner(report_id,source_run_id,organization_id,establishment_id,language,scope,stale,stale_reason,generated_at,derived:document->derived_report,evidence_bindings,source_bindings)';
 export async function readRestaurantRecommendationCatalogue(c: {client: AuthContext['client']; user: Pick<AuthContext['user'],'id'>}, organizationId: string) {
   // c must come from requireUser(request), not from caller-supplied IDs/claims.
   await assertMembership(c.client,c.user.id,organizationId,['owner','admin','manager']);
@@ -17,7 +17,8 @@ export async function readRestaurantRecommendationCatalogue(c: {client: AuthCont
     const {data,error} = await c.client.from('restaurant_recommendation_sheets').select(RECOMMENDATION_SELECT)
       .eq('organization_id',organizationId).eq('language',language).order('establishment_id').range(offset,offset+pageSize-1);
     if (error || !data) throw Error('RECOMMENDATION_READ_FAILED');
-    rows.push(...data as unknown as SheetRow[]);
+    // Only frozen IDs are needed for support counts. Discard all other source fields immediately.
+    rows.push(...(data as unknown as SheetRow[]).map(row=>({...row,publication:row.publication?{...row.publication,source_bindings:Array.isArray(row.publication.source_bindings)?row.publication.source_bindings.map(v=>({id:(v as {id?:unknown})?.id})):undefined}:null})));
     if (data.length < pageSize) break;
   }
   const establishments:{id:string;name:string;organization_id:string}[]=[];

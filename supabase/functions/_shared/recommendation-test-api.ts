@@ -18,9 +18,9 @@ function criteria(raw:unknown) {
     || b.maximum_vnd!==undefined && (typeof b.maximum_vnd!=='number'||!Number.isSafeInteger(b.maximum_vnd)||b.maximum_vnd<0)
     || b.service_priority!==undefined && typeof b.service_priority!=='boolean'
     || b.required_features!==undefined && !validAiFeatures(b.required_features)
-    || b.preference_mode!==undefined && b.preference_mode!=='free_text_v2')throw Error('INVALID_RECOMMENDATION_REQUEST');
+    || b.preference_mode!==undefined && !['free_text_v2','report_facts_v3'].includes(String(b.preference_mode)))throw Error('INVALID_RECOMMENDATION_REQUEST');
   if(b.preference!==undefined)b.preference=checkedRecommendationPreference(b.preference);
-  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'};
+  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'};
 }
 export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort}) {
  return async(request:Request):Promise<Response>=>{
@@ -33,9 +33,8 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    if(text.length>8192)return reply({error:'INVALID_RECOMMENDATION_REQUEST'},413);
    let raw:unknown;try{raw=JSON.parse(text);}catch{throw Error('INVALID_RECOMMENDATION_REQUEST');}
    const input=criteria(raw);
-   // Old cached pages promised that free text would not leave HOME Reviews.
-   // Require the updated client contract before reading a catalogue or reserving a paid attempt.
-   if(input.action==='compare'&&input.preference_mode!=='free_text_v2')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
+   // Require the client explaining that anonymous report excerpts are now sent, before any read/reservation.
+   if(input.action==='compare'&&input.preference_mode!=='report_facts_v3')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
    const membership=await context.client.from('organization_members').select('user_id,organization_id,role,organization:organizations!inner(id,name)')
     .eq('user_id',context.user.id).in('role',['owner','admin','manager']).order('organization_id');
    if(membership.error)throw Error('RECOMMENDATION_READ_FAILED');
