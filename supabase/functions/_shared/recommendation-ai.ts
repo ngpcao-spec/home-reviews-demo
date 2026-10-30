@@ -2,6 +2,7 @@ import {shortlistRestaurants,type Proposal,type Request as EngineRequest} from '
 import {PLACE_FEATURES,placeFeatureLabel} from './google-place-taxonomy.ts';
 import type {readRestaurantRecommendationCatalogue} from './restaurant-recommendation-read-v1.ts';
 import type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
+import {explainSavedReference} from './recommendation-explanation.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
 export const RECOMMENDATION_AI_VERSION='recommendation-ai-free-text-reference-selection-v2';
@@ -110,8 +111,9 @@ export function validateChoices(raw:unknown,prepared:Prepared):Choice[]{
  return value.choices;
 }
 export function renderChoices(choices:Choice[],p:Prepared):AiSelection[]{return choices.map(c=>{
- const facts=p.facts.get(c.id)!;const render=(ref:string)=>{const f=facts.find(x=>x.ref===ref)!;return {ref,text:f.label,source:f.source};};
- return {proposal:p.proposals.find(x=>x.establishment_id===c.id)!,reasons:c.reason_refs.map(render),caution:c.caution_ref?render(c.caution_ref):null};
+ const proposal=p.proposals.find(x=>x.establishment_id===c.id)!,facts=p.facts.get(c.id)!;
+ const render=(ref:string)=>{const f=facts.find(x=>x.ref===ref)!;return explainSavedReference(proposal,ref,f.label,f.source,proposal.report.language as 'fr'|'vi');};
+ return {proposal,reasons:c.reason_refs.map(render),caution:c.caution_ref?render(c.caution_ref):null};
 });}
 function metricsFrom(raw:Record<string,unknown>,duration:number,requestId:string|null):Metrics{
  const u=(raw.usage??{}) as Record<string,unknown>,details=(u.input_tokens_details??{}) as Record<string,unknown>;

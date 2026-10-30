@@ -6,7 +6,7 @@ import {useI18n} from '../i18n';
 import {recommendationMessages,recommendationCuisineLabels} from '../i18n/recommendations';
 import {recommendationTestApi,type Proposal,type RecommendationTestInput,type RecommendationTestResponse} from '../lib/recommendation-test';
 import './RecommendationTestPage.css';
-import type {AiSelection} from '../../supabase/functions/_shared/recommendation-ai-contract';
+import type {AiSelection,AiExplanation} from '../../supabase/functions/_shared/recommendation-ai-contract';
 
 export function RecommendationTestPage(){
  const {currentUser,isAuthenticated,demoMode}=useApp(),{language}=useI18n(),m=recommendationMessages[language];
@@ -71,9 +71,11 @@ export function RecommendationTestPage(){
     :<>{response.result.proposals.length<3&&<p className="recommendation-muted">{m.limited}</p>}<div className="recommendation-results">{response.result.proposals.map(p=><RecommendationCard key={p.establishment_id} proposal={p}/>)}</div></>}
    {response.result.excluded.length>0&&<p className="recommendation-muted">{m.excluded} : {response.result.excluded.length}</p>}
    {response.comparison&&<section className="recommendation-ai" aria-label={m.aiSelection}><h2>{m.aiSelection}</h2>
+    <p className="recommendation-origin" data-recommendation-origin={response.comparison.status}>{response.comparison.status==='completed'?m.originValidated:response.comparison.status==='cached'?m.originCached:response.comparison.status==='pending'?m.originPending:m.originFallback}</p>
+    {response.comparison.status==='cached'&&<p className="recommendation-muted">{m.cachedMetrics}</p>}
     {['completed','cached'].includes(response.comparison.status)?<>{response.comparison.status==='cached'&&<p className="recommendation-muted">{m.aiCached}</p>}<p className="recommendation-muted">{m.aiSource}</p><div className="recommendation-results">{response.comparison.selections.map(s=><RecommendationCard key={s.proposal.establishment_id} proposal={s.proposal} selection={s}/>)}</div></>
      :<p className="recommendation-notice card" role="status">{response.comparison.status==='pending'?m.aiPending:m.aiFallback}</p>}
-    <details className="recommendation-details"><summary>{m.aiMetrics}</summary><p>{m.aiModel} : {response.comparison.model}</p>{response.comparison.metrics&&<><p>{m.aiTokens} : {response.comparison.metrics.input_tokens??'—'} / {response.comparison.metrics.output_tokens??'—'}</p><p>{m.aiCache} : {response.comparison.metrics.cache_read_tokens??'—'} / {response.comparison.metrics.cache_write_tokens??'—'}</p><p>{m.aiDuration} : {response.comparison.metrics.duration_ms} ms</p><p>{response.comparison.metrics.cost_usd===null?m.aiUnknownCost:`${response.comparison.metrics.cost_usd} USD`}</p></>}</details>
+    <details className="recommendation-details"><summary>{m.aiMetrics}</summary><p>{m.aiModel} : {response.comparison.model}</p>{response.comparison.attempt_id&&<p className="recommendation-attempt">{m.attemptReference} : {response.comparison.attempt_id}</p>}{response.comparison.metrics&&<><p>{m.aiTokens} : {response.comparison.metrics.input_tokens??'—'} / {response.comparison.metrics.output_tokens??'—'}</p><p>{m.aiCache} : {response.comparison.metrics.cache_read_tokens??'—'} / {response.comparison.metrics.cache_write_tokens??'—'}</p><p>{m.aiDuration} : {response.comparison.metrics.duration_ms} ms</p><p>{response.comparison.metrics.cost_usd===null?m.aiUnknownCost:`${response.comparison.metrics.cost_usd} USD`}</p></>}</details>
    </section>}
   </section>}
  </section></>;
@@ -88,21 +90,42 @@ function RecommendationCard({proposal:p,selection}:{proposal:Proposal;selection?
  const chosen=p.reasons.find(r=>r.code==='CATEGORY_PREFERENCE'&&r.category==='service'&&r.citations?.length)
   ??p.reasons.find(r=>r.code==='REPORT_STRENGTH'&&r.citations?.length);
  const citation=chosen?.citations?.[0],caution=p.reservations[0];
+ const displayedCaution=selection?selection.caution:caution;
  const second=citation?chosen?.code==='CATEGORY_PREFERENCE'?m.serviceReason:m.reportReason:p.budget_match==='google_range'?m.budgetReason:p.cuisines.values.length?m.cuisineReason:m.corpusReason;
  return <article className="recommendation-card card">
   <header><div><h2>{p.name}</h2>{p.cuisines.values.length>0&&<p className="recommendation-muted">{p.cuisines.values.map(c=>recommendationCuisineLabels[c]?.[language]??c).join(' · ')}</p>}</div><div className="recommendation-global"><span>{m.global}</span><strong>{score(p.scores.global)}<small> / 6</small></strong></div></header>
   <dl className="recommendation-scores">{(['quality','service','ambiance'] as const).map(c=><div key={c}><dt>{c==='quality'?m.quality:c==='service'?m.serviceScore:m.ambiance}</dt><dd>{score(p.scores[c])}<small> / 6</small></dd></div>)}</dl>
   <section className="recommendation-price"><h3>{m.indicative}</h3><p>{range?`${amount(range.minimum)}–${amount(range.maximum)} ${range.currency}`:price.status==='known'?price.level!==null?`${m.level} : ${price.level}/4`:price.label:m.unknownPrice}{price.unit==='per_person'?` · ${m.perPerson}`:` · ${m.unitUnknown}`}</p><small>{m.notGuaranteed}</small></section>
-  <h3>{m.reasons}</h3><ul className="recommendation-reasons">{selection?selection.reasons.map(r=><li key={r.ref}>{r.text}</li>):<><li>{m.scoreReason}</li><li>{second}{citation&&<blockquote className="recommendation-excerpt">{citation.text}</blockquote>}</li></>}</ul>
-  {(selection?.caution||caution)&&<section className="recommendation-caution"><h3>{m.caution}</h3><blockquote className="recommendation-excerpt">{selection?.caution?.text??caution?.text}</blockquote></section>}
+  <h3>{m.reasons}</h3><ul className="recommendation-reasons">{selection?selection.reasons.map(r=><li key={r.ref}>{r.display_kind==='report_extract'&&<small>{m.reportExtract}</small>}<p className="recommendation-excerpt">{r.text}</p><ExplanationNotes explanation={r}/></li>):<><li>{m.scoreReason}</li><li>{second}{citation&&<blockquote className="recommendation-excerpt">{citation.text}</blockquote>}</li></>}</ul>
+  {displayedCaution&&<section className="recommendation-caution"><h3>{m.caution}</h3>{selection?.caution?.display_kind==='report_extract'&&<small>{m.reportExtract}</small>}<blockquote className="recommendation-excerpt">{displayedCaution.text}</blockquote>{selection?.caution&&<ExplanationNotes explanation={selection.caution}/>}</section>}
   <p className="recommendation-report-date">{m.reportDate} {date(p.report.generated_at)}</p>
   {p.report.freshness==='corpus_changed'&&<p className="recommendation-freshness">{m.stale}</p>}
   <details className="recommendation-details"><summary>{m.details}</summary><div>
    <p>{m.corpus} : {String(p.report.corpus.total_reviews)}</p>{price.status==='known'&&price.source&&<p>{m.source}{price.observed_at?` · ${m.observed.toLowerCase()} ${date(price.observed_at)}`:''}</p>}
    <p>{price.unit_label} · {m.notGuaranteed}</p>
-   {(citation||caution)&&<><h3>{m.reportSource}</h3>{citation&&<blockquote>{citation.text}</blockquote>}{caution&&<blockquote>{caution.text}</blockquote>}</>}
+   {selection?<>{selection.reasons.map((r,i)=><ExplanationDetails key={r.ref} explanation={r} label={`${m.reasonSource} ${i+1}`}/>)}{selection.caution&&<ExplanationDetails explanation={selection.caution} label={m.cautionSource}/>}</>
+    :(citation||caution)&&<><h3>{m.reportSource}</h3>{citation&&<blockquote>{citation.text}</blockquote>}{caution&&<blockquote>{caution.text}</blockquote>}</>}
    <small>{m.reference} : {p.report.id}</small>
   </div></details>
   <Link className="secondary-button full-width recommendation-open" to={`/etablissements/${encodeURIComponent(p.establishment_id)}`}>{m.view}</Link>
  </article>;
+}
+
+function ExplanationNotes({explanation}:{explanation:AiExplanation}){
+ const {language}=useI18n(),m=recommendationMessages[language];
+ return <>{explanation.notes?.map(note=><p className="recommendation-source-note" key={note}>{note==='google_not_noise_measurement'?m.googleLimit:note==='recurrence_not_established'?m.recurrenceLimit:m.sourceUnavailable}</p>)}</>;
+}
+function ExplanationDetails({explanation:e,label}:{explanation:AiExplanation;label:string}){
+ const {language}=useI18n(),m=recommendationMessages[language],locale=language==='vi'?'vi-VN':'fr-FR';
+ const date=(v:string)=>new Date(v).toLocaleString(locale);
+ const category=(c:string)=>c==='quality'?m.quality:c==='service'?m.serviceScore:c==='ambiance'?m.ambiance:c==='global'?m.global:c==='price'?m.priceCategory:c;
+ return <section className="recommendation-bound-source"><h3>{label}</h3><small>{m.selectedReference} : {e.ref}</small>
+  {e.sources?.map((s,i)=><div key={i} className="recommendation-source-entry">{s.kind==='google_maps'?<>
+   <p>{m.googleDeclaration}{s.observed_at?` · ${m.observed} ${date(s.observed_at)}`:''}</p><blockquote>« {s.label} » : {s.value?m.sourceYes:m.sourceNo}</blockquote><code>{s.field}</code>
+   {s.url&&<a href={s.url} target="_blank" rel="noopener noreferrer">{m.openGoogleSource}</a>}
+  </>:s.kind==='report'?<><p>{m.reportSource} · {category(s.category)} · {m.sourcePoint} {s.index+1} · {date(s.generated_at)}</p><blockquote>{s.text}</blockquote><small>{m.reference} : {s.report_id}</small><small>{m.sourceReferences} : {s.evidence_ids.length}</small></>
+   :<><p>{m.internalScoreSource} · {category(s.category)} : {s.score}/6</p><small>{m.reference} : {s.report_id} · {date(s.generated_at)}</small></>}</div>)}
+  {!e.sources?.length&&<p>{e.display_kind==='saved_metadata'?m.metadataSource:m.sourceUnavailable}</p>}
+  <ExplanationNotes explanation={e}/>
+ </section>;
 }
