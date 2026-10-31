@@ -2,8 +2,9 @@ import {add, compare, exactJson, quotient, rational, subtract, type Rational} fr
 import {PLACE_FEATURES,placeFeatureLabel,placeCategories,taxonomyValue,type TaxonomyKind} from './google-place-taxonomy.ts';
 import {scheduledOpening,PLACE_PROFILE_VERSION,type PlaceProfile} from './google-place-profile.ts';
 import {googleMoneyRange,googlePriceLevel,googlePerPersonPriceLabel,type MoneyRange} from './google-maps-prices.ts';
+import {REPORT_FEATURE_PHRASES,reportFeatureSignals,limitedScope,type FeatureScope,type FeatureVisit} from './report-feature-evidence.ts';
 
-export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v4';
+export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v5';
 export const COMPARABLE_SCORE_GAP = '0.10';
 export const COMPARABLE_DISTANCE_METRES = 250;
 export const CATEGORIES = ['quality', 'service', 'ambiance'] as const;
@@ -38,7 +39,8 @@ export type Proposal = {
   cuisines: {values: string[]; source: string | null; observed_at: string | null};
   scores: Record<Category, Score> & {global: Score}; budget: Prices; budget_match: 'not_requested' | 'google_level' | 'google_range';
   reasons: {code: string; category?: Category; feature?: string; citations?: Citation[]}[]; reservations: Citation[];
-  features: Record<string, {status: 'reported' | 'denied' | 'conflicted' | 'not_documented'; citations: Citation[]; label?:string; google?:unknown}>;
+  features: Record<string, {status: 'reported' | 'denied' | 'conflicted' | 'not_documented'; citations: Citation[]; label?:string; google?:unknown;
+    context?:{status:'matched'|'outside'|'unresolved';scopes:FeatureScope[]}}>;
   practical:PlaceProfile|null; specialties:string[]; usages:string[];
   opening:{status:'not_requested'|'scheduled_open'; live:false; holiday_guarantee:false};
   contradictions:{feature:string; google:unknown; citations:Citation[]}[];
@@ -118,42 +120,23 @@ function citations(row: SheetRow, section: Citation['section']): Citation[] {
       ? [{report_id: row.report_id, section, index, category: String(p.category), text: String(p.text), evidence_ids: refs}] : [];
   });
 }
-/** Deliberately small, conservative literal vocabulary. Never inferred from a score.
- * A match describes a reported observation, not a guaranteed facility or service. */
-const featurePhrases: Record<string, string[]> = {
-  quiet: ['quiet', 'calm atmosphere', 'calme', 'yen tinh'],
-  fast_service: ['fast service', 'quick service', 'service rapide', 'phuc vu nhanh', 'nhanh nhen'],
-  sea_view: ['sea view', 'ocean view', 'vue sur la mer', 'vue mer', 'canh bien', 'view bien'],
-  air_conditioning: ['air conditioning', 'air conditioned', 'climatisation', 'climatise', 'may lanh', 'dieu hoa'],
-  private_room: ['private room', 'salle privee', 'phong rieng'],
-};
-const contraryPhrases: Record<string, string[]> = {
-  quiet: ['noisy', 'loud music', 'bruyant', 'bruyante', 'tieng on', 'on ao', 'nhac to'],
-  fast_service: ['slow service', 'long wait', 'service lent', 'attente longue', 'cho mon lau', 'cho lau', 'phuc vu cham'],
-};
-function containsPhrase(text: string, phrases: string[]) {
-  const k = ' ' + key(text).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g,' ') + ' ';
-  return phrases.some(p => k.includes(' ' + p + ' '));
+function featureStatus(name: string, positives: Citation[], negatives: Citation[],visit:FeatureVisit): Proposal['features'][string]&{assertedPositive:boolean;assertedNegative:boolean} {
+  const signals=[...positives,...negatives].flatMap(citation=>reportFeatureSignals(citation.text,name,visit).map(signal=>({...signal,citation})));
+  const active=signals.filter(s=>s.applies!==false),negative=active.some(s=>s.polarity==='negative'&&s.applies===true);
+  const yes=active.some(s=>s.polarity==='positive'&&s.applies===true);
+  const scopedPositive=signals.some(s=>s.polarity==='positive'&&limitedScope(s.scope));
+  const unresolved=active.some(s=>limitedScope(s.scope)&&(s.applies===null||s.polarity==='unknown'))||scopedPositive&&!yes;
+  const scopes=[...new Map(signals.filter(s=>limitedScope(s.scope)).map(s=>[JSON.stringify(s.scope),s.scope])).values()];
+  const contextStatus=unresolved?'unresolved':active.length?'matched':'outside';
+  return {status:negative?'conflicted':unresolved?'not_documented':yes?'reported':'not_documented',assertedPositive:active.some(s=>s.polarity==='positive'),assertedNegative:active.some(s=>s.polarity==='negative'),
+    citations:[...new Set(active.filter(s=>s.polarity!=='unknown').map(s=>s.citation))],...(scopes.length?{context:{status:contextStatus,scopes}}:{})};
 }
-function hasPhrase(text: string, feature: string) {
-  return containsPhrase(text,Object.hasOwn(featurePhrases,feature) ? featurePhrases[feature] : []);
-}
-function affirmative(text: string) {
-  const k = key(text).replace(/khong (gian|khi)/g, '');
-  return !/\b(not|no|never|without|pas|sans|non|jamais|khong|chua|thieu)\b/.test(k);
-}
-function featureStatus(name: string, positives: Citation[], negatives: Citation[]): Proposal['features'][string] {
-  const contrary = (p: Citation) => containsPhrase(p.text,Object.hasOwn(contraryPhrases,name) ? contraryPhrases[name] : []);
-  const yes = positives.filter(p => hasPhrase(p.text, name) && affirmative(p.text) && !contrary(p));
-  const no = [...negatives.filter(p => hasPhrase(p.text, name) || contrary(p)), ...positives.filter(p => hasPhrase(p.text, name) && (!affirmative(p.text) || contrary(p)))];
-  return {status: yes.length ? no.length ? 'conflicted' : 'reported' : no.length ? 'conflicted' : 'not_documented', citations: [...yes, ...no]};
-}
-function combinedFeature(name:string,profile:PlaceProfile|null,positives:Citation[],negatives:Citation[],language:string):Proposal['features'][string]{
- const report=featureStatus(name,positives,negatives),fact=profile&&Object.hasOwn(profile.attributes.facts,name)?profile.attributes.facts[name]:undefined;
+function combinedFeature(name:string,profile:PlaceProfile|null,positives:Citation[],negatives:Citation[],language:string,instant?:string,sourceDisagreements=false):Proposal['features'][string]{
+ const report=featureStatus(name,positives,negatives,{instant,timezone:profile?.hours.timezone}),fact=profile&&Object.hasOwn(profile.attributes.facts,name)?profile.attributes.facts[name]:undefined;
  const google=fact?{...fact,source:profile!.attributes.source,observed_at:profile!.attributes.observed_at}:undefined;
- const status=fact?.status==='conflicted'||fact?.value===true&&report.status==='conflicted'||fact?.value===false&&report.status==='reported'?'conflicted'
-  :fact?.value===false?'denied':fact?.value===true?'reported':report.status;
- return {status,citations:report.citations,label:placeFeatureLabel(name,language),...(google?{google}:{})};
+ const status=fact?.status==='conflicted'||fact?.value===true&&(sourceDisagreements?report.assertedNegative:report.status==='conflicted')||fact?.value===false&&(sourceDisagreements?report.assertedPositive:report.status==='reported')?'conflicted'
+  :fact?.value===false?'denied':fact?.value===true&&report.context?.status!=='unresolved'?'reported':report.status;
+ return {status,citations:report.citations,label:placeFeatureLabel(name,language),...(report.context?{context:report.context}:{}),...(google?{google}:{})};
 }
 function priceRange(raw: unknown): Prices['establishment']['range'] {
   const r=googleMoneyRange(raw);
@@ -252,7 +235,7 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
   const result: Result = {version:RECOMMENDATION_ENGINE_VERSION,comparable_score_gap:COMPARABLE_SCORE_GAP,proposals:[],excluded:[],notices:[],refinements:[]};
   const features = [...new Set([...(request.preferences?.features ?? []),...(request.required_features ?? [])])];
   const preferredCategories = [...new Set(request.preferences?.categories ?? [])];
-  const unknownFeatures = features.filter(f => !Object.hasOwn(featurePhrases,f)&&!Object.hasOwn(PLACE_FEATURES,f));
+  const unknownFeatures = features.filter(f => !Object.hasOwn(REPORT_FEATURE_PHRASES,f)&&!Object.hasOwn(PLACE_FEATURES,f));
   result.notices.push(...unknownFeatures.map(f => 'UNSUPPORTED_FEATURE:' + f));
   const authorised = rows.filter(r => r.organization_id === organization && r.language === language);
   const seen = new Set<string>(), duplicates = new Set<string>();
@@ -283,8 +266,10 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
     if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN'
       : request.budget?.kind==='amount' && budget.establishment.unit!=='per_person' ? 'BUDGET_UNIT_UNCONFIRMED' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
     const positives = citations(row,'positive_aspects'), reservations = citations(row,'reservations');
-    const observations=Object.fromEntries(features.map(f=>[f,combinedFeature(f,profile,positives,reservations,language)]));
-    const contradictions=Object.keys(featurePhrases).map(f=>({feature:f,...combinedFeature(f,profile,positives,reservations,language)})).filter(x=>x.status==='conflicted'&&x.google&&x.citations.length).map(x=>({feature:x.feature,google:x.google,citations:x.citations}));
+    const observations=Object.fromEntries(features.map(f=>[f,combinedFeature(f,profile,positives,reservations,language,request.visit_at)]));
+    // Preserve all genuine dated source disagreements, even if outside this visit.
+    // The requested-context feature above separately controls mandatory eligibility.
+    const contradictions=Object.keys(REPORT_FEATURE_PHRASES).map(f=>({feature:f,...combinedFeature(f,profile,positives,reservations,language,undefined,true)})).filter(x=>x.status==='conflicted'&&x.google&&x.citations.length).map(x=>({feature:x.feature,google:x.google,citations:x.citations}));
     if (request.required_features?.some(f => observations[f].status !== 'reported')) reasons.push('REQUIRED_FEATURE_NOT_CONFIRMED');
     let global: ReturnType<typeof score> | null = null, categories: Record<Category, ReturnType<typeof score>> | null = null;
     try {

@@ -37,7 +37,7 @@ export function candidateFacts(p:Proposal,language:Language,row?:Catalogue['rows
  const price=p.budget.establishment;
  if(price.range)push('price','price',{...price.range,unit:price.unit,indicative:true},{source:price.source,observed_at:price.observed_at},vi?'Khoảng giá Google Maps tham khảo đã lưu.':'Fourchette Google Maps indicative enregistrée.');
  for(const feature of AI_FACT_FEATURES){const fact=p.features[feature];
-  if(fact&&fact.status!=='not_documented')push('feature_'+feature,'feature',{feature,status:fact.status},
+  if(fact&&fact.status!=='not_documented')push('feature_'+feature,'feature',{feature,status:fact.status,...(fact.context?{context:fact.context}:{})},
    {google:fact.google?{source:p.practical?.attributes.source,observed_at:p.practical?.attributes.observed_at}:null,report:fact.citations.map(c=>({report_id:c.report_id,section:c.section,index:c.index,evidence_ids:c.evidence_ids}))},
    `${extraFeatureLabels[feature as keyof typeof extraFeatureLabels]?.[language]??placeFeatureLabel(feature,language)} : ${fact.status==='reported'?(vi?'thông tin được ghi nhận':'information documentée'):fact.status==='denied'?(vi?'không có theo Google':'non selon Google'):(vi?'thông tin trái chiều':'informations contradictoires')}`);
  }
@@ -91,7 +91,8 @@ export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:str
    (source as {report:unknown[]}).report.length?'google_maps_practical_and_report':'google_maps_practical':'report'
    :kind==='price'?'google_maps_price':kind==='cuisine'?'google_maps_categories':'report';
   // Exact decimal score strings suffice on the wire; fractions remain in the unchanged engine/proposals.
-  return {ref,kind,value:kind==='score'?(value as {value:string}).value:kind==='feature'?{status:(value as {status:string}).status}:value,source:compactSource};
+  const featureValue=value as {status:string;context?:unknown};
+  return {ref,kind,value:kind==='score'?(value as {value:string}).value:kind==='feature'?{status:featureValue.status,...(featureValue.context?{context:featureValue.context}:{})}:value,source:compactSource};
  })}));
  const schema={type:'object',additionalProperties:false,required:['choices'],properties:{choices:{type:'array',maxItems:3,items:{type:'object',additionalProperties:false,required:['id','reason_refs','caution_ref'],properties:{id:{type:'string',enum:candidates.map(c=>c.id)},reason_refs:{type:'array',minItems:1,maxItems:2,items:{type:'string'}},caution_ref:{type:['string','null']}}}}}};
  const request={model:RECOMMENDATION_AI_MODEL,store:false,reasoning:{effort:'low'},max_output_tokens:1800,

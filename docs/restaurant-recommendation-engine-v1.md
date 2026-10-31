@@ -95,12 +95,48 @@ supplémentaire. Une préférence de rubrique ne devient pas une exigence impos�
 
 V1 reconnaît un petit lexique littéral FR/VI/EN pour `quiet`, `fast_service`,
 `sea_view`, `air_conditioning`, `private_room`. Un signal exige une phrase dans
-les points positifs ; une négation ou une réserve contraire le rend non confirmé.
+les points du rapport ; une critique explicite ou une contradiction applicable le rend non confirmé.
 Le statut est `reported`, `conflicted` ou `not_documented`. Les phrases exactes
 sont toujours fournies : « mentionné dans le rapport », jamais « garanti ».
 Ambiance ≠ calme ; service ≠ rapidité. Les termes non pris en charge sont
 signalés et ne favorisent personne. Le lexique est conservateur et incomplet :
 pas de compréhension libre des formulations, sarcasmes ou autres langues.
+
+### Correction locale des négations et du contexte (moteur v5)
+
+L'interprétation des **points de rapport sauvegardés** sépare les propositions,
+les négations locales et les informations inconnues. Elle ne prétraite pas la
+demande libre de l'utilisateur, qui reste entière pour le choix final IA.
+`report-feature-evidence.ts` est un parseur conservateur FR/VI/EN ; ce n'est pas
+un analyseur universel du langage naturel.
+
+- « Calme en semaine ; week-ends non documentés » n'établit aucun bruit ni
+  contradiction. Une information inconnue n'est ni négative ni positive.
+- « Souhaite plus de places ; aucun bruit signalé » n'est pas une critique de
+  bruit et ne devient pas une preuve de calme. Une déclaration Google indépendante
+  garde sa propre source ; le démenti d'une plainte n'est pas cité comme support.
+- Une affirmation de calme n'est pas étendue hors de sa période. Les jours et
+  bornes horaires explicites sont confrontés à `visit_at` dans le fuseau Google
+  enregistré. Sans date/fuseau, ou pour des conditions non résolues (« lors de
+  dîners », « quand il y a peu de monde »), une exigence reste non confirmée.
+  Aucune plage horaire chiffrée n'est inventée pour le mot « dîner ».
+- Les contradictions effectivement rapportées, dont Google « calme » face à une
+  salle bruyante dans le contexte applicable, restent signalées et inadmissibles
+  pour une exigence de calme. Les extraits et références natifs restent intacts.
+
+Les caractéristiques contextualisées exposent `context.status` (`matched`,
+`outside` ou `unresolved`) et les bornes structurées. Les désaccords réels restent
+dans `contradictions`, même lorsqu'ils concernent un autre jour que la visite ;
+ils ne sont pas transformés en constat du jour demandé. Les faits compacts IA conservent les bornes
+d'un contexte confirmé, sans recopier de texte personnel. Le hash de la requête
+intègre ces faits comme auparavant : une ancienne réponse n'est pas réutilisée
+si le dossier réellement envoyé diffère. Aucun modèle ni prompt n'est changé.
+
+Les notes V2, fractions, bandes de 0,10, budget/devise/unité, cuisine, géographie,
+droits, fraîcheur et plafonds 20/3 sont inchangés. La présélection S16 n'est pas
+corrigée dans cette étape. Les fixtures synthétiques V1.1 et leurs attentes sont
+conservées sans adaptation ; les diagnostics ne sont pas des oracles métier à
+reproduire. Cette correction est locale, sans déploiement ni appel fournisseur.
 
 `preferences.features` est facultatif et ne filtre pas les absences ; un critère
 explicitement impératif utilise `required_features` et échoue s’il est inconnu
@@ -123,7 +159,7 @@ dans la demande, **et une unité « par personne » confirmée**. Exemple :
 appels `amount` sans `unit` sont également traités comme des budgets par personne ;
 l’omission ne contourne pas ce contrôle. Les autres unités de demande sont refusées.
 
-Version du moteur : `restaurant-recommendation-engine-v4` (scores V2 inchangés).
+Version locale du moteur : `restaurant-recommendation-engine-v5` (scores V2 inchangés).
 Une unité est confirmée uniquement par un libellé explicite du champ de prix
 Google sauvegardé (FR/VI/EN), ou par une observation `google_maps_ui` sauvegardée,
 datée, dont l’URL identifie exactement l’établissement et dont le libellé explicite
