@@ -6,7 +6,7 @@ import {explainSavedReference} from './recommendation-explanation.ts';
 import {reportPoint,savedReportPoints,REPORT_FACTS_VERSION} from './recommendation-report-facts.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
-export const RECOMMENDATION_AI_VERSION='recommendation-ai-report-excerpts-v3';
+export const RECOMMENDATION_AI_VERSION='recommendation-ai-shortlist-coverage-v4';
 export const RECOMMENDATION_AI_MODEL='gpt-6.1-sol';
 export const RECOMMENDATION_AI_INPUT_BYTES=200000;
 export const AI_FEATURES=['quiet','family_friendly','kids','vegetarian_options','vegan_options','outdoor_seating','air_conditioning','wheelchair_entrance','reservation'] as const;
@@ -72,7 +72,7 @@ export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:str
  const naturalLanguageRequest=checkedRecommendationPreference(preference);
  const language=catalogue.language as Language;
  // Include all supported characteristics in observations, without giving any an implicit preference.
- const shortlist=shortlistRestaurants(catalogue.rows,catalogue.organizationId,language,query);
+ const shortlist=shortlistRestaurants(catalogue.rows,catalogue.organizationId,language,query,{text:naturalLanguageRequest});
  const proposals=shortlist.proposals.map(p=>{
   const row=catalogue.rows.find(r=>r.establishment_id===p.establishment_id)!;
   // Use the existing engine's feature reconciliation, not raw unchecked metadata.
@@ -99,7 +99,7 @@ export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:str
   instructions:prompt,input:JSON.stringify({configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,language,mandatory_constraints:query,natural_language_request:naturalLanguageRequest,candidates}),
   text:{format:{type:'json_schema',name:'restaurant_selection',strict:true,schema}}};
  const reportPoints=new Map(proposals.map(p=>[p.establishment_id,savedReportPoints(p,catalogue.rows.find(r=>r.establishment_id===p.establishment_id))]));
- return {proposals,facts,candidates,request,reportPoints};
+ return {proposals,facts,candidates,request,reportPoints,shortlist:shortlist.shortlist};
 }
 export type Prepared=ReturnType<typeof prepareAi>;
 function reasonFact(f:Fact){return ['score','cuisine','price','strength'].includes(f.kind)||f.kind==='feature'&&['reported','denied'].includes((f.value as {status:string}).status);}

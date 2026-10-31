@@ -56,7 +56,7 @@ describe('versioned useful report excerpts with proven frozen support',()=>{
  });
  it('keeps score values and deterministic ranking intact while versioning content and compact wire scores',()=>{
   const f=fixture(),before=recommendRestaurants(f.catalogue.rows,f.catalogue.organizationId,'vi',{geography:'not_requested'}),input=JSON.parse(f.prepared.request.input);
-  expect(input.configuration_version).toBe('recommendation-ai-report-excerpts-v3');expect(input.content_version).toBe(REPORT_FACTS_VERSION);
+  expect(input.configuration_version).toBe('recommendation-ai-shortlist-coverage-v4');expect(input.content_version).toBe(REPORT_FACTS_VERSION);
   for(const c of ['global','quality','service','ambiance'] as const)expect(input.candidates[0].facts.find((v:{ref:string})=>v.ref==='score_'+c).value).toBe(before.proposals[0].scores[c].value);
   expect(f.p.scores).toEqual(before.proposals[0].scores);expect(f.prepared.request.instructions).toContain('Absence of criticism does not establish quiet');expect(f.prepared.request.instructions).toContain('Price opinions');
  });
