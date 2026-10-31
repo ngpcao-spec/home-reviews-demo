@@ -81,6 +81,22 @@ for(const language of ['fr','vi'] as const){
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await card.screenshot({path:testInfo.outputPath('ai-bound-sources.png')});
  });
+ test(`multi-criterion partial match and family alternative ${language}`,async({page},testInfo)=>{
+  await page.addInitScript(()=>localStorage.setItem('recommendation-ai-case','criteria'));
+  await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
+  await page.getByLabel(language==='fr'?'Qu’est-ce qui compte pour vous ?':'Điều gì quan trọng với bạn?',{exact:true}).fill(language==='fr'?'Un repas en famille en terrasse.':'Bữa ăn gia đình ở ngoài trời.');
+  await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
+  const card=page.locator('.recommendation-ai .recommendation-card');await expect(card).toHaveCount(1);
+  await expect(card.locator('[data-match="partial"]')).toBeVisible();
+  await expect(card.locator('.recommendation-coverage').first().locator('[data-criterion="feature_family_friendly"]')).toHaveAttribute('data-criterion-state','unknown');
+  await expect(card.locator('.recommendation-coverage').first().locator('[data-criterion="feature_outdoor_seating"]')).toHaveAttribute('data-criterion-state','documented');
+  await card.locator('.recommendation-alternative > summary').click();
+  const alternative=card.locator('.recommendation-alternative');await expect(alternative).toContainText('Restaurant témoin 2');
+  await expect(alternative.locator('[data-criterion="feature_family_friendly"]')).toHaveAttribute('data-criterion-state','documented');
+  await expect(alternative.locator('[data-criterion="feature_outdoor_seating"]')).toHaveAttribute('data-criterion-state','unknown');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await card.screenshot({path:testInfo.outputPath('criterion-tradeoff-'+language+'.png')});
+ });
  for(const state of ['cached','pending'])test(`explicit ${state} provenance ${language}`,async({page})=>{
   await page.addInitScript(state=>localStorage.setItem('recommendation-ai-case',state),state);
   await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');

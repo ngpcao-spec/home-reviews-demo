@@ -30,3 +30,12 @@ it('never retries an abandoned/unknown key and rejects missing organization righ
  const names=(await db.query<{column_name:string}>(`select column_name from information_schema.columns where table_schema='private' and table_name='recommendation_ai_attempts'`)).rows.map(r=>r.column_name);
  expect(names).not.toContain('request_text');expect(names).not.toContain('raw_response');
 });
+it('stores the V5 source-bound coverage array without a schema change or user text and keeps the receipt immutable',async()=>{
+ await db.exec('set role service_role');const a=await reserve('e');expect(a.owned).toBe(true);
+ const selection=[{id:'fixture',reason_refs:['score_global'],caution_ref:null,coverage_version:'recommendation-criteria-coverage-v1',
+  criteria_spans:[{key:'feature_family_friendly',start:0,end:12}],criterion_evidence:[{criterion:0,state:'unknown',refs:['feature_family_friendly']}],caution_refs:[],alternative_ids:[]}];
+ const finish=()=>db.query<{v:boolean}>('select public.finish_recommendation_ai_v1($1,$2,$3,$4,$5) v',[a.id,'succeeded',JSON.stringify(selection),JSON.stringify({configuration_version:'recommendation-ai-criteria-coverage-v5'}),null]);
+ expect((await finish()).rows[0].v).toBe(true);expect((await finish()).rows[0].v).toBe(false);
+ const cached=await reserve('e');expect(cached).toMatchObject({id:a.id,owned:false,state:'succeeded',selection});expect(JSON.stringify(cached.selection)).not.toContain('Un repas en famille');
+ await db.exec('reset role');
+});

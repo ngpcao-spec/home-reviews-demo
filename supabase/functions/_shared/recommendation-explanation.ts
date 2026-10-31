@@ -39,8 +39,9 @@ export function explainSavedReference(p:Proposal,ref:string,label:string,source:
    for(const evidence of google.evidence)for(const field of evidence.source_fields)sources.push({kind:'google_maps',observed_at:p.practical?.attributes.observed_at??null,field,label:evidence.label,value:evidence.value,url:googleLink(p)});
   }
   const citations=boundCitations(p,bindings.report,feature?.citations??[]);sources.push(...reportSources(p,citations));
+  if(feature?.status==='not_documented'&&citations.length)return {...base,text:citations[0].text,display_kind:'report_extract',sources,notes:name==='quiet'&&sources.some(s=>s.kind==='google_maps')?['google_not_noise_measurement']:[]};
   if(sources.some(s=>s.kind==='google_maps')){
-   const description=feature.status==='reported'?(vi?'Google Maps ghi nhận là có':'Google Maps indique oui'):feature.status==='denied'?(vi?'Google Maps ghi nhận là không':'Google Maps indique non'):(vi?'thông tin trái chiều':'informations contradictoires');
+   const description=feature.status==='reported'?(vi?'Google Maps ghi nhận là có':'Google Maps indique oui'):feature.status==='denied'?(vi?'Google Maps ghi nhận là không':'Google Maps indique non'):feature.status==='not_documented'?(vi?'phạm vi xác nhận còn hạn chế hoặc chưa rõ':'portée de la confirmation limitée ou indéterminée'):(vi?'thông tin trái chiều':'informations contradictoires');
    return {...base,text:`${feature.label??name} : ${description}.`,display_kind:'google_declaration',sources,notes:name==='quiet'?['google_not_noise_measurement']:[]};
   }
   if(citations.length)return {...base,text:citations[0].text,display_kind:'report_extract',sources,notes:[]};

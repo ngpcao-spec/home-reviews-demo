@@ -3,6 +3,7 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 import {requireUser} from '../../supabase/functions/_shared/auth';
 import {recommendationTestHandler} from '../../supabase/functions/_shared/recommendation-test-api';
 import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalogue';
+import {coveredWireReply} from '../fixtures/recommendation-coverage-reply';
 const org='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 const user='33333333-3333-4333-8333-333333333333';
 function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;failed?:boolean;rows?:ReturnType<typeof recommendationSheet>[];memberships?:boolean;ai?:boolean}={}){
@@ -26,7 +27,7 @@ function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;fa
  }));
  const reserve=vi.fn(async()=>({id:'attempt-offline',owned:true,state:'dispatched',selection:null,metrics:null}));
  const finish=vi.fn(async()=>{});
- const provider=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({choices:[{id:rows[0].establishment_id,reason_refs:['score_global'],caution_ref:null}]})}]}]})));
+ const provider=vi.fn<typeof fetch>(async(_url,init)=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(coveredWireReply(JSON.parse(JSON.parse(String(init?.body)).input),[{id:rows[0].establishment_id,reason_refs:['score_global'],caution_ref:null}]))}]}]})));
  const handler=recommendationTestHandler(requireUser,options.ai?{key:()=> 'offline-placeholder',http:provider,port:()=>({reserve,finish})}:undefined);
  const send=(body:unknown,authenticated=true,method='POST')=>handler(new Request('https://fixture.invalid/functions/v1/test-restaurant-recommendations',{method,headers:authenticated?{Authorization:'Bearer caller-token'}:{},...(method==='POST'?{body:JSON.stringify(body)}:{})}));
  return{rows,requests,auths,send,reserve,finish,provider};
@@ -81,7 +82,7 @@ describe('authenticated recommendation endpoint',()=>{
  it('calls the AI only for an explicit compare, under the same organization/session and frozen rows',async()=>{
   const f=fixture({ai:true});await f.send({action:'options'});await f.send({action:'recommend',preference:'en famille'});
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
-  const r=await(await f.send({action:'compare',preference_mode:'report_facts_v3',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
+  const r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v5',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledTimes(1);
  });
  it.each([undefined,'free_text_v2'])('rejects an old page mode %s before any catalogue read, reservation or text transmission, preserving classic searches',async mode=>{
@@ -94,24 +95,24 @@ describe('authenticated recommendation endpoint',()=>{
  it.each(['fr','vi'] as const)('sends the whole %s request with its negation only after compare and does not echo or persist it',async language=>{
   const f=fixture({ai:true,language}),text=language==='fr'?'Je ne cherche pas forcément le calme.\nSans musique en direct, si possible.':'Không nhất thiết yên tĩnh; nếu được, không có nhạc sống.';
   await f.send({action:'recommend',preference:text});expect(f.provider).not.toHaveBeenCalled();
-  const response=await f.send({action:'compare',preference_mode:'report_facts_v3',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
+  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v5',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
   const sent=JSON.parse(JSON.parse(String(f.provider.mock.calls[0][1]!.body)).input);
   expect(sent.natural_language_request).toBe(text);expect(data).not.toHaveProperty('interpreted_preferences');
   expect(JSON.stringify(data)).not.toContain(text);expect(JSON.stringify(f.finish.mock.calls)).not.toContain(text);
  });
  it('refuses foreign organization, unsupported requirements and personal contact data before reserving an AI attempt',async()=>{
   const f=fixture({ai:true});
-  for(const body of [{action:'compare',preference_mode:'report_facts_v3',organization_id:other},{action:'compare',preference_mode:'report_facts_v3',required_features:['invented']},{action:'compare',preference_mode:'report_facts_v3',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
+  for(const body of [{action:'compare',preference_mode:'criteria_coverage_v5',organization_id:other},{action:'compare',preference_mode:'criteria_coverage_v5',required_features:['invented']},{action:'compare',preference_mode:'criteria_coverage_v5',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
  });
  it('does not confirm an unknown mandatory feature and returns the ordinary empty engine result',async()=>{
-  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'report_facts_v3',required_features:['quiet']})).json();
+  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v5',required_features:['quiet']})).json();
   expect(r.result.proposals).toEqual([]);expect(r.comparison.status).toBe('fallback');expect(f.provider).not.toHaveBeenCalled();
  });
  it('does not return candidate data after permissions are revoked during the single provider attempt',async()=>{
   const options={ai:true,role:'manager'},f=fixture(options),native=f.provider.getMockImplementation()!;
   f.provider.mockImplementation(async(...args)=>{const response=await native(...args);options.role='viewer';return response;});
-  const r=await f.send({action:'compare',preference_mode:'report_facts_v3',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
+  const r=await f.send({action:'compare',preference_mode:'criteria_coverage_v5',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledWith('attempt-offline','obsolete',null,expect.any(Object),'FORBIDDEN');
  });
 });
