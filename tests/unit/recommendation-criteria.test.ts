@@ -4,7 +4,7 @@ import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalog
 import {coveredReply} from '../fixtures/recommendation-coverage-reply';
 import {placeProfile} from '../../supabase/functions/_shared/google-place-profile';
 import {prepareAi,renderChoices,compareAi,RECOMMENDATION_AI_VERSION,type AiPort,type Attempt} from '../../supabase/functions/_shared/recommendation-ai';
-import {validateCoveredDecision,restoreCoveredChoices,CRITERIA_VERSION} from '../../supabase/functions/_shared/recommendation-criteria';
+import {validateCoveredDecision,restoreCoveredChoices,CRITERIA_VERSION,ReferenceValidationError} from '../../supabase/functions/_shared/recommendation-criteria';
 import {recommendRestaurants,type SheetRow} from '../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
 
 const query={geography:'not_requested' as const};
@@ -23,6 +23,39 @@ function family(language:Language){
 }
 beforeEach(()=>vi.stubGlobal('fetch',vi.fn(()=>{throw Error('NETWORK_FORBIDDEN');})));
 afterEach(()=>{expect(fetch).not.toHaveBeenCalled();vi.unstubAllGlobals();});
+
+describe.each(['fr','vi'] as const)('content-free invalid-reference diagnostics %s',language=>{
+ function diagnostic(work:()=>unknown){
+  try{work();}catch(e){expect(e).toBeInstanceOf(ReferenceValidationError);expect((e as Error).message).toBe('INVALID_REFERENCE');return (e as ReferenceValidationError).diagnostic;}
+  throw Error('EXPECTED_REFERENCE_REJECTION');
+ }
+ it('identifies a missing reason without recording its untrusted text or changing the response',()=>{
+  const f=family(language),secret=language==='fr'?'Jean Dupont jean@example.invalid':'Nguyễn Văn Test private@example.invalid';f.native.choices[0].reason_refs=[secret];
+  const before=JSON.stringify(f.native),request=JSON.stringify(f.p.request),d=diagnostic(()=>validateCoveredDecision(f.native,f.p));
+  expect(d).toMatchObject({version:'recommendation-reference-diagnostic-v1',location:'reason_refs',rule:'reference_not_in_candidate',choice_index:0,reference_index:0,criterion_index:null,known_reference:null,fact_kind:null});
+  expect(JSON.stringify(d)).not.toContain(secret);expect(JSON.stringify(d)).not.toContain(f.text);expect(JSON.stringify(f.native)).toBe(before);expect(JSON.stringify(f.p.request)).toBe(request);
+ });
+ it('does not retain malformed objects returned instead of reference strings',()=>{
+  const f=family(language);Object.assign(f.native.choices[0],{reason_refs:[{private_data:'person@example.invalid'}]});
+  const d=diagnostic(()=>validateCoveredDecision(f.native,f.p));expect(d).toMatchObject({location:'reason_refs',rule:'invalid_list',known_reference:null});expect(JSON.stringify(d)).not.toContain('person@example');
+ });
+ it('distinguishes an existing unknown fact from an invented reason, without accepting it as a positive',()=>{
+  const f=family(language);f.native.choices[0].reason_refs=['feature_family_friendly'];
+  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'reason_refs',rule:'reference_not_allowed_for_reason',known_reference:'feature_family_friendly',fact_kind:'feature',fact_status:'not_documented'});
+ });
+ it('identifies the exact criterion position when a known reference belongs to another criterion',()=>{
+  const f=family(language);f.native.choices[0].criterion_evidence[1].refs=['feature_family_friendly'];
+  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'criterion_evidence.refs',rule:'reference_not_allowed_for_criterion',criterion_index:1,reference_index:0,known_reference:'feature_family_friendly'});
+ });
+ it('identifies an absent caution without retaining an arbitrary model string',()=>{
+  const f=family(language);f.native.choices[0].caution_refs=['foreign@example.invalid'];
+  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'caution_refs',rule:'reference_not_in_candidate',reference_index:0,known_reference:null});
+ });
+ it.each(['duplicate_reference','empty_list','too_many_references'] as const)('keeps rejection semantics and distinguishes %s',rule=>{
+  const f=family(language);f.native.choices[0].reason_refs=rule==='duplicate_reference'?['score_global','score_global']:rule==='empty_list'?[]:Array.from({length:7},(_,i)=>'missing-'+i);
+  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'reason_refs',rule});
+ });
+});
 
 describe.each(['fr','vi'] as const)('source-bound multi-criterion coverage %s',language=>{
  it('keeps family and outdoor separate, exposes unknown data, and compares the inverse tradeoff',()=>{

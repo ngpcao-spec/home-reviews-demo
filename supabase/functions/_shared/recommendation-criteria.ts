@@ -15,6 +15,26 @@ const exact=(v:unknown,keys:string[])=>object(v)&&Object.keys(v).sort().join()==
 const unique=(v:unknown):v is string[]=>Array.isArray(v)&&v.every(x=>typeof x==='string')&&new Set(v).size===v.length;
 const point=(f:Fact)=>f.value as {category?:string;status?:string};
 
+export type ReferenceValidationDiagnostic={version:'recommendation-reference-diagnostic-v1';
+ location:'reason_refs'|'criterion_evidence.refs'|'caution_refs';
+ rule:'invalid_list'|'duplicate_reference'|'empty_list'|'too_many_references'|'reference_not_in_candidate'|'reference_not_allowed_for_reason'|'reference_not_allowed_for_criterion';
+ choice_index:number;candidate_index:number;criterion_index:number|null;reference_index:number|null;
+ known_reference:string|null;fact_kind:Fact['kind']|null;fact_status:string|null};
+export class ReferenceValidationError extends Error{
+ readonly diagnostic:ReferenceValidationDiagnostic;
+ constructor(diagnostic:ReferenceValidationDiagnostic){super('INVALID_REFERENCE');this.name='ReferenceValidationError';this.diagnostic=diagnostic;}
+}
+/** Receipt-only diagnostics. Never copy an unvalidated model string, request quote,
+ * report excerpt or raw response into the error. Unknown references stay unknown. */
+function invalidReference(p:Prepared,id:string,choice_index:number,location:ReferenceValidationDiagnostic['location'],rule:ReferenceValidationDiagnostic['rule'],reference_index:number|null=null,ref:unknown=null,criterion_index:number|null=null):never{
+ const f=typeof ref==='string'?p.facts.get(id)?.find(f=>f.ref===ref):undefined;
+ const status=f&&['feature','recurrence'].includes(f.kind)?point(f).status:undefined;
+ throw new ReferenceValidationError({version:'recommendation-reference-diagnostic-v1',location,rule,choice_index,
+  candidate_index:p.candidates.findIndex(c=>c.id===id),criterion_index,reference_index,
+  known_reference:f&&/^(?:score_(?:global|quality|service|ambiance)|cuisine|price|freshness|cooking_recurrence|feature_[a-z_]{1,40}|(?:strength|reservation)_(?:quality|service|ambiance|price)_\d{1,4})$/.test(f.ref)?f.ref:null,
+  fact_kind:f?.kind??null,fact_status:status&&['reported','denied','conflicted','not_documented','reported_repetition','not_established','unknown'].includes(status)?status:null});
+}
+
 /** Existing conservative hints create coverage obligations, never new eligibility filters.
  * Arbitrary/uninterpreted free text still reaches the model intact and may add quoted criteria. */
 export function criterionHints(query:EngineRequest,text:string,language:'fr'|'vi'):CriterionHint[]{
@@ -94,15 +114,21 @@ export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
  }
  if(hintKeys.some(k=>!keys.includes(k))||p.naturalLanguageRequest&&!v.criteria.length)throw Error('MISSING_CRITERION');
  const seen=new Set<string>();
- for(const c of v.choices){
+ for(const [choiceIndex,c]of v.choices.entries()){
   if(!exact(c,['id','reason_refs','criterion_evidence','caution_refs','alternative_ids'])||typeof c.id!=='string'||seen.has(c.id)||!p.facts.has(c.id))throw Error('INVALID_SELECTION');
   seen.add(c.id);const facts=p.facts.get(c.id)!,proposal=p.proposals.find(x=>x.establishment_id===c.id)!;
-  if(!unique(c.reason_refs)||!c.reason_refs.length||c.reason_refs.length>6||c.reason_refs.some(r=>!facts.some(f=>f.ref===r&&(['score','cuisine','price','strength'].includes(f.kind)||f.kind==='feature'&&['reported','denied'].includes(point(f).status??'')))))throw Error('INVALID_REFERENCE');
+  if(!Array.isArray(c.reason_refs)||c.reason_refs.some(r=>typeof r!=='string'))invalidReference(p,c.id,choiceIndex,'reason_refs','invalid_list');
+  if(new Set(c.reason_refs).size!==c.reason_refs.length){const i=c.reason_refs.findIndex((r,i)=>c.reason_refs.indexOf(r)!==i);invalidReference(p,c.id,choiceIndex,'reason_refs','duplicate_reference',i,c.reason_refs[i]);}
+  if(!c.reason_refs.length)invalidReference(p,c.id,choiceIndex,'reason_refs','empty_list');
+  if(c.reason_refs.length>6)invalidReference(p,c.id,choiceIndex,'reason_refs','too_many_references');
+  const badReason=c.reason_refs.findIndex(r=>!facts.some(f=>f.ref===r&&(['score','cuisine','price','strength'].includes(f.kind)||f.kind==='feature'&&['reported','denied'].includes(point(f).status??''))));
+  if(badReason>=0)invalidReference(p,c.id,choiceIndex,'reason_refs',facts.some(f=>f.ref===c.reason_refs[badReason])?'reference_not_allowed_for_reason':'reference_not_in_candidate',badReason,c.reason_refs[badReason]);
   if(!Array.isArray(c.criterion_evidence)||c.criterion_evidence.length!==v.criteria.length||!unique(c.caution_refs)||c.caution_refs.length>4||!unique(c.alternative_ids)||c.alternative_ids.length>2)throw Error('MISSING_CRITERION');
   for(const [i,e]of c.criterion_evidence.entries()){
    if(!exact(e,['criterion','state','refs'])||e.criterion!==i||!states.includes(e.state)||!unique(e.refs)||e.refs.length>2)throw Error('INVALID_CRITERION_EVIDENCE');
    const key=v.criteria[i].key,selected=e.refs.map(r=>facts.find(f=>f.ref===r));
-   if(selected.some(f=>!f||!permittedForCriterion(f,key)))throw Error('INVALID_REFERENCE');
+   const badEvidence=selected.findIndex(f=>!f||!permittedForCriterion(f,key));
+   if(badEvidence>=0)invalidReference(p,c.id,choiceIndex,'criterion_evidence.refs',selected[badEvidence]?'reference_not_allowed_for_criterion':'reference_not_in_candidate',badEvidence,e.refs[badEvidence],i);
    if(key!==null){
     const expected=assessment(key,proposal,facts,p.criteriaHints.find(h=>h.key===key)!);
     if(e.state!==expected.state)throw Error('INVALID_CRITERION_EVIDENCE');
@@ -118,8 +144,8 @@ export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
     if(e.state==='documented'&&!positive||e.state==='contradicted'&&!negative||e.state==='partial'&&!selected.length||e.state==='conflicted'&&!selected.some(f=>f?.kind==='feature'&&point(f).status==='conflicted'))throw Error('INVALID_CRITERION_EVIDENCE');
    }
   }
-  for(const r of c.caution_refs){
-   const f=facts.find(f=>f.ref===r);if(!f)throw Error('INVALID_REFERENCE');
+  for(const [referenceIndex,r]of c.caution_refs.entries()){
+   const f=facts.find(f=>f.ref===r);if(!f)invalidReference(p,c.id,choiceIndex,'caution_refs','reference_not_in_candidate',referenceIndex,r);
    if(!cautionContext(f,p,c.id,v.criteria,c.criterion_evidence))throw Error('IRRELEVANT_CAUTION');
   }
  }

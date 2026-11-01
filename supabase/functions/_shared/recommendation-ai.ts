@@ -5,7 +5,7 @@ import type {AiSelection,AiComparison,AiExplanation,Metrics,FallbackDisclosure} 
 import {explainSavedReference} from './recommendation-explanation.ts';
 import {reportPoint,savedReportPoints,REPORT_FACTS_VERSION} from './recommendation-report-facts.ts';
 import {repeatedCookingConcern} from './shortlist-preferences.ts';
-import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,type CoverageData} from './recommendation-criteria.ts';
+import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,ReferenceValidationError,type ReferenceValidationDiagnostic,type CoverageData} from './recommendation-criteria.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
 export const RECOMMENDATION_AI_VERSION='recommendation-ai-caution-safety-v6';
@@ -182,7 +182,7 @@ export async function compareAi(args:{catalogue:Catalogue;query:EngineRequest;pr
   }
   return {...base,status:attempt.state==='dispatched'?'pending':'fallback',notice:attempt.state==='dispatched'?'IN_PROGRESS':'PREVIOUS_ATTEMPT_NOT_RETRIED',attempt_id:attempt.id};
  }
- const start=Date.now();let httpDuration:number|null=null,metrics:Metrics=metricsFrom({},0,null),state='unknown',choices:Choice[]|null=null,error:string|null=null;
+ const start=Date.now();let httpDuration:number|null=null,metrics:Metrics=metricsFrom({},0,null),state='unknown',choices:Choice[]|null=null,error:string|null=null,validationDiagnostic:ReferenceValidationDiagnostic|undefined;
  try{
   const response=await args.http('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+args.key,'Content-Type':'application/json'},body:serialized,redirect:'error',signal:AbortSignal.timeout(45000)});
   const body=await response.text();httpDuration=Date.now()-start;metrics=metricsFrom({},httpDuration,response.headers.get('x-request-id'));state=response.ok?'invalid_output':'http_error';
@@ -198,10 +198,13 @@ export async function compareAi(args:{catalogue:Catalogue;query:EngineRequest;pr
   state='obsolete';
   if(!await args.unchanged()){state='obsolete';choices=null;throw Error('SOURCE_OR_ACCESS_CHANGED');}
   state='succeeded';
- }catch(e){error=e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'PROVIDER_OUTCOME_UNKNOWN';metrics.duration_ms=httpDuration??Date.now()-start;choices=null;}
- console.info('RECOMMENDATION_AI_ATTEMPT',{attempt_id:attempt.id,state,...metrics});
+ }catch(e){error=e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'PROVIDER_OUTCOME_UNKNOWN';if(e instanceof ReferenceValidationError)validationDiagnostic=e.diagnostic;metrics.duration_ms=httpDuration??Date.now()-start;choices=null;}
+ // Preserve the public result and acceptance rules. The bounded diagnostic is
+ // retained only in the existing private receipt/log, never in client metrics.
+ const recordedMetrics={...metrics,...(validationDiagnostic?{validation_diagnostic:validationDiagnostic}:{})};
+ console.info('RECOMMENDATION_AI_ATTEMPT',{attempt_id:attempt.id,state,...recordedMetrics});
  // Save before rendering; a failed save leaves a consumed reservation, never a paid resend.
- try{await args.port.finish(attempt.id,state,choices,metrics,error);}catch{return {...base,status:'fallback',notice:'RECEIPT_SAVE_UNKNOWN',attempt_id:attempt.id,metrics};}
+ try{await args.port.finish(attempt.id,state,choices,recordedMetrics,error);}catch{return {...base,status:'fallback',notice:'RECEIPT_SAVE_UNKNOWN',attempt_id:attempt.id,metrics};}
  return state==='succeeded'&&choices?{...base,status:'completed',attempt_id:attempt.id,metrics,selections:renderChoices(choices,prepared)}:{...base,status:'fallback',notice:error??state,attempt_id:attempt.id,metrics};
 }
 export const validAiFeatures=(v:unknown):v is string[]=>Array.isArray(v)&&v.length<=AI_FEATURES.length&&new Set(v).size===v.length&&v.every(f=>typeof f==='string'&&AI_FEATURES.includes(f as typeof AI_FEATURES[number]));

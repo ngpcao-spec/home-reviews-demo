@@ -79,6 +79,18 @@ describe('bounded AI comparison using the existing engine',()=>{
   expect(bounded.candidates).toEqual([]);
   const r=await compareAi({...f.args,query:{...query,required_features:['quiet']}});expect(r.status).toBe('fallback');expect(f.http).not.toHaveBeenCalled();
  });
+ it('saves bounded reference diagnostics privately, returns the same fallback and never resends the failed attempt',async()=>{
+  const f=fixture(),untrusted='private-person@example.invalid',raw=f.native([{...f.valid[0],reason_refs:[untrusted]}]),body=JSON.stringify(raw);
+  f.http.mockImplementation(async()=>new Response(body));
+  const log=vi.spyOn(console,'info').mockImplementation(()=>{});
+  try{
+   const first=await compareAi(f.args);expect(first).toMatchObject({status:'fallback',notice:'INVALID_REFERENCE',selections:[]});
+   expect(first.metrics).not.toHaveProperty('validation_diagnostic');
+   expect(f.port.finish).toHaveBeenCalledWith('attempt-1','invalid_output',null,expect.objectContaining({validation_diagnostic:expect.objectContaining({location:'reason_refs',rule:'reference_not_in_candidate',known_reference:null})}),'INVALID_REFERENCE');
+   const recorded=JSON.stringify({receipt:vi.mocked(f.port.finish).mock.calls,logs:log.mock.calls});expect(recorded).not.toContain(untrusted);expect(recorded).not.toContain('output_text');
+   expect((await compareAi(f.args)).notice).toBe('PREVIOUS_ATTEMPT_NOT_RETRIED');expect(f.http).toHaveBeenCalledTimes(1);expect(f.port.finish).toHaveBeenCalledTimes(1);expect(JSON.stringify(raw)).toBe(body);
+  }finally{log.mockRestore();}
+ });
  it('records one native receipt and reuses an identical compatible request, including native cache fields',async()=>{
   const f=fixture(),first=await compareAi(f.args),second=await compareAi(f.args);
   expect(first.status).toBe('completed');expect(second.status).toBe('cached');expect(f.http).toHaveBeenCalledTimes(1);expect(f.port.finish).toHaveBeenCalledTimes(1);
