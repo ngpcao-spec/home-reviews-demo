@@ -5,7 +5,8 @@ import type {AiSelection,AiComparison,AiExplanation,Metrics,FallbackDisclosure} 
 import {explainSavedReference} from './recommendation-explanation.ts';
 import {reportPoint,savedReportPoints,REPORT_FACTS_VERSION} from './recommendation-report-facts.ts';
 import {repeatedCookingConcern} from './shortlist-preferences.ts';
-import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,ReferenceValidationError,type ReferenceValidationDiagnostic,type CoverageData} from './recommendation-criteria.ts';
+import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,ReferenceValidationError,type CoverageData} from './recommendation-criteria.ts';
+import {DecisionValidationError,diagnosticTrace,selectedDiagnosticIds,diagnosticCriterionKeys,type DiagnosticObservation,type DiagnosticRuntime,type RecommendationTrace} from './recommendation-diagnostics.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
 export const RECOMMENDATION_AI_VERSION='recommendation-ai-caution-safety-v6';
@@ -164,8 +165,15 @@ function metricsFrom(raw:Record<string,unknown>,duration:number,requestId:string
  const cost=typeof u.cost_usd==='number'&&Number.isFinite(u.cost_usd)&&u.cost_usd>=0?u.cost_usd:null;
  return {configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,model:typeof raw.model==='string'?raw.model:null,input_tokens:token(u.input_tokens),output_tokens:token(u.output_tokens),cache_read_tokens:token(details.cached_tokens),cache_write_tokens:token(details.cache_write_tokens),duration_ms:duration,cost_usd:cost,cost_kind:cost===null?'unavailable':'provider_returned',provider_request_id:requestId};
 }
-export async function compareAi(args:{catalogue:Catalogue;query:EngineRequest;preference:string;userId:string;access:unknown;port:AiPort;key:string;http:typeof fetch;unchanged:()=>Promise<boolean>}):Promise<AiComparison>{
+type ComparisonArgs={catalogue:Catalogue;query:EngineRequest;preference:string;userId:string;access:unknown;port:AiPort;key:string;http:typeof fetch;unchanged:()=>Promise<boolean>;diagnosticRuntime?:DiagnosticRuntime;onDiagnostic?:(trace:RecommendationTrace)=>void};
+export async function compareAi(args:ComparisonArgs):Promise<AiComparison>{
+ const observation:DiagnosticObservation={stage:'preparation'};
+ const emit=(result:AiComparison)=>{try{args.onDiagnostic?.(diagnosticTrace(observation,result,args.diagnosticRuntime));}catch{/* Diagnostics must never change a recommendation or trigger a resend. */}};
+ try{const result=await compareAiObserved(args,observation);emit(result);return result;}catch(e){observation.failure={stage:observation.stage,code:e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'INTERNAL_ERROR',rule:'preparation_failed'};emit({status:'fallback',model:RECOMMENDATION_AI_MODEL,candidate_count:0,selections:[]});throw e;}
+}
+async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObservation):Promise<AiComparison>{
  const prepared=prepareAi(args.catalogue,args.query,args.preference),base={model:RECOMMENDATION_AI_MODEL,candidate_count:prepared.candidates.length,selections:[] as AiSelection[]};
+ observation.prepared=prepared;
  if(!prepared.candidates.length)return {...base,status:'fallback',notice:'NO_CANDIDATES'};
  if(prepared.criteriaHints.length>8)return {...base,status:'fallback',notice:'TOO_MANY_CRITERIA'};
  if(!args.key.trim())return {...base,status:'fallback',notice:'AI_UNAVAILABLE'};
@@ -175,36 +183,45 @@ export async function compareAi(args:{catalogue:Catalogue;query:EngineRequest;pr
  const requestHash=await aiHash(prepared.request);
  const snapshot=await aiHash({rows:args.catalogue.rows,active:args.catalogue.establishments,language:args.catalogue.language});
  const cacheKey=await aiHash({version:RECOMMENDATION_AI_VERSION,requestHash,snapshot,user:args.userId,access:args.access,organization:args.catalogue.organizationId});
+ observation.stage='reservation';
  let attempt:Attempt;try{attempt=await args.port.reserve(cacheKey,requestHash);}catch{return {...base,status:'fallback',notice:'RESERVATION_UNAVAILABLE'};}
+ observation.attempt_id=attempt.id??undefined;
  if(!attempt.owned){
+  observation.stage='cache_lookup';observation.prior_state=['succeeded','invalid_output','http_error','unknown','obsolete','dispatched'].includes(attempt.state)?attempt.state:'unknown';
   if(attempt.state==='succeeded'&&attempt.selection){
-   try{const choices=restoreCoveredChoices(attempt.selection,prepared);if(!await args.unchanged())throw Error('SOURCE_CHANGED');return {...base,status:'cached',attempt_id:attempt.id,selections:renderChoices(choices,prepared),...(attempt.metrics?{metrics:attempt.metrics}:{})};}catch{return {...base,status:'fallback',notice:'CACHE_INCOMPATIBLE'};}
+   observation.selected_ids=selectedDiagnosticIds({choices:attempt.selection},prepared);
+   observation.criterion_keys=attempt.selection[0]?.criteria_spans?.slice(0,8).map(s=>s.key!==null&&prepared.criteriaHints.some(h=>h.key===s.key)?s.key:null);
+   try{observation.stage='cache_validation';const choices=restoreCoveredChoices(attempt.selection,prepared);observation.selected_ids=choices.map(c=>c.id);observation.stage='cache_source_recheck';if(!await args.unchanged())throw Error('SOURCE_CHANGED');return {...base,status:'cached',attempt_id:attempt.id,selections:renderChoices(choices,prepared),...(attempt.metrics?{metrics:attempt.metrics}:{})};}catch(e){observation.failure=e instanceof ReferenceValidationError?e.diagnostic.detail:e instanceof DecisionValidationError?e.diagnostic:{stage:observation.stage,code:e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'INTERNAL_ERROR',rule:'cache_not_compatible'};return {...base,status:'fallback',notice:'CACHE_INCOMPATIBLE'};}
   }
   return {...base,status:attempt.state==='dispatched'?'pending':'fallback',notice:attempt.state==='dispatched'?'IN_PROGRESS':'PREVIOUS_ATTEMPT_NOT_RETRIED',attempt_id:attempt.id};
  }
- const start=Date.now();let httpDuration:number|null=null,metrics:Metrics=metricsFrom({},0,null),state='unknown',choices:Choice[]|null=null,error:string|null=null,validationDiagnostic:ReferenceValidationDiagnostic|undefined;
+ const start=Date.now();let httpDuration:number|null=null,metrics:Metrics=metricsFrom({},0,null),state='unknown',choices:Choice[]|null=null,error:string|null=null;
  try{
+  observation.stage='provider_http';
   const response=await args.http('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+args.key,'Content-Type':'application/json'},body:serialized,redirect:'error',signal:AbortSignal.timeout(45000)});
+  observation.http_status=response.status;
   const body=await response.text();httpDuration=Date.now()-start;metrics=metricsFrom({},httpDuration,response.headers.get('x-request-id'));state=response.ok?'invalid_output':'http_error';
-  if(new TextEncoder().encode(body).length>128000)throw Error('RESPONSE_TOO_LARGE');
+  observation.stage='provider_response_size';if(new TextEncoder().encode(body).length>128000)throw Error('RESPONSE_TOO_LARGE');
+  observation.stage='provider_json';
   let raw:Record<string,unknown>;try{raw=JSON.parse(body);}catch{state='invalid_output';throw Error('INVALID_OUTPUT');}
   metrics=metricsFrom(raw,httpDuration,response.headers.get('x-request-id'));
-  if(!response.ok){state='http_error';throw Error('PROVIDER_HTTP_ERROR');}
+  observation.stage='provider_status';if(!response.ok){state='http_error';throw Error('PROVIDER_HTTP_ERROR');}
   state='invalid_output';
-  if(raw.model!==RECOMMENDATION_AI_MODEL||raw.status!=='completed'||!Array.isArray(raw.output))throw Error('INVALID_OUTPUT');
+  observation.stage='provider_envelope';
+  if(raw.model!==RECOMMENDATION_AI_MODEL||raw.status!=='completed'||!Array.isArray(raw.output)){observation.failure={stage:observation.stage,code:'INVALID_OUTPUT',field:raw.model!==RECOMMENDATION_AI_MODEL?'model':raw.status!=='completed'?'status':'output',rule:raw.model!==RECOMMENDATION_AI_MODEL?'unexpected_provider_model':raw.status!=='completed'?'provider_not_completed':'provider_output_not_array'};throw Error('INVALID_OUTPUT');}
   const chunks=raw.output.flatMap((v:{type?:string;content?:{type?:string;text?:string}[]})=>v.type==='message'&&Array.isArray(v.content)?v.content:[]);
-  if(chunks.length!==1||chunks[0].type!=='output_text'||typeof chunks[0].text!=='string')throw Error('INVALID_OUTPUT');
-  choices=validateCoveredDecision(JSON.parse(chunks[0].text),prepared);
+  if(chunks.length!==1||chunks[0].type!=='output_text'||typeof chunks[0].text!=='string'){observation.failure={stage:observation.stage,code:'INVALID_OUTPUT',field:'output.content',rule:chunks.length!==1?'expected_one_content_chunk':chunks[0].type!=='output_text'?'unexpected_content_type':'output_text_not_string'};throw Error('INVALID_OUTPUT');}
+  observation.stage='decision_json';const decision:unknown=JSON.parse(chunks[0].text);observation.selected_ids=selectedDiagnosticIds(decision,prepared);observation.criterion_keys=diagnosticCriterionKeys(decision,prepared);
+  observation.stage='decision_validation';choices=validateCoveredDecision(decision,prepared);
   state='obsolete';
+  observation.stage='source_recheck';
   if(!await args.unchanged()){state='obsolete';choices=null;throw Error('SOURCE_OR_ACCESS_CHANGED');}
   state='succeeded';
- }catch(e){error=e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'PROVIDER_OUTCOME_UNKNOWN';if(e instanceof ReferenceValidationError)validationDiagnostic=e.diagnostic;metrics.duration_ms=httpDuration??Date.now()-start;choices=null;}
- // Preserve the public result and acceptance rules. The bounded diagnostic is
- // retained only in the existing private receipt/log, never in client metrics.
- const recordedMetrics={...metrics,...(validationDiagnostic?{validation_diagnostic:validationDiagnostic}:{})};
- console.info('RECOMMENDATION_AI_ATTEMPT',{attempt_id:attempt.id,state,...recordedMetrics});
+ }catch(e){error=e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'PROVIDER_OUTCOME_UNKNOWN';observation.failure=e instanceof ReferenceValidationError?e.diagnostic.detail:e instanceof DecisionValidationError?e.diagnostic:observation.failure??{stage:observation.stage,code:error,rule:observation.stage==='provider_json'||observation.stage==='decision_json'?'invalid_json':'stage_failed'};metrics.duration_ms=httpDuration??Date.now()-start;choices=null;}
+ console.info('RECOMMENDATION_AI_ATTEMPT',{attempt_id:attempt.id,state,...metrics});
  // Save before rendering; a failed save leaves a consumed reservation, never a paid resend.
- try{await args.port.finish(attempt.id,state,choices,recordedMetrics,error);}catch{return {...base,status:'fallback',notice:'RECEIPT_SAVE_UNKNOWN',attempt_id:attempt.id,metrics};}
+ try{await args.port.finish(attempt.id,state,choices,metrics,error);}catch{observation.stage='receipt_save';return {...base,status:'fallback',notice:'RECEIPT_SAVE_UNKNOWN',attempt_id:attempt.id,metrics};}
+ if(state==='succeeded')observation.stage='completed';
  return state==='succeeded'&&choices?{...base,status:'completed',attempt_id:attempt.id,metrics,selections:renderChoices(choices,prepared)}:{...base,status:'fallback',notice:error??state,attempt_id:attempt.id,metrics};
 }
 export const validAiFeatures=(v:unknown):v is string[]=>Array.isArray(v)&&v.length<=AI_FEATURES.length&&new Set(v).size===v.length&&v.every(f=>typeof f==='string'&&AI_FEATURES.includes(f as typeof AI_FEATURES[number]));

@@ -3,6 +3,7 @@ import {recommendationCuisineOptions,type Request as RecommendationRequest} from
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
 import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import type {DiagnosticRuntime,RecommendationTrace} from './recommendation-diagnostics.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
 type Context={client:AuthContext['client'];admin?:AuthContext['admin'];user:Pick<AuthContext['user'],'id'|'is_anonymous'>};
@@ -22,10 +23,12 @@ function criteria(raw:unknown) {
   if(b.preference!==undefined)b.preference=checkedRecommendationPreference(b.preference);
   return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'|'criteria_coverage_v5'|'criteria_coverage_v6'};
 }
-export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort}) {
+export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort;diagnostics?:{runtime:DiagnosticRuntime;prune:(context:Context,organization:string)=>Promise<void>;record:(context:Context,organization:string,trace:RecommendationTrace)=>Promise<void>}}) {
  return async(request:Request):Promise<Response>=>{
   if(request.method==='OPTIONS')return reply({});
   if(request.method!=='POST')return reply({error:'METHOD_NOT_ALLOWED'},405);
+  let trace:RecommendationTrace|undefined,traceContext:{context:Context;organization:string}|undefined;
+  const saveTrace=async(status:number,error?:string)=>{if(!trace||!traceContext||!dependencies?.diagnostics)return;try{await dependencies.diagnostics.record(traceContext.context,traceContext.organization,{...trace,response_status:status,...(error?{origin:'unavailable' as const,stage:'response_recheck',notice:error}:{})});}catch{console.warn('RECOMMENDATION_DIAGNOSTIC_SAVE_FAILED',{attempt_id:trace.attempt_id});}};
   try{
    const context=await authorize(request);
    if(context.user.is_anonymous)throw Error('UNAUTHORIZED');
@@ -45,6 +48,8 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    });
    const organizationId=input.organization_id??organizations[0]?.id;
    if(!organizationId||!organizations.some(o=>o.id===organizationId))throw Error('FORBIDDEN');
+   traceContext={context,organization:organizationId};
+   if(dependencies?.diagnostics)try{await dependencies.diagnostics.prune(context,organizationId);}catch{console.warn('RECOMMENDATION_DIAGNOSTIC_PRUNE_FAILED');}
    const catalogue=await readRestaurantRecommendationCatalogue(context,organizationId);
    const cuisines=recommendationCuisineOptions(catalogue.rows,organizationId,catalogue.language);
    if(input.cuisine&&!cuisines.includes(input.cuisine))throw Error('INVALID_RECOMMENDATION_REQUEST');
@@ -62,21 +67,24 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    const access=organizations;
    const snapshot=await aiHash(catalogue);
    const comparison=await compareAi({catalogue,query,preference:(input.preference??'').trim().normalize('NFC'),userId:context.user.id,access,port:dependencies.port(context,organizationId),key:dependencies.key(),http:dependencies.http,
+    diagnosticRuntime:dependencies.diagnostics?.runtime,onDiagnostic:value=>{trace=value;},
     unchanged:async()=>{
      const current=await readRestaurantRecommendationCatalogue(context,organizationId);
      return await aiHash(current)===snapshot;
     }});
    // Membership, language and corpus are checked again before returning any comparison (including fallback).
    const current=await readRestaurantRecommendationCatalogue(context,organizationId);
-   if(await aiHash(current)!==snapshot)return reply({error:'RECOMMENDATION_DATA_CHANGED'},409);
+   if(await aiHash(current)!==snapshot){await saveTrace(409,'RECOMMENDATION_DATA_CHANGED');return reply({error:'RECOMMENDATION_DATA_CHANGED'},409);}
    if(comparison.status==='fallback'||comparison.status==='pending')comparison.fallback=describeRecommendationFallback(catalogue,query,input.preference??'',result.proposals);
    console.info('RECOMMENDATION_COMPARISON_RESPONSE',{attempt_id:comparison.attempt_id??null,status:comparison.status,model:comparison.model,candidate_count:comparison.candidate_count});
+   await saveTrace(200);
    return reply({...common,result,comparison});
   }catch(error){
    const message=error instanceof Error?error.message:'';
    const status=message==='UNAUTHORIZED'?401:message==='FORBIDDEN'?403:message==='INVALID_RECOMMENDATION_REQUEST'?400:message==='RECOMMENDATION_CLIENT_UPDATE_REQUIRED'?409:500;
    const code=status===500?'RECOMMENDATION_TEST_UNAVAILABLE':message;
    if(status===500)console.warn('Recommendation test read failed',{code});
+   await saveTrace(status,code);
    return reply({error:code},status);
   }
  };

@@ -3,6 +3,17 @@ import {recommendationTestHandler} from '../_shared/recommendation-test-api.ts';
 
 Deno.serve(recommendationTestHandler(requireUser,{
  key:()=>Deno.env.get('OPENAI_API_KEY')??'',http:fetch,
+ diagnostics:{
+  runtime:{deployment_id:Deno.env.get('DENO_DEPLOYMENT_ID')??null},
+  prune:async(context,organization)=>{if(!context.admin)throw Error('DIAGNOSTIC_STORE_UNAVAILABLE');const {error}=await context.admin.rpc('prune_recommendation_diagnostics_v1',{p_organization_id:organization});if(error)throw Error('DIAGNOSTIC_PRUNE_FAILED');},
+  record:async(context,organization,trace)=>{
+   if(!context.admin)throw Error('DIAGNOSTIC_STORE_UNAVAILABLE');
+   const {data,error}=await context.admin.rpc('record_recommendation_diagnostic_v1',{p_organization_id:organization,p_user_id:context.user.id,p_attempt_id:trace.attempt_id,p_trace:trace});
+   if(error)throw Error('DIAGNOSTIC_SAVE_FAILED');
+   if(!data){console.warn('RECOMMENDATION_DIAGNOSTIC_SKIPPED_BUSY',{attempt_id:trace.attempt_id});return;}
+   console.info('RECOMMENDATION_DIAGNOSTIC_RECORDED',{diagnostic_id:data,attempt_id:trace.attempt_id,origin:trace.origin,diagnostic_version:trace.version,deployment_id:trace.deployment_id});
+  },
+ },
  port:(context,organization)=>({
   reserve:async(key,requestHash)=>{
    if(!context.admin)throw Error('AI_STORE_UNAVAILABLE');

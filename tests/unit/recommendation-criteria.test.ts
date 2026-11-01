@@ -5,6 +5,7 @@ import {coveredReply} from '../fixtures/recommendation-coverage-reply';
 import {placeProfile} from '../../supabase/functions/_shared/google-place-profile';
 import {prepareAi,renderChoices,compareAi,RECOMMENDATION_AI_VERSION,type AiPort,type Attempt} from '../../supabase/functions/_shared/recommendation-ai';
 import {validateCoveredDecision,restoreCoveredChoices,CRITERIA_VERSION,ReferenceValidationError} from '../../supabase/functions/_shared/recommendation-criteria';
+import {DecisionValidationError} from '../../supabase/functions/_shared/recommendation-diagnostics';
 import {recommendRestaurants,type SheetRow} from '../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
 
 const query={geography:'not_requested' as const};
@@ -41,11 +42,21 @@ describe.each(['fr','vi'] as const)('content-free invalid-reference diagnostics 
  });
  it('distinguishes an existing unknown fact from an invented reason, without accepting it as a positive',()=>{
   const f=family(language);f.native.choices[0].reason_refs=['feature_family_friendly'];
-  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'reason_refs',rule:'reference_not_allowed_for_reason',known_reference:'feature_family_friendly',fact_kind:'feature',fact_status:'not_documented'});
+  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'reason_refs',rule:'reference_not_allowed_for_reason',known_reference:'feature_family_friendly',fact_kind:'feature',fact_status:'not_documented',detail:{candidate_id:'outside',reference:{exists_in_transmitted_facts:true,exists_for_candidate:true,allowed_usages:{reason:false,criterion_keys:['feature_family_friendly']}}}});
+ });
+ it('distinguishes an unknown canonical reference from one transmitted only for another candidate',()=>{
+  const f=family(language);f.p.facts.get('family')!.push({ref:'reservation_quality_9',kind:'reservation',value:{category:'quality',text:'PRIVATE_SOURCE_NOT_TO_LOG'},source:{},label:'PRIVATE_LABEL_NOT_TO_LOG'});f.native.choices[0].reason_refs=['reservation_quality_9'];
+  const d=diagnostic(()=>validateCoveredDecision(f.native,f.p)).detail;
+  expect(d).toMatchObject({candidate_id:'outside',field:'reason_refs',reference:{code:'reservation_quality_9',exists_in_transmitted_facts:true,exists_for_candidate:false,candidate_ids:['family'],fact_kind:'reservation',allowed_usages:{reason:false}}});
+  expect(JSON.stringify(d)).not.toContain('PRIVATE_');
  });
  it('identifies the exact criterion position when a known reference belongs to another criterion',()=>{
   const f=family(language);f.native.choices[0].criterion_evidence[1].refs=['feature_family_friendly'];
   expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'criterion_evidence.refs',rule:'reference_not_allowed_for_criterion',criterion_index:1,reference_index:0,known_reference:'feature_family_friendly'});
+ });
+ it('keeps irrelevant existing cautions blocked with their exact source role',()=>{
+  const f=family(language);f.native.choices[0].caution_refs=['score_global'];
+  try{validateCoveredDecision(f.native,f.p);throw Error('EXPECTED_REJECTION');}catch(e){expect(e).toBeInstanceOf(DecisionValidationError);expect((e as DecisionValidationError).diagnostic).toMatchObject({code:'IRRELEVANT_CAUTION',field:'caution_refs',reference_index:0,reference:{code:'score_global',exists_for_candidate:true,allowed_usages:{caution_policy:'not_allowed'}}});}
  });
  it('identifies an absent caution without retaining an arbitrary model string',()=>{
   const f=family(language);f.native.choices[0].caution_refs=['foreign@example.invalid'];
@@ -53,7 +64,13 @@ describe.each(['fr','vi'] as const)('content-free invalid-reference diagnostics 
  });
  it.each(['duplicate_reference','empty_list','too_many_references'] as const)('keeps rejection semantics and distinguishes %s',rule=>{
   const f=family(language);f.native.choices[0].reason_refs=rule==='duplicate_reference'?['score_global','score_global']:rule==='empty_list'?[]:Array.from({length:7},(_,i)=>'missing-'+i);
-  expect(diagnostic(()=>validateCoveredDecision(f.native,f.p))).toMatchObject({location:'reason_refs',rule});
+  const d=diagnostic(()=>validateCoveredDecision(f.native,f.p));expect(d).toMatchObject({location:'reason_refs',rule});
+  expect(d.detail.list).toMatchObject({type:'array',size:rule==='duplicate_reference'?2:rule==='empty_list'?0:7,limit:6,duplicate_count:rule==='duplicate_reference'?1:0});
+ });
+ it('distinguishes duplicate caution/evidence lists without changing their public error codes',()=>{
+  for(const field of ['caution_refs','evidence'] as const){const f=family(language);if(field==='caution_refs')f.native.choices[0].caution_refs=['score_global','score_global'];else f.native.choices[0].criterion_evidence[0].refs=['feature_family_friendly','feature_family_friendly'];
+   try{validateCoveredDecision(f.native,f.p);throw Error('EXPECTED_REJECTION');}catch(e){expect(e).toBeInstanceOf(DecisionValidationError);expect((e as Error).message).toBe(field==='caution_refs'?'MISSING_CRITERION':'INVALID_CRITERION_EVIDENCE');expect((e as DecisionValidationError).diagnostic).toMatchObject({field:field==='caution_refs'?'caution_refs':'criterion_evidence',list:{size:2,duplicate_count:1,duplicate_positions:[1]}});}
+  }
  });
 });
 
