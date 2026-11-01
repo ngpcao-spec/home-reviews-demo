@@ -176,11 +176,28 @@ describe('bounded AI comparison using the existing engine',()=>{
   const f=fixture();expect(()=>validateChoices({choices:Array(4).fill(f.valid[0])},f.prepared)).toThrow();
   f.http.mockResolvedValue(new Response(JSON.stringify({...f.native(),model:'other'})));expect((await compareAi(f.args)).status).toBe('fallback');
  });
- it('requires no calls with no candidates, unavailable key or over-limit context',async()=>{
+ it('requires no calls with no candidates or an unavailable key',async()=>{
   const f=fixture(0);expect((await compareAi(f.args)).notice).toBe('NO_CANDIDATES');expect(f.http).not.toHaveBeenCalled();
   const g=fixture();expect((await compareAi({...g.args,key:''})).notice).toBe('AI_UNAVAILABLE');expect(g.port.reserve).not.toHaveBeenCalled();
-  const h=fixture(),source=h.catalogue.rows[0];
+ });
+ it.each(['success','unknown','http','invalid'] as const)('passes the complete body above the former byte cap once, preserving %s outcome protections',async scenario=>{
+  const f=fixture(20),source=f.catalogue.rows[0];
   const calculation=JSON.parse(source.calculation_text);calculation.global_score='5.'+'0'.repeat(RECOMMENDATION_AI_INPUT_BYTES);source.calculation_text=JSON.stringify(calculation);
-  expect((await compareAi(h.args)).notice).toBe('CONTEXT_LIMIT');expect(h.port.reserve).not.toHaveBeenCalled();expect(h.http).not.toHaveBeenCalled();
+  const prepared=prepareAi(f.catalogue,query,''),serialized=JSON.stringify(prepared.request),originalHttp=f.http.getMockImplementation()!;
+  expect(new TextEncoder().encode(serialized).length).toBeGreaterThan(RECOMMENDATION_AI_INPUT_BYTES);expect(prepared.candidates).toHaveLength(20);
+  f.http.mockImplementation(async(url,init)=>{
+   expect([...f.records.values()][0].state).toBe('dispatched');expect(init?.body).toBe(serialized);expect(init?.signal).toBeInstanceOf(AbortSignal);expect(init?.redirect).toBe('error');
+   const sent=JSON.parse(JSON.parse(String(init?.body)).input);expect(sent.candidates).toEqual(prepared.candidates);expect(sent.candidates[0].facts.find((v:{ref:string})=>v.ref==='score_global').value).toBe(calculation.global_score);
+   if(scenario==='unknown')throw Error('SIMULATED_TIMEOUT');
+   if(scenario==='http')return new Response('{}',{status:400});
+   if(scenario==='invalid')return new Response(JSON.stringify({...f.native(),model:'other'}));
+   return originalHttp(url,init);
+  });
+  const first=await compareAi(f.args);expect(first.status).toBe(scenario==='success'?'completed':'fallback');expect(first.notice).not.toBe('CONTEXT_LIMIT');
+  const second=await compareAi(f.args);expect(second.status).toBe(scenario==='success'?'cached':'fallback');expect(f.http).toHaveBeenCalledTimes(1);expect(f.port.finish).toHaveBeenCalledTimes(1);
+ });
+ it('keeps the response-size protection and never retries a consumed oversized response',async()=>{
+  const f=fixture();f.http.mockResolvedValue(new Response(' '.repeat(128001)));
+  expect((await compareAi(f.args)).notice).toBe('RESPONSE_TOO_LARGE');expect((await compareAi(f.args)).notice).toBe('PREVIOUS_ATTEMPT_NOT_RETRIED');expect(f.http).toHaveBeenCalledTimes(1);
  });
 });
