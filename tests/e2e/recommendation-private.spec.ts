@@ -104,12 +104,18 @@ for(const language of ['fr','vi'] as const){
   await expect(page.locator(`[data-recommendation-origin="${state}"]`)).toBeVisible();
   await expect(page.locator('.recommendation-ai .recommendation-card')).toHaveCount(state==='cached'?2:0);
  });
- test(`invalid AI keeps the existing engine ${language}`,async({page})=>{
+ test(`invalid AI explicitly separates general fallback from unavailable personalization ${language}`,async({page},testInfo)=>{
   await page.addInitScript(()=>localStorage.setItem('recommendation-ai-case','invalid'));
   await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
   await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
-  await expect(page.locator('.recommendation-card')).toHaveCount(3);await expect(page.locator('.recommendation-ai')).toContainText(language==='fr'?'classement du moteur conservé':'giữ xếp hạng');
+  await expect(page.locator('.recommendation-card')).toHaveCount(3);await expect(page.locator('.recommendation-ai')).toContainText(language==='fr'?'Choix personnalisé indisponible':'Chưa có lựa chọn cá nhân hóa');
   await expect(page.locator('[data-recommendation-origin="fallback"]')).toBeVisible();
+  const notice=page.locator('[data-fallback-personalization="unavailable"]');await expect(notice).toContainText(language==='fr'?'Contrôles effectivement appliqués':'Các điều kiện đã kiểm tra');
+  await expect(notice).toContainText(language==='fr'?'Les préférences du texte libre ne sont pas validées':'Chưa xác nhận các mong muốn');
+  const first=page.locator('.recommendation-card').first();expect(await notice.evaluate((node)=>node.getBoundingClientRect().top)).toBeLessThan(await first.evaluate(node=>node.getBoundingClientRect().top));
+  await expect(first).toContainText(language==='fr'?'Classement général distinct':'Xếp hạng chung riêng biệt');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await notice.screenshot({path:testInfo.outputPath('explicit-fallback-'+language+'.png')});
  });
  test(`localized access refusal without private results ${language}`,async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('recommendation-case','forbidden'));

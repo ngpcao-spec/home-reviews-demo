@@ -2,7 +2,7 @@ import type {Request as EngineRequest,Proposal} from './restaurant-recommendatio
 import {shortlistPreferences} from './shortlist-preferences.ts';
 import {placeFeatureLabel} from './google-place-taxonomy.ts';
 import type {Choice,Fact,Prepared} from './recommendation-ai.ts';
-import type {AiExplanation,AiSelection,CriterionCoverage,CriterionState} from './recommendation-ai-contract.ts';
+import type {AiExplanation,AiSelection,CriterionCoverage,CriterionState,CautionContext} from './recommendation-ai-contract.ts';
 
 export const CRITERIA_VERSION='recommendation-criteria-coverage-v1';
 export type CriterionHint={key:string;label:string;expected:boolean;origin:'optional_text_hint'|'structured_preference'|'mandatory_filter'};
@@ -56,12 +56,24 @@ function permittedForCriterion(f:Fact,key:string|null){
  if(key==='cooking_recurrence')return f.ref===key;
  return (f.kind==='strength'||f.kind==='reservation')&&point(f).category===key.slice(9);
 }
-function relevantCaution(f:Fact,p:Prepared,criteria:Criterion[]){
- if(f.kind==='reservation')return true;
- if(f.kind==='freshness')return (f.value as {state:string}).state==='corpus_changed';
- if(f.kind==='recurrence')return point(f).status==='reported_repetition';
- return f.kind==='feature'&&['denied','conflicted'].includes(point(f).status??'')
-  &&(point(f).status==='conflicted'||criteria.some(c=>c.key===f.ref)||p.criteriaHints.some(h=>h.key===f.ref));
+function cautionContext(f:Fact,p:Prepared,id:string,criteria:Criterion[],evidence:Evidence[]):CautionContext|null{
+ if(f.kind==='freshness')return (f.value as {state:string}).state==='corpus_changed'?{kind:'freshness',criterion_keys:[]}:null;
+ if(!criteria.length)return f.kind==='reservation'?{kind:'documented_issue',criterion_keys:[]}:null;
+ const proposal=p.proposals.find(x=>x.establishment_id===id)!;
+ for(const [i,c]of criteria.entries()){
+  const e=evidence[i];if(!c.key||!e||e.state==='documented')continue;
+  // Only the already validated evidence of a known criterion can bind a caution.
+  // A category label or a model's unsupported relevance assertion is insufficient.
+  if(e.refs.includes(f.ref)&&f.kind!=='strength')return {kind:e.state==='unknown'?'uncertainty':e.state==='partial'?'context_limit':'documented_issue',criterion_keys:[c.key]};
+  if(f.kind==='reservation'&&c.key==='category_'+point(f).category)return {kind:'documented_issue',criterion_keys:[c.key]};
+  // A positive report point may itself contain a temporal qualification. Match its
+  // exact report/section/index to the criterion's reconciled feature citations.
+  if(c.key.startsWith('feature_')&&e.state==='partial'&&(f.kind==='strength'||f.kind==='reservation')){
+   const sources=Array.isArray(f.source)?f.source as {report_id:string;section:string;index:number}[]:[];
+   if(proposal.features[c.key.slice(8)]?.citations.some(c=>sources.some(s=>s.report_id===c.report_id&&s.section===c.section&&s.index===c.index)))return {kind:'context_limit',criterion_keys:[c.key]};
+  }
+ }
+ return null;
 }
 /** No free explanation is accepted. Quotes must come verbatim from the request; only
  * their offsets are persisted. Source references cannot cross restaurant/corpus boundaries. */
@@ -106,7 +118,10 @@ export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
     if(e.state==='documented'&&!positive||e.state==='contradicted'&&!negative||e.state==='partial'&&!selected.length||e.state==='conflicted'&&!selected.some(f=>f?.kind==='feature'&&point(f).status==='conflicted'))throw Error('INVALID_CRITERION_EVIDENCE');
    }
   }
-  if(c.caution_refs.some(r=>!facts.some(f=>f.ref===r&&relevantCaution(f,p,v.criteria))))throw Error('IRRELEVANT_CAUTION');
+  for(const r of c.caution_refs){
+   const f=facts.find(f=>f.ref===r);if(!f)throw Error('INVALID_REFERENCE');
+   if(!cautionContext(f,p,c.id,v.criteria,c.criterion_evidence))throw Error('IRRELEVANT_CAUTION');
+  }
  }
  const alternatives=[...new Set(v.choices.flatMap(c=>c.alternative_ids))];
  if(alternatives.length>2||alternatives.some(id=>seen.has(id)||!p.facts.has(id)))throw Error('INVALID_ALTERNATIVE');
@@ -135,7 +150,8 @@ export function renderCoveredChoices(choices:Choice[],p:Prepared,render:(id:stri
  }
  return choices.map(c=>{
   const proposal=p.proposals.find(x=>x.establishment_id===c.id)!,data=c as Choice&CoverageData,cov=coverage(c.id,data.criteria_spans,data.criterion_evidence);
-  const cautions=data.caution_refs.map(ref=>render(c.id,ref));
+  const criteria=data.criteria_spans.map(s=>({key:s.key,quote:p.naturalLanguageRequest.slice(s.start,s.end)}));
+  const cautions=data.caution_refs.map(ref=>({...render(c.id,ref),caution_context:cautionContext(p.facts.get(c.id)!.find(f=>f.ref===ref)!,p,c.id,criteria,data.criterion_evidence)!}));
   const used=new Set([...c.reason_refs,...data.criterion_evidence.flatMap(e=>e.refs),...data.caution_refs]);
   const other=p.facts.get(c.id)!.filter(f=>!used.has(f.ref)&&(f.kind==='reservation'||f.kind==='feature'&&['denied','conflicted'].includes(point(f).status??'')));
   const alternatives=data.alternative_ids.map(id=>({proposal:p.proposals.find(x=>x.establishment_id===id)!,coverage:coverage(id,data.criteria_spans,data.criteria_spans.map((s,criterion)=>{
@@ -143,4 +159,10 @@ export function renderCoveredChoices(choices:Choice[],p:Prepared,render:(id:stri
   }))}));
   return {proposal,reasons:c.reason_refs.map(ref=>render(c.id,ref)),caution:cautions[0]??null,coverage:cov,cautions,other_limits:other.map(f=>render(c.id,f.ref)),alternatives,match:cov.every(x=>x.state==='documented')?'documented':'partial'};
  });
+}
+
+/** Conservative source observations for a general ranking, never a personalized choice. */
+export function conservativeCoverage(p:Prepared,id:string,render:(ref:string)=>AiExplanation):CriterionCoverage[]{
+ const proposal=p.proposals.find(x=>x.establishment_id===id)!;
+ return p.criteriaHints.map(h=>{const a=assessment(h.key,proposal,p.facts.get(id)!,h);return {criterion:h.label,label:h.label,key:h.key,request_span:{start:0,end:0},requirement:h.origin==='mandatory_filter'?'mandatory_filter':'preference',state:a.state,evidence:a.refs.map(render)};});
 }

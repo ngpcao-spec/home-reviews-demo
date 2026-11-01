@@ -1,14 +1,14 @@
 import {shortlistRestaurants,type Proposal,type Request as EngineRequest} from './restaurant-recommendation-engine-v1.ts';
 import {PLACE_FEATURES,placeFeatureLabel} from './google-place-taxonomy.ts';
 import type {readRestaurantRecommendationCatalogue} from './restaurant-recommendation-read-v1.ts';
-import type {AiSelection,AiComparison,AiExplanation,Metrics} from './recommendation-ai-contract.ts';
+import type {AiSelection,AiComparison,AiExplanation,Metrics,FallbackDisclosure} from './recommendation-ai-contract.ts';
 import {explainSavedReference} from './recommendation-explanation.ts';
 import {reportPoint,savedReportPoints,REPORT_FACTS_VERSION} from './recommendation-report-facts.ts';
 import {repeatedCookingConcern} from './shortlist-preferences.ts';
-import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,type CoverageData} from './recommendation-criteria.ts';
+import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,type CoverageData} from './recommendation-criteria.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
-export const RECOMMENDATION_AI_VERSION='recommendation-ai-criteria-coverage-v5';
+export const RECOMMENDATION_AI_VERSION='recommendation-ai-caution-safety-v6';
 export const RECOMMENDATION_AI_MODEL='gpt-6.1-sol';
 export const RECOMMENDATION_AI_INPUT_BYTES=200000;
 export const AI_FEATURES=['quiet','family_friendly','kids','vegetarian_options','vegan_options','outdoor_seating','air_conditioning','wheelchair_entrance','reservation'] as const;
@@ -133,7 +133,7 @@ export function validateChoices(raw:unknown,prepared:Prepared):Choice[]{
  }
  return value.choices;
 }
-export function renderChoices(choices:Choice[],p:Prepared):AiSelection[]{
+export function renderPreparedReference(p:Prepared,id:string,ref:string):AiExplanation{
  const render=(id:string,ref:string):AiExplanation=>{
   const proposal=p.proposals.find(x=>x.establishment_id===id)!,f=p.facts.get(id)!.find(x=>x.ref===ref)!;
   if(f.kind==='recurrence')return {ref,text:f.label,source:f.source,display_kind:'derived_observation',sources:(f.value as {point_refs:string[]}).point_refs.flatMap(r=>render(id,r).sources??[]),notes:['derived_observation','recurrence_requires_source_check']};
@@ -141,8 +141,22 @@ export function renderChoices(choices:Choice[],p:Prepared):AiSelection[]{
   const rendered=explainSavedReference(proposal,ref,f.label,f.source,proposal.report.language as 'fr'|'vi',p.reportPoints.get(id));
   return rendered.display_kind==='report_extract'&&(f.kind==='strength'||f.kind==='reservation')?{...rendered,text:(f.value as {text:string}).text}:rendered;
  };
+ return render(id,ref);
+}
+export function renderChoices(choices:Choice[],p:Prepared):AiSelection[]{
+ const render=(id:string,ref:string)=>renderPreparedReference(p,id,ref);
  if(choices.some(c=>c.coverage_version))return renderCoveredChoices(restoreCoveredChoices(choices,p),p,render);
  return choices.map(c=>({proposal:p.proposals.find(x=>x.establishment_id===c.id)!,reasons:c.reason_refs.map(r=>render(c.id,r)),caution:c.caution_ref?render(c.id,c.caution_ref):null}));
+}
+export function describeRecommendationFallback(catalogue:Catalogue,query:EngineRequest,preference:string,proposals:Proposal[]):FallbackDisclosure{
+ return {version:'recommendation-fallback-disclosure-v1',personalized_choice_available:false,free_text:preference.trim()?'not_verified':'not_requested',
+  verified:{access:true,report_and_scores:true,cuisines:query.cuisines??[],budget:query.budget??null,required_features:query.required_features??[],geography:query.geography==='not_requested'?'not_requested':'filtered',service_priority:query.preferences?.categories?.includes('service')??false},
+  assessments:proposals.map(proposal=>{
+   // Reuse the same source preparation, independently of whether this ordinary
+   // engine result belonged to the twenty AI candidates. Do not rank it again.
+   const p=prepareAi({...catalogue,rows:catalogue.rows.filter(r=>r.establishment_id===proposal.establishment_id)},query,preference);
+   return {establishment_id:proposal.establishment_id,coverage:conservativeCoverage(p,proposal.establishment_id,ref=>renderPreparedReference(p,proposal.establishment_id,ref))};
+  })};
 }
 function metricsFrom(raw:Record<string,unknown>,duration:number,requestId:string|null):Metrics{
  const u=(raw.usage??{}) as Record<string,unknown>,details=(u.input_tokens_details??{}) as Record<string,unknown>;

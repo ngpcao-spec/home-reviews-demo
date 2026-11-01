@@ -35,6 +35,11 @@ describe.each(['fr','vi'] as const)('source-bound multi-criterion coverage %s',l
   expect(display.coverage?.[0].label).not.toBe(display.coverage?.[1].label);
   expect(display.proposal.scores).toEqual(recommendRestaurants(f.rows,f.cat.organizationId,language,query).proposals.find(x=>x.establishment_id==='outside')!.scores);expect(f.rows).toEqual(before);
  });
+ it('accepts an explicitly unknown requested family attribute as a caution without declaring it unsuitable',()=>{
+  const f=family(language);f.native.choices[0].caution_refs=['feature_family_friendly'];const s=renderChoices(validateCoveredDecision(f.native,f.p),f.p)[0];
+  expect(s.cautions?.[0].caution_context).toEqual({kind:'uncertainty',criterion_keys:['feature_family_friendly']});expect(s.coverage?.[0].state).toBe('unknown');expect(s.cautions?.[0].sources).toEqual([]);
+  f.native.choices[0].criterion_evidence[0].state='contradicted';expect(()=>validateCoveredDecision(f.native,f.p)).toThrow('INVALID_CRITERION_EVIDENCE');
+ });
  it('rejects omission, a combined replacement criterion, invented confirmation, wrong references and a missing tradeoff',()=>{
   for(const kind of ['missing','combined','wrong_quote','confirmation','wrong_ref','score_only','missing_alternative','foreign_alternative','self_alternative','extra_prose']){
    const f=family(language),n=structuredClone(f.native);
@@ -96,6 +101,31 @@ describe.each(['fr','vi'] as const)('source-bound multi-criterion coverage %s',l
  });
 });
 
+describe.each(['fr','vi'] as const)('bound uncertainty and contextual cautions %s',language=>{
+ it('accepts unknown cooking recurrence as an uncertainty without changing the native reply or confirming absence',()=>{
+  const r=row('source',language),p=prepareAi(catalogue([r],language),query,language==='fr'?'Éviter les défauts de cuisson récurrents.':'Tránh vấn đề nấu nướng lặp lại.'),n=coveredReply(p,[{id:'source',reason_refs:['score_global'],caution_ref:'cooking_recurrence'}]),before=JSON.stringify(n);
+  const s=renderChoices(validateCoveredDecision(n,p),p)[0];expect(JSON.stringify(n)).toBe(before);
+  expect(s.coverage?.[0].state).toBe('unknown');expect(s.cautions?.[0].caution_context).toMatchObject({kind:'uncertainty',criterion_keys:['cooking_recurrence']});
+  expect(s.cautions?.[0].text).toMatch(/indéterminée|Chưa xác định/);expect(s.cautions?.[0].sources).toEqual([]);
+  n.choices[0].criterion_evidence[0].state='documented';expect(()=>validateCoveredDecision(n,p)).toThrow('INVALID_CRITERION_EVIDENCE');
+ });
+ it('accepts the scoped feature or its exact report source, but refuses another positive point in the same category',()=>{
+  const r=row('source',language,{Quiet:true}),text=language==='fr'?'Six avis décrivent un dîner calme en semaine ; les week-ends ne sont pas documentés.':'Sáu khách mô tả bữa tối yên tĩnh ngày thường; cuối tuần chưa được ghi nhận.';
+  const points=[{category:'ambiance',text,evidence_ids:['a'.repeat(64)]},{category:'ambiance',text:language==='fr'?'La décoration est appréciée.':'Trang trí được đánh giá tốt.',evidence_ids:['b'.repeat(64)]}];r.report_sections.positive_aspects=points;(r.publication!.derived.report as Record<string,unknown>).positive_aspects=points;
+  const p=prepareAi(catalogue([r],language),query,language==='fr'?'Un dîner calme.':'Bữa tối yên tĩnh.');
+  for(const ref of ['feature_quiet','strength_ambiance_0']){const n=coveredReply(p,[{id:'source',reason_refs:['score_global'],caution_ref:ref}]),s=renderChoices(validateCoveredDecision(n,p),p)[0];expect(s.cautions?.[0].caution_context?.kind).toBe('context_limit');expect(s.cautions?.[0].text).toBe(text);}
+  const n=coveredReply(p,[{id:'source',reason_refs:['score_global'],caution_ref:'strength_ambiance_1'}]);expect(()=>validateCoveredDecision(n,p)).toThrow('IRRELEVANT_CAUTION');
+ });
+ it('keeps unrelated reservations, denied facilities, invented refs and foreign refs blocked',()=>{
+  const r=row('source',language,{'Live music':false},language==='fr'?'Le prix est jugé élevé.':'Giá bị nhận xét cao.');(r.report_sections.reservations as {category:string}[])[0].category='price';(r.publication!.derived.report as {negative_aspects:{category:string}[]}).negative_aspects[0].category='price';
+  const p=prepareAi(catalogue([r],language),query,language==='fr'?'Un dîner calme.':'Bữa tối yên tĩnh.');
+  for(const [ref,error]of [['reservation_price_0','IRRELEVANT_CAUTION'],['feature_live_music','IRRELEVANT_CAUTION'],['cooking_recurrence','IRRELEVANT_CAUTION'],['other-restaurant:reservation_price_0','INVALID_REFERENCE'],['invented','INVALID_REFERENCE']]){
+   const n=coveredReply(p,[{id:'source',reason_refs:['score_global'],caution_ref:ref}]);expect(()=>validateCoveredDecision(n,p)).toThrow(error);
+  }
+  const n=coveredReply(p,[{id:'source',reason_refs:['score_global'],caution_ref:null}]);Object.assign(n.choices[0],{caution:'Ce lieu est certainement calme'});expect(()=>validateCoveredDecision(n,p)).toThrow('INVALID_SELECTION');
+ });
+});
+
 describe.each(['fr','vi'] as const)('S16 recurrence and useful cautions %s',language=>{
  const cases=language==='fr'?[
   ['Un client trouve le T-bone moins cuit que demandé mais reste satisfait. Un autre le trouve trop gras. Ces remarques différentes ne prouvent pas la répétition du même défaut.','not_established','unknown'],
@@ -124,14 +154,16 @@ describe.each(['fr','vi'] as const)('S16 recurrence and useful cautions %s',lang
   expect(s.cautions).toEqual([]);expect(s.coverage?.[0].state).toBe('partial');expect(s.coverage?.[0].evidence.some(e=>e.ref==='reservation_service_0')).toBe(true);
   expect(s.other_limits?.some(e=>e.ref==='feature_live_music')).toBe(true);
  });
- it('keeps multiple selected cautions and the remaining saved reservation without substituting or losing a source',()=>{
+ it('rejects an off-topic selected caution while preserving it among other saved limits',()=>{
   const r=row('source',language),texts=language==='fr'?['Un plat froid est signalé.','Deux clients signalent une attente, malgré un personnel apprécié.','Un client souhaiterait plus de place.']:['Có phản ánh món nguội.','Hai khách phản ánh chờ lâu dù khen nhân viên.','Một khách mong có thêm chỗ ngồi.'];
   const points=texts.map((text,index)=>({category:['quality','service','ambiance'][index],text,evidence_ids:[String(index+1).repeat(64)]}));
   r.report_sections.reservations=points;(r.publication!.derived.report as {negative_aspects:unknown[]}).negative_aspects=points;
   const p=prepareAi(catalogue([r],language),query,language==='fr'?'Service attentionné.':'Phục vụ chu đáo.'),n=coveredReply(p,[{id:r.establishment_id,reason_refs:['strength_service_0'],caution_ref:null}]);
-  n.choices[0].caution_refs=['reservation_quality_0','reservation_service_1'];const s=renderChoices(validateCoveredDecision(n,p),p)[0];
-  expect(s.cautions?.map(c=>c.text)).toEqual(texts.slice(0,2));expect(s.other_limits?.find(e=>e.ref==='reservation_ambiance_2')?.text).toBe(texts[2]);
-  expect(s.cautions?.[1].sources?.[0]).toMatchObject({kind:'report',report_id:r.report_id,category:'service',index:1});
+  n.choices[0].caution_refs=['reservation_quality_0','reservation_service_1'];expect(()=>validateCoveredDecision(n,p)).toThrow('IRRELEVANT_CAUTION');
+  n.choices[0].caution_refs=['reservation_service_1'];const s=renderChoices(validateCoveredDecision(n,p),p)[0];
+  expect(s.cautions?.map(c=>c.text)).toEqual([texts[1]]);expect(s.other_limits?.find(e=>e.ref==='reservation_ambiance_2')?.text).toBe(texts[2]);
+  expect(s.other_limits?.find(e=>e.ref==='reservation_quality_0')?.text).toBe(texts[0]);
+  expect(s.cautions?.[0].sources?.[0]).toMatchObject({kind:'report',report_id:r.report_id,category:'service',index:1});
  });
  it('lets relevant later source points explain a mixed category rather than forcing its first positive and reservation',()=>{
   const r=row('source',language),positives=(language==='fr'?['Un accueil souriant.','Le personnel adapte ses explications aux besoins du groupe.']:['Đón tiếp niềm nở.','Nhân viên giải thích theo nhu cầu của nhóm.']).map((text,index)=>({category:'service',text,evidence_ids:[String(index+1).repeat(64)]}));
@@ -153,7 +185,7 @@ it('uses a new version/cache while retaining one attempt, receipt reuse and unkn
  const http=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(f.native)}]}]})));
  const args={catalogue:f.cat,query,preference:f.text,userId:'test',access:['org-a'],port,key:'offline-fixture',http,unchanged:async()=>true};
  expect((await compareAi(args)).status).toBe('completed');expect((await compareAi(args)).status).toBe('cached');expect(http).toHaveBeenCalledTimes(1);expect(JSON.stringify([...records.values()])).not.toContain(f.text);
- expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-criteria-coverage-v5');
+ expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-caution-safety-v6');
  const failed={...args,userId:'another',http:vi.fn<typeof fetch>(async()=>{throw Error('SIMULATED_UNKNOWN');})};
  await compareAi(failed);await compareAi(failed);expect(failed.http).toHaveBeenCalledTimes(1);
 });

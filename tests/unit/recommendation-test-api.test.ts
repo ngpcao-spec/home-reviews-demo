@@ -82,10 +82,10 @@ describe('authenticated recommendation endpoint',()=>{
  it('calls the AI only for an explicit compare, under the same organization/session and frozen rows',async()=>{
   const f=fixture({ai:true});await f.send({action:'options'});await f.send({action:'recommend',preference:'en famille'});
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
-  const r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v5',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
+  const r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledTimes(1);
  });
- it.each([undefined,'free_text_v2'])('rejects an old page mode %s before any catalogue read, reservation or text transmission, preserving classic searches',async mode=>{
+ it.each([undefined,'free_text_v2','criteria_coverage_v5'])('rejects an old page mode %s before any catalogue read, reservation or text transmission, preserving classic searches',async mode=>{
   const f=fixture({ai:true}),text='Je ne cherche pas forcément le calme.';
   const r=await f.send({action:'compare',preference:text,...(mode?{preference_mode:mode}:{})});expect(r.status).toBe(409);expect(await r.json()).toEqual({error:'RECOMMENDATION_CLIENT_UPDATE_REQUIRED'});
   expect(f.requests.some(u=>u.pathname.endsWith('/restaurant_recommendation_sheets'))).toBe(false);
@@ -95,24 +95,33 @@ describe('authenticated recommendation endpoint',()=>{
  it.each(['fr','vi'] as const)('sends the whole %s request with its negation only after compare and does not echo or persist it',async language=>{
   const f=fixture({ai:true,language}),text=language==='fr'?'Je ne cherche pas forcément le calme.\nSans musique en direct, si possible.':'Không nhất thiết yên tĩnh; nếu được, không có nhạc sống.';
   await f.send({action:'recommend',preference:text});expect(f.provider).not.toHaveBeenCalled();
-  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v5',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
+  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
   const sent=JSON.parse(JSON.parse(String(f.provider.mock.calls[0][1]!.body)).input);
   expect(sent.natural_language_request).toBe(text);expect(data).not.toHaveProperty('interpreted_preferences');
   expect(JSON.stringify(data)).not.toContain(text);expect(JSON.stringify(f.finish.mock.calls)).not.toContain(text);
  });
  it('refuses foreign organization, unsupported requirements and personal contact data before reserving an AI attempt',async()=>{
   const f=fixture({ai:true});
-  for(const body of [{action:'compare',preference_mode:'criteria_coverage_v5',organization_id:other},{action:'compare',preference_mode:'criteria_coverage_v5',required_features:['invented']},{action:'compare',preference_mode:'criteria_coverage_v5',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
+  for(const body of [{action:'compare',preference_mode:'criteria_coverage_v6',organization_id:other},{action:'compare',preference_mode:'criteria_coverage_v6',required_features:['invented']},{action:'compare',preference_mode:'criteria_coverage_v6',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
  });
  it('does not confirm an unknown mandatory feature and returns the ordinary empty engine result',async()=>{
-  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v5',required_features:['quiet']})).json();
+  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v6',required_features:['quiet']})).json();
   expect(r.result.proposals).toEqual([]);expect(r.comparison.status).toBe('fallback');expect(f.provider).not.toHaveBeenCalled();
  });
  it('does not return candidate data after permissions are revoked during the single provider attempt',async()=>{
   const options={ai:true,role:'manager'},f=fixture(options),native=f.provider.getMockImplementation()!;
   f.provider.mockImplementation(async(...args)=>{const response=await native(...args);options.role='viewer';return response;});
-  const r=await f.send({action:'compare',preference_mode:'criteria_coverage_v5',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
+  const r=await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledWith('attempt-offline','obsolete',null,expect.any(Object),'FORBIDDEN');
+ });
+ it.each(['fr','vi'] as const)('discloses unavailable personalization and only actual structured controls after invalid output %s',async language=>{
+  const f=fixture({ai:true,language}),text=language==='fr'?'Un dîner calme.':'Bữa tối yên tĩnh.';
+  f.provider.mockImplementation(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"choices":[]}'}]}]})));
+  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:text,service_priority:true}),data=await response.json();
+  expect(data.comparison.status).toBe('fallback');expect(data.comparison.selections).toEqual([]);
+  expect(data.comparison.fallback).toMatchObject({personalized_choice_available:false,free_text:'not_verified',verified:{access:true,report_and_scores:true,geography:'not_requested',budget:null,cuisines:[],required_features:[],service_priority:true}});
+  expect(data.comparison.fallback.assessments).toHaveLength(data.result.proposals.length);expect(JSON.stringify(data)).not.toContain(text);
+  expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledTimes(1);
  });
 });

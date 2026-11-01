@@ -43,14 +43,17 @@ function scopeFor(clause: string): FeatureScope {
   const excludedDays = exception ? daysFor(clause.slice(exception.index + exception[0].length)) : null;
   if (excludedDays) days = (days ?? [0, 1, 2, 3, 4, 5, 6]).filter(day => !excludedDays.includes(day));
   const clock = '(\\d{1,2})(?:\\s*[:h]\\s*(\\d{2}))?\\s*(?:h|heures?|gio)?';
-  const before = new RegExp('\\b(?:avant|truoc|before)\\s+' + clock + '\\b').exec(clause);
-  const after = new RegExp('\\b(?:apres|sau|after|a partir de|tu|from)\\s+' + clock + '\\b').exec(clause);
+  // Accent normalization merges Vietnamese sáu (Friday) and sau (after).
+  // Keep the weekday for daysFor, but do not read its name as a clock qualifier.
+  const clockClause=clause.replace(/\bthu sau\b/g,'thu 6');
+  const before = new RegExp('\\b(?:avant|truoc|before)\\s+' + clock + '\\b').exec(clockClause);
+  const after = new RegExp('\\b(?:apres|sau|after|a partir de|tu|from)\\s+' + clock + '\\b').exec(clockClause);
   const minutes = (m: RegExpExecArray | null) => m && Number(m[1]) < 24 && Number(m[2] ?? 0) < 60 ? Number(m[1]) * 60 + Number(m[2] ?? 0) : null;
   const start = minutes(after), end = minutes(before);
   // Do not invent numeric hours for "dinner", "busy", "sometimes", etc.
   const unresolved = /\b(?:le matin|en matinee|morning|afternoon|apres midi|buoi sang|buoi trua|buoi chieu|le soir|en soiree|buoi toi|bua toi|diners?|dinner|evening|la nuit|night|buoi dem|jours? feries?|ngay le|holidays?|heures? de pointe|gio cao diem|peak hours|parfois|sometimes|doi khi|rarement|rarely|quand|lorsque|when|khi|certains|certaines)\b/.test(clause)
     || /\b(?:vers|autour de|environ|a|at|around|khoang|luc)\s+\d{1,2}(?:\s*[:h]|\s+gio\b)/.test(clause)
-    || /\b(?:avant|apres|truoc|sau|before|after|a partir de|from)\b/.test(clause)&&!before&&!after
+    || /\b(?:avant|apres|truoc|sau|before|after|a partir de|from)\b/.test(clockClause)&&!before&&!after
     || !!(before && end === null || after && start === null || exception && !excludedDays);
   return {days, start, start_exclusive:!!after&&/^(?:apres|sau|after)\b/.test(after[0]), end, unresolved};
 }

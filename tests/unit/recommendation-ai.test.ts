@@ -87,6 +87,7 @@ describe('bounded AI comparison using the existing engine',()=>{
  });
  it('includes the full wording in compatibility: adding a negation or an arbitrary detail prevents incorrect cache reuse, without storing the text',async()=>{
   const f=fixture(),positive='Je cherche le calme.',negative='Je ne cherche pas le calme.',detail='Je ne cherche pas forcément le calme.';
+  f.http.mockImplementation(async(_url,init)=>new Response(JSON.stringify(f.native(f.valid.map(c=>({...c,caution_ref:null})),JSON.parse(JSON.parse(String(init?.body)).input)))));
   const log=vi.spyOn(console,'info');
   await compareAi({...f.args,preference:positive});await compareAi({...f.args,preference:negative});await compareAi({...f.args,preference:detail});
   const cached=await compareAi({...f.args,preference:negative});expect(cached.status).toBe('cached');expect(f.http).toHaveBeenCalledTimes(3);expect(new Set(f.keys).size).toBe(3);

@@ -2,7 +2,7 @@ import type {AuthContext} from './auth.ts';
 import {recommendationCuisineOptions,type Request as RecommendationRequest} from './restaurant-recommendation-engine-v1.ts';
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
-import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,featureOption,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
 type Context={client:AuthContext['client'];admin?:AuthContext['admin'];user:Pick<AuthContext['user'],'id'|'is_anonymous'>};
@@ -18,9 +18,9 @@ function criteria(raw:unknown) {
     || b.maximum_vnd!==undefined && (typeof b.maximum_vnd!=='number'||!Number.isSafeInteger(b.maximum_vnd)||b.maximum_vnd<0)
     || b.service_priority!==undefined && typeof b.service_priority!=='boolean'
     || b.required_features!==undefined && !validAiFeatures(b.required_features)
-    || b.preference_mode!==undefined && !['free_text_v2','report_facts_v3','criteria_coverage_v5'].includes(String(b.preference_mode)))throw Error('INVALID_RECOMMENDATION_REQUEST');
+    || b.preference_mode!==undefined && !['free_text_v2','report_facts_v3','criteria_coverage_v5','criteria_coverage_v6'].includes(String(b.preference_mode)))throw Error('INVALID_RECOMMENDATION_REQUEST');
   if(b.preference!==undefined)b.preference=checkedRecommendationPreference(b.preference);
-  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'|'criteria_coverage_v5'};
+  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'|'criteria_coverage_v5'|'criteria_coverage_v6'};
 }
 export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort}) {
  return async(request:Request):Promise<Response>=>{
@@ -34,7 +34,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    let raw:unknown;try{raw=JSON.parse(text);}catch{throw Error('INVALID_RECOMMENDATION_REQUEST');}
    const input=criteria(raw);
    // Require the client explaining that anonymous report excerpts are now sent, before any read/reservation.
-   if(input.action==='compare'&&input.preference_mode!=='criteria_coverage_v5')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
+   if(input.action==='compare'&&input.preference_mode!=='criteria_coverage_v6')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
    const membership=await context.client.from('organization_members').select('user_id,organization_id,role,organization:organizations!inner(id,name)')
     .eq('user_id',context.user.id).in('role',['owner','admin','manager']).order('organization_id');
    if(membership.error)throw Error('RECOMMENDATION_READ_FAILED');
@@ -58,7 +58,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
     ...(input.service_priority?{preferences:{categories:['service']}}:{})};
    const result=recommendFromCatalogue(catalogue,query);
    if(input.action!=='compare')return reply({...common,result});
-   if(!dependencies)return reply({...common,result,comparison:{status:'fallback',notice:'AI_UNAVAILABLE',model:'gpt-6.1-sol',candidate_count:0,selections:[]}});
+   if(!dependencies)return reply({...common,result,comparison:{status:'fallback',notice:'AI_UNAVAILABLE',model:'gpt-6.1-sol',candidate_count:0,selections:[],fallback:describeRecommendationFallback(catalogue,query,input.preference??'',result.proposals)}});
    const access=organizations;
    const snapshot=await aiHash(catalogue);
    const comparison=await compareAi({catalogue,query,preference:(input.preference??'').trim().normalize('NFC'),userId:context.user.id,access,port:dependencies.port(context,organizationId),key:dependencies.key(),http:dependencies.http,
@@ -69,6 +69,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    // Membership, language and corpus are checked again before returning any comparison (including fallback).
    const current=await readRestaurantRecommendationCatalogue(context,organizationId);
    if(await aiHash(current)!==snapshot)return reply({error:'RECOMMENDATION_DATA_CHANGED'},409);
+   if(comparison.status==='fallback'||comparison.status==='pending')comparison.fallback=describeRecommendationFallback(catalogue,query,input.preference??'',result.proposals);
    console.info('RECOMMENDATION_COMPARISON_RESPONSE',{attempt_id:comparison.attempt_id??null,status:comparison.status,model:comparison.model,candidate_count:comparison.candidate_count});
    return reply({...common,result,comparison});
   }catch(error){
