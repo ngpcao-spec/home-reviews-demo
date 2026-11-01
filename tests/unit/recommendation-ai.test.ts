@@ -24,6 +24,23 @@ function fixture(count=5){
  const args={catalogue,query,preference:'',userId:'caller',access:[org],port,key:'offline-placeholder',http,unchanged:async()=>true};
  return {catalogue,prepared,valid,native,records,keys,args,http,port};
 }
+
+it('persists the exact final rejection diagnostic with native usage without changing the request',async()=>{
+ const f=fixture();f.args.http=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify(f.native([{...f.valid[0],reason_refs:['feature_family_friendly']}]))));
+ const checkpoint=vi.fn<NonNullable<AiPort['finishWithDiagnostic']>>(async(id,state,selection,metrics,error)=>f.port.finish(id,state,selection,metrics,error));f.port.finishWithDiagnostic=checkpoint;
+ const result=await compareAi({...f.args,diagnosticRuntime:{deployment_id:'project_function_8'}});expect(result.status).toBe('fallback');expect(result.notice).toBe('INVALID_REFERENCE');
+ expect(checkpoint.mock.calls[0][5]).toMatchObject({server_version:8,origin:'fallback',failure:{code:'INVALID_REFERENCE',field:'reason_refs',reference_index:0}});
+ expect(checkpoint.mock.calls[0][3]).toMatchObject({input_tokens:123,output_tokens:45});
+ expect(f.args.http.mock.calls[0][1]?.body).toBe(JSON.stringify(f.prepared.request));
+});
+it('never resends after an atomic diagnostic/receipt save failure',async()=>{
+ const f=fixture();f.port.finishWithDiagnostic=vi.fn(async()=>{throw Error('SIMULATED_STORE_FAILURE');});
+ expect((await compareAi(f.args)).notice).toBe('RECEIPT_SAVE_UNKNOWN');expect((await compareAi(f.args)).status).toBe('pending');expect(f.http).toHaveBeenCalledTimes(1);expect(f.port.finish).not.toHaveBeenCalled();
+});
+it('blocks a changed authorized request before HTTP and preserves its technical cause',async()=>{
+ const f=fixture(),traces:RecommendationTrace[]=[];f.port.reserve=vi.fn(async()=>{throw Error('DIAGNOSTIC_REQUEST_CHANGED');});
+ const result=await compareAi({...f.args,onDiagnostic:t=>traces.push(t)});expect(result.notice).toBe('DIAGNOSTIC_REQUEST_CHANGED');expect(f.http).not.toHaveBeenCalled();expect(traces[0].failure).toMatchObject({stage:'reservation',code:'DIAGNOSTIC_REQUEST_CHANGED'});
+});
 describe('bounded AI comparison using the existing engine',()=>{
  it('keeps exactly the existing first three and bounds the same ranked/diverse selection to twenty',()=>{
   const f=fixture(25),old=recommendRestaurants(f.catalogue.rows,org,'vi',query),short=shortlistRestaurants(f.catalogue.rows,org,'vi',query);
