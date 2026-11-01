@@ -11,10 +11,18 @@ about 98% of the body is spent in the calculations, rather than the migration or
 fixture construction. Database initialization runs separately in `beforeAll`.
 
 The previous five-second runner deadline interrupted this functional scenario;
-it is not an application latency contract. Only this test has a bounded 15 s
-timeout, roughly three times the largest completed measurement, to allow local
-WASM/runner variability. Its body and assertions are unchanged. Other test and
-hook limits, score functions, fixtures and application code are unchanged.
+it is not an application latency contract. This test has a bounded 15 s timeout,
+roughly three times the largest completed measurement, to allow local WASM/runner
+variability. Its body and assertions are unchanged.
+
+The full-suite follow-up also exposed a five-second cutoff in the existing
+`direct4-short-comparison.test.ts` rehearsal of 174 **mocked** HTTP exchanges.
+It passed before/after in 3.582/2.063 s and in 4.653 s in a full parallel run,
+then hit the runner deadline in a serial full run. Its receipt, comparison,
+concurrency and duplicate-call assertions are preserved with the same bounded
+15 s allowance. These are the only two case-specific deadline changes; no
+global timeout increase is applied. Other test and hook limits, score functions,
+fixtures and application code are unchanged. No real HTTP call is made.
 
 The measurements do not establish the precise historical OS load or a production
 performance improvement. Complete verification results remain in the private

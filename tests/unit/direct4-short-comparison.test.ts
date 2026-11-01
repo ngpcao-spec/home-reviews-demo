@@ -57,6 +57,9 @@ it.each(DIRECT_NATIVE_CHOICES)('keeps native JEV %s and confidence zero without 
  const r=raw('jev-1.13.0',choice,0),before=JSON.stringify(r),p=parseShortJev(r);expect(p.categories.quality.native_choice).toBe(choice);expect(p.categories.quality.native_confidence).toBe(0);expect(JSON.stringify(r)).toBe(before);
 });
 it('rejects a different served model without a fallback request',()=>expect(()=>parseShortJev(raw('another'))).toThrow());
+// Functional rehearsal of 174 mocked exchanges, not a latency benchmark.
+// Measured 2.06–4.65 s before/after and 5 s cutoffs under the full local suite;
+// keep every receipt/concurrency assertion with a bounded runner allowance.
 it('rehearses all 174 calls with concurrency, immutable receipts, complete comparison, changes from old prompts and repeated wakes',async()=>{
  const f=await fixture(),http=vi.fn(f.mock),contract=shortContract();
  for(let n=0;n<24&&f.state.run.status!=='completed';n++)await Promise.all([processRestaurant(f.port,'run',{jev:'mock',openai:'mock'},http,contract),processRestaurant(f.port,'run',{jev:'mock',openai:'mock'},http,contract)]);
@@ -64,7 +67,7 @@ it('rehearses all 174 calls with concurrency, immutable receipts, complete compa
  const b=f.state.artifacts.find(a=>a.kind==='short_common_classification_comparison')!.body;
  expect(b.total_cells).toBe(348);expect(b.change_counts).toEqual({jev:348,luna:348});expect(b.agreements).toBe(348);
  await processRestaurant(f.port,'run',{jev:'mock',openai:'mock'},http,contract);expect(http).toHaveBeenCalledTimes(174);
-});
+},15000);
 it.each(['timeout','429','500','invalid_json','wrong_model','missing_usage'])('preserves %s and never resends an uncertain attempt',async kind=>{
  const f=await fixture(),http=vi.fn(async()=>{if(kind==='timeout')throw Error('EXPLICIT_MOCK_TIMEOUT');if(kind==='invalid_json')return new Response('bad');
  const r=raw(kind==='wrong_model'?'other':'jev-1.13.0');if(kind==='missing_usage')delete (r as {usage?:unknown}).usage;return new Response(JSON.stringify(r),{status:kind==='429'?429:kind==='500'?500:200});});

@@ -21,7 +21,7 @@ async function publish(p:Pub){await db.query(`insert into public.current_report_
 // Functional integration test: nine SQL calculations over 150-review corpora.
 // Local before/after measurements ranged from 2.33 to 4.65 s; the former 5 s
 // deadline also interrupted this case. Allow bounded WASM/runner variability,
-// not a different score or weaker assertions. Other tests keep their defaults.
+// not a different score or weaker assertions. Other cases here keep defaults.
 it('without negatives preserves V1 scores; four positives exactly compensate one exclusive negative',async()=>{
  await upgrade();for(const positive of [0,1,60]){const p=await publication(150,{positive,rating:4.8});expect((await calc(p)).global_score).toBe((await calc(p,1)).global_score);}
  const c=await calc(await publication(150,{positive:4,negative:1,rating:4.8}));expect(c.global_score).toBe(4.8);expect(c).toMatchObject({version:'internal-recommendation-v2',negative_weight:-4});
