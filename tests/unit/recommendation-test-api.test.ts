@@ -4,9 +4,10 @@ import {requireUser} from '../../supabase/functions/_shared/auth';
 import {recommendationTestHandler} from '../../supabase/functions/_shared/recommendation-test-api';
 import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalogue';
 import {coveredWireReply} from '../fixtures/recommendation-coverage-reply';
+import type {RecommendationTrace} from '../../supabase/functions/_shared/recommendation-diagnostics';
 const org='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 const user='33333333-3333-4333-8333-333333333333';
-function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;failed?:boolean;rows?:ReturnType<typeof recommendationSheet>[];memberships?:boolean;ai?:boolean}={}){
+function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;failed?:boolean;rows?:ReturnType<typeof recommendationSheet>[];memberships?:boolean;ai?:boolean;diagnostics?:boolean}={}){
  const language=options.language??'vi';
  const rows=(options.rows??[recommendationSheet('a',{category:'service',cuisines:['indian'],positive:'Phục vụ chu đáo.'}),recommendationSheet('b')]).map(r=>{
   r.organization_id=org;r.language=language;Object.assign(r.metadata.identity as object,{organization_id:org});
@@ -28,12 +29,23 @@ function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;fa
  const reserve=vi.fn(async()=>({id:'attempt-offline',owned:true,state:'dispatched',selection:null,metrics:null}));
  const finish=vi.fn(async()=>{});
  const provider=vi.fn<typeof fetch>(async(_url,init)=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(coveredWireReply(JSON.parse(JSON.parse(String(init?.body)).input),[{id:rows[0].establishment_id,reason_refs:['score_global'],caution_ref:null}]))}]}]})));
- const handler=recommendationTestHandler(requireUser,options.ai?{key:()=> 'offline-placeholder',http:provider,port:()=>({reserve,finish})}:undefined);
+ const prune=vi.fn(async()=>{}),record=vi.fn<(context:unknown,organization:string,trace:RecommendationTrace)=>Promise<void>>(async()=>{});
+ const handler=recommendationTestHandler(requireUser,options.ai?{key:()=> 'offline-placeholder',http:provider,port:()=>({reserve,finish}),...(options.diagnostics?{diagnostics:{runtime:{deployment_id:'project_function_7'},prune,record}}:{})}:undefined);
  const send=(body:unknown,authenticated=true,method='POST')=>handler(new Request('https://fixture.invalid/functions/v1/test-restaurant-recommendations',{method,headers:authenticated?{Authorization:'Bearer caller-token'}:{},...(method==='POST'?{body:JSON.stringify(body)}:{})}));
- return{rows,requests,auths,send,reserve,finish,provider};
+ return{rows,requests,auths,send,reserve,finish,provider,prune,record};
 }
 afterEach(()=>vi.unstubAllGlobals());
 describe('authenticated recommendation endpoint',()=>{
+ it.each(['fr','vi'] as const)('records the final origin privately and never calls AI on options/search %s',async language=>{
+  const f=fixture({ai:true,diagnostics:true,language});await f.send({action:'options'});await f.send({action:'recommend'});expect(f.prune).toHaveBeenCalledTimes(2);expect(f.record).not.toHaveBeenCalled();expect(f.provider).not.toHaveBeenCalled();
+  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v6'});const data=await response.json();expect(data.comparison.status).toBe('completed');expect(f.record).toHaveBeenCalledTimes(1);
+  expect(f.record.mock.calls[0][2]).toMatchObject({version:'recommendation-diagnostic-v2',origin:'ai_validated',response_status:200,server_version:7,candidate_ids:['a','b']});
+  expect(JSON.stringify(f.record.mock.calls.map(c=>c[2]))).not.toContain('Phục vụ chu đáo');expect(data.comparison).not.toHaveProperty('diagnostic');
+  f.record.mockRejectedValueOnce(Error('private diagnostic unavailable'));expect((await f.send({action:'compare',preference_mode:'criteria_coverage_v6'})).status).toBe(200);
+ });
+ it('does not prune or record before authorization and organization membership are established',async()=>{
+  const f=fixture({ai:true,diagnostics:true,role:'viewer'});expect((await f.send({action:'options'})).status).toBe(403);expect(f.prune).not.toHaveBeenCalled();expect(f.record).not.toHaveBeenCalled();expect(f.provider).not.toHaveBeenCalled();
+ });
  it('rejects unauthenticated and anonymous callers before reading restaurant data',async()=>{
   const f=fixture();expect((await f.send({action:'recommend'},false)).status).toBe(401);expect(f.requests).toHaveLength(0);
   const a=fixture({anonymous:true});expect((await a.send({action:'recommend'})).status).toBe(401);expect(a.requests).toHaveLength(1);
