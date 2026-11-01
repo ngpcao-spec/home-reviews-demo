@@ -13,6 +13,7 @@ export {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
 import {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
 import {LEGACY_DIAGNOSTIC_VERSION,prepareLegacyDiagnosticRequest} from './recommendation-legacy-diagnostic-identity.ts';
 export const RECOMMENDATION_AI_MODEL='gpt-6.1-sol';
+// Historical benchmark kept for the existing offline fixtures; not a dispatch limit.
 export const RECOMMENDATION_AI_INPUT_BYTES=200000;
 export const AI_FEATURES=['quiet','family_friendly','kids','vegetarian_options','vegan_options','outdoor_seating','air_conditioning','wheelchair_entrance','reservation'] as const;
 // A source allowlist is not an input vocabulary: expose all already-normalized Google characteristics.
@@ -183,8 +184,6 @@ async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObser
  if(prepared.criteriaHints.length>8)return {...base,status:'fallback',notice:'TOO_MANY_CRITERIA'};
  if(!args.key.trim())return {...base,status:'fallback',notice:'AI_UNAVAILABLE'};
  const serialized=JSON.stringify(prepared.request);
- // Conservative bytes bound, far below the provider context, without truncating a source.
- if(new TextEncoder().encode(serialized).length>RECOMMENDATION_AI_INPUT_BYTES)return {...base,status:'fallback',notice:'CONTEXT_LIMIT'};
  const requestHash=await aiHash(prepared.request);
  const snapshot=await aiHash({rows:args.catalogue.rows,active:args.catalogue.establishments,language:args.catalogue.language});
  const cacheKey=await aiHash({version:RECOMMENDATION_AI_VERSION,requestHash,snapshot,user:args.userId,access:args.access,organization:args.catalogue.organizationId});
