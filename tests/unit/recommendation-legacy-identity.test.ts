@@ -37,7 +37,7 @@ it('sends only the current V7 request after a successful one-use reservation and
   const body=JSON.parse(String(init?.body)),input=JSON.parse(body.input);expect(input.configuration_version).toBe('recommendation-ai-open-criteria-safety-v7');expect(input.criteria_version).toBe('recommendation-criteria-coverage-v2');
   expect(input.candidates.length).toBeLessThanOrEqual(20);expect(body).not.toHaveProperty('legacy_request');
   const decision=coveredWireReply(input,[{id:'a',reason_refs:['score_global'],caution_ref:null}]);
-  return new Response(JSON.stringify({status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({...decision,choices:decision.choices.map(c=>({...c,caution_bindings:[]}))})}]}]}));
+  return new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({...decision,choices:decision.choices.map(c=>({...c,caution_bindings:[]}))})}]}]}));
  });
  const result=await compareAi({catalogue:c,query,preference:'',userId:'fixture-user',access:[],key:'offline-placeholder',http,port:{reserve,reserveCorrectedDiagnostic,finish,finishWithDiagnostic},unchanged:async()=>true,diagnosticRuntime:{deployment_id:'project_function_10'}});
  expect(result).toMatchObject({status:'completed',attempt_id:'simulated-child'});expect(reserveCorrectedDiagnostic).toHaveBeenCalledTimes(1);expect(http).toHaveBeenCalledTimes(1);expect(reserve).not.toHaveBeenCalled();expect(finish).not.toHaveBeenCalled();expect(finishWithDiagnostic).toHaveBeenCalledTimes(1);
