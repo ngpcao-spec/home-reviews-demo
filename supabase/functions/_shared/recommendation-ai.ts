@@ -21,7 +21,7 @@ export type Fact={ref:string;kind:'score'|'cuisine'|'price'|'feature'|'strength'
 export type CompactCandidate={id:string;sources:unknown;facts:Omit<Fact,'label'>[];criterion_observations?:ReturnType<typeof candidateCoverageHints>};
 export type Choice={id:string;reason_refs:string[];caution_ref:string|null}&Partial<CoverageData>;
 export type Attempt={id:string;owned:boolean;state:string;selection:Choice[]|null;metrics:Metrics|null};
-export type AiPort={reserve:(key:string,requestHash:string)=>Promise<Attempt>;finish:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null)=>Promise<void>};
+export type AiPort={reserve:(key:string,requestHash:string)=>Promise<Attempt>;finish:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null)=>Promise<void>;finishWithDiagnostic?:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null,trace:RecommendationTrace)=>Promise<void>};
 const categoryLabels={fr:{quality:'Qualité des plats',service:'Service',ambiance:'Ambiance',price:'Prix'},vi:{quality:'Chất lượng món ăn',service:'Phục vụ',ambiance:'Không gian',price:'Giá'}};
 const extraFeatureLabels={fast_service:{fr:'Rapidité du service',vi:'Tốc độ phục vụ'},sea_view:{fr:'Vue sur la mer',vi:'Tầm nhìn ra biển'}};
 const stable=(v:unknown):string=>JSON.stringify(v===undefined?null:Array.isArray(v)?v.map(x=>JSON.parse(stable(x))):v!==null&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(stable((v as Record<string,unknown>)[k]))])):v);
@@ -184,7 +184,11 @@ async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObser
  const snapshot=await aiHash({rows:args.catalogue.rows,active:args.catalogue.establishments,language:args.catalogue.language});
  const cacheKey=await aiHash({version:RECOMMENDATION_AI_VERSION,requestHash,snapshot,user:args.userId,access:args.access,organization:args.catalogue.organizationId});
  observation.stage='reservation';
- let attempt:Attempt;try{attempt=await args.port.reserve(cacheKey,requestHash);}catch{return {...base,status:'fallback',notice:'RESERVATION_UNAVAILABLE'};}
+ let attempt:Attempt;try{attempt=await args.port.reserve(cacheKey,requestHash);}catch(e){
+  const code=e instanceof Error&&/^DIAGNOSTIC_[A-Z_]+$/.test(e.message)?e.message:'RESERVATION_UNAVAILABLE';
+  observation.failure={stage:'reservation',code,field:'diagnostic_authorization',rule:'reservation_precondition_failed'};
+  return {...base,status:'fallback',notice:code};
+ }
  observation.attempt_id=attempt.id??undefined;
  if(!attempt.owned){
   observation.stage='cache_lookup';observation.prior_state=['succeeded','invalid_output','http_error','unknown','obsolete','dispatched'].includes(attempt.state)?attempt.state:'unknown';
@@ -220,7 +224,10 @@ async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObser
  }catch(e){error=e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'PROVIDER_OUTCOME_UNKNOWN';observation.failure=e instanceof ReferenceValidationError?e.diagnostic.detail:e instanceof DecisionValidationError?e.diagnostic:observation.failure??{stage:observation.stage,code:error,rule:observation.stage==='provider_json'||observation.stage==='decision_json'?'invalid_json':'stage_failed'};metrics.duration_ms=httpDuration??Date.now()-start;choices=null;}
  console.info('RECOMMENDATION_AI_ATTEMPT',{attempt_id:attempt.id,state,...metrics});
  // Save before rendering; a failed save leaves a consumed reservation, never a paid resend.
- try{await args.port.finish(attempt.id,state,choices,metrics,error);}catch{observation.stage='receipt_save';return {...base,status:'fallback',notice:'RECEIPT_SAVE_UNKNOWN',attempt_id:attempt.id,metrics};}
+ try{
+  if(args.port.finishWithDiagnostic)await args.port.finishWithDiagnostic(attempt.id,state,choices,metrics,error,diagnosticTrace(observation,{status:state==='succeeded'?'completed':'fallback',attempt_id:attempt.id,...(error?{notice:error}:{})},args.diagnosticRuntime));
+  else await args.port.finish(attempt.id,state,choices,metrics,error);
+ }catch{observation.stage='receipt_save';return {...base,status:'fallback',notice:'RECEIPT_SAVE_UNKNOWN',attempt_id:attempt.id,metrics};}
  if(state==='succeeded')observation.stage='completed';
  return state==='succeeded'&&choices?{...base,status:'completed',attempt_id:attempt.id,metrics,selections:renderChoices(choices,prepared)}:{...base,status:'fallback',notice:error??state,attempt_id:attempt.id,metrics};
 }
