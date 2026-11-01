@@ -1,15 +1,18 @@
 import type {Request as EngineRequest,Proposal} from './restaurant-recommendation-engine-v1.ts';
-import {shortlistPreferences} from './shortlist-preferences.ts';
+import {shortlistPreferences,preferenceProofText,boundedPreferenceClause} from './shortlist-preferences.ts';
 import {placeFeatureLabel} from './google-place-taxonomy.ts';
 import type {Choice,Fact,Prepared} from './recommendation-ai.ts';
 import type {AiExplanation,AiSelection,CriterionCoverage,CriterionState,CautionContext} from './recommendation-ai-contract.ts';
 import {decisionDiagnostic,decisionFailure,type DecisionDiagnostic} from './recommendation-diagnostics.ts';
+import {CRITERIA_VERSION} from './recommendation-versions.ts';
+import {limitedScope,reportFeatureSignals} from './report-feature-evidence.ts';
 
-export const CRITERIA_VERSION='recommendation-criteria-coverage-v1';
+export {CRITERIA_VERSION} from './recommendation-versions.ts';
 export type CriterionHint={key:string;label:string;expected:boolean;origin:'optional_text_hint'|'structured_preference'|'mandatory_filter'};
 type Criterion={key:string|null;quote:string};
 type Evidence={criterion:number;state:CriterionState;refs:string[]};
-export type CoverageData={coverage_version:typeof CRITERIA_VERSION;criteria_spans:{key:string|null;start:number;end:number}[];criterion_evidence:Evidence[];caution_refs:string[];alternative_ids:string[]};
+export type CautionBinding={ref:string;criterion:number|null};
+export type CoverageData={coverage_version:typeof CRITERIA_VERSION;criteria_spans:{key:string|null;start:number;end:number}[];criterion_evidence:Evidence[];caution_refs:string[];caution_bindings:CautionBinding[];alternative_ids:string[]};
 const states:CriterionState[]=['documented','partial','contradicted','conflicted','unknown'];
 const object=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const exact=(v:unknown,keys:string[])=>object(v)&&Object.keys(v).sort().join()===keys.sort().join();
@@ -55,7 +58,7 @@ export function coverageSchema(ids:string[],hints:CriterionHint[]){
  const evidence={type:'object',additionalProperties:false,required:['criterion','state','refs'],properties:{criterion:{type:'integer',minimum:0,maximum:7},state:{type:'string',enum:states},refs:{type:'array',maxItems:2,items:{type:'string'}}}};
  return {type:'object',additionalProperties:false,required:['criteria','choices'],properties:{
   criteria:{type:'array',maxItems:8,items:{type:'object',additionalProperties:false,required:['key','quote'],properties:{key:{type:['string','null'],enum:[...hints.map(h=>h.key),null]},quote:{type:'string',maxLength:500}}}},
-  choices:{type:'array',maxItems:3,items:{type:'object',additionalProperties:false,required:['id','reason_refs','criterion_evidence','caution_refs','alternative_ids'],properties:{id:{type:'string',enum:ids},reason_refs:{type:'array',minItems:1,maxItems:6,items:{type:'string'}},criterion_evidence:{type:'array',maxItems:8,items:evidence},caution_refs:{type:'array',maxItems:4,items:{type:'string'}},alternative_ids:{type:'array',maxItems:2,items:{type:'string',enum:ids}}}}}
+  choices:{type:'array',maxItems:3,items:{type:'object',additionalProperties:false,required:['id','reason_refs','criterion_evidence','caution_refs','caution_bindings','alternative_ids'],properties:{id:{type:'string',enum:ids},reason_refs:{type:'array',minItems:1,maxItems:6,items:{type:'string'}},criterion_evidence:{type:'array',maxItems:8,items:evidence},caution_refs:{type:'array',maxItems:4,items:{type:'string'}},caution_bindings:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,required:['ref','criterion'],properties:{ref:{type:'string'},criterion:{type:['integer','null'],minimum:0,maximum:7}}}},alternative_ids:{type:'array',maxItems:2,items:{type:'string',enum:ids}}}}}
  }};
 }
 function assessment(key:string,proposal:Proposal,facts:Fact[],hint:CriterionHint):{state:CriterionState;refs:string[]}{
@@ -78,7 +81,23 @@ function permittedForCriterion(f:Fact,key:string|null){
  if(key==='cooking_recurrence')return f.ref===key;
  return (f.kind==='strength'||f.kind==='reservation')&&point(f).category===key.slice(9);
 }
-function cautionContext(f:Fact,p:Prepared,id:string,criteria:Criterion[],evidence:Evidence[]):CautionContext|null{
+/** A quoted open need is not a trusted semantic assertion by the model. Reuse the
+ * conservative subject/negation grammar against BOTH quote and complete context.
+ * Removing optionality markers here never edits the request, shortlist or filters.
+ * Subjects/scopes this independent check cannot verify remain unknown. */
+export function verifiedOpenCriterion(p:Prepared,c:Criterion):CriterionHint|undefined{
+ const language=p.proposals[0]?.report.language==='vi'?'vi':'fr';
+ const quote=preferenceProofText(c.quote),inQuote=criterionHints({geography:'not_requested'},quote,language);
+ if(inQuote.length!==1)return;
+ const context=p.naturalLanguageRequest.replace(/(?<![\p{L}\p{N}])(?:si possible|nếu có thể|if possible)(?![\p{L}\p{N}])/giu,' ');
+ const h=inQuote[0],whole=criterionHints({geography:'not_requested'},preferenceProofText(context),language);
+ if(!whole.some(x=>x.key===h.key&&x.expected===h.expected))return;
+ const clauses=preferenceProofText(context).split(/[;.!?,\n]+|\b(?:et|mais|va|nhung|and|but)\b/).map(c=>c.trim());
+ if(!clauses.some(clause=>clause.includes(quote)&&boundedPreferenceClause(clause,h.key)))return;
+ if(h.key.startsWith('feature_')&&reportFeatureSignals(context,h.key.slice(8)).some(s=>limitedScope(s.scope)))return;
+ return h;
+}
+function knownCautionContext(f:Fact,p:Prepared,id:string,criteria:Criterion[],evidence:Evidence[]):CautionContext|null{
  if(f.kind==='freshness')return (f.value as {state:string}).state==='corpus_changed'?{kind:'freshness',criterion_keys:[]}:null;
  if(!criteria.length)return f.kind==='reservation'?{kind:'documented_issue',criterion_keys:[]}:null;
  const proposal=p.proposals.find(x=>x.establishment_id===id)!;
@@ -97,11 +116,23 @@ function cautionContext(f:Fact,p:Prepared,id:string,criteria:Criterion[],evidenc
  }
  return null;
 }
+function cautionContext(f:Fact,p:Prepared,id:string,criteria:Criterion[],evidence:Evidence[],binding?:CautionBinding):CautionContext|null{
+ // Explicit V1 compatibility: only already verified KNOWN criteria may derive a
+ // missing binding. Never invent a link for a historical open criterion.
+ if(!binding)return knownCautionContext(f,p,id,criteria,evidence);
+ if(binding.criterion===null)return f.kind==='freshness'||!criteria.length?knownCautionContext(f,p,id,[],[]):null;
+ if(f.kind==='freshness')return null; // A stale date is a global limit, never proof about a free need.
+ const i=binding.criterion,c=criteria[i],e=evidence[i];if(!c||!e)return null;
+ const hint=c.key===null?verifiedOpenCriterion(p,c):p.criteriaHints.find(h=>h.key===c.key);
+ if(!hint)return null;
+ const context=knownCautionContext(f,p,id,[{key:hint.key,quote:c.quote}],[e]);
+ return context?{...context,criterion_keys:c.key===null?[]:[c.key],criterion_indices:[i]}:null;
+}
 /** No free explanation is accepted. Quotes must come verbatim from the request; only
  * their offsets are persisted. Source references cannot cross restaurant/corpus boundaries. */
 export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
  if(!exact(raw,['criteria','choices']))decisionFailure(p,'INVALID_SELECTION','decision','unexpected_root_shape');
- const v=raw as {criteria:Criterion[];choices:{id:string;reason_refs:string[];criterion_evidence:Evidence[];caution_refs:string[];alternative_ids:string[]}[]};
+ const v=raw as {criteria:Criterion[];choices:{id:string;reason_refs:string[];criterion_evidence:Evidence[];caution_refs:string[];caution_bindings?:CautionBinding[];alternative_ids:string[]}[]};
  if(!Array.isArray(v.criteria)||v.criteria.length>8||!Array.isArray(v.choices)||v.choices.length>3||!v.choices.length&&p.candidates.length)decisionFailure(p,'INVALID_SELECTION',!Array.isArray(v.criteria)||v.criteria.length>8?'criteria':'choices',!Array.isArray(v.criteria)||!Array.isArray(v.choices)?'not_an_array':v.criteria.length>8||v.choices.length>3?'too_many_items':'empty_choices',{list:!Array.isArray(v.criteria)||v.criteria.length>8?v.criteria:v.choices,list_limit:!Array.isArray(v.criteria)||v.criteria.length>8?8:3});
  const hintKeys=p.criteriaHints.map(h=>h.key),keys:string[]=[],spans:CoverageData['criteria_spans']=[];
  for(const [criterionIndex,c]of v.criteria.entries()){
@@ -117,7 +148,8 @@ export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
  if(hintKeys.some(k=>!keys.includes(k))||p.naturalLanguageRequest&&!v.criteria.length)decisionFailure(p,'MISSING_CRITERION','criteria','required_criterion_missing');
  const seen=new Set<string>();
  for(const [choiceIndex,c]of v.choices.entries()){
-  if(!exact(c,['id','reason_refs','criterion_evidence','caution_refs','alternative_ids'])||typeof c.id!=='string'||seen.has(c.id)||!p.facts.has(c.id))decisionFailure(p,'INVALID_SELECTION','choices',!exact(c,['id','reason_refs','criterion_evidence','caution_refs','alternative_ids'])?'unexpected_choice_shape':typeof c.id!=='string'?'candidate_id_not_string':seen.has(c.id)?'duplicate_candidate':'candidate_not_transmitted',{choice_index:choiceIndex,candidate_id:c?.id});
+  const shape=exact(c,['id','reason_refs','criterion_evidence','caution_refs','alternative_ids'])||exact(c,['id','reason_refs','criterion_evidence','caution_refs','caution_bindings','alternative_ids']);
+  if(!shape||typeof c.id!=='string'||seen.has(c.id)||!p.facts.has(c.id))decisionFailure(p,'INVALID_SELECTION','choices',!shape?'unexpected_choice_shape':typeof c.id!=='string'?'candidate_id_not_string':seen.has(c.id)?'duplicate_candidate':'candidate_not_transmitted',{choice_index:choiceIndex,candidate_id:c?.id});
   seen.add(c.id);const facts=p.facts.get(c.id)!,proposal=p.proposals.find(x=>x.establishment_id===c.id)!;
   if(!Array.isArray(c.reason_refs)||c.reason_refs.some(r=>typeof r!=='string'))invalidReference(p,c.id,choiceIndex,'reason_refs','invalid_list',null,null,null,c.reason_refs,6);
   if(new Set(c.reason_refs).size!==c.reason_refs.length){const i=c.reason_refs.findIndex((r,i)=>c.reason_refs.indexOf(r)!==i);invalidReference(p,c.id,choiceIndex,'reason_refs','duplicate_reference',i,c.reason_refs[i],null,c.reason_refs,6);}
@@ -131,27 +163,29 @@ export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
   }
   for(const [i,e]of c.criterion_evidence.entries()){
    if(!exact(e,['criterion','state','refs'])||e.criterion!==i||!states.includes(e.state)||!unique(e.refs)||e.refs.length>2)decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence',!exact(e,['criterion','state','refs'])?'unexpected_evidence_shape':e.criterion!==i?'criterion_order_mismatch':!states.includes(e.state)?'unknown_evidence_state':!Array.isArray(e.refs)?'refs_not_array':e.refs.some(x=>typeof x!=='string')?'non_string_reference':new Set(e.refs).size!==e.refs.length?'duplicate_reference':'too_many_references',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,list:e?.refs,list_limit:2});
-   const key=v.criteria[i].key,selected=e.refs.map(r=>facts.find(f=>f.ref===r));
+   const criterion=v.criteria[i],openHint=criterion.key===null?verifiedOpenCriterion(p,criterion):undefined,key=criterion.key??openHint?.key,selected=e.refs.map(r=>facts.find(f=>f.ref===r));
+   const missing=selected.findIndex(f=>!f);
+   if(missing>=0)invalidReference(p,c.id,choiceIndex,'criterion_evidence.refs','reference_not_in_candidate',missing,e.refs[missing],i);
+   if(key===undefined){
+    if(e.state!=='unknown'||e.refs.length)decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence.refs','open_subject_or_context_not_independently_verified',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,list:e.refs,list_limit:0});
+    continue;
+   }
    const badEvidence=selected.findIndex(f=>!f||!permittedForCriterion(f,key));
    if(badEvidence>=0)invalidReference(p,c.id,choiceIndex,'criterion_evidence.refs',selected[badEvidence]?'reference_not_allowed_for_criterion':'reference_not_in_candidate',badEvidence,e.refs[badEvidence],i);
-   if(key!==null){
-    const expected=assessment(key,proposal,facts,p.criteriaHints.find(h=>h.key===key)!);
+   {
+    const expected=assessment(key,proposal,facts,openHint??p.criteriaHints.find(h=>h.key===key)!);
     if(e.state!==expected.state)decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence.state','state_not_supported_by_facts',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,expected_state:expected.state,received_state:e.state});
     if(key.startsWith('category_')){
      const positive=selected.some(f=>f?.kind==='strength'),negative=selected.some(f=>f?.kind==='reservation');
      if(e.state==='documented'&&!positive||e.state==='contradicted'&&!negative||e.state==='partial'&&(!positive||!negative)||e.state==='unknown'&&e.refs.length)decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence.refs',e.state==='documented'?'positive_source_missing':e.state==='contradicted'?'negative_source_missing':e.state==='partial'?'mixed_sources_incomplete':'unknown_category_with_references',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,list:e.refs,list_limit:2});
-    }else if(expected.refs.some(r=>!e.refs.includes(r)))decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence.refs','canonical_reference_missing',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,reference:expected.refs.find(r=>!e.refs.includes(r)),list:e.refs,list_limit:2});
-   }else{
-    // For open-ended needs, validate provenance/polarity rather than pretending a lexical
-    // classifier can prove semantic relevance. Display remains an attributed source, not free prose.
-    const positive=selected.some(f=>f&&['strength','cuisine','price','freshness'].includes(f.kind)||f?.kind==='feature'&&['reported','denied'].includes(point(f).status??''));
-    const negative=selected.some(f=>f?.kind==='reservation'||f?.kind==='feature'&&['denied','reported'].includes(point(f).status??''));
-    if(e.state==='documented'&&!positive||e.state==='contradicted'&&!negative||e.state==='partial'&&!selected.length||e.state==='conflicted'&&!selected.some(f=>f?.kind==='feature'&&point(f).status==='conflicted'))decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence.refs','open_criterion_evidence_missing',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,list:e.refs,list_limit:2});
+    }else if(!(criterion.key===null&&e.state==='unknown'&&e.refs.length===0)&&expected.refs.some(r=>!e.refs.includes(r)))decisionFailure(p,'INVALID_CRITERION_EVIDENCE','criterion_evidence.refs','canonical_reference_missing',{choice_index:choiceIndex,candidate_id:c.id,criterion_index:i,reference:expected.refs.find(r=>!e.refs.includes(r)),list:e.refs,list_limit:2});
    }
   }
+  if(c.caution_bindings!==undefined&&(!Array.isArray(c.caution_bindings)||c.caution_bindings.length!==c.caution_refs.length||c.caution_bindings.some((b,i)=>!exact(b,['ref','criterion'])||b.ref!==c.caution_refs[i]||b.criterion!==null&&(!Number.isInteger(b.criterion)||b.criterion<0||b.criterion>=v.criteria.length))))decisionFailure(p,'IRRELEVANT_CAUTION','caution_bindings','invalid_or_misaligned_criterion_binding',{choice_index:choiceIndex,candidate_id:c.id});
   for(const [referenceIndex,r]of c.caution_refs.entries()){
    const f=facts.find(f=>f.ref===r);if(!f)invalidReference(p,c.id,choiceIndex,'caution_refs','reference_not_in_candidate',referenceIndex,r);
-   if(!cautionContext(f,p,c.id,v.criteria,c.criterion_evidence))decisionFailure(p,'IRRELEVANT_CAUTION','caution_refs','reference_not_bound_to_requested_criterion',{choice_index:choiceIndex,candidate_id:c.id,reference_index:referenceIndex,reference:r});
+   const binding=c.caution_bindings?.[referenceIndex];
+   if(!cautionContext(f,p,c.id,v.criteria,c.criterion_evidence,binding))decisionFailure(p,'IRRELEVANT_CAUTION','caution_refs',!binding&&v.criteria.some(c=>c.key===null)?'open_criterion_requires_explicit_verified_binding':'reference_not_bound_to_requested_criterion',{choice_index:choiceIndex,candidate_id:c.id,reference_index:referenceIndex,reference:r,criterion_index:binding?.criterion??undefined});
   }
  }
  const alternatives=[...new Set(v.choices.flatMap(c=>c.alternative_ids))];
@@ -164,14 +198,14 @@ export function validateCoveredDecision(raw:unknown,p:Prepared):Choice[]{
  }
  if(comparisonNeeded&&!comparisonProvided)decisionFailure(p,'MISSING_TRADEOFF','alternative_ids','documented_alternative_not_compared');
  return v.choices.map(c=>({id:c.id,reason_refs:c.reason_refs,caution_ref:c.caution_refs[0]??null,
-  coverage_version:CRITERIA_VERSION,criteria_spans:spans,criterion_evidence:c.criterion_evidence,caution_refs:c.caution_refs,alternative_ids:c.alternative_ids}));
+  coverage_version:CRITERIA_VERSION,criteria_spans:spans,criterion_evidence:c.criterion_evidence,caution_refs:c.caution_refs,caution_bindings:c.caution_bindings??c.caution_refs.map(ref=>{const context=knownCautionContext(p.facts.get(c.id)!.find(f=>f.ref===ref)!,p,c.id,v.criteria,c.criterion_evidence)!;return {ref,criterion:context.criterion_keys.length?v.criteria.findIndex(c=>c.key===context.criterion_keys[0]):null};}),alternative_ids:c.alternative_ids}));
 }
 export function restoreCoveredChoices(choices:Choice[],p:Prepared):Choice[]{
- if(!Array.isArray(choices)||choices.some(c=>c.coverage_version!==CRITERIA_VERSION||!Array.isArray(c.criteria_spans))||!choices[0])throw Error('CACHE_INCOMPATIBLE');
+ if(!Array.isArray(choices)||choices.some(c=>c.coverage_version!==CRITERIA_VERSION||!Array.isArray(c.criteria_spans)||!Array.isArray(c.caution_bindings))||!choices[0])throw Error('CACHE_INCOMPATIBLE');
  const spans=choices[0].criteria_spans!;
  if(spans.some(s=>!Number.isInteger(s.start)||!Number.isInteger(s.end)||s.start<0||s.end<s.start||s.end>p.naturalLanguageRequest.length)||choices.some(c=>JSON.stringify(c.criteria_spans)!==JSON.stringify(spans)))throw Error('CACHE_INCOMPATIBLE');
- const restored=validateCoveredDecision({criteria:spans.map(s=>({key:s.key,quote:p.naturalLanguageRequest.slice(s.start,s.end)})),choices:choices.map(c=>({id:c.id,reason_refs:c.reason_refs,criterion_evidence:c.criterion_evidence,caution_refs:c.caution_refs,alternative_ids:c.alternative_ids}))},p);
- if(choices.some((c,i)=>!exact(c,['id','reason_refs','caution_ref','coverage_version','criteria_spans','criterion_evidence','caution_refs','alternative_ids'])||JSON.stringify(c.reason_refs)!==JSON.stringify(restored[i].reason_refs)||c.caution_ref!==restored[i].caution_ref||c.criteria_spans!.some((s,j)=>s.key!==restored[i].criteria_spans![j].key||s.start!==restored[i].criteria_spans![j].start||s.end!==restored[i].criteria_spans![j].end)))throw Error('CACHE_INCOMPATIBLE');
+ const restored=validateCoveredDecision({criteria:spans.map(s=>({key:s.key,quote:p.naturalLanguageRequest.slice(s.start,s.end)})),choices:choices.map(c=>({id:c.id,reason_refs:c.reason_refs,criterion_evidence:c.criterion_evidence,caution_refs:c.caution_refs,caution_bindings:c.caution_bindings,alternative_ids:c.alternative_ids}))},p);
+ if(choices.some((c,i)=>!exact(c,['id','reason_refs','caution_ref','coverage_version','criteria_spans','criterion_evidence','caution_refs','caution_bindings','alternative_ids'])||JSON.stringify(c.reason_refs)!==JSON.stringify(restored[i].reason_refs)||c.caution_ref!==restored[i].caution_ref||c.criteria_spans!.some((s,j)=>s.key!==restored[i].criteria_spans![j].key||s.start!==restored[i].criteria_spans![j].start||s.end!==restored[i].criteria_spans![j].end)))throw Error('CACHE_INCOMPATIBLE');
  return restored;
 }
 export function renderCoveredChoices(choices:Choice[],p:Prepared,render:(id:string,ref:string)=>AiExplanation):AiSelection[]{
@@ -182,7 +216,7 @@ export function renderCoveredChoices(choices:Choice[],p:Prepared,render:(id:stri
  return choices.map(c=>{
   const proposal=p.proposals.find(x=>x.establishment_id===c.id)!,data=c as Choice&CoverageData,cov=coverage(c.id,data.criteria_spans,data.criterion_evidence);
   const criteria=data.criteria_spans.map(s=>({key:s.key,quote:p.naturalLanguageRequest.slice(s.start,s.end)}));
-  const cautions=data.caution_refs.map(ref=>({...render(c.id,ref),caution_context:cautionContext(p.facts.get(c.id)!.find(f=>f.ref===ref)!,p,c.id,criteria,data.criterion_evidence)!}));
+  const cautions=data.caution_refs.map(ref=>({...render(c.id,ref),caution_context:cautionContext(p.facts.get(c.id)!.find(f=>f.ref===ref)!,p,c.id,criteria,data.criterion_evidence,data.caution_bindings.find(b=>b.ref===ref))!}));
   const used=new Set([...c.reason_refs,...data.criterion_evidence.flatMap(e=>e.refs),...data.caution_refs]);
   const other=p.facts.get(c.id)!.filter(f=>!used.has(f.ref)&&(f.kind==='reservation'||f.kind==='feature'&&['denied','conflicted'].includes(point(f).status??'')));
   const alternatives=data.alternative_ids.map(id=>({proposal:p.proposals.find(x=>x.establishment_id===id)!,coverage:coverage(id,data.criteria_spans,data.criteria_spans.map((s,criterion)=>{

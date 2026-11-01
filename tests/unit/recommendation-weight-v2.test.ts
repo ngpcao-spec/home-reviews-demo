@@ -18,12 +18,16 @@ const calc=async(p:Pub,version=2)=>(await db.query<{c:{version:string;negative_w
 async function publish(p:Pub){await db.query(`insert into public.current_report_publications select * from jsonb_populate_record(null::public.current_report_publications,$1)
  on conflict(establishment_id,language) do update set report_id=excluded.report_id,document=excluded.document,source_bindings=excluded.source_bindings,scope=excluded.scope,generated_at=excluded.generated_at`,[JSON.stringify({...p,updated_at:p.generated_at})]);}
 
+// Functional integration test: nine SQL calculations over 150-review corpora.
+// Local before/after measurements ranged from 2.33 to 4.65 s; the former 5 s
+// deadline also interrupted this case. Allow bounded WASM/runner variability,
+// not a different score or weaker assertions. Other cases here keep defaults.
 it('without negatives preserves V1 scores; four positives exactly compensate one exclusive negative',async()=>{
  await upgrade();for(const positive of [0,1,60]){const p=await publication(150,{positive,rating:4.8});expect((await calc(p)).global_score).toBe((await calc(p,1)).global_score);}
  const c=await calc(await publication(150,{positive:4,negative:1,rating:4.8}));expect(c.global_score).toBe(4.8);expect(c).toMatchObject({version:'internal-recommendation-v2',negative_weight:-4});
  expect((await calc(await publication(150,{positive:60,negative:15,rating:4.8}))).global_score).toBe(4.8);
  expect((await calc(await publication(150,{positive:60,negative:15,rating:4.8}),1)).global_score).toBe(5);
-});
+},15000);
 it('clamps at 0 and 6 and uses the actual corpus size, including textless reviews',async()=>{
  await upgrade();expect((await calc(await publication(10,{negative:10,rating:1}))).global_score).toBe(0);
  expect((await calc(await publication(10,{positive:10}))).global_score).toBe(6);

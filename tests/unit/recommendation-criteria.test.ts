@@ -78,7 +78,8 @@ describe.each(['fr','vi'] as const)('source-bound multi-criterion coverage %s',l
  it('keeps family and outdoor separate, exposes unknown data, and compares the inverse tradeoff',()=>{
   const f=family(language),wire=JSON.parse(f.p.request.input),before=structuredClone(f.rows),selected=validateCoveredDecision(f.native,f.p),display=renderChoices(selected,f.p)[0];
   expect(wire.criterion_hints.map((h:{key:string})=>h.key)).toEqual(['feature_family_friendly','feature_outdoor_seating']);
-  expect(wire.candidates.find((x:{id:string})=>x.id==='outside').facts.find((x:{ref:string})=>x.ref==='feature_family_friendly')).toMatchObject({value:{status:'not_documented'},source:'not_documented'});
+  expect(wire.candidates.find((x:{id:string})=>x.id==='outside').unknown_feature_refs).toContain('feature_family_friendly');
+  expect(f.p.facts.get('outside')?.find(f=>f.ref==='feature_family_friendly')).toMatchObject({value:{status:'not_documented'},source:{google:null,report:[]}});
   expect(display.match).toBe('partial');expect(display.coverage?.map(c=>c.state)).toEqual(['unknown','documented']);
   expect(display.coverage?.[0].evidence[0].sources).toEqual([]);expect(display.coverage?.[1].evidence[0].sources?.[0]).toMatchObject({kind:'google_maps',field:'additionalInfo.Amenities.Outdoor seating',value:true});
   expect(display.alternatives?.[0].proposal.establishment_id).toBe('family');expect(display.alternatives?.[0].coverage.map(c=>c.state)).toEqual(['documented','unknown']);
@@ -87,7 +88,7 @@ describe.each(['fr','vi'] as const)('source-bound multi-criterion coverage %s',l
  });
  it('accepts an explicitly unknown requested family attribute as a caution without declaring it unsuitable',()=>{
   const f=family(language);f.native.choices[0].caution_refs=['feature_family_friendly'];const s=renderChoices(validateCoveredDecision(f.native,f.p),f.p)[0];
-  expect(s.cautions?.[0].caution_context).toEqual({kind:'uncertainty',criterion_keys:['feature_family_friendly']});expect(s.coverage?.[0].state).toBe('unknown');expect(s.cautions?.[0].sources).toEqual([]);
+  expect(s.cautions?.[0].caution_context).toEqual({kind:'uncertainty',criterion_keys:['feature_family_friendly'],criterion_indices:[0]});expect(s.coverage?.[0].state).toBe('unknown');expect(s.cautions?.[0].sources).toEqual([]);
   f.native.choices[0].criterion_evidence[0].state='contradicted';expect(()=>validateCoveredDecision(f.native,f.p)).toThrow('INVALID_CRITERION_EVIDENCE');
  });
  it('rejects omission, a combined replacement criterion, invented confirmation, wrong references and a missing tradeoff',()=>{
@@ -136,11 +137,13 @@ describe.each(['fr','vi'] as const)('source-bound multi-criterion coverage %s',l
   const n=coveredReply(p,[{id:r.establishment_id,reason_refs:['score_global'],caution_ref:null}]);
   const c=renderChoices(validateCoveredDecision(n,p),p)[0].coverage![0];expect(c.state).toBe('partial');expect(c.evidence[0].text).toBe(text);expect(c.evidence[0].text).not.toMatch(/informations contradictoires|thông tin trái chiều/);
  });
- it('supports several open-ended criteria without forcing them into the hint vocabulary or treating a negation as a requirement',()=>{
+ it('keeps uninterpreted open needs distinct and unknown instead of accepting a model-only semantic assertion',()=>{
   const f=family(language),parts=language==='fr'?['Pas forcément un cadre feutré','je viens avec mes petits']:['Không nhất thiết không gian trầm','đi cùng các bé'],text=parts.join('; '),p=prepareAi(f.cat,query,text);
   expect(p.criteriaHints).toEqual([]);
   const n={criteria:parts.map(quote=>({key:null,quote})),choices:[{id:'family',reason_refs:['feature_family_friendly'],criterion_evidence:[{criterion:0,state:'unknown',refs:[]},{criterion:1,state:'documented',refs:['feature_family_friendly']}],caution_refs:[],alternative_ids:[]}]};
-  const result=renderChoices(validateCoveredDecision(n,p),p)[0];expect(result.coverage?.map(c=>c.state)).toEqual(['unknown','documented']);expect(result.match).toBe('partial');
+  expect(()=>validateCoveredDecision(n,p)).toThrow('INVALID_CRITERION_EVIDENCE');
+  n.choices[0].criterion_evidence[1]={criterion:1,state:'unknown',refs:[]};
+  const result=renderChoices(validateCoveredDecision(n,p),p)[0];expect(result.coverage?.map(c=>c.state)).toEqual(['unknown','unknown']);expect(result.match).toBe('partial');
   expect(JSON.stringify(result)).not.toContain(parts[0]);expect(JSON.parse(p.request.input).natural_language_request).toBe(text);
  });
  it('requires the avoidance quote to retain its negation rather than changing its intent',()=>{
@@ -235,7 +238,7 @@ it('uses a new version/cache while retaining one attempt, receipt reuse and unkn
  const http=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(f.native)}]}]})));
  const args={catalogue:f.cat,query,preference:f.text,userId:'test',access:['org-a'],port,key:'offline-fixture',http,unchanged:async()=>true};
  expect((await compareAi(args)).status).toBe('completed');expect((await compareAi(args)).status).toBe('cached');expect(http).toHaveBeenCalledTimes(1);expect(JSON.stringify([...records.values()])).not.toContain(f.text);
- expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-caution-safety-v6');
+ expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v7');
  const failed={...args,userId:'another',http:vi.fn<typeof fetch>(async()=>{throw Error('SIMULATED_UNKNOWN');})};
  await compareAi(failed);await compareAi(failed);expect(failed.http).toHaveBeenCalledTimes(1);
 });
