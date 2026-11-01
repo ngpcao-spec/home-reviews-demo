@@ -64,6 +64,24 @@ export function shortlistPreferences(request:Request,text=''):ShortlistPreferenc
     active:!!input||features.length>0||categories.length>0};
 }
 
+/** Evidence verification only. These canonical aliases NEVER feed preselection.
+ * A recognized subject must not erase an extra qualifier (heated, babies, etc.). */
+export const preferenceProofText=(text:string)=>key(text).replace(/\b(?:famille|familial|familiale)\b/g,'family friendly').replace(/\bexterieur\b/g,'outdoor seating');
+export function boundedPreferenceClause(text:string,subject:string):boolean{
+ let rest=preferenceProofText(text),matched=false;
+ const feature=subject.startsWith('feature_')?subject.slice(8):null,category=subject.startsWith('category_')?subject.slice(9) as Category:null;
+ if(feature)for(const phrase of phrases[feature]??[]){const pattern=new RegExp('\\b'+phrase+'\\b','g');if(pattern.test(rest)){matched=true;rest=rest.replace(pattern,' ');}}
+ else if(category&&categoryPhrases[category]){matched=categoryPhrases[category].test(rest);rest=rest.replace(categoryPhrases[category],' ');}
+ if(!matched)return false;
+ // Another independently recognizable subject may share the clause (notably VI
+ // "gia đình ở ngoài trời"). It does not become proof for this criterion; its
+ // own quote/evidence/binding is still separate. Unknown qualifiers remain below.
+ for(const aliases of Object.values(phrases))for(const phrase of aliases)rest=rest.replace(new RegExp('\\b'+phrase+'\\b','g'),' ');
+ for(const pattern of Object.values(categoryPhrases))rest=rest.replace(pattern,' ');
+ rest=rest.replace(/\b(?:je|cherche|souhaite|voudrais|un|une|des|le|la|les|de|du|en|au|aux|avec|pour|a|l|d|lieu|endroit|restaurant|repas|cadre|sans|pas|aucun|aucune|eviter|ni|tôi|toi|tim|mong|muon|mot|noi|quan|nha|hang|bua|an|dung|voi|o|khong|co|tranh|a|the|place|restaurant|meal|with|for|no|without|avoid)\b/g,' ').replace(/[\s.!?,;:]+/g,'');
+ return rest.length===0;
+}
+
 export type CookingConcern={status:'reported_repetition'|'not_established'|'unknown';citations:Citation[]};
 /** Attributed report wording, never an incident count or an independently verified
  * safety verdict. No evidence cardinality, stars, length or raw reviews are used. */
