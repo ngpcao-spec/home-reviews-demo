@@ -1,5 +1,25 @@
 # Source-bound open criteria — local correction
 
+## Local SQL validation follow-up
+
+The functional test `recommendation-weight-v2.test.ts` comparing V1/V2 without
+negative reviews and checking four positives against one negative performs nine
+SQL calculations over frozen 150-review publications. A diagnostic-only local
+comparison of the parent revision and the corrected revision measured 2.33–4.65 s
+for its body, including runs with two workers. The SQL result digests match;
+about 98% of the body is spent in the calculations, rather than the migration or
+fixture construction. Database initialization runs separately in `beforeAll`.
+
+The previous five-second runner deadline interrupted this functional scenario;
+it is not an application latency contract. Only this test has a bounded 15 s
+timeout, roughly three times the largest completed measurement, to allow local
+WASM/runner variability. Its body and assertions are unchanged. Other test and
+hook limits, score functions, fixtures and application code are unchanged.
+
+The measurements do not establish the precise historical OS load or a production
+performance improvement. Complete verification results remain in the private
+delivery folder; no supplier call or deployment is needed.
+
 This is a local protocol/validator change, not a deployment or a quality verdict
 about a historical model reply. No provider, database, import or report call is
 needed. Restaurant-specific data stay in the private delivery folder.
