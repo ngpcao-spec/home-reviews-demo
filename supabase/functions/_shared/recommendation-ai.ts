@@ -11,6 +11,7 @@ export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contrac
 
 export {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
 import {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
+import {LEGACY_DIAGNOSTIC_VERSION,prepareLegacyDiagnosticRequest} from './recommendation-legacy-diagnostic-identity.ts';
 export const RECOMMENDATION_AI_MODEL='gpt-6.1-sol';
 export const RECOMMENDATION_AI_INPUT_BYTES=200000;
 export const AI_FEATURES=['quiet','family_friendly','kids','vegetarian_options','vegan_options','outdoor_seating','air_conditioning','wheelchair_entrance','reservation'] as const;
@@ -22,7 +23,7 @@ export type Fact={ref:string;kind:'score'|'cuisine'|'price'|'feature'|'strength'
 export type CompactCandidate={id:string;sources:unknown;facts:Omit<Fact,'label'>[];unknown_feature_refs:string[];criterion_observations?:ReturnType<typeof candidateCoverageHints>};
 export type Choice={id:string;reason_refs:string[];caution_ref:string|null}&Partial<CoverageData>;
 export type Attempt={id:string;owned:boolean;state:string;selection:Choice[]|null;metrics:Metrics|null};
-export type AiPort={reserve:(key:string,requestHash:string)=>Promise<Attempt>;finish:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null)=>Promise<void>;finishWithDiagnostic?:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null,trace:RecommendationTrace)=>Promise<void>};
+export type AiPort={reserve:(key:string,requestHash:string)=>Promise<Attempt>;reserveCorrectedDiagnostic?:(key:string,requestHash:string,legacyKey:string,legacyHash:string)=>Promise<Attempt>;finish:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null)=>Promise<void>;finishWithDiagnostic?:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null,trace:RecommendationTrace)=>Promise<void>};
 const categoryLabels={fr:{quality:'Qualité des plats',service:'Service',ambiance:'Ambiance',price:'Prix'},vi:{quality:'Chất lượng món ăn',service:'Phục vụ',ambiance:'Không gian',price:'Giá'}};
 const extraFeatureLabels={fast_service:{fr:'Rapidité du service',vi:'Tốc độ phục vụ'},sea_view:{fr:'Vue sur la mer',vi:'Tầm nhìn ra biển'}};
 const stable=(v:unknown):string=>JSON.stringify(v===undefined?null:Array.isArray(v)?v.map(x=>JSON.parse(stable(x))):v!==null&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(stable((v as Record<string,unknown>)[k]))])):v);
@@ -188,7 +189,15 @@ async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObser
  const snapshot=await aiHash({rows:args.catalogue.rows,active:args.catalogue.establishments,language:args.catalogue.language});
  const cacheKey=await aiHash({version:RECOMMENDATION_AI_VERSION,requestHash,snapshot,user:args.userId,access:args.access,organization:args.catalogue.organizationId});
  observation.stage='reservation';
- let attempt:Attempt;try{attempt=await args.port.reserve(cacheKey,requestHash);}catch(e){
+ let attempt:Attempt;try{
+  if(args.port.reserveCorrectedDiagnostic){
+   // The legacy request is hashed locally for identity proof only. It is never
+   // transmitted, saved, validated as a new choice or used as a retry namespace.
+   const legacyHash=await aiHash(prepareLegacyDiagnosticRequest(args.catalogue,args.query,prepared.naturalLanguageRequest,candidateFacts).request);
+   const legacyKey=await aiHash({version:LEGACY_DIAGNOSTIC_VERSION,requestHash:legacyHash,snapshot,user:args.userId,access:args.access,organization:args.catalogue.organizationId});
+   attempt=await args.port.reserveCorrectedDiagnostic(cacheKey,requestHash,legacyKey,legacyHash);
+  }else attempt=await args.port.reserve(cacheKey,requestHash);
+ }catch(e){
   const code=e instanceof Error&&/^DIAGNOSTIC_[A-Z_]+$/.test(e.message)?e.message:'RESERVATION_UNAVAILABLE';
   observation.failure={stage:'reservation',code,field:'diagnostic_authorization',rule:'reservation_precondition_failed'};
   return {...base,status:'fallback',notice:code};

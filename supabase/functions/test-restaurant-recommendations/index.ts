@@ -24,6 +24,12 @@ Deno.serve(recommendationTestHandler(requireUser,{
     p_trace:diagnosticTrace({stage:'diagnostic_reservation'},{status:'pending'},diagnosticRuntime)});
    if(error||!data)throw Error(error&&/^DIAGNOSTIC_[A-Z_]+$/.test(error.message)?error.message:'AI_RESERVATION_FAILED');return data;
   },
+  reserveCorrectedDiagnostic:async(key,requestHash,legacyKey,legacyHash)=>{
+   if(!context.admin)throw Error('AI_STORE_UNAVAILABLE');
+   const {data,error}=await context.admin.rpc('reserve_corrected_recommendation_diagnostic_v1',{p_organization_id:organization,p_user_id:context.user.id,p_cache_key:key,p_request_sha256:requestHash,p_legacy_cache_key:legacyKey,p_legacy_request_sha256:legacyHash,
+    p_trace:diagnosticTrace({stage:'diagnostic_reservation'},{status:'pending'},diagnosticRuntime)});
+   if(error||!data)throw Error(error&&/^DIAGNOSTIC_[A-Z_]+$/.test(error.message)?error.message:'AI_RESERVATION_FAILED');return data;
+  },
   finish:async(id,state,selection,metrics,errorCode)=>{
    if(!context.admin)throw Error('AI_STORE_UNAVAILABLE');
    const {data,error}=await context.admin.rpc('finish_recommendation_ai_v1',{p_id:id,p_state:state,p_selection:selection,p_metrics:metrics,p_error:errorCode});
@@ -31,7 +37,7 @@ Deno.serve(recommendationTestHandler(requireUser,{
   },
   finishWithDiagnostic:async(id,state,selection,metrics,errorCode,trace)=>{
    if(!context.admin)throw Error('AI_STORE_UNAVAILABLE');
-   const {data,error}=await context.admin.rpc('finish_recommendation_with_diagnostic_v1',{p_id:id,p_state:state,p_selection:selection,p_metrics:metrics,p_error:errorCode,p_trace:trace});
+   const {data,error}=await context.admin.rpc('finish_corrected_recommendation_diagnostic_v1',{p_id:id,p_state:state,p_selection:selection,p_metrics:metrics,p_error:errorCode,p_trace:trace});
    if(error||data!==true)throw Error('AI_RECEIPT_SAVE_FAILED');
   },
  }),
