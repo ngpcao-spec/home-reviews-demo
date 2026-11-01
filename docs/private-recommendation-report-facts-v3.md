@@ -1,5 +1,9 @@
 # Fiches de recommandation : extraits de rapport V3
 
+> Évolution locale de la présélection et de la version de cache : voir
+> [la politique de couverture V1](recommendation-shortlist-coverage-v1.md).
+> Le contenu V3 décrit ici reste inchangé ; cette évolution n'est pas déployée.
+
 Configuration : `recommendation-ai-report-excerpts-v3`.
 Contenu : `recommendation-report-points-v1`.
 Client : `preference_mode: report_facts_v3`.

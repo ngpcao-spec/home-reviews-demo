@@ -2,8 +2,11 @@ import {add, compare, exactJson, quotient, rational, subtract, type Rational} fr
 import {PLACE_FEATURES,placeFeatureLabel,placeCategories,taxonomyValue,type TaxonomyKind} from './google-place-taxonomy.ts';
 import {scheduledOpening,PLACE_PROFILE_VERSION,type PlaceProfile} from './google-place-profile.ts';
 import {googleMoneyRange,googlePriceLevel,googlePerPersonPriceLabel,type MoneyRange} from './google-maps-prices.ts';
+import {REPORT_FEATURE_PHRASES,reportFeatureSignals,limitedScope,type FeatureScope,type FeatureVisit} from './report-feature-evidence.ts';
+import {shortlistPreferences,repeatedCookingConcern,type ShortlistPreferences} from './shortlist-preferences.ts';
 
-export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v4';
+export const RECOMMENDATION_ENGINE_VERSION = 'restaurant-recommendation-engine-v6';
+export const SHORTLIST_VERSION='recommendation-shortlist-coverage-v1';
 export const COMPARABLE_SCORE_GAP = '0.10';
 export const COMPARABLE_DISTANCE_METRES = 250;
 export const CATEGORIES = ['quality', 'service', 'ambiance'] as const;
@@ -38,17 +41,23 @@ export type Proposal = {
   cuisines: {values: string[]; source: string | null; observed_at: string | null};
   scores: Record<Category, Score> & {global: Score}; budget: Prices; budget_match: 'not_requested' | 'google_level' | 'google_range';
   reasons: {code: string; category?: Category; feature?: string; citations?: Citation[]}[]; reservations: Citation[];
-  features: Record<string, {status: 'reported' | 'denied' | 'conflicted' | 'not_documented'; citations: Citation[]; label?:string; google?:unknown}>;
+  features: Record<string, {status: 'reported' | 'denied' | 'conflicted' | 'not_documented'; citations: Citation[]; label?:string; google?:unknown;
+    context?:{status:'matched'|'outside'|'unresolved';scopes:FeatureScope[]}}>;
   practical:PlaceProfile|null; specialties:string[]; usages:string[];
   opening:{status:'not_requested'|'scheduled_open'; live:false; holiday_guarantee:false};
   contradictions:{feature:string; google:unknown; citations:Citation[]}[];
   report: {id: string; generated_at: string; language: string; freshness: 'current'|'corpus_changed'; corpus: Obj};
 };
-type Candidate = {proposal: Proposal; global: Rational; preference: Rational; matches: number; band: number; preference_band: number};
+type Candidate = {proposal: Proposal; global: Rational; preference: Rational; matches: number; band: number; preference_band: number;positives:Citation[]};
+export type ShortlistDecision={establishment_id:string;reason:'all_eligible'|'baseline_core'|'documented_preferences'|'documented_diversity'|'baseline_completion';
+  confirmed:string[];unknown:string[];warnings:string[];report_references:{report_id:string;section:string;index:number}[];cooking_recurrence:'reported_repetition'|'not_established'|'unknown'};
+export type ShortlistDiagnostics={version:string;limit:20;eligible_count:number;quality_pool_count:number;baseline_core_count:number;
+  quality_margin:string;quality_floor:{numerator:string;denominator:string}|null;preferences:ShortlistPreferences;decisions:ShortlistDecision[]};
 export type Result = {
   version: string; comparable_score_gap: string; proposals: Proposal[];
   excluded: {establishment_id: string; name: string; report_id: string; reasons: string[]}[];
   notices: string[]; refinements: {kind: 'closer' | 'lower_price_level' | 'lower_price_range' | 'documented_feature'; feature?:string; from_id: string; alternative_id: string}[];
+  shortlist?:ShortlistDiagnostics;
 };
 const obj = (v: unknown): Obj => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Obj : {};
 const str = (v: unknown) => typeof v === 'string' ? v : null;
@@ -118,42 +127,23 @@ function citations(row: SheetRow, section: Citation['section']): Citation[] {
       ? [{report_id: row.report_id, section, index, category: String(p.category), text: String(p.text), evidence_ids: refs}] : [];
   });
 }
-/** Deliberately small, conservative literal vocabulary. Never inferred from a score.
- * A match describes a reported observation, not a guaranteed facility or service. */
-const featurePhrases: Record<string, string[]> = {
-  quiet: ['quiet', 'calm atmosphere', 'calme', 'yen tinh'],
-  fast_service: ['fast service', 'quick service', 'service rapide', 'phuc vu nhanh', 'nhanh nhen'],
-  sea_view: ['sea view', 'ocean view', 'vue sur la mer', 'vue mer', 'canh bien', 'view bien'],
-  air_conditioning: ['air conditioning', 'air conditioned', 'climatisation', 'climatise', 'may lanh', 'dieu hoa'],
-  private_room: ['private room', 'salle privee', 'phong rieng'],
-};
-const contraryPhrases: Record<string, string[]> = {
-  quiet: ['noisy', 'loud music', 'bruyant', 'bruyante', 'tieng on', 'on ao', 'nhac to'],
-  fast_service: ['slow service', 'long wait', 'service lent', 'attente longue', 'cho mon lau', 'cho lau', 'phuc vu cham'],
-};
-function containsPhrase(text: string, phrases: string[]) {
-  const k = ' ' + key(text).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g,' ') + ' ';
-  return phrases.some(p => k.includes(' ' + p + ' '));
+function featureStatus(name: string, positives: Citation[], negatives: Citation[],visit:FeatureVisit): Proposal['features'][string]&{assertedPositive:boolean;assertedNegative:boolean} {
+  const signals=[...positives,...negatives].flatMap(citation=>reportFeatureSignals(citation.text,name,visit).map(signal=>({...signal,citation})));
+  const active=signals.filter(s=>s.applies!==false),negative=active.some(s=>s.polarity==='negative'&&s.applies===true);
+  const yes=active.some(s=>s.polarity==='positive'&&s.applies===true);
+  const scopedPositive=signals.some(s=>s.polarity==='positive'&&limitedScope(s.scope));
+  const unresolved=active.some(s=>limitedScope(s.scope)&&(s.applies===null||s.polarity==='unknown'))||scopedPositive&&!yes;
+  const scopes=[...new Map(signals.filter(s=>limitedScope(s.scope)).map(s=>[JSON.stringify(s.scope),s.scope])).values()];
+  const contextStatus=unresolved?'unresolved':active.length?'matched':'outside';
+  return {status:negative?'conflicted':unresolved?'not_documented':yes?'reported':'not_documented',assertedPositive:active.some(s=>s.polarity==='positive'),assertedNegative:active.some(s=>s.polarity==='negative'),
+    citations:[...new Set(active.filter(s=>s.polarity!=='unknown').map(s=>s.citation))],...(scopes.length?{context:{status:contextStatus,scopes}}:{})};
 }
-function hasPhrase(text: string, feature: string) {
-  return containsPhrase(text,Object.hasOwn(featurePhrases,feature) ? featurePhrases[feature] : []);
-}
-function affirmative(text: string) {
-  const k = key(text).replace(/khong (gian|khi)/g, '');
-  return !/\b(not|no|never|without|pas|sans|non|jamais|khong|chua|thieu)\b/.test(k);
-}
-function featureStatus(name: string, positives: Citation[], negatives: Citation[]): Proposal['features'][string] {
-  const contrary = (p: Citation) => containsPhrase(p.text,Object.hasOwn(contraryPhrases,name) ? contraryPhrases[name] : []);
-  const yes = positives.filter(p => hasPhrase(p.text, name) && affirmative(p.text) && !contrary(p));
-  const no = [...negatives.filter(p => hasPhrase(p.text, name) || contrary(p)), ...positives.filter(p => hasPhrase(p.text, name) && (!affirmative(p.text) || contrary(p)))];
-  return {status: yes.length ? no.length ? 'conflicted' : 'reported' : no.length ? 'conflicted' : 'not_documented', citations: [...yes, ...no]};
-}
-function combinedFeature(name:string,profile:PlaceProfile|null,positives:Citation[],negatives:Citation[],language:string):Proposal['features'][string]{
- const report=featureStatus(name,positives,negatives),fact=profile&&Object.hasOwn(profile.attributes.facts,name)?profile.attributes.facts[name]:undefined;
+function combinedFeature(name:string,profile:PlaceProfile|null,positives:Citation[],negatives:Citation[],language:string,instant?:string,sourceDisagreements=false):Proposal['features'][string]{
+ const report=featureStatus(name,positives,negatives,{instant,timezone:profile?.hours.timezone}),fact=profile&&Object.hasOwn(profile.attributes.facts,name)?profile.attributes.facts[name]:undefined;
  const google=fact?{...fact,source:profile!.attributes.source,observed_at:profile!.attributes.observed_at}:undefined;
- const status=fact?.status==='conflicted'||fact?.value===true&&report.status==='conflicted'||fact?.value===false&&report.status==='reported'?'conflicted'
-  :fact?.value===false?'denied':fact?.value===true?'reported':report.status;
- return {status,citations:report.citations,label:placeFeatureLabel(name,language),...(google?{google}:{})};
+ const status=fact?.status==='conflicted'||fact?.value===true&&(sourceDisagreements?report.assertedNegative:report.status==='conflicted')||fact?.value===false&&(sourceDisagreements?report.assertedPositive:report.status==='reported')?'conflicted'
+  :fact?.value===false?'denied':fact?.value===true&&report.context?.status!=='unresolved'?'reported':report.status;
+ return {status,citations:report.citations,label:placeFeatureLabel(name,language),...(report.context?{context:report.context}:{}),...(google?{google}:{})};
 }
 function priceRange(raw: unknown): Prices['establishment']['range'] {
   const r=googleMoneyRange(raw);
@@ -243,16 +233,17 @@ export function recommendRestaurants(rows: SheetRow[], organization: string, lan
   return selectRestaurants(rows,organization,language,request,3);
 }
 /** Same eligibility, exact score bands, service ties and price diversity; bounded private AI input. */
-export function shortlistRestaurants(rows:SheetRow[],organization:string,language:string,request:Request):Result {
-  return selectRestaurants(rows,organization,language,request,20);
+export function shortlistRestaurants(rows:SheetRow[],organization:string,language:string,request:Request,context?:{text:string}):Result {
+  return selectRestaurants(rows,organization,language,request,20,shortlistPreferences(request,context?.text));
 }
-function selectRestaurants(rows: SheetRow[], organization: string, language: string, request: Request, limit:number): Result {
+function selectRestaurants(rows: SheetRow[], organization: string, language: string, request: Request, limit:number,plan?:ShortlistPreferences): Result {
   validateRequest(request);
   if (!organization || !['fr','vi'].includes(language)) throw Error('AUTHORIZED_CONTEXT_REQUIRED');
   const result: Result = {version:RECOMMENDATION_ENGINE_VERSION,comparable_score_gap:COMPARABLE_SCORE_GAP,proposals:[],excluded:[],notices:[],refinements:[]};
   const features = [...new Set([...(request.preferences?.features ?? []),...(request.required_features ?? [])])];
+  const observationFeatures=plan?.active?[...new Set([...features,...plan.features.map(f=>f.feature),...Object.keys(PLACE_FEATURES),...Object.keys(REPORT_FEATURE_PHRASES)])]:features;
   const preferredCategories = [...new Set(request.preferences?.categories ?? [])];
-  const unknownFeatures = features.filter(f => !Object.hasOwn(featurePhrases,f)&&!Object.hasOwn(PLACE_FEATURES,f));
+  const unknownFeatures = features.filter(f => !Object.hasOwn(REPORT_FEATURE_PHRASES,f)&&!Object.hasOwn(PLACE_FEATURES,f));
   result.notices.push(...unknownFeatures.map(f => 'UNSUPPORTED_FEATURE:' + f));
   const authorised = rows.filter(r => r.organization_id === organization && r.language === language);
   const seen = new Set<string>(), duplicates = new Set<string>();
@@ -283,8 +274,10 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
     if (match === null) reasons.push(budget.establishment.status === 'unknown' ? 'BUDGET_UNKNOWN'
       : request.budget?.kind==='amount' && budget.establishment.unit!=='per_person' ? 'BUDGET_UNIT_UNCONFIRMED' : 'BUDGET_NOT_COMPARABLE_OR_MISMATCH');
     const positives = citations(row,'positive_aspects'), reservations = citations(row,'reservations');
-    const observations=Object.fromEntries(features.map(f=>[f,combinedFeature(f,profile,positives,reservations,language)]));
-    const contradictions=Object.keys(featurePhrases).map(f=>({feature:f,...combinedFeature(f,profile,positives,reservations,language)})).filter(x=>x.status==='conflicted'&&x.google&&x.citations.length).map(x=>({feature:x.feature,google:x.google,citations:x.citations}));
+    const observations=Object.fromEntries(observationFeatures.map(f=>[f,combinedFeature(f,profile,positives,reservations,language,request.visit_at)]));
+    // Preserve all genuine dated source disagreements, even if outside this visit.
+    // The requested-context feature above separately controls mandatory eligibility.
+    const contradictions=Object.keys(REPORT_FEATURE_PHRASES).map(f=>({feature:f,...combinedFeature(f,profile,positives,reservations,language,undefined,true)})).filter(x=>x.status==='conflicted'&&x.google&&x.citations.length).map(x=>({feature:x.feature,google:x.google,citations:x.citations}));
     if (request.required_features?.some(f => observations[f].status !== 'reported')) reasons.push('REQUIRED_FEATURE_NOT_CONFIRMED');
     let global: ReturnType<typeof score> | null = null, categories: Record<Category, ReturnType<typeof score>> | null = null;
     try {
@@ -313,7 +306,7 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
       scores:{quality:categories.quality.out,service:categories.service.out,ambiance:categories.ambiance.out,global:global.out},budget,budget_match:match,
       reasons:choiceReasons,reservations,features:observations,report:{id:row.report_id,generated_at:row.report_generated_at,language:row.language,freshness:corpusChanged?'corpus_changed':'current',corpus:row.corpus}};
     if(corpusChanged)proposal.reasons.push({code:'DATED_REPORT_NEW_REVIEWS_NOT_COVERED'});
-    candidates.push({proposal,global:global.exact,preference,matches:features.filter(f => observations[f].status === 'reported').length,band:0,preference_band:0});
+    candidates.push({proposal,global:global.exact,preference,matches:features.filter(f => observations[f].status === 'reported').length,band:0,preference_band:0,positives});
   }
   const ranked: Candidate[] = [];
   bands(candidates,c => c.global).forEach((group,band) => {
@@ -323,7 +316,7 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
       ranked.push(...pg.sort((a,b) => rankDistance(a)-rankDistance(b) || cmpId(a,b)));
     });
   });
-  const remaining = [...ranked], chosen: Candidate[] = [];
+  const remaining = [...ranked];let chosen: Candidate[] = [];
   while (remaining.length && chosen.length < limit) {
     const first = remaining[0];
     const comparable = remaining.filter(c => c.band === first.band && c.matches === first.matches && c.preference_band === first.preference_band
@@ -334,6 +327,7 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
     const pick = represented(first) ? varied ?? first : first;
     remaining.splice(remaining.indexOf(pick),1);chosen.push(pick);
   }
+  if(limit===20&&plan?.active){const portfolio=shortlistPortfolio(candidates,chosen,plan,request.visit_at);chosen=portfolio.chosen;result.shortlist=portfolio.diagnostics;}
   result.proposals = chosen.map(c => c.proposal);
   if (result.proposals.some(p => p.budget.establishment.status === 'unknown')) result.notices.push('ESTABLISHMENT_BUDGET_UNKNOWN');
   if (!result.proposals.length) result.notices.push('NO_MATCHING_CURRENT_SHEET');
@@ -350,4 +344,70 @@ function selectRestaurants(rows: SheetRow[], organization: string, language: str
   }
   result.excluded.sort((a,b) => a.establishment_id < b.establishment_id ? -1 : a.establishment_id > b.establishment_id ? 1 : 0);
   return result;
+}
+
+/** A bounded portfolio INSIDE the existing engine, after its single eligibility
+ * gate. No alternate reader/scorer or LLM. Normal three-result ranking is intact. */
+function shortlistPortfolio(candidates:Candidate[],baseline:Candidate[],plan:ShortlistPreferences,visit_at?:string){
+  const fit=(c:Candidate)=>{
+    const confirmed:string[]=[],unknown:string[]=[],warnings:string[]=[],refs:Citation[]=[];
+    for(const wanted of plan.features){
+      const f=c.proposal.features[wanted.feature];
+      if(!f||f.status==='not_documented')unknown.push(wanted.feature);
+      else if(wanted.expected?f.status==='reported':f.status==='denied'){confirmed.push(wanted.feature);refs.push(...f.citations);}
+      const disagreement=c.proposal.contradictions.some(x=>x.feature===wanted.feature&&(!visit_at||x.citations.some(citation=>
+        reportFeatureSignals(citation.text,wanted.feature,{instant:visit_at,timezone:c.proposal.practical?.hours.timezone})
+          .some(signal=>signal.polarity!=='unknown'&&signal.applies!==false))));
+      if(disagreement){warnings.push('SOURCE_DISAGREEMENT:'+wanted.feature);refs.push(...(f?.citations??[]));}
+      else if(f&&f.status!=='not_documented'&&!(wanted.expected?f.status==='reported':f.status==='denied')){
+        warnings.push('FEATURE_NOT_ALIGNED:'+wanted.feature);refs.push(...f.citations);
+      }
+    }
+    const cooking=repeatedCookingConcern(c.proposal.reservations);
+    if(plan.avoidRepeatedCooking){
+      if(cooking.status==='reported_repetition'){warnings.push('REPORTED_REPEATED_COOKING');refs.push(...cooking.citations);}
+      else unknown.push('cooking_recurrence'); // Missing evidence is never proof of no recurrence.
+    }
+    const categories=plan.categories.filter(category=>c.positives.some(p=>p.category===category));
+    for(const category of categories)refs.push(...c.positives.filter(p=>p.category===category));
+    const sum=categories.reduce((s,category)=>add(s,quotient(c.proposal.scores[category].numerator,c.proposal.scores[category].denominator)),rational('0'));
+    const categoryScore=categories.length?{n:sum.n,d:sum.d*BigInt(categories.length)}:rational('0');
+    return {confirmed,unknown,warnings:[...new Set(warnings)],refs,cooking: cooking.status,categoryScore};
+  };
+  const fits=new Map(candidates.map(c=>[c,fit(c)]));
+  const decision=(c:Candidate,reason:ShortlistDecision['reason']):ShortlistDecision=>{
+    const f=fits.get(c)!;
+    return {establishment_id:c.proposal.establishment_id,reason,confirmed:f.confirmed,unknown:f.unknown,warnings:f.warnings,
+      report_references:[...new Map(f.refs.map(r=>[r.report_id+':'+r.section+':'+r.index,{report_id:r.report_id,section:r.section,index:r.index}])).values()],cooking_recurrence:f.cooking};
+  };
+  const base={version:SHORTLIST_VERSION,limit:20 as const,eligible_count:candidates.length,quality_margin:COMPARABLE_SCORE_GAP,preferences:plan};
+  if(candidates.length<=20)return {chosen:baseline,diagnostics:{...base,quality_pool_count:candidates.length,baseline_core_count:baseline.length,quality_floor:null,
+    decisions:baseline.map(c=>decision(c,'all_eligible'))}};
+  const edge=baseline.reduce((a,c)=>compare(c.global,a)<0?c.global:a,baseline[0].global),floor=subtract(edge,rational(COMPARABLE_SCORE_GAP));
+  const pool=candidates.filter(c=>compare(c.global,floor)>=0),chosen=baseline.slice(0,10);
+  const decisions=chosen.map(c=>decision(c,'baseline_core'));
+  const tags=(c:Candidate)=>new Set([
+    ...c.proposal.cuisines.values.map(x=>'cuisine:'+x),...c.proposal.specialties.map(x=>'specialty:'+x),...c.proposal.usages.map(x=>'usage:'+x),
+    ...Object.entries(c.proposal.features).filter(([name,f])=>!plan.suppressed.includes(name)&&['reported','denied'].includes(f.status)).map(([name,f])=>'feature:'+name+':'+f.status),
+    ...c.positives.map(p=>'report_positive:'+p.category),
+  ]);
+  while(chosen.length<20){
+    const remaining=pool.filter(c=>!chosen.includes(c));if(!remaining.length)break;
+    const warningMin=Math.min(...remaining.map(c=>fits.get(c)!.warnings.length));
+    const safe=remaining.filter(c=>fits.get(c)!.warnings.length===warningMin);
+    const maxConfirmed=Math.max(...safe.map(c=>fits.get(c)!.confirmed.length));
+    const matching=safe.filter(c=>fits.get(c)!.confirmed.length===maxConfirmed);
+    const categoryBand=bands(matching,c=>fits.get(c)!.categoryScore)[0];
+    const group=bands(categoryBand,c=>c.global)[0].sort((a,b)=>rankDistance(a)-rankDistance(b)||cmpId(a,b));
+    const first=group[0],comparable=group.filter(c=>rankDistance(c)<=rankDistance(first)+COMPARABLE_DISTANCE_METRES);
+    const represented=(c:Candidate)=>chosen.some(x=>comparableBudgets(c.proposal.budget,x.proposal.budget)&&!distinctBudgets(c.proposal.budget,x.proposal.budget));
+    const varied=comparable.filter(c=>chosen.some(x=>comparableBudgets(c.proposal.budget,x.proposal.budget))&&!represented(c));
+    const alternatives=represented(first)&&varied.length?varied:comparable;
+    const covered=new Set(chosen.flatMap(c=>[...tags(c)]));
+    const novelty=(c:Candidate)=>[...tags(c)].filter(tag=>!covered.has(tag)).length;
+    const pick=[...alternatives].sort((a,b)=>novelty(b)-novelty(a)||rankDistance(a)-rankDistance(b)||cmpId(a,b))[0];
+    chosen.push(pick);decisions.push(decision(pick,fits.get(pick)!.confirmed.length?'documented_preferences':novelty(pick)?'documented_diversity':'baseline_completion'));
+  }
+  return {chosen,diagnostics:{...base,quality_pool_count:pool.length,baseline_core_count:10,
+    quality_floor:{numerator:floor.n.toString(),denominator:floor.d.toString()},decisions}};
 }
