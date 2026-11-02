@@ -2,7 +2,7 @@ import type {AuthContext} from './auth.ts';
 import {recommendationCuisineOptions,type Request as RecommendationRequest} from './restaurant-recommendation-engine-v1.ts';
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
-import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareDirectAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
 import type {DiagnosticRuntime,RecommendationTrace} from './recommendation-diagnostics.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
@@ -53,7 +53,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    const catalogue=await readRestaurantRecommendationCatalogue(context,organizationId);
    const cuisines=recommendationCuisineOptions(catalogue.rows,organizationId,catalogue.language);
    if(input.cuisine&&!cuisines.includes(input.cuisine))throw Error('INVALID_RECOMMENDATION_REQUEST');
-   const supported=prepareAi(catalogue,{geography:'not_requested'},'').proposals;
+   const supported=prepareDirectAi(catalogue,{geography:'not_requested'},'').proposals;
    const features=AI_FEATURES.filter(f=>supported.some(p=>p.features[f]?.status==='reported')).map(f=>featureOption(f,catalogue.language));
    const common={api_version:RECOMMENDATION_TEST_API_VERSION,language:catalogue.language,organization_id:organizationId,organizations,cuisines,features};
    if(input.action==='options')return reply(common);

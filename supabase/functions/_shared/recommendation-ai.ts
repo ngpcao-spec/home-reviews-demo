@@ -6,7 +6,7 @@ import {directChoicePrompt,directChoiceSchema,validateDirectDecision,restoreDire
 import {explainSavedReference} from './recommendation-explanation.ts';
 import {reportPoint,savedReportPoints,REPORT_FACTS_VERSION} from './recommendation-report-facts.ts';
 import {repeatedCookingConcern} from './shortlist-preferences.ts';
-import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,ReferenceValidationError,type CoverageData} from './recommendation-criteria.ts';
+import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,restoreCoveredChoices,renderCoveredChoices,ReferenceValidationError,type CoverageData} from './recommendation-criteria.ts';
 import {DecisionValidationError,diagnosticTrace,selectedDiagnosticIds,diagnosticCriterionKeys,type DiagnosticObservation,type DiagnosticRuntime,type RecommendationTrace} from './recommendation-diagnostics.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
@@ -174,15 +174,12 @@ export function renderChoices(choices:Choice[],p:Prepared):AiSelection[]{
  if(choices.some(c=>c.coverage_version))return renderCoveredChoices(restoreCoveredChoices(choices,p),p,render);
  return choices.map(c=>({proposal:p.proposals.find(x=>x.establishment_id===c.id)!,reasons:c.reason_refs.map(r=>render(c.id,r)),caution:c.caution_ref?render(c.id,c.caution_ref):null}));
 }
-export function describeRecommendationFallback(catalogue:Catalogue,query:EngineRequest,preference:string,proposals:Proposal[]):FallbackDisclosure{
+export function describeRecommendationFallback(_catalogue:Catalogue,query:EngineRequest,preference:string,proposals:Proposal[]):FallbackDisclosure{
  return {version:'recommendation-fallback-disclosure-v1',personalized_choice_available:false,free_text:preference.trim()?'not_verified':'not_requested',
   verified:{access:true,report_and_scores:true,cuisines:query.cuisines??[],budget:query.budget??null,required_features:query.required_features??[],geography:query.geography==='not_requested'?'not_requested':'filtered',service_priority:query.preferences?.categories?.includes('service')??false},
-  assessments:proposals.map(proposal=>{
-   // Reuse the same source preparation, independently of whether this ordinary
-   // engine result belonged to the twenty AI candidates. Do not rank it again.
-   const p=prepareAi({...catalogue,rows:catalogue.rows.filter(r=>r.establishment_id===proposal.establishment_id)},query,preference);
-   return {establishment_id:proposal.establishment_id,coverage:conservativeCoverage(p,proposal.establishment_id,ref=>renderPreparedReference(p,proposal.establishment_id,ref))};
-  })};
+  // The fallback exposes only actual structured controls. It does not impose
+  // another semantic interpretation of the free text or rank candidates again.
+  assessments:proposals.map(proposal=>({establishment_id:proposal.establishment_id,coverage:[]}))};
 }
 function metricsFrom(raw:Record<string,unknown>,duration:number,requestId:string|null):Metrics{
  const u=(raw.usage??{}) as Record<string,unknown>,details=(u.input_tokens_details??{}) as Record<string,unknown>;
