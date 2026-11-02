@@ -48,6 +48,7 @@ it('requires unchanged proven ancestry and refuses missing or changed links',asy
 it('pins runtime, request, filters, catalogue and access identity before consuming',async()=>{
  await arm();await expect(reserve(key,hash,hash)).rejects.toThrow('DIAGNOSTIC_REQUEST_CHANGED');await expect(reserve(key,hash,legacyKey,hash)).rejects.toThrow('DIAGNOSTIC_REQUEST_CHANGED');
  await expect(reserve(key,hash,legacyKey,legacyHash,trace(false))).rejects.toThrow('DIAGNOSTIC_RUNTIME_INCOMPATIBLE');expect((await newGrant()).consumed_at).toBeNull();
+ await expect(reserve(key,hash,legacyKey,legacyHash,{...trace(),validator_version:'recommendation-criteria-validator-v3',cache_version:'recommendation-ai-open-criteria-safety-v9'})).rejects.toThrow('DIAGNOSTIC_RUNTIME_INCOMPATIBLE');expect((await newGrant()).consumed_at).toBeNull();
 });
 it('consumes one child with diagnostic atomically; double click joins and unknown never resends',async()=>{
  await arm();const child=await reserve();expect(child.owned).toBe(true);expect(await reserve()).toMatchObject({id:child.id,owned:false,state:'dispatched'});
