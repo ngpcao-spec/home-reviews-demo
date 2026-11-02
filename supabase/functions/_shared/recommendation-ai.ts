@@ -116,9 +116,10 @@ export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:str
   return {ref,kind,value:kind==='score'?(value as {value:string}).value:kind==='feature'?{status:featureValue.status,...(featureValue.context?{context:featureValue.context}:{})}:value,source:compactSource};
  })}));
  for(const candidate of candidates)candidate.criterion_observations=candidateCoverageHints(proposals.find(p=>p.establishment_id===candidate.id)!,facts.get(candidate.id)!,criteriaHints);
- const schema=coverageSchema(candidates.map(c=>c.id),criteriaHints);
+ const input={configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,criteria_version:CRITERIA_VERSION,language,mandatory_constraints:query,natural_language_request:naturalLanguageRequest,criterion_hints:criteriaHints,candidates};
+ const schema=coverageSchema(input.candidates,criteriaHints);
  const request={model:RECOMMENDATION_AI_MODEL,store:false,reasoning:{effort:'low'},max_output_tokens:1800,
-  instructions:prompt,input:JSON.stringify({configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,criteria_version:CRITERIA_VERSION,language,mandatory_constraints:query,natural_language_request:naturalLanguageRequest,criterion_hints:criteriaHints,candidates}),
+  instructions:prompt,input:JSON.stringify(input),
   text:{format:{type:'json_schema',name:'restaurant_selection',strict:true,schema}}};
  const reportPoints=new Map(proposals.map(p=>[p.establishment_id,savedReportPoints(p,catalogue.rows.find(r=>r.establishment_id===p.establishment_id))]));
  return {proposals,facts,candidates,request,reportPoints,shortlist:shortlist.shortlist,criteriaHints,naturalLanguageRequest};

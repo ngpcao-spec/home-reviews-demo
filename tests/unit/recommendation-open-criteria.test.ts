@@ -107,7 +107,7 @@ describe.each(['fr','vi'] as const)('independently source-bound open criteria %s
   native.choices[0].caution_refs=['reservation_quality_0'];native.choices[0].caution_bindings=[{ref:'reservation_quality_0',criterion:0}];expect(()=>validateCoveredDecision(native,p)).toThrow('IRRELEVANT_CAUTION');
  });
  it('rejects old cache coverage rather than silently promoting it to the new protocol',()=>{
-  const f=family(language),choices=validateCoveredDecision(f.native,f.p);expect(CRITERIA_VERSION).toBe('recommendation-criteria-coverage-v2');
+  const f=family(language),choices=validateCoveredDecision(f.native,f.p);expect(CRITERIA_VERSION).toBe('recommendation-criteria-coverage-v3');
   const incomplete=structuredClone(choices);delete incomplete[0].caution_bindings;expect(()=>restoreCoveredChoices(incomplete,f.p)).toThrow('CACHE_INCOMPATIBLE');
   choices[0].coverage_version='recommendation-criteria-coverage-v1' as typeof CRITERIA_VERSION;expect(()=>restoreCoveredChoices(choices,f.p)).toThrow('CACHE_INCOMPATIBLE');
  });
