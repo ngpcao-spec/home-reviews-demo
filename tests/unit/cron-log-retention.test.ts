@@ -1,9 +1,17 @@
 // @vitest-environment node
 import {PGlite} from '@electric-sql/pglite';
 import {readFileSync,readdirSync} from 'node:fs';
-import {beforeAll,beforeEach,afterEach,afterAll,it,expect} from 'vitest';
+import {beforeAll,beforeEach,afterEach,afterAll,describe,it,expect} from 'vitest';
+import {sqlMigrationSource} from '../fixtures/sql-migration-source';
+describe.each(['LF','CRLF'] as const)('cron retention with %s migration sources',lineEndings=>{
 let db:PGlite;
-const migration=(suffix:string)=>readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8');
+const migration=(suffix:string)=>{
+ const lf=readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith(suffix)),'utf8').replace(/\r\n/g,'\n');
+ // Exercise both byte representations on every OS; no checkout mutation or
+ // global Git setting is needed. The existing policy assertions run for each.
+ const source=lineEndings==='CRLF'?lf.replace(/\n/g,'\r\n'):lf;
+ return sqlMigrationSource(source);
+};
 const install=()=>db.exec(migration('_schedule_cron_log_retention.sql'));
 beforeAll(async()=>{
  db=new PGlite();await db.waitReady;
@@ -56,4 +64,5 @@ it('keeps the function invoker-only and deletes solely cron history, with concur
  const sql=migration('_bounded_cron_log_retention.sql');expect(sql).toContain('security invoker');expect(sql).toContain('pg_try_advisory_xact_lock');expect(sql).toContain('skip locked');expect(sql).toContain("lock_timeout='2s'");expect([...sql.matchAll(/delete from (\S+)/g)].map(m=>m[1])).toEqual(['cron.job_run_details']);
  const d=(await db.query("select pg_get_functiondef('private.purge_cron_job_run_details(integer)'::regprocedure) d")).rows[0].d as string;
  expect(d).toContain('targets as materialized');expect(d).toContain('d.ctid=e.row_tid');expect(d).toContain('order by runid');expect(d).toContain('from log_rows');
+});
 });

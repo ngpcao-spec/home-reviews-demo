@@ -83,11 +83,21 @@ same committed test measured 1.922 s on the baseline copy and 1.676 s on the
 current copy, in one environment with one worker. Its assertions, SQL and timeout
 are unchanged. No recommendation latency improvement is inferred from this.
 
-The subsequent full run used two workers. A pre-existing cron-suite install
-failed on `CRON_LOG_RETENTION_LOOKUP_ANCHOR_CHANGED`: checkout CRLF bytes inside a
-function body did not match a migration's literal LF anchor. Both baseline and
-current tests reproduce it. Replacing only those four unmodified local migration
-files with their committed LF bytes makes both copies pass. No migration content,
-cron implementation, test assertion or deadline change is included in this patch.
-The private results distinguish the initial full-run installation failure from
-the successful isolated cron rerun; it is not reported as an initially green run.
+A pre-existing cron-suite install failed on
+`CRON_LOG_RETENTION_LOOKUP_ANCHOR_CHANGED`: checkout CRLF bytes inside a function
+body did not match a later migration's literal LF anchor. Baseline and corrected
+code reproduce the same failure. A one-off LF conversion established the cause,
+but did not make validation reproducible after another checkout.
+
+The test loader now uses `sqlMigrationSource` to normalize CRLF to LF in memory,
+before PostgreSQL interprets the body. It never rewrites SQL files, string escapes,
+Git settings, production migrations or assertions. The complete thirteen-case
+cron suite runs with both explicitly constructed LF and CRLF inputs on every OS.
+All existing retention, lock, access, idempotence and preservation assertions run
+for both representations with their original deadlines. Skipping the literal
+anchor check or accepting a failed installation is not allowed.
+
+Review validation runs the entire global suite on the final committed source,
+along with targeted FR/VI coverage, the 48 mobile tests, lint, strict typing,
+build and the offline synthetic-catalogue replay. Private results record the
+exact commit and original fixture hashes; no provider or production call is used.
