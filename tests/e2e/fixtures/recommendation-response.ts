@@ -1,11 +1,11 @@
 import {recommendationSheet} from '../../fixtures/restaurant-recommendation-catalogue';
 import {recommendRestaurants,recommendationCuisineOptions,type Request} from '../../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
-import {prepareAi,renderChoices,validateChoices,describeRecommendationFallback} from '../../../supabase/functions/_shared/recommendation-ai';
+import {prepareDirectAi as prepareAi,renderChoices,describeRecommendationFallback} from '../../../supabase/functions/_shared/recommendation-ai';
 import {placeProfile} from '../../../supabase/functions/_shared/google-place-profile';
-import {validateCoveredDecision} from '../../../supabase/functions/_shared/recommendation-criteria';
-import {coveredReply} from '../../fixtures/recommendation-coverage-reply';
+import {validateDirectDecision} from '../../../supabase/functions/_shared/recommendation-direct-choice';
+import {directWireReply} from '../../fixtures/recommendation-direct-reply';
 export function recommendationResponse(body:Record<string,unknown>){
- if(body.action==='compare'&&body.preference_mode!=='criteria_coverage_v6')throw Error('Updated comparison client required');
+ if(body.action==='compare'&&body.preference_mode!=='direct_choice_v1')throw Error('Updated comparison client required');
  const language=localStorage.getItem('review-details-language')==='fr'?'fr':'vi',org='org-account-a';
  const rows=[recommendationSheet('place-account-a',{score:'5.3',cuisines:['indian'],reservation:language==='fr'?'Un témoignage évoque une attente prolongée.':'Một khách cho biết đã chờ lâu.'}),
   recommendationSheet('place-account-b',{score:'5.25',cuisines:['italian'],category:'service',positive:language==='fr'?'Le personnel est décrit comme accueillant.':'Nhân viên được nhận xét thân thiện.'}),
@@ -34,8 +34,11 @@ export function recommendationResponse(body:Record<string,unknown>){
  const result=recommendRestaurants(catalogue,org,language,request);
  const aiCase=localStorage.getItem('recommendation-ai-case'),prepared=prepareAi({rows:catalogue,organizationId:org,language,establishments:[]},request,String(body.preference??''));
  const choices=result.proposals.slice(0,2).reverse().map(p=>({id:p.establishment_id,reason_refs:sourceCase&&p.establishment_id===rows[0].establishment_id?['feature_quiet','strength_quality_0']:['score_global'],caution_ref:sourceCase&&p.establishment_id===rows[0].establishment_id?'reservation_ambiance_1':p.reservations.length?'reservation_'+p.reservations[0].category+'_'+p.reservations[0].index:null}));
- const coverageReply=criteriaCase?validateCoveredDecision(coveredReply(prepared,[{id:rows[0].establishment_id,reason_refs:['feature_outdoor_seating','score_global'],caution_ref:null}]),prepared):null;
- const comparison=body.action==='compare'?{status:aiCase==='invalid'?'fallback':aiCase==='cached'?'cached':aiCase==='pending'?'pending':'completed',model:'gpt-6.1-sol',attempt_id:'00000000-0000-4000-8000-000000000001',candidate_count:catalogue.length,selections:aiCase==='invalid'||aiCase==='pending'?[]:renderChoices(coverageReply??validateChoices({choices},prepared),prepared),metrics:{input_tokens:123,output_tokens:25,cache_read_tokens:0,cache_write_tokens:null,duration_ms:500,cost_usd:null,cost_kind:'unavailable',model:'gpt-6.1-sol',provider_request_id:'fixture'}}:undefined;
+ const direct=directWireReply(JSON.parse(prepared.request.input),criteriaCase?[choices.find(c=>c.id===rows[0].establishment_id)!]:choices);
+ if(criteriaCase){direct.choices[0].explanation=language==='fr'?'La terrasse est renseignée, mais l’accueil des familles reste inconnu. Restaurant témoin 2 constitue une alternative familiale dont l’extérieur reste inconnu.':'Có thông tin về chỗ ngồi ngoài trời, nhưng chưa rõ mức phù hợp với gia đình. Restaurant témoin 2 là lựa chọn gia đình khác, chưa rõ có ngoài trời.';direct.choices[0].uncertainties=[language==='fr'?'Accueil des enfants non confirmé.':'Chưa xác nhận tiện nghi cho trẻ em.'];}
+ if(aiCase==='direct-unverified'){direct.choices[0].explanation='<b>Model assessment</b>';direct.choices[0].source_refs=['unusable-source'];direct.choices[0].uncertainties=[language==='fr'?'Information familiale inconnue.':'Chưa rõ thông tin gia đình.'];}
+ if(aiCase==='empty')direct.choices=[];
+ const comparison=body.action==='compare'?{contract_version:'recommendation-direct-choice-v1',status:aiCase==='invalid'?'fallback':aiCase==='cached'?'cached':aiCase==='pending'?'pending':'completed',model:'gpt-6.1-sol',attempt_id:'00000000-0000-4000-8000-000000000001',candidate_count:catalogue.length,selections:aiCase==='invalid'||aiCase==='pending'?[]:renderChoices(validateDirectDecision(direct,prepared),prepared),metrics:{input_tokens:123,output_tokens:25,cache_read_tokens:0,cache_write_tokens:null,duration_ms:500,cost_usd:null,cost_kind:'unavailable',model:'gpt-6.1-sol',provider_request_id:'fixture'}}:undefined;
  if(comparison&&["fallback","pending"].includes(comparison.status))Object.assign(comparison,{fallback:describeRecommendationFallback({rows:catalogue,organizationId:org,language,establishments:[]},request,String(body.preference??""),result.proposals)});
  return body.action==='options'?common:{...common,result,...(comparison?{comparison}:{})};
 }

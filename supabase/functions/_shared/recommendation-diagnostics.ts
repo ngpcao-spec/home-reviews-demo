@@ -1,10 +1,10 @@
 import type {Fact,Prepared} from './recommendation-ai.ts';
 import {PLACE_FEATURES} from './google-place-taxonomy.ts';
-import {CRITERIA_VERSION,RECOMMENDATION_AI_VERSION,VALIDATOR_VERSION} from './recommendation-versions.ts';
+import {RECOMMENDATION_CONTRACT_VERSION as CRITERIA_VERSION,RECOMMENDATION_AI_VERSION,VALIDATOR_VERSION} from './recommendation-versions.ts';
 export {VALIDATOR_VERSION} from './recommendation-versions.ts';
 
 export const DIAGNOSTIC_VERSION='recommendation-diagnostic-v2';
-export const DIAGNOSTIC_BUILD='private-recommendation-diagnostics-v2';
+export const DIAGNOSTIC_BUILD='private-recommendation-direct-diagnostics-v3';
 export type DiagnosticRuntime={deployment_id:string|null};
 type Context={choice_index?:number;candidate_id?:unknown;criterion_index?:number;reference_index?:number;reference?:unknown;list?:unknown;list_limit?:number;expected_state?:string;received_state?:unknown};
 const states=['documented','partial','contradicted','conflicted','unknown'];
@@ -63,7 +63,7 @@ export type RecommendationTrace={version:typeof DIAGNOSTIC_VERSION;server_build:
  attempt_id:string|null;origin:'ai_validated'|'cache'|'fallback'|'pending'|'unavailable';stage:string;notice:string|null;candidate_ids:string[];selected_candidate_ids:string[];criterion_keys:(string|null)[];failure:DiagnosticObservation['failure']|null;prior_attempt_state:string|null;provider_http_status:number|null;response_status?:number};
 export function diagnosticTrace(observation:DiagnosticObservation,result:{status:'completed'|'cached'|'fallback'|'pending';attempt_id?:string;notice?:string},runtime:DiagnosticRuntime|undefined):RecommendationTrace{
  const deployment=runtime?.deployment_id&&/^[a-z0-9_-]{1,160}$/i.test(runtime.deployment_id)?runtime.deployment_id:null,version=deployment?.match(/_(\d+)$/)?.[1];
- return {version:DIAGNOSTIC_VERSION,server_build:DIAGNOSTIC_BUILD,deployment_id:deployment,server_version:version?Number(version):null,api_version:'recommendation-test-v1',client_mode:'criteria_coverage_v6',contract_version:CRITERIA_VERSION,validator_version:VALIDATOR_VERSION,cache_version:RECOMMENDATION_AI_VERSION,
+ return {version:DIAGNOSTIC_VERSION,server_build:DIAGNOSTIC_BUILD,deployment_id:deployment,server_version:version?Number(version):null,api_version:'recommendation-test-v1',client_mode:'direct_choice_v1',contract_version:CRITERIA_VERSION,validator_version:VALIDATOR_VERSION,cache_version:RECOMMENDATION_AI_VERSION,
   attempt_id:result.attempt_id??observation.attempt_id??null,origin:result.status==='completed'?'ai_validated':result.status==='cached'?'cache':result.status,stage:observation.stage,notice:result.notice??null,
   candidate_ids:observation.prepared?.candidates.map(c=>c.id)??[],selected_candidate_ids:observation.selected_ids??[],criterion_keys:observation.criterion_keys??[],failure:observation.failure??null,prior_attempt_state:observation.prior_state??null,provider_http_status:observation.http_status??null};
 }

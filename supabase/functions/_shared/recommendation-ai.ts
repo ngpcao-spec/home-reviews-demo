@@ -1,16 +1,17 @@
 import {shortlistRestaurants,type Proposal,type Request as EngineRequest} from './restaurant-recommendation-engine-v1.ts';
 import {PLACE_FEATURES,placeFeatureLabel} from './google-place-taxonomy.ts';
 import type {readRestaurantRecommendationCatalogue} from './restaurant-recommendation-read-v1.ts';
-import type {AiSelection,AiComparison,AiExplanation,Metrics,FallbackDisclosure} from './recommendation-ai-contract.ts';
+import type {AiSelection,AiComparison,AiExplanation,Metrics,FallbackDisclosure,DirectAiContent} from './recommendation-ai-contract.ts';
+import {directChoicePrompt,directChoiceSchema,validateDirectDecision,restoreDirectChoices,renderDirectChoices} from './recommendation-direct-choice.ts';
 import {explainSavedReference} from './recommendation-explanation.ts';
 import {reportPoint,savedReportPoints,REPORT_FACTS_VERSION} from './recommendation-report-facts.ts';
 import {repeatedCookingConcern} from './shortlist-preferences.ts';
-import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,validateCoveredDecision,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,ReferenceValidationError,type CoverageData} from './recommendation-criteria.ts';
+import {CRITERIA_VERSION,criterionHints,coverageSchema,candidateCoverageHints,restoreCoveredChoices,renderCoveredChoices,conservativeCoverage,ReferenceValidationError,type CoverageData} from './recommendation-criteria.ts';
 import {DecisionValidationError,diagnosticTrace,selectedDiagnosticIds,diagnosticCriterionKeys,type DiagnosticObservation,type DiagnosticRuntime,type RecommendationTrace} from './recommendation-diagnostics.ts';
 export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contract.ts';
 
 export {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
-import {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
+import {RECOMMENDATION_AI_VERSION,RECOMMENDATION_CONTRACT_VERSION} from './recommendation-versions.ts';
 import {LEGACY_DIAGNOSTIC_VERSION,prepareLegacyDiagnosticRequest} from './recommendation-legacy-diagnostic-identity.ts';
 export const RECOMMENDATION_AI_MODEL='gpt-6.1-sol';
 // Historical benchmark kept for the existing offline fixtures; not a dispatch limit.
@@ -22,7 +23,7 @@ type Catalogue=Awaited<ReturnType<typeof readRestaurantRecommendationCatalogue>>
 type Language='fr'|'vi';
 export type Fact={ref:string;kind:'score'|'cuisine'|'price'|'feature'|'strength'|'reservation'|'freshness'|'recurrence';value:unknown;source:unknown;label:string};
 export type CompactCandidate={id:string;sources:unknown;facts:Omit<Fact,'label'>[];unknown_feature_refs:string[];criterion_observations?:ReturnType<typeof candidateCoverageHints>};
-export type Choice={id:string;reason_refs:string[];caution_ref:string|null}&Partial<CoverageData>;
+export type Choice={id:string;reason_refs:string[];caution_ref:string|null;ai?:DirectAiContent}&Partial<CoverageData>;
 export type Attempt={id:string;owned:boolean;state:string;selection:Choice[]|null;metrics:Metrics|null};
 export type AiPort={reserve:(key:string,requestHash:string)=>Promise<Attempt>;reserveCorrectedDiagnostic?:(key:string,requestHash:string,legacyKey:string,legacyHash:string)=>Promise<Attempt>;finish:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null)=>Promise<void>;finishWithDiagnostic?:(id:string,state:string,selection:Choice[]|null,metrics:Metrics,error:string|null,trace:RecommendationTrace)=>Promise<void>};
 const categoryLabels={fr:{quality:'Qualité des plats',service:'Service',ambiance:'Ambiance',price:'Prix'},vi:{quality:'Chất lượng món ăn',service:'Phục vụ',ambiance:'Không gian',price:'Giá'}};
@@ -86,7 +87,7 @@ export function checkedRecommendationPreference(value:unknown):string{
   ||/(?:je m['’]appelle|mon nom est|my name is|tôi tên là|tên tôi là)\s/iu.test(inspected))throw Error('INVALID_RECOMMENDATION_REQUEST');
  return value.trim().normalize('NFC');
 }
-export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:string){
+function prepareCandidateData(catalogue:Catalogue,query:EngineRequest,preference:string){
  const naturalLanguageRequest=checkedRecommendationPreference(preference);
  const language=catalogue.language as Language;
  const criteriaHints=criterionHints(query,naturalLanguageRequest,language);
@@ -115,20 +116,36 @@ export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:str
   const featureValue=value as {status:string;context?:unknown};
   return {ref,kind,value:kind==='score'?(value as {value:string}).value:kind==='feature'?{status:featureValue.status,...(featureValue.context?{context:featureValue.context}:{})}:value,source:compactSource};
  })}));
+ const reportPoints=new Map(proposals.map(p=>[p.establishment_id,savedReportPoints(p,catalogue.rows.find(r=>r.establishment_id===p.establishment_id))]));
+ return {proposals,facts,candidates,reportPoints,shortlist:shortlist.shortlist,criteriaHints,naturalLanguageRequest};
+}
+export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:string){
+ const data=prepareCandidateData(catalogue,query,preference);
+ const {proposals,facts,candidates,criteriaHints,naturalLanguageRequest}=data;
  for(const candidate of candidates)candidate.criterion_observations=candidateCoverageHints(proposals.find(p=>p.establishment_id===candidate.id)!,facts.get(candidate.id)!,criteriaHints);
- const input={configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,criteria_version:CRITERIA_VERSION,language,mandatory_constraints:query,natural_language_request:naturalLanguageRequest,criterion_hints:criteriaHints,candidates};
+ const input={configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,criteria_version:CRITERIA_VERSION,language:catalogue.language,mandatory_constraints:query,natural_language_request:naturalLanguageRequest,criterion_hints:criteriaHints,candidates};
  const schema=coverageSchema(input.candidates,criteriaHints);
  const request={model:RECOMMENDATION_AI_MODEL,store:false,reasoning:{effort:'low'},max_output_tokens:1800,
   instructions:prompt,input:JSON.stringify(input),
   text:{format:{type:'json_schema',name:'restaurant_selection',strict:true,schema}}};
- const reportPoints=new Map(proposals.map(p=>[p.establishment_id,savedReportPoints(p,catalogue.rows.find(r=>r.establishment_id===p.establishment_id))]));
- return {proposals,facts,candidates,request,reportPoints,shortlist:shortlist.shortlist,criteriaHints,naturalLanguageRequest};
+ return {...data,request};
 }
-export type Prepared=ReturnType<typeof prepareAi>;
+type HistoricalPrepared=ReturnType<typeof prepareAi>;
+export type Prepared=Omit<HistoricalPrepared,'request'>&{request:Omit<HistoricalPrepared['request'],'text'>&{text:{format:Omit<HistoricalPrepared['request']['text']['format'],'schema'>&{schema:Record<string,unknown>}}}};
+/** Live contract. Historical coverage preparation remains available for offline
+ * receipts/fixtures only, and never decides acceptance of a new AI response. */
+export function prepareDirectAi(catalogue:Catalogue,query:EngineRequest,preference:string):Prepared{
+ const p=prepareCandidateData(catalogue,query,preference);
+ const input={configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,contract_version:RECOMMENDATION_CONTRACT_VERSION,
+  language:catalogue.language,mandatory_constraints:query,natural_language_request:p.naturalLanguageRequest,candidates:p.candidates};
+ return {...p,criteriaHints:[],request:{model:RECOMMENDATION_AI_MODEL,store:false,reasoning:{effort:'low'},max_output_tokens:1800,
+  instructions:directChoicePrompt,input:JSON.stringify(input),text:{format:{type:'json_schema',name:'restaurant_selection',strict:true,schema:directChoiceSchema(p.candidates.map(c=>c.id))}}}};
+}
+
 function reasonFact(f:Fact){return ['score','cuisine','price','strength'].includes(f.kind)||f.kind==='feature'&&['reported','denied'].includes((f.value as {status:string}).status);}
 function cautionFact(f:Fact){return f.kind==='reservation'||f.kind==='freshness'||f.kind==='feature'&&['denied','conflicted'].includes((f.value as {status:string}).status);}
 export function validateChoices(raw:unknown,prepared:Prepared):Choice[]{
- // Legacy decoder retained for offline historical receipts. Live comparisons use validateCoveredDecision.
+ // Legacy decoder retained for offline historical receipts only.
  const value=raw as {choices:Choice[]};
  if(!value||typeof value!=='object'||Object.keys(value).join()!=='choices'||!Array.isArray(value.choices)||value.choices.length>3||value.choices.length===0&&prepared.candidates.length)throw Error('INVALID_SELECTION');
  const seen=new Set<string>();
@@ -153,6 +170,7 @@ export function renderPreparedReference(p:Prepared,id:string,ref:string):AiExpla
 }
 export function renderChoices(choices:Choice[],p:Prepared):AiSelection[]{
  const render=(id:string,ref:string)=>renderPreparedReference(p,id,ref);
+ if(choices.some(c=>c.ai))return renderDirectChoices(restoreDirectChoices(choices,p),p,render);
  if(choices.some(c=>c.coverage_version))return renderCoveredChoices(restoreCoveredChoices(choices,p),p,render);
  return choices.map(c=>({proposal:p.proposals.find(x=>x.establishment_id===c.id)!,reasons:c.reason_refs.map(r=>render(c.id,r)),caution:c.caution_ref?render(c.id,c.caution_ref):null}));
 }
@@ -179,10 +197,9 @@ export async function compareAi(args:ComparisonArgs):Promise<AiComparison>{
  try{const result=await compareAiObserved(args,observation);emit(result);return result;}catch(e){observation.failure={stage:observation.stage,code:e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'INTERNAL_ERROR',rule:'preparation_failed'};emit({status:'fallback',model:RECOMMENDATION_AI_MODEL,candidate_count:0,selections:[]});throw e;}
 }
 async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObservation):Promise<AiComparison>{
- const prepared=prepareAi(args.catalogue,args.query,args.preference),base={model:RECOMMENDATION_AI_MODEL,candidate_count:prepared.candidates.length,selections:[] as AiSelection[]};
+ const prepared=prepareDirectAi(args.catalogue,args.query,args.preference),base={contract_version:RECOMMENDATION_CONTRACT_VERSION,model:RECOMMENDATION_AI_MODEL,candidate_count:prepared.candidates.length,selections:[] as AiSelection[]};
  observation.prepared=prepared;
  if(!prepared.candidates.length)return {...base,status:'fallback',notice:'NO_CANDIDATES'};
- if(prepared.criteriaHints.length>8)return {...base,status:'fallback',notice:'TOO_MANY_CRITERIA'};
  if(!args.key.trim())return {...base,status:'fallback',notice:'AI_UNAVAILABLE'};
  const serialized=JSON.stringify(prepared.request);
  const requestHash=await aiHash(prepared.request);
@@ -208,7 +225,7 @@ async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObser
   if(attempt.state==='succeeded'&&attempt.selection){
    observation.selected_ids=selectedDiagnosticIds({choices:attempt.selection},prepared);
    observation.criterion_keys=attempt.selection[0]?.criteria_spans?.slice(0,8).map(s=>s.key!==null&&prepared.criteriaHints.some(h=>h.key===s.key)?s.key:null);
-   try{observation.stage='cache_validation';const choices=restoreCoveredChoices(attempt.selection,prepared);observation.selected_ids=choices.map(c=>c.id);observation.stage='cache_source_recheck';if(!await args.unchanged())throw Error('SOURCE_CHANGED');return {...base,status:'cached',attempt_id:attempt.id,selections:renderChoices(choices,prepared),...(attempt.metrics?{metrics:attempt.metrics}:{})};}catch(e){observation.failure=e instanceof ReferenceValidationError?e.diagnostic.detail:e instanceof DecisionValidationError?e.diagnostic:{stage:observation.stage,code:e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'INTERNAL_ERROR',rule:'cache_not_compatible'};return {...base,status:'fallback',notice:'CACHE_INCOMPATIBLE'};}
+   try{observation.stage='cache_validation';const choices=restoreDirectChoices(attempt.selection,prepared);observation.selected_ids=choices.map(c=>c.id);observation.stage='cache_source_recheck';if(!await args.unchanged())throw Error('SOURCE_CHANGED');return {...base,status:'cached',attempt_id:attempt.id,selections:renderChoices(choices,prepared),...(attempt.metrics?{metrics:attempt.metrics}:{})};}catch(e){observation.failure=e instanceof ReferenceValidationError?e.diagnostic.detail:e instanceof DecisionValidationError?e.diagnostic:{stage:observation.stage,code:e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'INTERNAL_ERROR',rule:'cache_not_compatible'};return {...base,status:'fallback',notice:'CACHE_INCOMPATIBLE'};}
   }
   return {...base,status:attempt.state==='dispatched'?'pending':'fallback',notice:attempt.state==='dispatched'?'IN_PROGRESS':'PREVIOUS_ATTEMPT_NOT_RETRIED',attempt_id:attempt.id};
  }
@@ -229,7 +246,7 @@ async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObser
   const chunks=raw.output.flatMap((v:{type?:string;content?:{type?:string;text?:string}[]})=>v.type==='message'&&Array.isArray(v.content)?v.content:[]);
   if(chunks.length!==1||chunks[0].type!=='output_text'||typeof chunks[0].text!=='string'){observation.failure={stage:observation.stage,code:'INVALID_OUTPUT',field:'output.content',rule:chunks.length!==1?'expected_one_content_chunk':chunks[0].type!=='output_text'?'unexpected_content_type':'output_text_not_string'};throw Error('INVALID_OUTPUT');}
   observation.stage='decision_json';const decision:unknown=JSON.parse(chunks[0].text);observation.selected_ids=selectedDiagnosticIds(decision,prepared);observation.criterion_keys=diagnosticCriterionKeys(decision,prepared);
-  observation.stage='decision_validation';choices=validateCoveredDecision(decision,prepared);
+  observation.stage='decision_validation';choices=validateDirectDecision(decision,prepared);
   state='obsolete';
   observation.stage='source_recheck';
   if(!await args.unchanged()){state='obsolete';choices=null;throw Error('SOURCE_OR_ACCESS_CHANGED');}
