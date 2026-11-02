@@ -96,6 +96,9 @@ cron suite runs with both explicitly constructed LF and CRLF inputs on every OS.
 All existing retention, lock, access, idempotence and preservation assertions run
 for both representations with their original deadlines. Skipping the literal
 anchor check or accepting a failed installation is not allowed.
+Explicit result types for the local SQL test database allow this harness to be
+checked in strict TypeScript too. Type erasure leaves the existing policy test
+bodies unchanged; no assertion or runtime behavior is changed by these types.
 
 Review validation runs the entire global suite on the final committed source,
 along with targeted FR/VI coverage, the 48 mobile tests, lint, strict typing,
