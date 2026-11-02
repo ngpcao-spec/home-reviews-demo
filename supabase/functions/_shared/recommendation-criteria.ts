@@ -116,11 +116,17 @@ function permittedForCriterion(f:Fact,key:string|null){
  * Removing optionality markers here never edits the request, shortlist or filters.
  * Subjects/scopes this independent check cannot verify remain unknown. */
 export function verifiedOpenCriterion(p:Prepared,c:Criterion):CriterionHint|undefined{
+ if(!c.quote||!p.naturalLanguageRequest.includes(c.quote))return;
  const language=p.proposals[0]?.report.language==='vi'?'vi':'fr';
- const quote=preferenceProofText(c.quote),inQuote=criterionHints({geography:'not_requested'},quote,language);
+ // Apply the SAME proof-only normalization to the quote and its full context.
+ // Optionality/punctuation may be inside the verbatim quote. Previously those
+ // quotes failed even though a shorter quote of the same need was accepted.
+ // Never edit the transmitted request, stored spans, shortlist or hard filters.
+ const proof=(text:string)=>preferenceProofText(text).replace(/\b(?:si possible|neu co the|if possible)\b/g,' ').replace(/\s+/g,' ').replace(/^[\s,;.!?]+|[\s,;.!?]+$/g,'');
+ const quote=proof(c.quote),inQuote=criterionHints({geography:'not_requested'},quote,language);
  if(inQuote.length!==1)return;
- const context=p.naturalLanguageRequest.replace(/(?<![\p{L}\p{N}])(?:si possible|nếu có thể|if possible)(?![\p{L}\p{N}])/giu,' ');
- const h=inQuote[0],whole=criterionHints({geography:'not_requested'},preferenceProofText(context),language);
+ const context=proof(p.naturalLanguageRequest);
+ const h=inQuote[0],whole=criterionHints({geography:'not_requested'},context,language);
  if(!whole.some(x=>x.key===h.key&&x.expected===h.expected))return;
  const clauses=preferenceProofText(context).split(/[;.!?,\n]+|\b(?:et|mais|va|nhung|and|but)\b/).map(c=>c.trim());
  if(!clauses.some(clause=>clause.includes(quote)&&boundedPreferenceClause(clause,h.key)))return;

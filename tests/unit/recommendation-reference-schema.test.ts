@@ -110,9 +110,9 @@ it('uses only the documented strict schema subset and local definitions in the R
  }
  expect(schema.type).toBe('object');visit(schema);expect(properties).toBeLessThanOrEqual(5000);expect(enumValues).toBeLessThanOrEqual(1000);expect(strings).toBeLessThanOrEqual(120000);expect(ajv.validateSchema(schema)).toBe(true);
 });
-it('changes the contract/cache without changing validator semantics, and rejects old cached coverage',async()=>{
- const {p,native}=fixture('fr'),stored=validateCoveredDecision(native,p);expect(CRITERIA_VERSION).toBe('recommendation-criteria-coverage-v3');expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v8');expect(VALIDATOR_VERSION).toBe('recommendation-criteria-validator-v2');
+it('keeps the bounded wire contract, versions the proof/cache changes and rejects old cached coverage',async()=>{
+ const {p,native}=fixture('fr'),stored=validateCoveredDecision(native,p);expect(CRITERIA_VERSION).toBe('recommendation-criteria-coverage-v3');expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v9');expect(VALIDATOR_VERSION).toBe('recommendation-criteria-validator-v3');
  stored[0].coverage_version='recommendation-criteria-coverage-v2' as typeof CRITERIA_VERSION;expect(()=>restoreCoveredChoices(stored,p)).toThrow('CACHE_INCOMPATIBLE');
- const legacy=structuredClone(p.request),input=JSON.parse(legacy.input);input.configuration_version='recommendation-ai-open-criteria-safety-v7';input.criteria_version='recommendation-criteria-coverage-v2';legacy.input=JSON.stringify(input);
+ const legacy=structuredClone(p.request),input=JSON.parse(legacy.input);input.configuration_version='recommendation-ai-open-criteria-safety-v8';legacy.input=JSON.stringify(input);
  expect(await aiHash(legacy)).not.toBe(await aiHash(p.request));
 });

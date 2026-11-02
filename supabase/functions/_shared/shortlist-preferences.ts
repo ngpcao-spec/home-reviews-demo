@@ -66,7 +66,10 @@ export function shortlistPreferences(request:Request,text=''):ShortlistPreferenc
 
 /** Evidence verification only. These canonical aliases NEVER feed preselection.
  * A recognized subject must not erase an extra qualifier (heated, babies, etc.). */
-export const preferenceProofText=(text:string)=>key(text).replace(/\b(?:famille|familial|familiale)\b/g,'family friendly').replace(/\bexterieur\b/g,'outdoor seating');
+export const preferenceProofText=(text:string)=>key(text)
+ .replace(/\b(?:en )?(?:familles?|familial|familiaux|familiales?)\b/g,'family friendly')
+ .replace(/\b(?:(?:pour les|aux) )?enfants?\b/g,'child friendly')
+ .replace(/\b(?:a l |en )?exterieurs?\b|\b(?:en )?terrasses?\b/g,'outdoor seating');
 export function boundedPreferenceClause(text:string,subject:string):boolean{
  let rest=preferenceProofText(text),matched=false;
  const feature=subject.startsWith('feature_')?subject.slice(8):null,category=subject.startsWith('category_')?subject.slice(9) as Category:null;
@@ -78,6 +81,9 @@ export function boundedPreferenceClause(text:string,subject:string):boolean{
  // own quote/evidence/binding is still separate. Unknown qualifiers remain below.
  for(const aliases of Object.values(phrases))for(const phrase of aliases)rest=rest.replace(new RegExp('\\b'+phrase+'\\b','g'),' ');
  for(const pattern of Object.values(categoryPhrases))rest=rest.replace(pattern,' ');
+ // Generic suitability/seating wording, not a new property. Leave concrete
+ // qualifiers (heating, supervision, babies, menus, times, etc.) unverified.
+ rest=rest.replace(/\b(?:adapte|adaptes|adaptee|adaptees|phu hop|cho ngoi)\b/g,' ');
  rest=rest.replace(/\b(?:je|cherche|souhaite|voudrais|un|une|des|le|la|les|de|du|en|au|aux|avec|pour|a|l|d|lieu|endroit|restaurant|repas|cadre|sans|pas|aucun|aucune|eviter|ni|tôi|toi|tim|mong|muon|mot|noi|quan|nha|hang|bua|an|dung|voi|o|khong|co|tranh|a|the|place|restaurant|meal|with|for|no|without|avoid)\b/g,' ').replace(/[\s.!?,;:]+/g,'');
  return rest.length===0;
 }
