@@ -238,7 +238,7 @@ it('uses a new version/cache while retaining one attempt, receipt reuse and unkn
  const http=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(f.native)}]}]})));
  const args={catalogue:f.cat,query,preference:f.text,userId:'test',access:['org-a'],port,key:'offline-fixture',http,unchanged:async()=>true};
  expect((await compareAi(args)).status).toBe('completed');expect((await compareAi(args)).status).toBe('cached');expect(http).toHaveBeenCalledTimes(1);expect(JSON.stringify([...records.values()])).not.toContain(f.text);
- expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v7');
+ expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v8');
  const failed={...args,userId:'another',http:vi.fn<typeof fetch>(async()=>{throw Error('SIMULATED_UNKNOWN');})};
  await compareAi(failed);await compareAi(failed);expect(failed.http).toHaveBeenCalledTimes(1);
 });

@@ -54,12 +54,42 @@ export function criterionHints(query:EngineRequest,text:string,language:'fr'|'vi
  if(p.avoidRepeatedCooking)hints.push({key:'cooking_recurrence',label:language==='vi'?'Vấn đề nấu nướng lặp lại':'Défauts de cuisson récurrents',expected:false,origin:'optional_text_hint'});
  return hints;
 }
-export function coverageSchema(ids:string[],hints:CriterionHint[]){
- const evidence={type:'object',additionalProperties:false,required:['criterion','state','refs'],properties:{criterion:{type:'integer',minimum:0,maximum:7},state:{type:'string',enum:states},refs:{type:'array',maxItems:2,items:{type:'string'}}}};
- return {type:'object',additionalProperties:false,required:['criteria','choices'],properties:{
-  criteria:{type:'array',maxItems:8,items:{type:'object',additionalProperties:false,required:['key','quote'],properties:{key:{type:['string','null'],enum:[...hints.map(h=>h.key),null]},quote:{type:'string',maxLength:500}}}},
-  choices:{type:'array',maxItems:3,items:{type:'object',additionalProperties:false,required:['id','reason_refs','criterion_evidence','caution_refs','caution_bindings','alternative_ids'],properties:{id:{type:'string',enum:ids},reason_refs:{type:'array',minItems:1,maxItems:6,items:{type:'string'}},criterion_evidence:{type:'array',maxItems:8,items:evidence},caution_refs:{type:'array',maxItems:4,items:{type:'string'}},caution_bindings:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,required:['ref','criterion'],properties:{ref:{type:'string'},criterion:{type:['integer','null'],minimum:0,maximum:7}}}},alternative_ids:{type:'array',maxItems:2,items:{type:'string',enum:ids}}}}}
+type TransmittedReferenceCandidate={id:string;facts:readonly {ref:string}[];unknown_feature_refs:readonly string[]};
+function checkReferenceSchemaLimits(schema:unknown){
+ let enumValues=0,strings=0;
+ const visit=(v:unknown):void=>{
+  if(Array.isArray(v)){v.forEach(visit);return;}if(!object(v))return;
+  for(const [key,value]of Object.entries(v)){
+   if(key==='enum'&&Array.isArray(value)){
+    const length=value.reduce((n,x)=>n+(typeof x==='string'?x.length:0),0);enumValues+=value.length;strings+=length;
+    if(value.length>250&&length>15000)throw Error('REFERENCE_SCHEMA_LIMIT');
+   }else if((key==='properties'||key==='$defs')&&object(value))strings+=Object.keys(value).join('').length;
+   else if(key==='const'&&typeof value==='string')strings+=value.length;
+   visit(value);
+  }
+ };
+ visit(schema);if(enumValues>1000||strings>120000)throw Error('REFERENCE_SCHEMA_LIMIT');
+}
+/** The same candidate objects are serialized in request.input. Do not derive
+ * this catalogue from unselected restaurants, hidden facts or source prose. */
+export function coverageSchema(candidates:readonly TransmittedReferenceCandidate[],hints:CriterionHint[]){
+ const ids=candidates.map(c=>c.id),keys=[...hints.map(h=>h.key),null];
+ const refs=[...new Set(candidates.flatMap(c=>[...c.facts.map(f=>f.ref),...c.unknown_feature_refs]))].sort();
+ if(ids.some(id=>typeof id!=='string'||!id)||refs.some(ref=>typeof ref!=='string'||!ref)||ids.length&&!refs.length)throw Error('INVALID_REFERENCE_CATALOGUE');
+ const factRef={$ref:'#/$defs/fact_ref'},candidateId={$ref:'#/$defs/candidate_id'};
+ const evidence={type:'object',additionalProperties:false,required:['criterion','state','refs'],properties:{criterion:{type:'integer',minimum:0,maximum:7},state:{type:'string',enum:states},refs:{type:'array',maxItems:2,items:factRef}}};
+ const schema={type:'object',additionalProperties:false,required:['criteria','choices'],properties:{
+  criteria:{type:'array',maxItems:8,items:{type:'object',additionalProperties:false,required:['key','quote'],properties:{key:{type:['string','null'],enum:keys},quote:{type:'string',maxLength:500}}}},
+  choices:{type:'array',maxItems:ids.length?3:0,items:{type:'object',additionalProperties:false,required:['id','reason_refs','criterion_evidence','caution_refs','caution_bindings','alternative_ids'],properties:{id:candidateId,reason_refs:{type:'array',minItems:1,maxItems:6,items:factRef},criterion_evidence:{type:'array',maxItems:8,items:evidence},caution_refs:{type:'array',maxItems:4,items:factRef},caution_bindings:{type:'array',maxItems:4,items:{type:'object',additionalProperties:false,required:['ref','criterion'],properties:{ref:factRef,criterion:{type:['integer','null'],minimum:0,maximum:7}}}},alternative_ids:{type:'array',maxItems:2,items:candidateId}}}}
+ },$defs:{
+  // With no candidates no choice is allowed and compareAi makes no call. Null
+  // definitions keep that unreachable branch valid without empty enums/sentinels.
+  fact_ref:refs.length?{type:'string',enum:refs}:{type:'null'},
+  candidate_id:ids.length?{type:'string',enum:ids}:{type:'null'},
  }};
+ // Documented Structured Outputs limits, not an application byte/context gate.
+ // Shared definitions count each enum once. Never trim candidates/references to fit.
+ checkReferenceSchemaLimits(schema);return schema;
 }
 function assessment(key:string,proposal:Proposal,facts:Fact[],hint:CriterionHint):{state:CriterionState;refs:string[]}{
  if(key.startsWith('feature_')){

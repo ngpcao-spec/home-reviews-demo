@@ -30,16 +30,16 @@ it('keeps a rejected identity check before HTTP and never sends or stores the le
  expect(result).toMatchObject({status:'fallback',notice:'DIAGNOSTIC_REQUEST_CHANGED'});expect(http).not.toHaveBeenCalled();expect(reserve).not.toHaveBeenCalled();expect(finish).not.toHaveBeenCalled();
  const args=reserveCorrectedDiagnostic.mock.calls[0] as unknown as string[];expect(args).toHaveLength(4);args.forEach(s=>expect(s).toMatch(/^[a-f0-9]{64}$/));expect(args[3]).toBe(cases[0][2]);
 });
-it('sends only the current V7 request after a successful one-use reservation and commits its diagnostic',async()=>{
+it('sends only the current V8 request after a successful mocked reservation and commits its diagnostic',async()=>{
  const c=catalogue('fr'),finish=vi.fn(async()=>{}),finishWithDiagnostic=vi.fn(async()=>{}),reserve=vi.fn(async()=>{throw Error('NOT_EXPECTED');});
  const reserveCorrectedDiagnostic=vi.fn(async()=>({id:'simulated-child',owned:true,state:'dispatched',selection:null,metrics:null}));
  const http=vi.fn<typeof fetch>(async(_url,init)=>{
-  const body=JSON.parse(String(init?.body)),input=JSON.parse(body.input);expect(input.configuration_version).toBe('recommendation-ai-open-criteria-safety-v7');expect(input.criteria_version).toBe('recommendation-criteria-coverage-v2');
+  const body=JSON.parse(String(init?.body)),input=JSON.parse(body.input);expect(input.configuration_version).toBe('recommendation-ai-open-criteria-safety-v8');expect(input.criteria_version).toBe('recommendation-criteria-coverage-v3');
   expect(input.candidates.length).toBeLessThanOrEqual(20);expect(body).not.toHaveProperty('legacy_request');
   const decision=coveredWireReply(input,[{id:'a',reason_refs:['score_global'],caution_ref:null}]);
   return new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({...decision,choices:decision.choices.map(c=>({...c,caution_bindings:[]}))})}]}]}));
  });
  const result=await compareAi({catalogue:c,query,preference:'',userId:'fixture-user',access:[],key:'offline-placeholder',http,port:{reserve,reserveCorrectedDiagnostic,finish,finishWithDiagnostic},unchanged:async()=>true,diagnosticRuntime:{deployment_id:'project_function_10'}});
  expect(result).toMatchObject({status:'completed',attempt_id:'simulated-child'});expect(reserveCorrectedDiagnostic).toHaveBeenCalledTimes(1);expect(http).toHaveBeenCalledTimes(1);expect(reserve).not.toHaveBeenCalled();expect(finish).not.toHaveBeenCalled();expect(finishWithDiagnostic).toHaveBeenCalledTimes(1);
- expect(finishWithDiagnostic.mock.calls[0]).toEqual(expect.arrayContaining([expect.objectContaining({server_version:10,contract_version:'recommendation-criteria-coverage-v2',validator_version:'recommendation-criteria-validator-v2',origin:'ai_validated'})]));
+ expect(finishWithDiagnostic.mock.calls[0]).toEqual(expect.arrayContaining([expect.objectContaining({server_version:10,contract_version:'recommendation-criteria-coverage-v3',validator_version:'recommendation-criteria-validator-v2',origin:'ai_validated'})]));
 });

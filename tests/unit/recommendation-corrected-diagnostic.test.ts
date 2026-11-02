@@ -37,6 +37,7 @@ it('cannot silently accept changed text, filters, access, data or protocol',asyn
  await arm();await expect(reserve(key,hash,'f'.repeat(64))).rejects.toThrow('DIAGNOSTIC_REQUEST_CHANGED');await expect(reserve(key,hash,oldKey,'f'.repeat(64))).rejects.toThrow('DIAGNOSTIC_REQUEST_CHANGED');
  await expect(reserve(key,hash,oldKey,oldHash,{...trace(),validator_version:'recommendation-criteria-validator-v1'})).rejects.toThrow('DIAGNOSTIC_RUNTIME_INCOMPATIBLE');
  await expect(reserve(key,hash,oldKey,oldHash,{...trace(),server_version:9})).rejects.toThrow('DIAGNOSTIC_RUNTIME_INCOMPATIBLE');expect((await grant()).child_attempt_id).toBeNull();
+ await expect(reserve(key,hash,oldKey,oldHash,{...trace(),contract_version:'recommendation-criteria-coverage-v3',cache_version:'recommendation-ai-open-criteria-safety-v8'})).rejects.toThrow('DIAGNOSTIC_RUNTIME_INCOMPATIBLE');expect((await grant()).child_attempt_id).toBeNull();
 });
 it('commits one new child and initial diagnostic before sending; double click joins it',async()=>{
  const before=await snapshot(),old=await oldGrant();await arm();const first=await reserve();expect(first.owned).toBe(true);expect(await reserve()).toMatchObject({id:first.id,owned:false,state:'dispatched'});
