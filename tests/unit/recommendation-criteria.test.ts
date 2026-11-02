@@ -5,6 +5,7 @@ import {coveredReply} from '../fixtures/recommendation-coverage-reply';
 import {placeProfile} from '../../supabase/functions/_shared/google-place-profile';
 import {prepareAi,renderChoices,compareAi,RECOMMENDATION_AI_VERSION,type AiPort,type Attempt} from '../../supabase/functions/_shared/recommendation-ai';
 import {validateCoveredDecision,restoreCoveredChoices,CRITERIA_VERSION,ReferenceValidationError} from '../../supabase/functions/_shared/recommendation-criteria';
+import {directWireReply} from '../fixtures/recommendation-direct-reply';
 import {DecisionValidationError} from '../../supabase/functions/_shared/recommendation-diagnostics';
 import {recommendRestaurants,type SheetRow} from '../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
 
@@ -235,10 +236,10 @@ describe.each(['fr','vi'] as const)('S16 recurrence and useful cautions %s',lang
 it('uses a new version/cache while retaining one attempt, receipt reuse and unknown-outcome protections',async()=>{
  const f=family('fr'),records=new Map<string,Attempt>();let seq=0;
  const port:AiPort={reserve:vi.fn(async key=>{const old=records.get(key);if(old)return {...old,owned:false};const a={id:String(++seq),owned:true,state:'dispatched',selection:null,metrics:null};records.set(key,a);return a;}),finish:vi.fn(async(id,state,selection,metrics)=>{Object.assign([...records.values()].find(x=>x.id===id)!,{state,selection,metrics});})};
- const http=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(f.native)}]}]})));
+ const http=vi.fn<typeof fetch>(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(directWireReply({language:'fr'},f.native.choices.map(c=>({id:c.id,reason_refs:c.reason_refs,caution_ref:null}))))}]}]})));
  const args={catalogue:f.cat,query,preference:f.text,userId:'test',access:['org-a'],port,key:'offline-fixture',http,unchanged:async()=>true};
  expect((await compareAi(args)).status).toBe('completed');expect((await compareAi(args)).status).toBe('cached');expect(http).toHaveBeenCalledTimes(1);expect(JSON.stringify([...records.values()])).not.toContain(f.text);
- expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v9');
+ expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-direct-choice-v10');
  const failed={...args,userId:'another',http:vi.fn<typeof fetch>(async()=>{throw Error('SIMULATED_UNKNOWN');})};
  await compareAi(failed);await compareAi(failed);expect(failed.http).toHaveBeenCalledTimes(1);
 });

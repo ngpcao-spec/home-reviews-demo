@@ -14,9 +14,8 @@ describe.each(['fr','vi'] as const)('general fallback disclosure %s',language=>{
   for(const visit_at of [undefined,'2026-10-30T12:00:00Z','2026-11-02T12:00:00Z']){
    const q:Request={geography:'not_requested',...(visit_at?{visit_at}:{})},result=recommendRestaurants([row],row.organization_id,language,q),r=describeRecommendationFallback(catalogue,q,request,result.proposals);
    expect(result.proposals).toHaveLength(1);expect(r.personalized_choice_available).toBe(false);expect(r.free_text).toBe('not_verified');expect(r.verified.geography).toBe('not_requested');
-   const c=r.assessments[0].coverage.find(c=>c.key==='feature_quiet')!;
-   if(!visit_at){expect(c.state).toBe('partial');expect(c.evidence.flatMap(x=>x.sources??[]).some(s=>s.kind==='report'&&s.text===text)).toBe(true);}
-   else expect(c.state).toBe(visit_at.includes('10-30')?'conflicted':'documented');
+   expect(r.assessments[0].coverage).toEqual([]);
+   expect(result.proposals[0].reservations[0].text).toBe(text);
    expect(result.proposals[0].scores.global.value).toBe('5');
   }
   expect(row).toEqual(before);

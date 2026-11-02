@@ -4,8 +4,9 @@ import Ajv from 'ajv';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalogue';
 import {placeProfile} from '../../supabase/functions/_shared/google-place-profile';
-import {aiHash,compareAi,prepareAi,renderChoices,type AiPort} from '../../supabase/functions/_shared/recommendation-ai';
+import {aiHash,compareAi,prepareDirectAi,prepareAi,renderChoices} from '../../supabase/functions/_shared/recommendation-ai';
 import {coverageSchema,restoreCoveredChoices,validateCoveredDecision} from '../../supabase/functions/_shared/recommendation-criteria';
+import {directWireReply} from '../fixtures/recommendation-direct-reply';
 import {CRITERIA_VERSION,RECOMMENDATION_AI_VERSION,VALIDATOR_VERSION} from '../../supabase/functions/_shared/recommendation-versions';
 const ajv=new Ajv({allErrors:true}),query={geography:'not_requested' as const};
 function fixture(language:'fr'|'vi'){
@@ -62,17 +63,12 @@ describe.each(['fr','vi'] as const)('transmitted reference catalogue %s',languag
   const general={criteria:[],choices:[{id:'candidate-a',reason_refs:['score_global'],criterion_evidence:[],caution_refs:['freshness'],caution_bindings:[{ref:'freshness',criterion:null}],alternative_ids:[]}]};
   expect(ajv.compile(noCriteria.request.text.format.schema)(general)).toBe(true);expect(validateCoveredDecision(general,noCriteria)).toHaveLength(1);
  });
- it('sends the bounded schema through the actual Responses preparation/transport path, using only mocks',async()=>{
-  const {p,native,catalogue,text}=fixture(language),reserve=vi.fn(async()=>({id:'mock-attempt',owned:true,state:'dispatched',selection:null,metrics:null})),finish=vi.fn(async()=>{});
-  const http=vi.fn<typeof fetch>(async(url,init)=>{
-   expect(url).toBe('https://api.openai.com/v1/responses');const body=JSON.parse(String(init?.body)),input=JSON.parse(body.input);
-   expect(body.text.format).toMatchObject({type:'json_schema',strict:true,name:'restaurant_selection'});expect(body.text.format.schema).toEqual(p.request.text.format.schema);
-   expect(body.text.format.schema.$defs.fact_ref.enum).toEqual([...new Set(input.candidates.flatMap((c:{facts:{ref:string}[];unknown_feature_refs:string[]})=>[...c.facts.map(f=>f.ref),...c.unknown_feature_refs]))].sort());
-   const validate=ajv.compile(body.text.format.schema);expect(validate(native),JSON.stringify(validate.errors)).toBe(true);
-   return new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(native)}]}]}));
-  });
-  const port:AiPort={reserve,finish};const result=await compareAi({catalogue,query,preference:text,userId:'synthetic',access:[],port,key:'offline-placeholder',http,unchanged:async()=>true});
-  expect(result.status).toBe('completed');expect(http).toHaveBeenCalledTimes(1);expect(reserve).toHaveBeenCalledTimes(1);expect(finish).toHaveBeenCalledTimes(1);
+ it('sends the direct schema through the actual transport without semantic reference constraints',async()=>{
+  const {catalogue,text}=fixture(language),p=prepareDirectAi(catalogue,query,text),native=directWireReply({language},[{id:'candidate-a',reason_refs:['unusable'],caution_ref:null}]);
+  const reserve=vi.fn(async()=>({id:'mock-attempt',owned:true,state:'dispatched',selection:null,metrics:null})),finish=vi.fn(async()=>{});
+  const http=vi.fn<typeof fetch>(async(_url,init)=>{const body=JSON.parse(String(init?.body));expect(body.text.format.schema).toEqual(p.request.text.format.schema);expect(ajv.compile(body.text.format.schema)(native)).toBe(true);expect(JSON.stringify(body.text.format.schema)).not.toContain('fact_ref');return new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(native)}]}]}));});
+  const result=await compareAi({catalogue,query,preference:text,userId:'synthetic',access:[],port:{reserve,finish},key:'offline-placeholder',http,unchanged:async()=>true});
+  expect(result.status).toBe('completed');expect(result.selections[0].ai).toMatchObject({omitted_source_count:1,independently_verified:false});expect(http).toHaveBeenCalledTimes(1);
  });
 });
 it('builds a valid empty-catalogue schema with no sentinel or empty enum',async()=>{
@@ -111,7 +107,7 @@ it('uses only the documented strict schema subset and local definitions in the R
  expect(schema.type).toBe('object');visit(schema);expect(properties).toBeLessThanOrEqual(5000);expect(enumValues).toBeLessThanOrEqual(1000);expect(strings).toBeLessThanOrEqual(120000);expect(ajv.validateSchema(schema)).toBe(true);
 });
 it('keeps the bounded wire contract, versions the proof/cache changes and rejects old cached coverage',async()=>{
- const {p,native}=fixture('fr'),stored=validateCoveredDecision(native,p);expect(CRITERIA_VERSION).toBe('recommendation-criteria-coverage-v3');expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-open-criteria-safety-v9');expect(VALIDATOR_VERSION).toBe('recommendation-criteria-validator-v3');
+ const {p,native}=fixture('fr'),stored=validateCoveredDecision(native,p);expect(CRITERIA_VERSION).toBe('recommendation-criteria-coverage-v3');expect(RECOMMENDATION_AI_VERSION).toBe('recommendation-ai-direct-choice-v10');expect(VALIDATOR_VERSION).toBe('recommendation-structural-validator-v1');
  stored[0].coverage_version='recommendation-criteria-coverage-v2' as typeof CRITERIA_VERSION;expect(()=>restoreCoveredChoices(stored,p)).toThrow('CACHE_INCOMPATIBLE');
  const legacy=structuredClone(p.request),input=JSON.parse(legacy.input);input.configuration_version='recommendation-ai-open-criteria-safety-v8';legacy.input=JSON.stringify(input);
  expect(await aiHash(legacy)).not.toBe(await aiHash(p.request));

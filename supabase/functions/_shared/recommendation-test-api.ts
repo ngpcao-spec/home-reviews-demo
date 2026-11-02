@@ -2,7 +2,7 @@ import type {AuthContext} from './auth.ts';
 import {recommendationCuisineOptions,type Request as RecommendationRequest} from './restaurant-recommendation-engine-v1.ts';
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
-import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareDirectAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
 import type {DiagnosticRuntime,RecommendationTrace} from './recommendation-diagnostics.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
@@ -19,9 +19,9 @@ function criteria(raw:unknown) {
     || b.maximum_vnd!==undefined && (typeof b.maximum_vnd!=='number'||!Number.isSafeInteger(b.maximum_vnd)||b.maximum_vnd<0)
     || b.service_priority!==undefined && typeof b.service_priority!=='boolean'
     || b.required_features!==undefined && !validAiFeatures(b.required_features)
-    || b.preference_mode!==undefined && !['free_text_v2','report_facts_v3','criteria_coverage_v5','criteria_coverage_v6'].includes(String(b.preference_mode)))throw Error('INVALID_RECOMMENDATION_REQUEST');
+    || b.preference_mode!==undefined && !['free_text_v2','report_facts_v3','criteria_coverage_v5','criteria_coverage_v6','direct_choice_v1'].includes(String(b.preference_mode)))throw Error('INVALID_RECOMMENDATION_REQUEST');
   if(b.preference!==undefined)b.preference=checkedRecommendationPreference(b.preference);
-  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'|'criteria_coverage_v5'|'criteria_coverage_v6'};
+  return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'|'criteria_coverage_v5'|'criteria_coverage_v6'|'direct_choice_v1'};
 }
 export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort;diagnostics?:{runtime:DiagnosticRuntime;prune:(context:Context,organization:string)=>Promise<void>;record:(context:Context,organization:string,trace:RecommendationTrace)=>Promise<void>}}) {
  return async(request:Request):Promise<Response>=>{
@@ -37,7 +37,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    let raw:unknown;try{raw=JSON.parse(text);}catch{throw Error('INVALID_RECOMMENDATION_REQUEST');}
    const input=criteria(raw);
    // Require the client explaining that anonymous report excerpts are now sent, before any read/reservation.
-   if(input.action==='compare'&&input.preference_mode!=='criteria_coverage_v6')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
+   if(input.action==='compare'&&input.preference_mode!=='direct_choice_v1')throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
    const membership=await context.client.from('organization_members').select('user_id,organization_id,role,organization:organizations!inner(id,name)')
     .eq('user_id',context.user.id).in('role',['owner','admin','manager']).order('organization_id');
    if(membership.error)throw Error('RECOMMENDATION_READ_FAILED');
@@ -53,7 +53,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    const catalogue=await readRestaurantRecommendationCatalogue(context,organizationId);
    const cuisines=recommendationCuisineOptions(catalogue.rows,organizationId,catalogue.language);
    if(input.cuisine&&!cuisines.includes(input.cuisine))throw Error('INVALID_RECOMMENDATION_REQUEST');
-   const supported=prepareAi(catalogue,{geography:'not_requested'},'').proposals;
+   const supported=prepareDirectAi(catalogue,{geography:'not_requested'},'').proposals;
    const features=AI_FEATURES.filter(f=>supported.some(p=>p.features[f]?.status==='reported')).map(f=>featureOption(f,catalogue.language));
    const common={api_version:RECOMMENDATION_TEST_API_VERSION,language:catalogue.language,organization_id:organizationId,organizations,cuisines,features};
    if(input.action==='options')return reply(common);

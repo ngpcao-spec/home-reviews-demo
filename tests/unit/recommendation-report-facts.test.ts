@@ -4,7 +4,7 @@ import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalog
 import {recommendRestaurants} from '../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
 import {privateReportText,reportPoint,REPORT_FACTS_VERSION} from '../../supabase/functions/_shared/recommendation-report-facts';
 import {prepareAi,renderChoices,validateChoices,compareAi,aiHash,RECOMMENDATION_AI_VERSION,type AiPort,type Attempt} from '../../supabase/functions/_shared/recommendation-ai';
-import {coveredWireReply} from '../fixtures/recommendation-coverage-reply';
+import {directWireReply} from '../fixtures/recommendation-direct-reply';
 const hashes=['a','b','c'].map(c=>c.repeat(64));
 function fixture(text='Un client souhaiterait davantage d’espace, mais reste satisfait.'){
  const row=recommendationSheet('example',{positive:'Les légumes sont appréciés.',reservation:text});
@@ -67,7 +67,7 @@ describe('versioned useful report excerpts with proven frozen support',()=>{
   records.set(oldKey,{id:'legacy',owned:false,state:'succeeded',selection:[],metrics:null});
   const port:AiPort={reserve:vi.fn(async key=>{if(records.has(key))return {...records.get(key)!,owned:false};const a={id:'v3',owned:true,state:'dispatched',selection:null,metrics:null};records.set(key,a);return a;}),finish:vi.fn(async(id,state,selection,metrics)=>{Object.assign([...records.values()].find(a=>a.id===id)!,{state,selection,metrics});})};
   const choices=[{id:f.row.establishment_id,reason_refs:['strength_quality_0'],caution_ref:'reservation_quality_0'}];
-  const http=vi.fn<typeof fetch>(async(_url,init)=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(coveredWireReply(JSON.parse(JSON.parse(String(init?.body)).input),choices))}]}]})));
+  const http=vi.fn<typeof fetch>(async(_url,init)=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(directWireReply(JSON.parse(JSON.parse(String(init?.body)).input),choices))}]}]})));
   const args={catalogue:f.catalogue,query:{geography:'not_requested' as const},preference:'',userId:'caller',access:['org-a'],port,key:'fixture',http,unchanged:async()=>true};
   expect((await compareAi(args)).status).toBe('completed');expect((await compareAi(args)).status).toBe('cached');expect(http).toHaveBeenCalledTimes(1);expect(records.get(oldKey)!.id).toBe('legacy');expect(RECOMMENDATION_AI_VERSION).not.toContain('v2');
   expect([...records.values()].find(a=>a.id==='v3')!.metrics).toMatchObject({configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION});

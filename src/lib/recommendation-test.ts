@@ -2,7 +2,7 @@ import {supabase} from './supabase';
 import type {Result,Proposal} from '../../supabase/functions/_shared/restaurant-recommendation-engine-v1';
 import type {AiComparison} from '../../supabase/functions/_shared/recommendation-ai-contract';
 export type {Proposal};
-export type RecommendationTestInput={action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'criteria_coverage_v6'};
+export type RecommendationTestInput={action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'direct_choice_v1'};
 export type RecommendationTestResponse={api_version:string;language:'fr'|'vi';organization_id:string;organizations:{id:string;name:string}[];cuisines:string[];features?:{id:string;label:string}[];result?:Result;comparison?:AiComparison};
 export async function recommendationTestApi(body:RecommendationTestInput):Promise<RecommendationTestResponse>{
  if(!supabase)throw Error('UNAUTHORIZED');
@@ -18,5 +18,7 @@ export async function recommendationTestApi(body:RecommendationTestInput):Promis
   throw Error(code);
  }
  if(!data||data.api_version!=='recommendation-test-v1'||!['fr','vi'].includes(data.language))throw Error('RECOMMENDATION_TEST_UNAVAILABLE');
+ if(body.action==='compare'&&['completed','cached'].includes(data.comparison?.status)&&
+  (data.comparison.contract_version!=='recommendation-direct-choice-v1'||!Array.isArray(data.comparison.selections)||data.comparison.selections.some((s:{ai?:{version?:string;independently_verified?:boolean}})=>s.ai?.version!=='recommendation-direct-choice-v1'||s.ai.independently_verified!==false)))throw Error('RECOMMENDATION_CLIENT_UPDATE_REQUIRED');
  return data as RecommendationTestResponse;
 }

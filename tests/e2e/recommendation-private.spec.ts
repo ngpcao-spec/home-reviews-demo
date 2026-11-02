@@ -66,10 +66,9 @@ for(const language of ['fr','vi'] as const){
   await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
   await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
   const card=page.locator('.recommendation-ai .recommendation-card').filter({hasText:'Restaurant témoin 1'});
-  await expect(card).toContainText(language==='fr'?'Les plats sont appréciés':'Các món ăn được khách khen');
-  await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'davantage d’espace':'thêm không gian');
-  await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'Le nombre de références':'Số tham chiếu');
-  await expect(card).toContainText(language==='fr'?'ne constitue pas un constat des avis':'không phải kết luận từ các đánh giá');
+  await expect(card).toContainText(language==='fr'?'Je propose ce restaurant':'Tôi đề xuất nhà hàng');
+  await expect(card).toContainText(language==='fr'?'non vérifiée indépendamment':'chưa được kiểm chứng độc lập');
+  await expect(card.locator('.recommendation-caution')).toContainText(language==='fr'?'point de vigilance':'điểm lưu ý');
   for(const excerpt of await card.locator('.recommendation-saved-excerpt').all())expect(await excerpt.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
   await card.getByText(language==='fr'?'Détails et sources':'Chi tiết và nguồn',{exact:true}).click();
   const sources=card.locator('.recommendation-bound-source');
@@ -87,15 +86,30 @@ for(const language of ['fr','vi'] as const){
   await page.getByLabel(language==='fr'?'Qu’est-ce qui compte pour vous ?':'Điều gì quan trọng với bạn?',{exact:true}).fill(language==='fr'?'Un repas en famille en terrasse.':'Bữa ăn gia đình ở ngoài trời.');
   await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
   const card=page.locator('.recommendation-ai .recommendation-card');await expect(card).toHaveCount(1);
-  await expect(card.locator('[data-match="partial"]')).toBeVisible();
-  await expect(card.locator('.recommendation-coverage').first().locator('[data-criterion="feature_family_friendly"]')).toHaveAttribute('data-criterion-state','unknown');
-  await expect(card.locator('.recommendation-coverage').first().locator('[data-criterion="feature_outdoor_seating"]')).toHaveAttribute('data-criterion-state','documented');
-  await card.locator('.recommendation-alternative > summary').click();
-  const alternative=card.locator('.recommendation-alternative');await expect(alternative).toContainText('Restaurant témoin 2');
-  await expect(alternative.locator('[data-criterion="feature_family_friendly"]')).toHaveAttribute('data-criterion-state','documented');
-  await expect(alternative.locator('[data-criterion="feature_outdoor_seating"]')).toHaveAttribute('data-criterion-state','unknown');
+  await expect(card.locator('[data-ai-explanation="unverified"]')).toBeVisible();
+  await expect(card).toContainText(language==='fr'?'l’accueil des familles reste inconnu':'chưa rõ mức phù hợp với gia đình');
+  await expect(card).toContainText(language==='fr'?'La terrasse est renseignée':'Có thông tin về chỗ ngồi ngoài trời');
+  await expect(card).toContainText('Restaurant témoin 2');
+  await expect(card).toContainText(language==='fr'?'Accueil des enfants non confirmé':'Chưa xác nhận tiện nghi cho trẻ em');
+  await expect(card.locator('[data-match], .recommendation-coverage')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await card.screenshot({path:testInfo.outputPath('criterion-tradeoff-'+language+'.png')});
+ });
+ test(`direct text remains visible with unusable sources and is never executed as HTML ${language}`,async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('recommendation-ai-case','direct-unverified'));
+  await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');
+  await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
+  const ai=page.locator('.recommendation-ai');await expect(ai.locator('[data-recommendation-origin="completed"]')).toBeVisible();
+  const text=ai.locator('.recommendation-direct-explanation').first();await expect(text).toContainText('<b>Model assessment</b>');await expect(text.locator('b')).toHaveCount(0);
+  await expect(text).toContainText(language==='fr'?'Certaines références inutilisables':'Một số tham chiếu không sử dụng được');
+  await expect(text).toContainText(language==='fr'?'Information familiale inconnue':'Chưa rõ thông tin gia đình');
+  await expect(ai).not.toContainText('unusable-source');await expect(ai.locator('.recommendation-coverage')).toHaveCount(0);
+ });
+ test(`empty model selection is usable and is not replaced by fallback ${language}`,async({page})=>{
+  await page.addInitScript(()=>localStorage.setItem('recommendation-ai-case','empty'));
+  await page.goto('/tests/e2e/fixtures/resume.html#/plus/recommandations');await page.getByRole('button',{name:language==='fr'?'Comparer avec l’IA':'So sánh với AI',exact:true}).click();
+  const ai=page.locator('.recommendation-ai');await expect(ai.locator('[data-recommendation-origin="completed"]')).toBeVisible();await expect(ai.locator('.recommendation-card')).toHaveCount(0);
+  await expect(ai).toContainText(language==='fr'?'L’IA n’a retenu aucun':'AI không chọn nhà hàng nào');await expect(page.locator('[data-fallback-personalization]')).toHaveCount(0);
  });
  for(const state of ['cached','pending'])test(`explicit ${state} provenance ${language}`,async({page})=>{
   await page.addInitScript(state=>localStorage.setItem('recommendation-ai-case',state),state);

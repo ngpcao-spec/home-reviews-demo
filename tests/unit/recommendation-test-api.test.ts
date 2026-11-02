@@ -3,7 +3,7 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 import {requireUser} from '../../supabase/functions/_shared/auth';
 import {recommendationTestHandler} from '../../supabase/functions/_shared/recommendation-test-api';
 import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalogue';
-import {coveredWireReply} from '../fixtures/recommendation-coverage-reply';
+import {directWireReply} from '../fixtures/recommendation-direct-reply';
 import type {RecommendationTrace} from '../../supabase/functions/_shared/recommendation-diagnostics';
 const org='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 const user='33333333-3333-4333-8333-333333333333';
@@ -28,7 +28,7 @@ function fixture(options:{language?:'fr'|'vi';role?:string;anonymous?:boolean;fa
  }));
  const reserve=vi.fn(async()=>({id:'attempt-offline',owned:true,state:'dispatched',selection:null,metrics:null}));
  const finish=vi.fn(async()=>{});
- const provider=vi.fn<typeof fetch>(async(_url,init)=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(coveredWireReply(JSON.parse(JSON.parse(String(init?.body)).input),[{id:rows[0].establishment_id,reason_refs:['score_global'],caution_ref:null}]))}]}]})));
+ const provider=vi.fn<typeof fetch>(async(_url,init)=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(directWireReply(JSON.parse(JSON.parse(String(init?.body)).input),[{id:rows[0].establishment_id,reason_refs:['score_global'],caution_ref:null}]))}]}]})));
  const prune=vi.fn(async()=>{}),record=vi.fn<(context:unknown,organization:string,trace:RecommendationTrace)=>Promise<void>>(async()=>{});
  const handler=recommendationTestHandler(requireUser,options.ai?{key:()=> 'offline-placeholder',http:provider,port:()=>({reserve,finish}),...(options.diagnostics?{diagnostics:{runtime:{deployment_id:'project_function_7'},prune,record}}:{})}:undefined);
  const send=(body:unknown,authenticated=true,method='POST')=>handler(new Request('https://fixture.invalid/functions/v1/test-restaurant-recommendations',{method,headers:authenticated?{Authorization:'Bearer caller-token'}:{},...(method==='POST'?{body:JSON.stringify(body)}:{})}));
@@ -38,10 +38,10 @@ afterEach(()=>vi.unstubAllGlobals());
 describe('authenticated recommendation endpoint',()=>{
  it.each(['fr','vi'] as const)('records the final origin privately and never calls AI on options/search %s',async language=>{
   const f=fixture({ai:true,diagnostics:true,language});await f.send({action:'options'});await f.send({action:'recommend'});expect(f.prune).toHaveBeenCalledTimes(2);expect(f.record).not.toHaveBeenCalled();expect(f.provider).not.toHaveBeenCalled();
-  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v6'});const data=await response.json();expect(data.comparison.status).toBe('completed');expect(f.record).toHaveBeenCalledTimes(1);
+  const response=await f.send({action:'compare',preference_mode:'direct_choice_v1'});const data=await response.json();expect(data.comparison.status).toBe('completed');expect(f.record).toHaveBeenCalledTimes(1);
   expect(f.record.mock.calls[0][2]).toMatchObject({version:'recommendation-diagnostic-v2',origin:'ai_validated',response_status:200,server_version:7,candidate_ids:['a','b']});
   expect(JSON.stringify(f.record.mock.calls.map(c=>c[2]))).not.toContain('Phục vụ chu đáo');expect(data.comparison).not.toHaveProperty('diagnostic');
-  f.record.mockRejectedValueOnce(Error('private diagnostic unavailable'));expect((await f.send({action:'compare',preference_mode:'criteria_coverage_v6'})).status).toBe(200);
+  f.record.mockRejectedValueOnce(Error('private diagnostic unavailable'));expect((await f.send({action:'compare',preference_mode:'direct_choice_v1'})).status).toBe(200);
  });
  it('does not prune or record before authorization and organization membership are established',async()=>{
   const f=fixture({ai:true,diagnostics:true,role:'viewer'});expect((await f.send({action:'options'})).status).toBe(403);expect(f.prune).not.toHaveBeenCalled();expect(f.record).not.toHaveBeenCalled();expect(f.provider).not.toHaveBeenCalled();
@@ -94,7 +94,7 @@ describe('authenticated recommendation endpoint',()=>{
  it('calls the AI only for an explicit compare, under the same organization/session and frozen rows',async()=>{
   const f=fixture({ai:true});await f.send({action:'options'});await f.send({action:'recommend',preference:'en famille'});
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
-  const r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
+  const r=await(await f.send({action:'compare',preference_mode:'direct_choice_v1',preference:'en famille'})).json();expect(r.comparison.status).toBe('completed');expect(r.result.proposals).toHaveLength(2);
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledTimes(1);
  });
  it.each([undefined,'free_text_v2','criteria_coverage_v5'])('rejects an old page mode %s before any catalogue read, reservation or text transmission, preserving classic searches',async mode=>{
@@ -107,30 +107,30 @@ describe('authenticated recommendation endpoint',()=>{
  it.each(['fr','vi'] as const)('sends the whole %s request with its negation only after compare and does not echo or persist it',async language=>{
   const f=fixture({ai:true,language}),text=language==='fr'?'Je ne cherche pas forcément le calme.\nSans musique en direct, si possible.':'Không nhất thiết yên tĩnh; nếu được, không có nhạc sống.';
   await f.send({action:'recommend',preference:text});expect(f.provider).not.toHaveBeenCalled();
-  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
+  const response=await f.send({action:'compare',preference_mode:'direct_choice_v1',preference:text}),data=await response.json();expect(data.comparison.status).toBe('completed');
   const sent=JSON.parse(JSON.parse(String(f.provider.mock.calls[0][1]!.body)).input);
   expect(sent.natural_language_request).toBe(text);expect(data).not.toHaveProperty('interpreted_preferences');
   expect(JSON.stringify(data)).not.toContain(text);expect(JSON.stringify(f.finish.mock.calls)).not.toContain(text);
  });
  it('refuses foreign organization, unsupported requirements and personal contact data before reserving an AI attempt',async()=>{
   const f=fixture({ai:true});
-  for(const body of [{action:'compare',preference_mode:'criteria_coverage_v6',organization_id:other},{action:'compare',preference_mode:'criteria_coverage_v6',required_features:['invented']},{action:'compare',preference_mode:'criteria_coverage_v6',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
+  for(const body of [{action:'compare',preference_mode:'direct_choice_v1',organization_id:other},{action:'compare',preference_mode:'direct_choice_v1',required_features:['invented']},{action:'compare',preference_mode:'direct_choice_v1',preference:'contact me at jane@example.com'}])expect((await f.send(body)).status).toBeGreaterThanOrEqual(400);
   expect(f.provider).not.toHaveBeenCalled();expect(f.reserve).not.toHaveBeenCalled();
  });
  it('does not confirm an unknown mandatory feature and returns the ordinary empty engine result',async()=>{
-  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'criteria_coverage_v6',required_features:['quiet']})).json();
+  const f=fixture({ai:true}),r=await(await f.send({action:'compare',preference_mode:'direct_choice_v1',required_features:['quiet']})).json();
   expect(r.result.proposals).toEqual([]);expect(r.comparison.status).toBe('fallback');expect(f.provider).not.toHaveBeenCalled();
  });
  it('does not return candidate data after permissions are revoked during the single provider attempt',async()=>{
   const options={ai:true,role:'manager'},f=fixture(options),native=f.provider.getMockImplementation()!;
   f.provider.mockImplementation(async(...args)=>{const response=await native(...args);options.role='viewer';return response;});
-  const r=await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
+  const r=await f.send({action:'compare',preference_mode:'direct_choice_v1',preference:'service'});expect(r.status).toBe(403);expect(await r.json()).toEqual({error:'FORBIDDEN'});
   expect(f.provider).toHaveBeenCalledTimes(1);expect(f.finish).toHaveBeenCalledWith('attempt-offline','obsolete',null,expect.any(Object),'FORBIDDEN');
  });
  it.each(['fr','vi'] as const)('discloses unavailable personalization and only actual structured controls after invalid output %s',async language=>{
   const f=fixture({ai:true,language}),text=language==='fr'?'Un dîner calme.':'Bữa tối yên tĩnh.';
-  f.provider.mockImplementation(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"choices":[]}'}]}]})));
-  const response=await f.send({action:'compare',preference_mode:'criteria_coverage_v6',preference:text,service_priority:true}),data=await response.json();
+  f.provider.mockImplementation(async()=>new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"choices":"invalid"}'}]}]})));
+  const response=await f.send({action:'compare',preference_mode:'direct_choice_v1',preference:text,service_priority:true}),data=await response.json();
   expect(data.comparison.status).toBe('fallback');expect(data.comparison.selections).toEqual([]);
   expect(data.comparison.fallback).toMatchObject({personalized_choice_available:false,free_text:'not_verified',verified:{access:true,report_and_scores:true,geography:'not_requested',budget:null,cuisines:[],required_features:[],service_priority:true}});
   expect(data.comparison.fallback.assessments).toHaveLength(data.result.proposals.length);expect(JSON.stringify(data)).not.toContain(text);
