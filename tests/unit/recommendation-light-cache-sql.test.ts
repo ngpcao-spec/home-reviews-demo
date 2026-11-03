@@ -14,7 +14,7 @@ it('isolates persistent light sheets by tenant, restricts writes to server, and 
    grant select on establishments,organization_members to authenticated;
    insert into organizations values('${org}'),('${other}');insert into establishments values('${est}','${org}');
    insert into organization_members values('${org}','${user}','manager');`);
-  const migration=readFileSync('supabase/migrations/20261102161943_recommendation_light_sheets_cache.sql','utf8');
+  const migration=readFileSync('supabase/migrations/20261103003249_recommendation_light_sheets_cache.sql','utf8');
   expect(migration).not.toMatch(/update public\.(restaurant_recommendation_sheets|current_report_publications)|recommendation_ai_attempts|diagnostic_trials|cron\./);
   await db.exec(migration);
   const insert=`insert into recommendation_light_sheet_cache values('${org}','${est}','fr','recommendation-light-v1','${'a'.repeat(64)}','{"id":"${est}"}')`;

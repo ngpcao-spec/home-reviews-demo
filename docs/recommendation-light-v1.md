@@ -46,7 +46,7 @@ At most one current source version is stored per tenant/restaurant/language/form
 Concurrent misses can perform the same free deterministic work; no paid call is
 used to prepare a sheet. The existing paid reservation still controls AI dispatch.
 
-Install `20261102161943_recommendation_light_sheets_cache.sql` before deploying the
+Install `20261103003249_recommendation_light_sheets_cache.sql` before deploying the
 updated private function for persistent reuse. No frontend contract change is
 required. The migration creates an empty derived cache only; it does not backfill,
 modify a report, run a supplier, or create/extend/reset a trial grant. Existing
