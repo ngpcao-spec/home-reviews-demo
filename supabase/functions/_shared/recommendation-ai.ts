@@ -13,6 +13,7 @@ export type {AiSelection,AiComparison,Metrics} from './recommendation-ai-contrac
 export {RECOMMENDATION_AI_VERSION} from './recommendation-versions.ts';
 import {RECOMMENDATION_AI_VERSION,RECOMMENDATION_CONTRACT_VERSION} from './recommendation-versions.ts';
 import {LEGACY_DIAGNOSTIC_VERSION,prepareLegacyDiagnosticRequest} from './recommendation-legacy-diagnostic-identity.ts';
+import {LIGHT_SHEET_VERSION,restaurantLightSheet,lightSheetLegend,lightSheetIdentity,type LightSheet,type LightSheetCachePort,type LightSheetCacheEntry} from './recommendation-light.ts';
 export const RECOMMENDATION_AI_MODEL='gpt-6.1-sol';
 // Historical benchmark kept for the existing offline fixtures; not a dispatch limit.
 export const RECOMMENDATION_AI_INPUT_BYTES=200000;
@@ -119,6 +120,9 @@ function prepareCandidateData(catalogue:Catalogue,query:EngineRequest,preference
  const reportPoints=new Map(proposals.map(p=>[p.establishment_id,savedReportPoints(p,catalogue.rows.find(r=>r.establishment_id===p.establishment_id))]));
  return {proposals,facts,candidates,reportPoints,shortlist:shortlist.shortlist,criteriaHints,naturalLanguageRequest};
 }
+export function supportedRecommendationProposals(catalogue:Catalogue){
+ return prepareCandidateData(catalogue,{geography:'not_requested'},'').proposals;
+}
 export function prepareAi(catalogue:Catalogue,query:EngineRequest,preference:string){
  const data=prepareCandidateData(catalogue,query,preference);
  const {proposals,facts,candidates,criteriaHints,naturalLanguageRequest}=data;
@@ -134,12 +138,35 @@ type HistoricalPrepared=ReturnType<typeof prepareAi>;
 export type Prepared=Omit<HistoricalPrepared,'request'>&{request:Omit<HistoricalPrepared['request'],'text'>&{text:{format:Omit<HistoricalPrepared['request']['text']['format'],'schema'>&{schema:Record<string,unknown>}}}};
 /** Live contract. Historical coverage preparation remains available for offline
  * receipts/fixtures only, and never decides acceptance of a new AI response. */
-export function prepareDirectAi(catalogue:Catalogue,query:EngineRequest,preference:string):Prepared{
+export function prepareDirectAi(catalogue:Catalogue,query:EngineRequest,preference:string,cachedSheets:ReadonlyMap<string,LightSheet>=new Map()):Prepared{
  const p=prepareCandidateData(catalogue,query,preference);
- const input={configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,contract_version:RECOMMENDATION_CONTRACT_VERSION,
-  language:catalogue.language,mandatory_constraints:query,natural_language_request:p.naturalLanguageRequest,candidates:p.candidates};
+ const candidates=p.proposals.map(proposal=>{
+  const row=catalogue.rows.find(r=>r.establishment_id===proposal.establishment_id)!;
+  return structuredClone(cachedSheets.get(proposal.establishment_id)??restaurantLightSheet(row,catalogue.language,()=>shortlistRestaurants([row],catalogue.organizationId,catalogue.language,
+   {geography:'not_requested',preferences:{categories:[],features:AI_FACT_FEATURES}}).proposals[0]));
+ });
+ const input={configuration_version:RECOMMENDATION_AI_VERSION,content_version:LIGHT_SHEET_VERSION,contract_version:RECOMMENDATION_CONTRACT_VERSION,
+  language:catalogue.language,mandatory_constraints:query,natural_language_request:p.naturalLanguageRequest,legend:lightSheetLegend,candidates};
  return {...p,criteriaHints:[],request:{model:RECOMMENDATION_AI_MODEL,store:false,reasoning:{effort:'low'},max_output_tokens:1800,
   instructions:directChoicePrompt,input:JSON.stringify(input),text:{format:{type:'json_schema',name:'restaurant_selection',strict:true,schema:directChoiceSchema(p.candidates.map(c=>c.id))}}}};
+}
+
+/** Persistent derived sheets are separate from business rows and paid receipts.
+ * Cache failure only causes a free deterministic rebuild, never an AI retry. */
+export async function prepareDirectAiCached(catalogue:Catalogue,query:EngineRequest,preference:string,cache?:LightSheetCachePort):Promise<Prepared>{
+ checkedRecommendationPreference(preference);
+ if(!cache)return prepareDirectAi(catalogue,query,preference);
+ const hashes=new Map(await Promise.all(catalogue.rows.map(async row=>[row.establishment_id,await aiHash(lightSheetIdentity(row,catalogue.language))] as const)));
+ let saved:LightSheetCacheEntry[]=[];try{saved=await cache.load(catalogue.organizationId,catalogue.language);}catch{/* Rebuild locally. */}
+ const sheets=new Map<string,LightSheet>();
+ for(const entry of saved)if(entry.organization_id===catalogue.organizationId&&entry.language===catalogue.language&&entry.format_version===LIGHT_SHEET_VERSION
+  &&hashes.get(entry.establishment_id)===entry.source_sha256&&entry.sheet?.id===entry.establishment_id&&Array.isArray(entry.sheet.reservations)&&Array.isArray(entry.sheet.review_summary))sheets.set(entry.establishment_id,entry.sheet);
+ const prepared=prepareDirectAi(catalogue,query,preference,sheets);
+ const generated=(JSON.parse(prepared.request.input) as {candidates:LightSheet[]}).candidates.filter(sheet=>!sheets.has(sheet.id)).map(sheet=>({
+  organization_id:catalogue.organizationId,establishment_id:sheet.id,language:catalogue.language,format_version:LIGHT_SHEET_VERSION,source_sha256:hashes.get(sheet.id)!,sheet,
+ }));
+ if(generated.length)try{await cache.save(generated);}catch{/* The light request stays usable; no provider is called here. */}
+ return prepared;
 }
 
 function reasonFact(f:Fact){return ['score','cuisine','price','strength'].includes(f.kind)||f.kind==='feature'&&['reported','denied'].includes((f.value as {status:string}).status);}
@@ -185,16 +212,16 @@ function metricsFrom(raw:Record<string,unknown>,duration:number,requestId:string
  const u=(raw.usage??{}) as Record<string,unknown>,details=(u.input_tokens_details??{}) as Record<string,unknown>;
  const token=(x:unknown)=>typeof x==='number'&&Number.isSafeInteger(x)&&x>=0?x:null;
  const cost=typeof u.cost_usd==='number'&&Number.isFinite(u.cost_usd)&&u.cost_usd>=0?u.cost_usd:null;
- return {configuration_version:RECOMMENDATION_AI_VERSION,content_version:REPORT_FACTS_VERSION,model:typeof raw.model==='string'?raw.model:null,input_tokens:token(u.input_tokens),output_tokens:token(u.output_tokens),cache_read_tokens:token(details.cached_tokens),cache_write_tokens:token(details.cache_write_tokens),duration_ms:duration,cost_usd:cost,cost_kind:cost===null?'unavailable':'provider_returned',provider_request_id:requestId};
+ return {configuration_version:RECOMMENDATION_AI_VERSION,content_version:LIGHT_SHEET_VERSION,model:typeof raw.model==='string'?raw.model:null,input_tokens:token(u.input_tokens),output_tokens:token(u.output_tokens),cache_read_tokens:token(details.cached_tokens),cache_write_tokens:token(details.cache_write_tokens),duration_ms:duration,cost_usd:cost,cost_kind:cost===null?'unavailable':'provider_returned',provider_request_id:requestId};
 }
-type ComparisonArgs={catalogue:Catalogue;query:EngineRequest;preference:string;userId:string;access:unknown;port:AiPort;key:string;http:typeof fetch;unchanged:()=>Promise<boolean>;diagnosticRuntime?:DiagnosticRuntime;onDiagnostic?:(trace:RecommendationTrace)=>void};
+type ComparisonArgs={catalogue:Catalogue;query:EngineRequest;preference:string;userId:string;access:unknown;port:AiPort;sheetCache?:LightSheetCachePort;key:string;http:typeof fetch;unchanged:()=>Promise<boolean>;diagnosticRuntime?:DiagnosticRuntime;onDiagnostic?:(trace:RecommendationTrace)=>void};
 export async function compareAi(args:ComparisonArgs):Promise<AiComparison>{
  const observation:DiagnosticObservation={stage:'preparation'};
  const emit=(result:AiComparison)=>{try{args.onDiagnostic?.(diagnosticTrace(observation,result,args.diagnosticRuntime));}catch{/* Diagnostics must never change a recommendation or trigger a resend. */}};
  try{const result=await compareAiObserved(args,observation);emit(result);return result;}catch(e){observation.failure={stage:observation.stage,code:e instanceof Error&&/^[A-Z_]+$/.test(e.message)?e.message:'INTERNAL_ERROR',rule:'preparation_failed'};emit({status:'fallback',model:RECOMMENDATION_AI_MODEL,candidate_count:0,selections:[]});throw e;}
 }
 async function compareAiObserved(args:ComparisonArgs,observation:DiagnosticObservation):Promise<AiComparison>{
- const prepared=prepareDirectAi(args.catalogue,args.query,args.preference),base={contract_version:RECOMMENDATION_CONTRACT_VERSION,model:RECOMMENDATION_AI_MODEL,candidate_count:prepared.candidates.length,selections:[] as AiSelection[]};
+ const prepared=await prepareDirectAiCached(args.catalogue,args.query,args.preference,args.sheetCache),base={contract_version:RECOMMENDATION_CONTRACT_VERSION,model:RECOMMENDATION_AI_MODEL,candidate_count:prepared.candidates.length,selections:[] as AiSelection[]};
  observation.prepared=prepared;
  if(!prepared.candidates.length)return {...base,status:'fallback',notice:'NO_CANDIDATES'};
  if(!args.key.trim())return {...base,status:'fallback',notice:'AI_UNAVAILABLE'};

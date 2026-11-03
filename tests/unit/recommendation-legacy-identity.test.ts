@@ -34,7 +34,7 @@ it('sends only the current direct V10 request after a successful mocked reservat
  const c=catalogue('fr'),finish=vi.fn(async()=>{}),finishWithDiagnostic=vi.fn(async()=>{}),reserve=vi.fn(async()=>{throw Error('NOT_EXPECTED');});
  const reserveCorrectedDiagnostic=vi.fn(async()=>({id:'simulated-child',owned:true,state:'dispatched',selection:null,metrics:null}));
  const http=vi.fn<typeof fetch>(async(_url,init)=>{
-  const body=JSON.parse(String(init?.body)),input=JSON.parse(body.input);expect(input.configuration_version).toBe('recommendation-ai-direct-choice-v10');expect(input.contract_version).toBe('recommendation-direct-choice-v1');
+  const body=JSON.parse(String(init?.body)),input=JSON.parse(body.input);expect(input.configuration_version).toBe('recommendation-ai-light-v11');expect(input.contract_version).toBe('recommendation-direct-choice-v1');
   expect(input.candidates.length).toBeLessThanOrEqual(20);expect(body).not.toHaveProperty('legacy_request');
   const decision=directWireReply(input,[{id:'a',reason_refs:['score_global'],caution_ref:null}]);
   return new Response(JSON.stringify({model:'gpt-6.1-sol',status:'completed',usage:{input_tokens:10,output_tokens:5},output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({...decision,choices:decision.choices.map(c=>({...c,caution_bindings:[]}))})}]}]}));

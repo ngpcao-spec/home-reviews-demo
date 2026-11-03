@@ -1,11 +1,13 @@
 import {requireUser} from '../_shared/auth.ts';
 import {recommendationTestHandler} from '../_shared/recommendation-test-api.ts';
 import {diagnosticTrace} from '../_shared/recommendation-diagnostics.ts';
+import {recommendationLightCache} from '../_shared/recommendation-light-cache.ts';
 
 const diagnosticRuntime={deployment_id:Deno.env.get('DENO_DEPLOYMENT_ID')??null};
 
 Deno.serve(recommendationTestHandler(requireUser,{
  key:()=>Deno.env.get('OPENAI_API_KEY')??'',http:fetch,
+ sheetCache:recommendationLightCache,
  diagnostics:{
   runtime:diagnosticRuntime,
   prune:async(context,organization)=>{if(!context.admin)throw Error('DIAGNOSTIC_STORE_UNAVAILABLE');const {error}=await context.admin.rpc('prune_recommendation_diagnostics_v1',{p_organization_id:organization});if(error)throw Error('DIAGNOSTIC_PRUNE_FAILED');},

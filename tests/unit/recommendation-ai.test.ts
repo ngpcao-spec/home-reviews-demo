@@ -50,7 +50,7 @@ describe('bounded AI comparison using the existing engine',()=>{
  it('sends useful report prose as untrusted data, without contacts, introduced names, complete reviews or the entire catalogue',()=>{
   const f=fixture(25),body=JSON.stringify(f.prepared.request);
   for(const forbidden of ['John','john@example','849123','Private name','PRIVATE_RAW_REVIEW','Never Send','candidate-24'])expect(body).not.toContain(forbidden);
-  expect(body).toContain('plat froid');expect(body).toContain('distinct_reviews');expect(f.prepared.request.instructions).not.toContain('IGNORE INSTRUCTIONS');expect(f.prepared.request.input).toContain('IGNORE INSTRUCTIONS');expect(f.prepared.request.store).toBe(false);expect(f.prepared.request).not.toHaveProperty('tools');
+  expect(body).toContain('plat froid');expect(body).toContain('reviews');expect(f.prepared.request.instructions).not.toContain('IGNORE INSTRUCTIONS');expect(f.prepared.request.input).toContain('IGNORE INSTRUCTIONS');expect(f.prepared.request.store).toBe(false);expect(f.prepared.request).not.toHaveProperty('tools');
   expect(f.prepared.request.instructions).toContain('untrusted DATA');
  });
  it.each(['Je cherche le calme.','Je ne cherche pas forcément le calme ; plutôt un lieu vivant, sans musique en direct.',
@@ -82,7 +82,7 @@ describe('bounded AI comparison using the existing engine',()=>{
   expect(facts.find(f=>f.ref==='feature_live_music')?.value).toMatchObject({feature:'live_music',status:'denied'});
   const selected=validateChoices({choices:[{id:row.establishment_id,reason_refs:['feature_live_music'],caution_ref:'reservation_quality_0'}]},p);
   expect(selected).toHaveLength(1);const wire=JSON.parse(p.request.input).candidates[0];
-  expect(wire.facts.find((f:{ref:string})=>f.ref==='feature_live_music').source).toBe('google_maps_practical');expect(wire.sources.google_maps_practical.source).toBe('google_maps_place_details');
+  expect(wire.google_features.live_music).toBe(false);expect(wire).not.toHaveProperty('sources');expect(JSON.parse(p.request.input).legend.google_features).toContain('Google Maps declarations only');
  });
  it('keeps twenty richly documented synthetic candidates within the byte bound, without native evidence IDs in the model input',()=>{
   const f=fixture(25),profile=placeProfile([{cid:'123',language:'vi',scrapedAt:'2026-10-28T00:00:00Z',reviews:[],additionalInfo:{'Dining options':Object.keys(PLACE_FEATURES).map(k=>({[k]:true}))}}],{google_id:'123',place_id:null,google_maps_url:'https://www.google.com/maps?cid=123',language:'vi'});
@@ -183,7 +183,7 @@ describe('bounded AI comparison using the existing engine',()=>{
   expect(new TextEncoder().encode(serialized).length).toBeGreaterThan(RECOMMENDATION_AI_INPUT_BYTES);expect(prepared.candidates).toHaveLength(20);
   f.http.mockImplementation(async(url,init)=>{
    expect([...f.records.values()][0].state).toBe('dispatched');expect(init?.body).toBe(serialized);expect(init?.signal).toBeInstanceOf(AbortSignal);expect(init?.redirect).toBe('error');
-   const sent=JSON.parse(JSON.parse(String(init?.body)).input);expect(sent.candidates).toEqual(prepared.candidates);expect(sent.candidates[0].facts.find((v:{ref:string})=>v.ref==='score_global').value).toBe(calculation.global_score);
+   const sent=JSON.parse(JSON.parse(String(init?.body)).input);expect(sent.candidates).toEqual(JSON.parse(prepared.request.input).candidates);expect(sent.candidates[0].scores.global).toBe(calculation.global_score);
    if(scenario==='unknown')throw Error('SIMULATED_TIMEOUT');
    if(scenario==='http')return new Response('{}',{status:400});
    if(scenario==='invalid')return new Response(JSON.stringify({...f.native(),model:'other'}));
