@@ -2,7 +2,8 @@ import type {AuthContext} from './auth.ts';
 import {recommendationCuisineOptions,type Request as RecommendationRequest} from './restaurant-recommendation-engine-v1.ts';
 import {readRestaurantRecommendationCatalogue,recommendFromCatalogue} from './restaurant-recommendation-read-v1.ts';
 import {corsHeaders} from './cors.ts';
-import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,prepareDirectAi,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import {AI_FEATURES,aiHash,checkedRecommendationPreference,compareAi,describeRecommendationFallback,featureOption,supportedRecommendationProposals,validAiFeatures,type AiPort} from './recommendation-ai.ts';
+import type {LightSheetCachePort} from './recommendation-light.ts';
 import type {DiagnosticRuntime,RecommendationTrace} from './recommendation-diagnostics.ts';
 
 export const RECOMMENDATION_TEST_API_VERSION='recommendation-test-v1';
@@ -23,7 +24,7 @@ function criteria(raw:unknown) {
   if(b.preference!==undefined)b.preference=checkedRecommendationPreference(b.preference);
   return b as {action:'options'|'recommend'|'compare';organization_id?:string;cuisine?:string;maximum_vnd?:number;service_priority?:boolean;preference?:string;required_features?:string[];preference_mode?:'free_text_v2'|'report_facts_v3'|'criteria_coverage_v5'|'criteria_coverage_v6'|'direct_choice_v1'};
 }
-export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort;diagnostics?:{runtime:DiagnosticRuntime;prune:(context:Context,organization:string)=>Promise<void>;record:(context:Context,organization:string,trace:RecommendationTrace)=>Promise<void>}}) {
+export function recommendationTestHandler(authorize:(request:Request)=>Promise<Context>,dependencies?:{key:()=>string;http:typeof fetch;port:(context:Context,organization:string)=>AiPort;sheetCache?:(context:Context,organization:string)=>LightSheetCachePort;diagnostics?:{runtime:DiagnosticRuntime;prune:(context:Context,organization:string)=>Promise<void>;record:(context:Context,organization:string,trace:RecommendationTrace)=>Promise<void>}}) {
  return async(request:Request):Promise<Response>=>{
   if(request.method==='OPTIONS')return reply({});
   if(request.method!=='POST')return reply({error:'METHOD_NOT_ALLOWED'},405);
@@ -53,7 +54,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    const catalogue=await readRestaurantRecommendationCatalogue(context,organizationId);
    const cuisines=recommendationCuisineOptions(catalogue.rows,organizationId,catalogue.language);
    if(input.cuisine&&!cuisines.includes(input.cuisine))throw Error('INVALID_RECOMMENDATION_REQUEST');
-   const supported=prepareDirectAi(catalogue,{geography:'not_requested'},'').proposals;
+   const supported=supportedRecommendationProposals(catalogue);
    const features=AI_FEATURES.filter(f=>supported.some(p=>p.features[f]?.status==='reported')).map(f=>featureOption(f,catalogue.language));
    const common={api_version:RECOMMENDATION_TEST_API_VERSION,language:catalogue.language,organization_id:organizationId,organizations,cuisines,features};
    if(input.action==='options')return reply(common);
@@ -67,6 +68,7 @@ export function recommendationTestHandler(authorize:(request:Request)=>Promise<C
    const access=organizations;
    const snapshot=await aiHash(catalogue);
    const comparison=await compareAi({catalogue,query,preference:(input.preference??'').trim().normalize('NFC'),userId:context.user.id,access,port:dependencies.port(context,organizationId),key:dependencies.key(),http:dependencies.http,
+    sheetCache:dependencies.sheetCache?.(context,organizationId),
     diagnosticRuntime:dependencies.diagnostics?.runtime,onDiagnostic:value=>{trace=value;},
     unchanged:async()=>{
      const current=await readRestaurantRecommendationCatalogue(context,organizationId);

@@ -26,7 +26,8 @@ Versions:
 
 - Contract: `recommendation-direct-choice-v1`
 - Validator: `recommendation-structural-validator-v1`
-- Cache: `recommendation-ai-direct-choice-v10`
+- Cache: `recommendation-ai-light-v11`
+- Input: `recommendation-light-v1` (see [light sheets](recommendation-light-v1.md))
 - Client mode: `direct_choice_v1`
 
 The historical `recommendation-criteria-coverage-v3` constant identifies the
@@ -37,14 +38,15 @@ acceptance only; the page never describes semantic/source validation.
 Deploy the private function and the client together. The server rejects an old
 comparison client before reservation; classical search remains compatible.
 The new client rejects an incompatible successful comparison response.
-No SQL schema change or grant activation is needed for this contract.
+No grant activation is needed for this output contract. Persistent light input
+reuse has its own empty derived-cache migration, documented with the light format.
 
 Authentication, organization roles/RLS, explicit mandatory filters, existing
-shortlisting (maximum twenty), immutable scores, full candidate facts/report
-points, languages and input-byte-gate removal are preserved. The only removed
-wire fields are obsolete coverage hints/observations, not source facts. Models,
-reasoning, output allowance, infrastructure timeouts and response-size bounds
-remain unchanged. There is no extra input optimization.
+shortlisting (maximum twenty), immutable scores, languages and input-byte-gate
+removal are preserved. Detailed candidate facts remain on the server; the live
+input uses deterministic general light sheets, retaining report reservations and
+separating Google declarations from report observations. Models, reasoning,
+output allowance, infrastructure timeouts and response-size bounds are unchanged.
 
 Reservations precede HTTP. Existing user/data/access/request identity checks,
 source recheck, one-use grants, unknown outcomes and receipt-save protections
