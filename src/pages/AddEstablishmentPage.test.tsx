@@ -205,7 +205,26 @@ describe('confirmation d’ajout d’un établissement', () => {
       createdAt: '2026-10-28T04:12:43Z', updatedAt: '2026-10-28T04:12:56Z',
     }]
     renderWizard()
-    expect(await screen.findByText('5 / 150 avis importés')).toBeVisible()
-    expect(screen.queryByText('150 / 150 avis importés')).not.toBeInTheDocument()
+    expect(await screen.findByText('5 / 150 avis récupérés')).toBeVisible()
+    expect(screen.queryByText('150 / 150 avis récupérés')).not.toBeInTheDocument()
+  })
+
+  it('leaves the spinner when 150 fetched reviews end in an identity failure, without retrying', async () => {
+    initialImportJobs = [{
+      id: 'job', organizationId: 'org', userId: 'user', query: 'link', expectedGoogleId: candidate.placeRef,
+      status: 'running', reviewsTarget: 150, reviewsFetched: 150, reviewsInserted: 0, candidate,
+      createdAt: '', updatedAt: '',
+    }]
+    const tree = () => <I18nProvider language="fr"><MemoryRouter><AddEstablishmentPage /></MemoryRouter></I18nProvider>
+    const view = render(tree())
+    expect(await screen.findByText('150 / 150 avis récupérés')).toBeVisible()
+    initialImportJobs = [{ ...initialImportJobs[0], status: 'failed', errorCode: 'ESTABLISHMENT_MISMATCH' }]
+    view.rerender(tree())
+    expect(await screen.findByRole('alert')).toHaveTextContent('La fiche Google Maps a changé')
+    expect(screen.queryByText('Import en cours…')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Réessayer' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retour aux établissements' })).toBeVisible()
+    expect(retryEstablishmentImport).not.toHaveBeenCalled()
+    expect(addEstablishment).not.toHaveBeenCalled()
   })
 })
