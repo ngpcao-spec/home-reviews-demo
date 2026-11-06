@@ -242,10 +242,13 @@ export function AddEstablishmentPage() {
         {messages.add.nextControl.replace('{hours}', String(nextCheckHours))}
       </p>}
       {(error || importFailed) && <p className="field-error" role="alert">{error || messages.add.importError}</p>}
-      {importFailed ? <button className="primary-button full-width" disabled={retrying} onClick={() => void retryImport()}>
+      {importFailed ? <div className="button-row">
+      {errorCode !== 'ESTABLISHMENT_MISMATCH' && <button className="primary-button" disabled={retrying} onClick={() => void retryImport()}>
         {retrying ? <LoaderCircle className="spin" /> : null}
         {retrying ? messages.add.retrying : messages.add.retryImport}
-      </button> : <div className="button-row">
+      </button>}
+      <button className="secondary-button" onClick={() => void leaveSuccess('/etablissements')}>{messages.add.backPlaces}</button>
+      </div> : <div className="button-row">
         <button className="primary-button" disabled={!result.establishmentId} onClick={() => void leaveSuccess(`/avis?etablissement=${result.establishmentId}&statut=all`)}>{messages.add.viewReviews}</button>
         <button className="secondary-button" onClick={() => void leaveSuccess('/etablissements')}>{messages.add.backPlaces}</button>
       </div>}

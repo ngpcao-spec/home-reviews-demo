@@ -891,8 +891,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const refreshInitialImports = useCallback(async () => {
-    await loadRealData({ background: true })
-  }, [loadRealData])
+    // Import progress must not wait for the full review corpus, nor be discarded
+    // when an unrelated dashboard request fails. This is a read-only status poll.
+    if (!supabase || !authUser) return
+    const userId = authUser.id
+    const epoch = authEpoch.current
+    try {
+      const { data, error } = await supabase.from('initial_import_jobs')
+        .select('id,organization_id,user_id,query,expected_google_id,establishment_id,status,reviews_target,reviews_fetched,reviews_inserted,error_code,candidate_snapshot,result,created_at,updated_at')
+        .eq('user_id', userId).eq('request_kind', 'initial').is('acknowledged_at', null)
+        .order('created_at', { ascending: false }).limit(10)
+      if (!error && data && activeUser.current === userId && authEpoch.current === epoch) {
+        setInitialImportJobs((data as InitialImportJobRow[]).map(mapInitialImportJob))
+      }
+    } catch { /* Keep the last known status while offline. Never restart an import. */ }
+  }, [authUser])
 
   const retryEstablishmentImport = async (importJobId: string) => {
     if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
