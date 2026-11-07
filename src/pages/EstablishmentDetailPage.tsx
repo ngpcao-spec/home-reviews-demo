@@ -13,10 +13,11 @@ import { useI18n } from '../i18n'
 import {RetainedCorpusInfo} from '../components/RetainedCorpusInfo'
 import { ReviewCollectionAlert } from '../components/ReviewCollectionAlert'
 import { ReviewReloadPanel } from '../components/ReviewReloadPanel'
+import { RainminerMenuPanel } from '../components/RainminerMenuPanel'
 
 export function EstablishmentDetailPage() {
   const { id } = useParams(); const navigate = useNavigate()
-  const { establishments, reviews, removeEstablishment } = useApp()
+  const { establishments, reviews, removeEstablishment, currentUser, demoMode } = useApp()
   const { messages } = useI18n()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -40,6 +41,7 @@ export function EstablishmentDetailPage() {
     <RetainedCorpusInfo establishmentId={establishment.id}/>
     <ReviewCollectionAlert establishment={establishment}/>
     <ReviewReloadPanel establishment={establishment}/>
+    {!demoMode && currentUser.id && <RainminerMenuPanel key={establishment.id} establishmentId={establishment.id} userId={currentUser.id}/>}
     <section className="sync-panel card"><div><strong>{messages.establishment.monitoringActive}</strong><SyncBadge status={establishment.syncStatus}/></div><div className="sync-timings"><p>{messages.establishment.lastCheck}<br/><strong>{fullDate(establishment.lastSyncedAt)}</strong></p><p>{messages.establishment.nextCheck}<br/><strong>{establishment.nextSyncAt ? timeUntil(establishment.nextSyncAt) : messages.establishment.notScheduled}</strong></p></div><div className="button-row"><a className="secondary-button full-width" href={establishment.googleMapsUrl} target="_blank" rel="noreferrer"><ExternalLink size={17}/>Google Maps</a></div></section>
     <div className="section-heading"><h2>{messages.establishment.recentNegative}</h2><button className="text-button" onClick={() => navigate(`/avis?etablissement=${id}&statut=all`)}>{messages.common.viewAll}</button></div>
     {related.map((review) => <ReviewRow key={review.id} review={review}/>)}

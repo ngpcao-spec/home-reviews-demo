@@ -584,3 +584,6 @@ verify_jwt = false
 # Server scheduler token checked inside the handler; no user-facing API.
 [functions.process-google-place-price-jobs]
 verify_jwt = false
+
+[functions.rainminer-menu]
+verify_jwt = false # Authenticates in the handler.
