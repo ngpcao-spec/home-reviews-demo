@@ -66,6 +66,10 @@ beforeAll(async()=>{ db=new PGlite({extensions:{pgcrypto}});await db.waitReady;
  await db.exec(production.aiTrigger.body);
  await db.exec('drop trigger reviews_enqueue_ai_after_insert on public.reviews;'+production.aiTrigger.definition);
  await db.exec(migration('_allow_historical_attention_without_auto_ai.sql'));
+ await db.exec("alter table public.review_sync_jobs add column if not exists incremental_receipt jsonb");
+ await db.exec(migration('_review_sync_terminal_recovery.sql'));
+ await db.exec(migration('_review_sync_no_run_resolution.sql'));
+ await db.exec(migration('_review_sync_resume_after_reload.sql'));
  await db.exec(`grant all on all tables in schema public to service_role;grant usage on schema extensions,private to service_role;
  update public.review_corpus_policy set enabled=true,paused=false,ingestions_paused=false;`);
 },90000);
@@ -112,6 +116,29 @@ async function reject(sql:string,args:unknown[],message:string){
 it('installs no work and makes no calls on migration',async()=>{
  expect((await db.query('select count(*)::int n from private.fake_net_calls')).rows[0].n).toBe(0);
  expect((await db.query('select count(*)::int n from private.review_reload_staging')).rows[0].n).toBe(0);
+});
+it('resumes the scheduler from the reloaded checkpoint without reviving old jobs',async()=>{
+ await seed();
+ const unknown=crypto.randomUUID(),terminal=crypto.randomUUID();
+ await db.query(`insert into public.review_sync_jobs(id,establishment_id,organization_id,status,scheduled_for,created_at,provider_start_attempted_at,apify_run_id,incremental_receipt)
+ values($1,$3,$4,'dead',now(),now()-interval '2 days',now()-interval '2 days',null,null),
+       ($2,$3,$4,'dead',now(),now()-interval '1 day',now()-interval '1 day','old-run','{"id":"old-run","status":"SUCCEEDED"}')`,[unknown,terminal,est,org]);
+ await reject('select public.request_review_reload($1,$2)',[est,crypto.randomUUID()],'REVIEW_COLLECTION_BUSY');
+ await db.query('update public.review_sync_jobs set provider_no_run_confirmed_at=now() where id=$1',[unknown]);
+ const j=await running();
+ await db.query("update public.establishments set next_sync_at=now()-interval '1 second' where id=$1",[est]);
+ expect((await db.query("select public.enqueue_due_review_sync_jobs(10) n")).rows[0].n).toBe(0);
+ await stage(j);await apply(j.id);
+ const after=(await db.query(`select e.last_review_id,e.last_review_at::text at,
+   e.last_sync_status,e.next_sync_at>now() future,
+   e.next_sync_at=e.last_sync_at+make_interval(hours=>o.monitoring_interval_hours) normal_interval
+   from public.establishments e join public.organizations o on o.id=e.organization_id where e.id=$1`,[est])).rows[0];
+ expect(after).toMatchObject({last_review_id:'fresh-0',last_sync_status:'ok',future:true,normal_interval:true});
+ await db.exec('reset role');
+ await db.query("update public.establishments set next_sync_at=now() where id=$1",[est]);
+ expect((await db.query("select public.enqueue_due_review_sync_jobs(10) n")).rows[0].n).toBe(1);
+ expect((await db.query("select public.enqueue_due_review_sync_jobs(10) n")).rows[0].n).toBe(0);
+ expect((await db.query("select checkpoint_review_id,checkpoint_review_at::text at from public.review_sync_jobs where establishment_id=$1 and status='queued'",[est])).rows).toEqual([{checkpoint_review_id:after.last_review_id,at:after.at}]);
 });
 it('validates a full native batch, counts unique IDs, accepts 5/5 and old/textless/all-star reviews, and rejects 5/150',()=>{
  const five=items();expect(stageBundle([...five,...five]).bundle).toHaveLength(5);
