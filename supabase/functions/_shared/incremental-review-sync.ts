@@ -1,6 +1,7 @@
 import {normalizeApifyDataset,type ApifyRunState} from './apify.ts';
 export const INCREMENTAL_SYNC_VERSION='google-reviews-incremental-v1';
-export const INCREMENTAL_ACTOR_BUILD='0.0.541';
+export const INCREMENTAL_ACTOR_BUILD='0.0.545';
+export const INCREMENTAL_COLLECTION_OVERLAP_MS=24*60*60*1000;
 export const INCREMENTAL_LIMIT=150;
 export const INCREMENTAL_OVERLAP_MS=5000;
 export type IncrementalCheckpoint={checkpoint_review_at:string|null;checkpoint_review_id:string|null;google_id:string;google_maps_url:string};
@@ -9,6 +10,12 @@ export function incrementalSince(job:IncrementalCheckpoint,now=Date.now()){
  const value=job.checkpoint_review_at;
  if(!/T.*(?:Z|[+-]\d\d:\d\d)$/.test(value)||!Number.isFinite(Date.parse(value))||Date.parse(value)>now||Date.parse(value)<INCREMENTAL_OVERLAP_MS)throw Error('SYNC_INCREMENTAL_CHECKPOINT_INVALID');
  return new Date(Date.parse(value)-INCREMENTAL_OVERLAP_MS).toISOString();
+}
+export function incrementalCollectionSince(job:IncrementalCheckpoint,build=INCREMENTAL_ACTOR_BUILD,now=Date.now()){
+ const since=incrementalSince(job,now);
+ if(build==='0.0.541')return since;
+ if(build!==INCREMENTAL_ACTOR_BUILD)throw Error('SYNC_INCREMENTAL_BUILD_UNKNOWN');
+ return new Date(Date.parse(job.checkpoint_review_at!)-INCREMENTAL_COLLECTION_OVERLAP_MS).toISOString();
 }
 export function incrementalRunReceipt(payload:Record<string,unknown>){
  const keys=['id','actId','buildId','status','statusMessage','startedAt','finishedAt','stats','usage','usageTotalUsd','chargedEventCounts','isMaxTotalChargeUsdReached','isMaxItemsReached'];
