@@ -410,6 +410,8 @@ describe('atomic incremental sync with the retained native corpus',()=>{
   await db.exec(readFileSync('supabase/migrations/20261029004621_incremental_review_sync.sql','utf8').replace(/^begin;$/m,'').replace(/^commit;$/m,''));
   const overlapMigration=readdirSync('supabase/migrations').find(n=>n.endsWith('_incremental_review_collection_overlap.sql'));
   await db.exec(readFileSync('supabase/migrations/'+overlapMigration,'utf8'));
+  const receiptMigration=readdirSync('supabase/migrations').find(n=>n.endsWith('_incremental_review_build_receipt.sql'));
+  await db.exec(readFileSync('supabase/migrations/'+receiptMigration,'utf8'));
  });
  async function seed(n=1){
   await db.exec("select set_config('home.retention_ingest','on',true)");
@@ -429,8 +431,8 @@ describe('atomic incremental sync with the retained native corpus',()=>{
  async function bind(id:string){
   await db.query("update public.review_sync_jobs set pagination_cursor=$2 where id=$1",[id,JSON.stringify({provider:'apify',runId:'run',datasetId:'data',language:'fr'})]);
  }
- async function finish(id:string,items:Record<string,unknown>[],worker='worker'){
-  const run={runId:'run',datasetId:'data',status:'SUCCEEDED'},receipt={id:'run',actId:'Xb8osYTtOjlsgI6k9',buildId:'Wck4NsSOTMrHCVoAk',status:'SUCCEEDED'};
+ async function finish(id:string,items:Record<string,unknown>[],worker='worker',buildId='Wck4NsSOTMrHCVoAk'){
+  const run={runId:'run',datasetId:'data',status:'SUCCEEDED'},receipt={id:'run',actId:'Xb8osYTtOjlsgI6k9',buildId,status:'SUCCEEDED'};
   await db.query('select public.observe_incremental_review_sync($1,$2,$3,$4,$5)',[id,worker,'run',receipt,items.length]);
   const p=prepareIncrementalResult(items,cp,run);
   const bundle=reviewIngestionBundle({id:est,organization_id:org},p.reviews,false,'apify');
@@ -451,7 +453,11 @@ describe('atomic incremental sync with the retained native corpus',()=>{
   const id=await job();
   expect((await db.query('select public.reserve_incremental_review_sync($1,$2,$3,$4) ok',[id,'worker',{...requestInput,reviewsStartDate:'2026-10-27T12:00:00.000Z'},'0.0.545'])).rows[0].ok).toBe(true);
   await bind(id);const additions=Array.from({length:4},(_,i)=>item('new-'+i,new Date(Date.parse(at)+(i+1)*60000).toISOString()));
-  expect(await finish(id,[...additions,item('known'),item('older-evidence','2026-10-28T11:00:00Z')])).toMatchObject({received:6,unique:6,already_known:1,outside_window:1,added:4,removed:4,retained:150});
+  const items=[...additions,item('known'),item('older-evidence','2026-10-28T11:00:00Z')];
+  await db.exec('savepoint wrong_build');
+  await expect(finish(id,items)).rejects.toThrow('SYNC_INCREMENTAL_BUILD_MISMATCH');
+  await db.exec('rollback to wrong_build');
+  expect(await finish(id,items,'worker','ZzXJ3FC9OUBCJxtza')).toMatchObject({received:6,unique:6,already_known:1,outside_window:1,added:4,removed:4,retained:150});
   expect((await db.query("select to_jsonb(r) r from public.reviews r where external_review_id='known'")).rows[0].r).toEqual(original);
   expect((await db.query('select to_jsonb(t) r from public.review_translations t where id=$1',[translation.id])).rows[0].r).toEqual(translation);
   expect((await db.query('select last_review_id from public.establishments')).rows[0].last_review_id).toBe('new-3');
