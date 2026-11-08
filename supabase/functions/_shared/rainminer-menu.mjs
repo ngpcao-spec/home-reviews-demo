@@ -6,18 +6,30 @@ const normalize = value => typeof value === 'string'
   : '';
 
 const beverageSection = /^(?:soft drinks?|boissons?|drinks?|beverages?|tea\s*\/\s*coffee|coffee|tea|wine(?: list)?|vodka|tequila|rhum|rum|(?:blended scotch |japanese |american )?whisk[ey]+|juices?|smoothies?|(?:classic )?cocktails?|beers?)$/;
+const beverageSectionTranslation = /^(?:the|cafe|tra|ca phe|do uong|nuoc giai khat|чаи|кофе|напитки)$/u;
+const isBeverageSection = section => {
+  // Some OCR headings mix Cyrillic Т/а with Latin letters in “Trà”.
+  const parts = section.split(/\s*[/,;|&+·\p{Pd}]\s*|\s+(?:and|et|va|и)\s+/u).filter(Boolean);
+  return parts.length > 0 && parts.every(part =>
+    beverageSection.test(part) || beverageSectionTranslation.test(part.replace(/^[тt]r[аa]$/u, 'tra')));
+};
 const foodSection = /^(?:food|pizzas?|desserts?|rice|soups?|salads?|pasta|seafood|main courses?|starters?)$/;
 const foodName = /\b(?:pizza|steak|lobster|octopus|chicken|poulet|coq|beef|pork|fish|salad|soup|cake|gateau|tiramisu|ice cream|noodles?|rice|pasta|risotto|sauce|braised|grilled)\b/;
 const beverageName = /^(?:vanil(?:l)?a latte|latte|cappuccino|americano|(?:milk|black|vietnamese white|coconut) coffee(?: \(vn\))?|tea cup\s*\(\s*lipton tea\s*\)|nuoc suoi|nuoc tang luc|mojito|long island iced tea|pinnacolada|pina colada|singapore sling|jim beam highball|tequila sunrise|peach crush|gin & tonic|screwdriver korea style)$/;
+const explicitBeverageName = /^(?:(?:(?:iced|hot|iced\/hot) )?(?:(?:green|black|lemon|kumquat) )?(?:iced )?tea|lipton(?: lemon)?(?: iced\/hot)?|(?:(?:iced|hot|iced\/hot) )?(?:(?:black|milk) )?coffee|espresso|tra (?:tac|chanh|xanh|nong)|ca phe(?: (?:den|sua|da)){0,2}|(?:черныи )?кофе(?: с молоком)?(?: со льдом)?)(?: \([^()]*\))?$/u;
+const ambiguousDrinkName = /\b(?:yogurt|yoghurt|yaourt|sua chua)\b|иогурт/u;
 
 export function classifyMenuRow({category, name}) {
   const section = normalize(category);
-  const label = normalize(name);
+  const label = normalize(name).replace(/^[\s\p{Pd}]+|[:\s]+$/gu, '');
+  const drinkSection = isBeverageSection(section);
+  const drinkName = beverageName.test(label) || explicitBeverageName.test(label);
   if (!label) return 'review';
   if (foodName.test(label) || foodSection.test(section)) {
-    return beverageSection.test(section) || beverageName.test(label) ? 'review' : 'food';
+    return drinkSection || drinkName ? 'review' : 'food';
   }
-  if (beverageSection.test(section) || beverageName.test(label)) return 'drink';
+  if (ambiguousDrinkName.test(label)) return 'review';
+  if (drinkSection || drinkName) return 'drink';
   return 'review';
 }
 
