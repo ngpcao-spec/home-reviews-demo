@@ -25,7 +25,7 @@ import {
   retryPolicy,
 } from '../_shared/sync-queue.ts'
 
-import {incrementalSince,prepareIncrementalResult,incrementalRunReceipt,assertIncrementalReceipt,INCREMENTAL_SYNC_VERSION,INCREMENTAL_ACTOR_BUILD,INCREMENTAL_LIMIT} from '../_shared/incremental-review-sync.ts'
+import {incrementalCollectionSince,prepareIncrementalResult,incrementalRunReceipt,assertIncrementalReceipt,INCREMENTAL_SYNC_VERSION,INCREMENTAL_ACTOR_BUILD,INCREMENTAL_LIMIT} from '../_shared/incremental-review-sync.ts'
 
 interface SyncJob {
   id: string
@@ -104,7 +104,7 @@ async function processApifyJob(
 ) {
   const token = apifyToken()
   await assertIngestionAllowed(admin)
-  const frozen=await requireSuccess<{collection_language:'fr'|'vi';provider_start_attempted_at:string|null;apify_run_id:string|null;apify_dataset_id:string|null;incremental_version:string|null;incremental_input:Record<string,unknown>|null}>(admin.from('review_sync_jobs').select('collection_language,provider_start_attempted_at,apify_run_id,apify_dataset_id,incremental_version,incremental_input').eq('id',job.id).single())
+  const frozen=await requireSuccess<{collection_language:'fr'|'vi';provider_start_attempted_at:string|null;apify_run_id:string|null;apify_dataset_id:string|null;incremental_version:string|null;incremental_build:string|null;incremental_input:Record<string,unknown>|null}>(admin.from('review_sync_jobs').select('collection_language,provider_start_attempted_at,apify_run_id,apify_dataset_id,incremental_version,incremental_build,incremental_input').eq('id',job.id).single())
   Object.assign(job,frozen)
   let cursor = parseApifyCursor(job.pagination_cursor)??(job.apify_run_id&&job.apify_dataset_id?{provider:'apify' as const,runId:job.apify_run_id,datasetId:job.apify_dataset_id,language:job.collection_language}:null)
   if(cursor&&cursor.language!==job.collection_language)throw Error('SYNC_PROVIDER_LANGUAGE_CHANGED')
@@ -115,7 +115,7 @@ async function processApifyJob(
     if(saved!==true)throw Error('SYNC_LEASE_LOST')
     job.apify_run_id=cursor.runId;job.apify_dataset_id=cursor.datasetId
   }
-  const since=incrementalSince(job)
+  const since=incrementalCollectionSince(job,frozen.incremental_build??undefined)
   if(job.incremental_version&&job.incremental_version!==INCREMENTAL_SYNC_VERSION)throw Error('SYNC_INCREMENTAL_VERSION_UNKNOWN')
   if(job.incremental_input&&job.incremental_input.reviewsStartDate!==since)throw Error('SYNC_INCREMENTAL_INPUT_MISMATCH')
   if (!cursor) {
@@ -201,6 +201,7 @@ async function processApifyJob(
   const recorded=await requireSuccess<boolean>(admin.rpc('observe_incremental_review_sync',{p_job:job.id,p_worker:worker,p_run:cursor.runId,p_receipt:receipt,p_received:items.length}))
   if(recorded!==true)throw Error('SYNC_LEASE_LOST')
   assertIncrementalReceipt(receipt)
+  if(frozen.incremental_build===INCREMENTAL_ACTOR_BUILD&&items.length===0)throw Error('SYNC_INCREMENTAL_BOUNDARY_NOT_REACHED')
   const plan=prepareIncrementalResult(items,job,run,!job.incremental_version)
   const bundle=reviewIngestionBundle({id:job.establishment_id,organization_id:job.organization_id},plan.reviews,false,'apify')
   const result=await requireSuccess<Record<string,unknown>>(admin.rpc('commit_incremental_review_sync',{

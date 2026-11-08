@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {beforeEach,afterEach,expect,it,vi} from 'vitest';
-import {incrementalSince,prepareIncrementalResult,assertIncrementalReceipt,INCREMENTAL_ACTOR_BUILD} from '../../supabase/functions/_shared/incremental-review-sync';
+import {incrementalSince,incrementalCollectionSince,prepareIncrementalResult,assertIncrementalReceipt,INCREMENTAL_ACTOR_BUILD} from '../../supabase/functions/_shared/incremental-review-sync';
 import {apifyActorInput,startApifyRun} from '../../supabase/functions/_shared/apify';
 const now=Date.parse('2026-10-29T06:00:00Z'),at='2026-10-28T12:00:00Z';
 const cp={google_id:'123',google_maps_url:'https://www.google.com/maps?cid=123',checkpoint_review_id:'known',checkpoint_review_at:at};
@@ -40,7 +40,8 @@ it('can reuse an already paid legacy window when its older rows prove the date b
 it('pins the verified automatic build and durably reserves the exact input before its single HTTP start',async()=>{
  vi.stubGlobal('Deno',{env:{get:()=>undefined}});
  const network=vi.fn(async()=>new Response(JSON.stringify({data:{id:'run',defaultDatasetId:'data',status:'RUNNING'}})));
- vi.stubGlobal('fetch',network);const reserve=vi.fn(async(input)=>{expect(input.reviewsStartDate).toBe('2026-10-28T11:59:55.000Z');expect(network).not.toHaveBeenCalled();});
- await startApifyRun('SYNTHETIC',{placeUrl:cp.google_maps_url,language:'vi',sort:'newest',limit:150,since:incrementalSince(cp,now),build:INCREMENTAL_ACTOR_BUILD},undefined,reserve);
- expect(network).toHaveBeenCalledTimes(1);expect(network.mock.calls[0][0]).toContain('&build=0.0.541');expect(reserve).toHaveBeenCalledTimes(1);
+ vi.stubGlobal('fetch',network);const reserve=vi.fn(async(input)=>{expect(input.reviewsStartDate).toBe('2026-10-27T12:00:00.000Z');expect(network).not.toHaveBeenCalled();});
+ await startApifyRun('SYNTHETIC',{placeUrl:cp.google_maps_url,language:'vi',sort:'newest',limit:150,since:incrementalCollectionSince(cp,undefined,now),build:INCREMENTAL_ACTOR_BUILD},undefined,reserve);
+ expect(network).toHaveBeenCalledTimes(1);expect(network.mock.calls[0][0]).toContain('&build=0.0.545');expect(reserve).toHaveBeenCalledTimes(1);
+ expect(incrementalCollectionSince(cp,'0.0.541',now)).toBe(incrementalSince(cp,now));
 });
