@@ -60,6 +60,43 @@ it('a later explicit new request starts from an empty fresh snapshot and retains
  expect((await db.query('select count(*)::int n from public.test_dispatch')).rows).toEqual([{n:1}]);
  await rejected(()=>enqueue(request),'REPORT_REQUEST_ABANDONED_NEW_ID_REQUIRED');
 });
+it('restarts Norden after a paid second batch failed to save',async()=>{
+ await db.exec(`reset role;create schema private;
+ create table private.shared_jev_runtime(enabled boolean);
+ insert into private.shared_jev_runtime values(true);
+ alter table public.report_generation_requests add column shared_jev_version text;
+ create function private.pin_shared_jev_request() returns trigger language plpgsql security definer as $$
+ begin new.shared_jev_version=case when new.engine='jev_sol_v2' and exists(select 1 from private.shared_jev_runtime where enabled) then 'shared-jev-initial-v1' end;return new;end $$;
+ create trigger pin_shared_jev_before before insert on public.report_generation_requests for each row execute function private.pin_shared_jev_request();
+ create function public.jev_batch_save_projection(p_task uuid,p_worker text,p_body jsonb,p_sha text,p_error text) returns boolean language plpgsql as $$
+ declare t record;r public.analysis_jev_batch_runs;begin
+  select p_task as run_id into t;
+  select * into r from public.analysis_jev_batch_runs where id=t.run_id for update;
+  return true;
+ end $$;
+ create function private.store_current_report_publication(p jsonb,sc jsonb,p_created_at timestamptz,p_recovery boolean) returns boolean language plpgsql as $$
+ declare is_stale boolean:=false; begin if is_stale and not p_recovery then return false;end if;return true;end $$;`);
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_restart_failed_historical_report.sql'))!,'utf8'));
+ await db.exec(readFileSync('supabase/migrations/'+readdirSync('supabase/migrations').find(n=>n.endsWith('_require_manual_failed_report_restart.sql'))!,'utf8'));
+ await db.exec(`set local role service_role;
+ update public.analysis_jev_batch_tasks set status='invalid_output',receipt='{"http_status":200}' where status='unknown';`);
+ await db.query("insert into public.analysis_jev_batch_tasks values($1,'pending',0,null,null)",[batch]);
+ const old=await unchanged();
+ await db.query("select set_config('home.auto_report_reference',$1,true)",[report]);
+ await rejected(()=>enqueue(),'REPORT_MANUAL_RESTART_REQUIRED');
+ await db.exec("select set_config('home.auto_report_reference','',true)");
+ const fresh=await enqueue();
+ expect(fresh.id).not.toBe(source);
+ expect(await enqueue()).toEqual(fresh);
+ expect(fresh.snapshot).not.toHaveProperty('classifications');
+ expect((await db.query('select shared_jev_version from public.report_generation_requests where source_run_id=$1',[fresh.id])).rows).toEqual([{shared_jev_version:null}]);
+ expect((await db.query("select public.jev_batch_save_projection($1,'old','{}','hash',null) saved",[batch])).rows).toEqual([{saved:false}]);
+ await db.exec('reset role');
+ expect((await db.query("select private.store_current_report_publication($1,'{}',now(),false) published",[{current_source_run_id:source}])).rows).toEqual([{published:false}]);
+ expect((await db.query("select private.store_current_report_publication($1,'{}',now(),false) published",[{current_source_run_id:fresh.id}])).rows).toEqual([{published:true}]);
+ expect(await unchanged()).toEqual(old);
+ expect((await db.query('select count(*)::int n from public.test_dispatch')).rows).toEqual([{n:1}]);
+});
 it.each(['running','completed'])('refuses abandonment of a %s source',async status=>{
  await db.query('update public.historical_report_runs set status=$1',[status]);
  await rejected(()=>abandon(),'REPORT_ABANDON_NOT_ALLOWED');
