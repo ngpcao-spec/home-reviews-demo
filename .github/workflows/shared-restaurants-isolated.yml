@@ -1,0 +1,31 @@
+name: Shared restaurant isolated stack preflight
+on:
+  push:
+    branches: [codex/shared-restaurants-auth-validation-20261109]
+    paths: [.github/workflows/shared-restaurants-isolated.yml]
+permissions:
+  contents: read
+jobs:
+  isolated-stack:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Docker
+        run: docker info --format '{{.ServerVersion}}'
+      - name: Start disposable Supabase without project credentials
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/home-reviews-isolated"
+          cd "$RUNNER_TEMP/home-reviews-isolated"
+          npx --yes supabase@2.118.0 init
+          npx --yes supabase@2.118.0 start > "$RUNNER_TEMP/supabase-start.log" 2>&1
+          curl --fail --silent http://127.0.0.1:54321/auth/v1/health
+      - name: Remove disposable services
+        if: always()
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/home-reviews-isolated"
+          npx --yes supabase@2.118.0 stop --no-backup > /dev/null 2>&1 || true
