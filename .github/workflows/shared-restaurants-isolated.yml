@@ -29,6 +29,8 @@ jobs:
           npx --yes supabase@2.118.0 start > "$RUNNER_TEMP/supabase-start.log" 2>&1
           npx --yes supabase@2.118.0 status -o json > "$RUNNER_TEMP/local-status.json"
           curl --fail --silent http://127.0.0.1:54321/auth/v1/health
+          docker exec supabase_db_home-reviews-isolated psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c "alter system set cron.launch_active_jobs='off'"
+          docker exec supabase_db_home-reviews-isolated psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c 'select pg_reload_conf()'
       - name: Load full schema and real Auth fixtures
         env:
           CI_PG_PACKAGE: ${{ runner.temp }}/pg-client

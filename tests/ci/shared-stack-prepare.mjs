@@ -9,8 +9,7 @@ const url=new URL(status.DB_URL)
 if(!['127.0.0.1','localhost'].includes(url.hostname)||url.port!=='54322')throw Error('LOCAL_DATABASE_REQUIRED')
 const db=new Client({connectionString:status.DB_URL});await db.connect()
 try{
- await db.query("alter system set cron.launch_active_jobs='off'")
- await db.query('select pg_reload_conf()')
+ if((await db.query("show cron.launch_active_jobs")).rows[0].cron_launch_active_jobs==='on')throw Error('CRON_MUST_BE_DISABLED')
  for(const file of readdirSync('supabase/migrations').filter(n=>n.endsWith('.sql')).sort()){
   console.log('MIGRATION',file)
   // Historical cron definitions must never address production, even with no secrets.
