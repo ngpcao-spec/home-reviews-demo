@@ -20,10 +20,17 @@ test('two real Supabase Auth sessions reach the actual application independently
     return (await supabase.auth.getUser()).data.user.id
    },fixture.users[i])
    expect(identity).toBe(fixture.users[i].id)
-   await expect(page.getByRole('button',{name:'Continuer avec Google'})).toHaveCount(0)
-   await expect(page.locator('body')).toContainText('HOME')
+   await page.goto('http://127.0.0.1:4173/')
+   await expect(page.getByRole('link',{name:'Établissements',exact:true})).toBeVisible()
+   const memberships=await page.evaluate(async()=>{
+    const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts')
+    const {data,error}=await supabase.from('organization_members').select('organization_id')
+    if(error)throw Error(error.message)
+    return data.map(row=>row.organization_id)
+   })
+   expect(memberships).toEqual([fixture.users[i].organizationId])
    await page.reload()
-   await expect(page.getByRole('button',{name:'Continuer avec Google'})).toHaveCount(0)
+   await expect(page.getByRole('link',{name:'Établissements',exact:true})).toBeVisible()
   }
  }finally{await Promise.all(contexts.map(c=>c.close()))}
 })

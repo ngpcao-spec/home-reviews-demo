@@ -9,11 +9,20 @@ const url=new URL(status.DB_URL)
 if(!['127.0.0.1','localhost'].includes(url.hostname)||url.port!=='54322')throw Error('LOCAL_DATABASE_REQUIRED')
 const db=new Client({connectionString:status.DB_URL});await db.connect()
 try{
- if((await db.query("show cron.launch_active_jobs")).rows[0].cron_launch_active_jobs==='on')throw Error('CRON_MUST_BE_DISABLED')
+ if((await db.query("select current_setting('cron.launch_active_jobs') value")).rows[0].value!=='off')throw Error('CRON_MUST_BE_DISABLED')
  for(const file of readdirSync('supabase/migrations').filter(n=>n.endsWith('.sql')).sort()){
   console.log('MIGRATION',file)
   // Historical cron definitions must never address production, even with no secrets.
-  const sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
+  let sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
+  if(file==='20260927022000_harden_home_reviews_sync.sql'){
+   // Cloud installs this optional event helper; the local image does not.
+   // Revoking a nonexistent helper has no effect. All application RLS still runs.
+   const exists=(await db.query("select to_regprocedure('public.rls_auto_enable()') is not null present")).rows[0].present
+   if(!exists){
+    sql=sql.replace('revoke execute on function public.rls_auto_enable() from public, anon, authenticated;','')
+    console.log('LOCAL_PLATFORM_DIFFERENCE: absent rls_auto_enable helper; no grant to revoke')
+   }
+  }
   try{await db.query(sql)}catch(error){console.error('MIGRATION_FAILED',file,error.code,error.message);throw Error('SCHEMA_BOOTSTRAP_FAILED')}
  }
  console.log('SCHEMA_BOOTSTRAP_OK')
