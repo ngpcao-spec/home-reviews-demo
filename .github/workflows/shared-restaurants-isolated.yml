@@ -1,20 +1,25 @@
-name: Shared restaurant isolated stack preflight
+name: Shared restaurant isolated validation
 on:
   push:
     branches: [codex/shared-restaurants-auth-validation-20261109]
-    paths: [.github/workflows/shared-restaurants-isolated.yml]
 permissions:
   contents: read
 jobs:
   isolated-stack:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Verify Docker
         run: docker info --format '{{.ServerVersion}}'
+      - name: Install test tools
+        run: |
+          npm ci
+          npm install --prefix "$RUNNER_TEMP/pg-client" pg@8.16.3
+          npx playwright install --with-deps chromium
       - name: Start disposable Supabase without project credentials
         shell: bash
         run: |
@@ -22,7 +27,18 @@ jobs:
           cd "$RUNNER_TEMP/home-reviews-isolated"
           npx --yes supabase@2.118.0 init
           npx --yes supabase@2.118.0 start > "$RUNNER_TEMP/supabase-start.log" 2>&1
+          npx --yes supabase@2.118.0 status -o json > "$RUNNER_TEMP/local-status.json"
           curl --fail --silent http://127.0.0.1:54321/auth/v1/health
+      - name: Load full schema and real Auth fixtures
+        env:
+          CI_PG_PACKAGE: ${{ runner.temp }}/pg-client
+          CI_SUPABASE_STATUS: ${{ runner.temp }}/local-status.json
+          CI_AUTH_FIXTURE: ${{ runner.temp }}/auth-fixture.json
+        run: node tests/ci/shared-stack-prepare.mjs
+      - name: Browser with real Auth
+        env:
+          CI_AUTH_FIXTURE: ${{ runner.temp }}/auth-fixture.json
+        run: npx playwright test --config playwright.shared-stack.config.ts
       - name: Remove disposable services
         if: always()
         shell: bash
