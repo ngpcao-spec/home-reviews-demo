@@ -84,6 +84,9 @@ test('complete mutualization with real browser Auth database and workers',async(
   await fetch('http://127.0.0.1:4411/control/negative',{method:'POST'})
   await rows("update private.shared_restaurant_establishments set subscribed_at='2026-11-01'")
   await rows("update organizations set monitoring_interval_hours=case when id=$1 then 3 else 12 end",[fixture.users[0].organizationId])
+  // Advance the common collection's clock, not just its private projections:
+  // the real scheduler recomputes their deadlines from this successful collection.
+  await rows("update private.shared_restaurant_collections set last_success_at=now()-interval '4 hours' where restaurant_id=$1",[restaurant])
   await rows("update establishments set next_sync_at=now()-interval '1 minute'")
   await Promise.all([worker('schedule-google-reviews'),worker('schedule-google-reviews')])
   expect(Number((await rows("select count(*) n from review_sync_jobs where status='queued'"))[0].n)).toBe(1)
