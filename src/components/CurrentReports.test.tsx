@@ -7,6 +7,21 @@ import {CurrentReports,type CurrentReportsView} from './CurrentReports'
 import {parallelPresentationRow} from '../../tests/fixtures/parallel-presentation'
 const mock=vi.hoisted(()=>({invoke:vi.fn()}));vi.mock('../lib/supabase',()=>({supabase:{functions:{invoke:mock.invoke}}}))
 afterEach(()=>{cleanup();mock.invoke.mockReset()})
+it('shows a saved shared report even when the next generation uses the legacy engine',async()=>{
+ draw('fr','sol_legacy','/analyses',{shared_versions:[{id:'mock-derived',language:'fr',generated_at:'2026-10-21T00:00:00Z'}]});
+ expect(await screen.findByText('EXPLICIT UNCHANGED CONCLUSION')).toBeVisible();
+ expect(document.querySelector('[data-report-id="mock-derived"]')).toBeVisible();
+ expect(screen.getByText(/Parcours de retour arrière/)).toBeVisible();
+ expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
+});
+it('opens a shared dated report in its recorded language using read requests only',async()=>{
+ draw('fr','jev_sol_v2','/analyses',{shared_versions:[{id:'shared-vi',language:'vi',generated_at:'2026-01-01T00:00:00Z'}]});
+ const select=await screen.findByRole('combobox',{name:'Rapports disponibles du restaurant'});
+ expect(select).toHaveTextContent('VI · Rapport daté');
+ fireEvent.change(select,{target:{value:'shared-vi'}});
+ await waitFor(()=>expect(mock.invoke).toHaveBeenCalledWith('parallel-reports',{body:{action:'read_current',establishment_id:'est',shared_report_id:'shared-vi'}}));
+ expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
+});
 it.each(['fr','vi'] as const)('shows refresh counts and localized automatic failure without technical details (%s)',async(language)=>{
  draw(language,'jev_sol_v2','/analyses',{refresh:{enabled:true,reference_usable:true,reference_report_id:'dated',new_reviews:24,negative_reviews:2,threshold_met:false,state:'failed',origin:'automatic_thresholds',request_id:'auto'}});
  expect(await screen.findByRole('region',{name:language==='fr'?'Actualisation du rapport':'Cập nhật báo cáo'})).toHaveTextContent('24');

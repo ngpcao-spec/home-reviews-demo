@@ -31,6 +31,7 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
   queryFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'read_current',establishment_id:establishmentId,...(comparison?{comparison_id:comparison}:{}),...(sharedReport?{shared_report_id:sharedReport}:{})}});if(r.error||!r.data||r.data.error)throw Error('CURRENT_REPORT_READ_FAILED');return r.data}})
  useEffect(()=>{if(enabled)void q.refetch()},[enabled,generationRevision]) // eslint-disable-line react-hooks/exhaustive-deps
  const data=q.data,row=data?.experimental,v2=data?.routing.engine==='jev_sol_v2',legacy=data?.legacy_report?mapHistoricalReport(data.legacy_report):current,retention=data?.retention;
+ const sharedAvailable=!!row&&!!data?.shared_versions?.some(version=>version.id===row.id);
  const archive=!retention&&(params.get('variant')==='legacy'||!!comparison);
  const date=(value:string|null|undefined)=>value?new Date(value).toLocaleString(fr?'fr-FR':'vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'—';
  const statuses:Record<string,string>=fr?{queued:'En attente',running:'En cours',completed:'Terminé',needs_review:'À réexaminer',invalid_output:'Sortie invalide',blocked:'Bloqué',failed:'Échec',billing_uncertain:'Issue incertaine',authorization_expired:'Autorisation expirée'}:{queued:'Đang chờ',running:'Đang xử lý',completed:'Hoàn tất',needs_review:'Cần xem lại',invalid_output:'Kết quả không hợp lệ',blocked:'Bị chặn',failed:'Thất bại',billing_uncertain:'Chưa rõ kết quả',authorization_expired:'Ủy quyền hết hạn'};
@@ -67,7 +68,7 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
     {!retention&&<button id="archive-report-tab" role="tab" aria-selected={archive} aria-controls="archive-report-panel" onClick={()=>switchTab(true)}>{fr?'Rapports précédents':'Báo cáo trước đây'}</button>}
    </div>
    <section id="current-report-panel" role="tabpanel" aria-labelledby="current-report-tab" hidden={archive}>
-    {!v2?legacyReport:<>
+    {!v2&&!sharedAvailable?legacyReport:<>
      {row&&meta(row)}{row&&<ReportLanguageInfo source={row.source_report as Record<string,unknown>|undefined}/> }
      {row&&requestRun&&row.current_source_run_id!==requestRun.source_run_id&&<p className="v5-muted">{fr?'Rapport précédent disponible. Il est distinct de la nouvelle demande ci-dessous.':'Báo cáo trước đây vẫn có sẵn, tách biệt với yêu cầu mới bên dưới.'}</p>}
      {requestRun?.request_id&&<p className="v5-muted" data-current-request-id={requestRun.request_id}>{fr?'Demande':'Yêu cầu'} {requestRun.request_id.slice(0,8)} · {date(requestRun.created_at)} · {statuses[requestRun.status]??requestRun.status}</p>}
