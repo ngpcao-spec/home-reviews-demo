@@ -62,6 +62,7 @@ Deno.serve(async (request) => {
       .select('id')
       .eq('organization_id', membership.organization_id)
       .eq('google_id', resolved.establishment.googleId)
+      .eq('active', true)
       .maybeSingle()
     if (existingError) throw existingError
     if (existing) {

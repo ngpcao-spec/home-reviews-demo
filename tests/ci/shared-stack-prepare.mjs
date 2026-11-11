@@ -38,6 +38,12 @@ try{
     await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
    }
   }
+  if(file==='20261008122506_artisan_negative_validation.sql'){
+   for(const restored of ['add_separate_ai_preannotations_for_negative_validation','isolated_jev_ai_reference_exploration_v1','prepare_independent_artisan_v11_holdout_tables']){
+    console.log('RECONSTRUCTION',restored)
+    await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+   }
+  }
  }
  console.log('SCHEMA_BOOTSTRAP_OK')
  const endpoint=new URL(status.API_URL)
