@@ -38,7 +38,10 @@ test('complete mutualization with real browser Auth database and workers',async(
   mark('real-auth')
   await Promise.all(pages.map(p=>p.getByRole('button',{name:'Ajouter cet établissement',exact:true}).click()))
   await expect.poll(async()=>Number((await rows('select count(*) n from initial_import_jobs'))[0].n)).toBe(2)
-  await Promise.all([worker('process-initial-import-jobs'),worker('process-initial-import-jobs')])
+  const imports=Promise.all([worker('process-initial-import-jobs'),worker('process-initial-import-jobs')])
+  await expect.poll(async()=>(await provider()).runs.length).toBe(1)
+  await expect(rows('delete from private.shared_restaurant_pilot_places where place_id=$1',[placeId])).rejects.toThrow(/SHARED_PILOT_REQUIRES_DRAIN/)
+  await imports
   // Only resume the same waiting job; never retry a failed or unknown attempt.
   await rows("update initial_import_jobs set available_at=now() where status in ('queued','retry') and provider_start_attempted_at is null")
   await worker('process-initial-import-jobs')
@@ -65,7 +68,7 @@ test('complete mutualization with real browser Auth database and workers',async(
    await pages[i].goto('/analyses');await expect(pages[i].locator('[data-report-id="'+report.id+'"]')).toBeVisible()
   }
   expect((await provider()).runs).toHaveLength(1);expect((await provider()).aiCalls).toBe(0)
-  expect(Number((await rows("select count(*) n from notifications where type='negative_review'"))[0].n)).toBe(0)
+  expect(Number((await rows("select count(*) n from notifications where type='new_negative_review'"))[0].n)).toBe(0)
   mark('existing-data-and-proofs')
   await fetch('http://127.0.0.1:4411/control/negative',{method:'POST'})
   await rows("update private.shared_restaurant_establishments set subscribed_at='2026-11-01'")
@@ -112,7 +115,8 @@ test('complete mutualization with real browser Auth database and workers',async(
   expect(Number((await rows("select count(*) n from private.shared_restaurants where place_id='ChIJOutsidePilotFixture'"))[0].n)).toBe(0)
   mark('outside-pilot')
   const before=await rows('select id,external_review_id from reviews order by id')
-  await rows('delete from private.shared_restaurant_pilot_places where place_id=$1',[placeId]);await rows('update private.shared_restaurant_runtime set enabled=false')
+  await rows('delete from private.shared_restaurant_pilot_places where place_id=$1',[placeId])
+  await rows(readFileSync('supabase/maintenance/disable-shared-restaurants.sql','utf8'))
   expect(await rows('select id,external_review_id from reviews order by id')).toEqual(before)
   await pages[1].goto('/avis/'+reviews[1].id);await expect(pages[1].getByText('Le repas était froid et le service très lent.',{exact:true})).toBeVisible()
   expect((await provider()).runs).toHaveLength(2);expect((await provider()).aiCalls).toBe(1)

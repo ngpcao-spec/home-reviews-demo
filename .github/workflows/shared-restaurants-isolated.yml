@@ -63,6 +63,13 @@ jobs:
         env:
           CI_BROWSER_RECEIPT: ${{ runner.temp }}/browser-receipt.json
         run: node tests/ci/assert-browser-completion.mjs
+      - name: Local failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/functions.log" ]; then
+            grep -E 'Error|error|FAILED|failed|BOOT' "$RUNNER_TEMP/functions.log" | tail -60 || true
+          fi
       - name: Remove disposable services
         if: always()
         shell: bash

@@ -17,6 +17,14 @@ try{
   console.log('MIGRATION',file)
   // Historical cron definitions must never address production, even with no secrets.
   let sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
+  if(file==='20260928160000_scalable_sync_runtime_retention_load_test.sql'){
+   const start=sql.indexOf('insert into public.review_sync_load_test_results(')
+   if(start<0||!sql.slice(start).includes('private.run_review_sync_queue_load_test(10000)'))throw Error('LOAD_TEST_SUFFIX_CHANGED')
+   // Keep every schema/function/grant definition. This suffix executes a historical
+   // benchmark against existing tenants; it is not part of empty schema creation.
+   sql=sql.slice(0,start)
+   console.log('OMIT_HISTORICAL_LOAD_BENCHMARK_ONLY')
+  }
   try{await db.query(sql)}catch(error){console.error('MIGRATION_FAILED',file,error.code,error.message);throw Error('SCHEMA_BOOTSTRAP_FAILED')}
   if(file==='20260926064355_home_reviews_v1.sql'){
    for(const restored of ['after-v1','home_reviews_hourly_scheduler_schema']){
