@@ -91,6 +91,11 @@ test('complete mutualization with real browser Auth database and workers',async(
   await Promise.all([worker('schedule-google-reviews'),worker('schedule-google-reviews')])
   expect(Number((await rows("select count(*) n from review_sync_jobs where status='queued'"))[0].n)).toBe(1)
   await Promise.all([worker('process-review-sync-jobs'),worker('process-review-sync-jobs')])
+  expect((await provider()).runs).toHaveLength(2)
+  // The worker checkpoints the run and yields before polling it. Continue that
+  // existing run only; do not retry a failed job or clear its provider identity.
+  await rows("update review_sync_jobs set available_at=now() where status='queued' and apify_run_id is not null")
+  await worker('process-review-sync-jobs')
   const syncJobs=await rows('select status,error_code from review_sync_jobs')
   expect(syncJobs,JSON.stringify(syncJobs)).toEqual([{status:'completed',error_code:null}])
   expect((await provider()).runs).toHaveLength(2)
