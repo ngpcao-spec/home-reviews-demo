@@ -38,3 +38,7 @@ $function$
 ;
 revoke all on function public.rls_auto_enable() from public,anon,authenticated;
 grant execute on function public.rls_auto_enable() to service_role;
+-- Hosted platform event trigger, confirmed in pg_event_trigger (not an app stub).
+create event trigger ensure_rls on ddl_command_end
+ when tag in ('CREATE TABLE','CREATE TABLE AS','SELECT INTO')
+ execute function public.rls_auto_enable();

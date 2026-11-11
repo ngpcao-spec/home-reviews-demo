@@ -18,7 +18,13 @@ try{
   let sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
   try{await db.query(sql)}catch(error){console.error('MIGRATION_FAILED',file,error.code,error.message);throw Error('SCHEMA_BOOTSTRAP_FAILED')}
   if(file==='20260926064355_home_reviews_v1.sql'){
-   for(const restored of ['after-v1','home_reviews_hourly_scheduler_schema','track_review_ai_processing_and_usage','track_review_ai_retry_history','retain_rejected_ai_outputs_for_audit']){
+   for(const restored of ['after-v1','home_reviews_hourly_scheduler_schema']){
+    console.log('RECONSTRUCTION',restored)
+    await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+   }
+  }
+  if(file==='20260927080953_simplify_review_ai.sql'){
+   for(const restored of ['track_review_ai_processing_and_usage','track_review_ai_retry_history','retain_rejected_ai_outputs_for_audit']){
     console.log('RECONSTRUCTION',restored)
     await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
    }
