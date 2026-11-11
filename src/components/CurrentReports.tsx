@@ -12,6 +12,7 @@ import {ReputationReport} from './ReputationReport'
 import {ReportLanguageInfo} from './CustomerRatingSummary'
 import './parallel-reports.css'
 export interface CurrentReportsView {
+ shared_versions?:{id:string;language:string;generated_at:string}[];
  refresh?:{enabled:boolean;reference_usable:boolean;reference_report_id:string|null;new_reviews:number|null;negative_reviews:number|null;threshold_met:boolean;state:'waiting'|'in_progress'|'failed';origin:'manual'|'automatic_thresholds'|null;request_id:string|null}|null;
  retention?:{policy:{version:string;enabled:boolean};state:{retained_count:number;period_start:string|null;period_end:string|null}|null;scope:{as_of:string;review_count:number;period_start:string;period_end:string;stale:boolean}|null;retired:{generated_at:string|null;review_count:number;period_start:string|null;period_end:string|null;reason:string}|null}|null;
  routing:{engine:'jev_sol_v2'|'sol_legacy';jev_transport?:'individual'|'batch_initial_v1';updated_at:string};current_transport?:'individual'|'batch_initial_v1';legacy_report:HistoricalReportRow|null;
@@ -24,9 +25,10 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
  establishmentId:string;account:string;enabled:boolean;languageKey:string|null;current:HistoricalReport|null;generating:boolean;generationRevision?:string;
  generationAction:ReactNode;children:ReactNode;reloadCompletedAt?:string}){
  const {language}=useI18n(),fr=language==='fr',[params,setParams]=useSearchParams(),comparison=params.get('comparison')??'';
- const q=useQuery<CurrentReportsView>({queryKey:['current-reports',account,establishmentId,languageKey,comparison,...(reloadCompletedAt?[reloadCompletedAt]:[])],enabled:enabled&&!!languageKey,retry:false,
+ const sharedReport=params.get('shared_report')??'';
+ const q=useQuery<CurrentReportsView>({queryKey:['current-reports',account,establishmentId,languageKey,comparison,...(sharedReport?[sharedReport]:[]),...(reloadCompletedAt?[reloadCompletedAt]:[])],enabled:enabled&&!!languageKey,retry:false,
   refetchInterval:query=>generating||[query.state.data?.request_run,query.state.data?.run].some(r=>r&&['queued','running','retry'].includes(r.status))?4000:query.state.data?.retention?30000:false,
-  queryFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'read_current',establishment_id:establishmentId,...(comparison?{comparison_id:comparison}:{})}});if(r.error||!r.data||r.data.error)throw Error('CURRENT_REPORT_READ_FAILED');return r.data}})
+  queryFn:async()=>{const r=await supabase!.functions.invoke('parallel-reports',{body:{action:'read_current',establishment_id:establishmentId,...(comparison?{comparison_id:comparison}:{}),...(sharedReport?{shared_report_id:sharedReport}:{})}});if(r.error||!r.data||r.data.error)throw Error('CURRENT_REPORT_READ_FAILED');return r.data}})
  useEffect(()=>{if(enabled)void q.refetch()},[enabled,generationRevision]) // eslint-disable-line react-hooks/exhaustive-deps
  const data=q.data,row=data?.experimental,v2=data?.routing.engine==='jev_sol_v2',legacy=data?.legacy_report?mapHistoricalReport(data.legacy_report):current,retention=data?.retention;
  const archive=!retention&&(params.get('variant')==='legacy'||!!comparison);
@@ -52,6 +54,7 @@ export function CurrentReports({establishmentId,account,enabled,languageKey,curr
   {q.isError&&<div role="alert"><p>{fr?'Impossible de lire les rapports enregistrés. Aucun lancement automatique.':'Không thể đọc báo cáo đã lưu. Không tự động khởi chạy.'}</p><button className="secondary-button" onClick={()=>void q.refetch()}>{fr?'Actualiser l’état (sans appel IA)':'Làm mới trạng thái (không gọi AI)'}</button></div>}
   {q.isPending&&<p role="status">{fr?'Lecture des rapports…':'Đang tải báo cáo…'}</p>}
   {data&&<>
+   {!!data.shared_versions?.length&&<label className="parallel-corpus-label">{fr?'Rapports disponibles du restaurant':'Báo cáo có sẵn của cơ sở'}<select value={sharedReport} onChange={e=>{const next=new URLSearchParams(params);next.delete('comparison');next.delete('variant');if(e.target.value)next.set('shared_report',e.target.value);else next.delete('shared_report');setParams(next)}}><option value="">{fr?'Dernier rapport dans la langue du compte':'Báo cáo mới nhất theo ngôn ngữ tài khoản'}</option>{data.shared_versions.map(v=><option key={v.id} value={v.id}>{date(v.generated_at)} · {v.language.toUpperCase()} · {fr?'Rapport daté':'Báo cáo có ngày'}</option>)}</select></label>}
    {data.refresh?.enabled&&<section className="card" aria-label={fr?'Actualisation du rapport':'Cập nhật báo cáo'}>
     <p>{data.refresh.reference_usable?(fr?`${data.refresh.new_reviews} nouveaux avis non couverts par le rapport publié, dont ${data.refresh.negative_reviews} notés de 1 à 3 étoiles.`:`${data.refresh.new_reviews} đánh giá mới chưa có trong báo cáo đã công bố, gồm ${data.refresh.negative_reviews} đánh giá từ 1 đến 3 sao.`):(fr?'Une génération manuelle est nécessaire pour établir une référence complète.':'Cần tạo báo cáo thủ công để thiết lập dữ liệu tham chiếu đầy đủ.')}</p>
     <p>{data.refresh.state==='in_progress'?(fr?'Actualisation en cours. Le rapport daté reste disponible.':'Đang cập nhật. Báo cáo có ngày trước vẫn có sẵn.'):data.refresh.state==='failed'?(fr?'L’actualisation a échoué. Le rapport précédent et les compteurs sont conservés. Aucun nouvel essai automatique.':'Cập nhật thất bại. Báo cáo trước và bộ đếm được giữ nguyên. Không tự động thử lại.'):(fr?'Actualisation automatique à partir de 3 nouveaux avis notés de 1 à 3 étoiles ou de 25 nouveaux avis au total.':'Tự động cập nhật khi có 3 đánh giá mới từ 1 đến 3 sao hoặc tổng cộng 25 đánh giá mới.')}</p>

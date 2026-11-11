@@ -37,10 +37,32 @@ jobs:
           CI_SUPABASE_STATUS: ${{ runner.temp }}/local-status.json
           CI_AUTH_FIXTURE: ${{ runner.temp }}/auth-fixture.json
         run: node tests/ci/shared-stack-prepare.mjs
+      - name: Start real workers with isolated providers
+        shell: bash
+        run: |
+          node tests/ci/prepare-edge-runtime.mjs
+          node tests/ci/provider-server.mjs > "$RUNNER_TEMP/providers.log" 2>&1 &
+          cd "$RUNNER_TEMP/home-reviews-isolated"
+          npx --yes supabase@2.118.0 functions serve --no-verify-jwt --env-file test-functions.env > "$RUNNER_TEMP/functions.log" 2>&1 &
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:54321/functions/v1/add-establishment)
+            if [ "$code" = 401 ]; then exit 0; fi
+            sleep 2
+          done
+          echo 'EDGE_RUNTIME_NOT_READY'
+          exit 1
       - name: Browser with real Auth
         env:
           CI_AUTH_FIXTURE: ${{ runner.temp }}/auth-fixture.json
+          CI_BROWSER_RECEIPT: ${{ runner.temp }}/browser-receipt.json
+          CI_PG_PACKAGE: ${{ runner.temp }}/pg-client
+          CI_SUPABASE_STATUS: ${{ runner.temp }}/local-status.json
         run: npx playwright test --config playwright.shared-stack.config.ts
+      - name: Require every browser scenario
+        if: always()
+        env:
+          CI_BROWSER_RECEIPT: ${{ runner.temp }}/browser-receipt.json
+        run: node tests/ci/assert-browser-completion.mjs
       - name: Remove disposable services
         if: always()
         shell: bash

@@ -1,0 +1,8 @@
+import {readFileSync} from 'node:fs'
+export const required=['real-auth','simultaneous-add','existing-data-and-proofs','shared-negative-sync','single-analysis','private-isolation','unsubscribe','outside-pilot','disable-and-rollback']
+const path=process.env.CI_BROWSER_RECEIPT
+if(!path)throw Error('BROWSER_RECEIPT_REQUIRED')
+const result=JSON.parse(readFileSync(path,'utf8'))
+const missing=required.filter(name=>!result.passed?.includes(name))
+if(missing.length)throw Error('REQUIRED_BROWSER_SCENARIOS_NOT_EXECUTED: '+missing.join(', '))
+console.log('ALL_REQUIRED_BROWSER_SCENARIOS_PASSED',required.join(', '))

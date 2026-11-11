@@ -91,7 +91,7 @@ async function continueJob(admin: SupabaseClient, jobId: string, worker: string,
   if (continued !== true) throw new Error('SYNC_LEASE_LOST')
 }
 
-async function processApifyJob(
+export async function processApifyJob(
   admin: SupabaseClient,
   job: SyncJob,
   worker: string,

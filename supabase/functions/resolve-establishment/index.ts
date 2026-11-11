@@ -7,6 +7,9 @@ import { preferredLanguageForUser, resolveEstablishmentCandidate } from '../_sha
 import { normalizeGoogleMapsLink } from '../_shared/google-maps-link.ts'
 import { createResolutionDiagnostics } from '../_shared/resolution-diagnostics.ts'
 import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
+import {sharedRpc,sharedRuntimeRequested} from '../_shared/shared-operation-supabase.ts'
+import {placeIdFromMapsLink} from '../_shared/shared-initial-import.ts'
+import type {NormalizedEstablishment} from '../_shared/outscraper.ts'
 
 interface RequestBody { input?: unknown }
 
@@ -46,7 +49,13 @@ Deno.serve(async (request) => {
     diagnostics.step('language')
     const language = await preferredLanguageForUser(admin, user.id)
     diagnostics.step('provider')
-    const resolved = await resolveEstablishmentCandidate(normalizedLink, language, diagnostics.step)
+    const placeId = placeIdFromMapsLink(normalizedLink)
+    const cached = sharedRuntimeRequested() && placeId
+      ? await sharedRpc<NormalizedEstablishment|null>(admin,'read_shared_restaurant_resolution',{p_place_id:placeId}) : null
+    const resolved = cached ? {establishment:cached} : await resolveEstablishmentCandidate(normalizedLink, language, diagnostics.step)
+    if (sharedRuntimeRequested() && resolved.establishment.placeId) {
+      await sharedRpc(admin,'register_shared_restaurant_resolution',{p_place:resolved.establishment})
+    }
     diagnostics.step('duplicate_check')
     const { data: existing, error: existingError } = await admin
       .from('establishments')

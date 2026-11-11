@@ -129,6 +129,7 @@ export interface BatchExperimentPort {
  draft(id:string,body:BatchDraft,sha:string):Promise<boolean>;
  envelope(id:string,body:BatchEnvelope,sha:string):Promise<boolean>;
  claimSol(id:string,worker:string):Promise<boolean>;
+ reserveSharedSol?(id:string,sha:string):Promise<{state:'legacy'|'owner'|'waiting'|'blocked'|'completed';receipt?:Record<string,unknown>;source_run_id?:string;source_receipt_sha256?:string}>;
  receiveSol(id:string,worker:string,body:unknown,sha:string):Promise<boolean>;
  finish(id:string,status:string,result:unknown,usage:unknown,error?:string):Promise<boolean>;
 }
@@ -238,7 +239,16 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   envelope.measurement.request_bytes===new TextEncoder().encode(envelope.request_json).length,'BATCH_SOL_MEASUREMENT_CHANGED');
  if(run.stage==='sol'){
   check(keys.sol,'BATCH_SOL_KEY_UNAVAILABLE');
+  const shared=await port.reserveSharedSol?.(id,envelope.request_sha256);
+  if(shared?.state==='waiting')return {phase:'shared_sol_waiting',provider_calls:0};
+  check(shared?.state!=='blocked','BATCH_SHARED_SOL_PREVIOUS_FAILED');
   if(!await port.claimSol(id,worker))return {phase:'sol_concurrent_or_consumed',provider_calls:0};
+  if(shared?.state==='completed'){
+   check(shared.receipt&&await directHash(shared.receipt)===shared.source_receipt_sha256&&shared.receipt.request_sha256===envelope.request_sha256,'BATCH_SHARED_SOL_RECEIPT_CHANGED');
+   const reused={...shared.receipt,shared_source_run_id:shared.source_run_id,shared_source_receipt_sha256:shared.source_receipt_sha256,shared_reused:true};
+   check(await port.receiveSol(id,worker,reused,await directHash(reused)),'BATCH_SOL_SAVE_UNCERTAIN_NO_RETRY');
+   return {phase:'shared_sol_receipt_reused',provider_calls:0};
+  }
   const at=Date.now();let receipt;
   try{
    providerCalls++;
@@ -260,7 +270,8 @@ export async function processBatchExperiment(port:BatchExperimentPort,id:string,
   if(!receipt.raw_response_text){status='billing_uncertain';throw Error('BATCH_SOL_OUTCOME_UNKNOWN_NO_RETRY');}
   check(await analysisTextSha256(receipt.raw_response_text)===receipt.raw_response_sha256,'BATCH_SOL_RAW_CHANGED');
   const raw=JSON.parse(receipt.raw_response_text);result.response=raw;
-  usage.sol={historical:false,provider_attempts:1,usage:raw.usage??null,duration_ms:receipt.duration_ms,provider_request_id:receipt.provider_request_id,served_model:raw.model??null};
+  usage.sol={historical:receipt.shared_reused===true,provider_attempts:receipt.shared_reused?0:1,usage:raw.usage??null,duration_ms:receipt.duration_ms,provider_request_id:receipt.provider_request_id,served_model:raw.model??null,
+   ...(receipt.shared_reused?{shared_source_run_id:receipt.shared_source_run_id,shared_source_receipt_sha256:receipt.shared_source_receipt_sha256,reused_usage_billed_again:false}:{})};
   check(receipt.http_status>=200&&receipt.http_status<300&&raw.model==='gpt-6.1-sol'&&raw.status==='completed','BATCH_SOL_HTTP_MODEL_OR_OUTPUT_INVALID');
   check(Number.isSafeInteger(raw.usage?.input_tokens)&&raw.usage.input_tokens>0&&Number.isSafeInteger(raw.usage.output_tokens)&&raw.usage.output_tokens>=0,'BATCH_SOL_USAGE_MISSING');
   const texts=raw.output.filter((x:any)=>x.type==='message').flatMap((x:any)=>x.content).filter((x:any)=>x.type==='output_text');

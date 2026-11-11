@@ -24,6 +24,8 @@ import {collectionLanguage} from '../_shared/review-language.ts'
 import {assertIngestionAllowed} from '../_shared/recent-review-policy.ts'
 import {advanceInitialApify} from '../_shared/initial-import-apify.ts'
 import {prepareManualReviewReload, ReviewReloadValidationError} from '../_shared/manual-review-reload.ts'
+import {sharedInitialReservation,saveSharedInitialResult} from '../_shared/shared-initial-import.ts'
+import {sharedRpc,sharedRuntimeRequested} from '../_shared/shared-operation-supabase.ts'
 
 interface InitialImportJob {
   id: string
@@ -189,6 +191,7 @@ async function persistResult(
   if (fetched.establishment.googleId !== job.expected_google_id) {
     throw new Error('ESTABLISHMENT_MISMATCH')
   }
+  await saveSharedInitialResult(admin,job,fetched)
   const importedReviews = newestFirst(prepareInitialReviews(fetched.reviews, job.reviews_target))
   const newest = fetched.checkpointReview??newestFirst([...(fetched.observedReviews??fetched.reviews)])[0]??null
   const oldest = importedReviews.at(-1) ?? null
@@ -249,6 +252,12 @@ async function persistResult(
     },
   }))
   if (finalized !== true) throw new Error('INITIAL_IMPORT_LEASE_LOST')
+  if (sharedRuntimeRequested() && fetched.establishment.placeId) {
+    await sharedRpc(admin,'attach_verified_shared_establishment',{
+      p_establishment:establishmentId,p_place:fetched.establishment.placeId,p_user:job.user_id,
+    })
+    await sharedRpc(admin,'seed_shared_establishment_menus',{p_establishment:establishmentId})
+  }
   return { jobId: job.id, status: 'completed', establishmentId, reviews: persistedCount }
 }
 
@@ -350,9 +359,27 @@ async function processJob(
     providerSlotWaitMs: number
   },
 ) {
+  let sharedAttempt = false
   try {
     await phase(admin,job,worker,'worker_started')
     await assertIngestionAllowed(admin)
+    if(sharedRuntimeRequested() && job.request_kind!=='reload' && !job.provider_start_attempted_at && !job.provider_run_id){
+      const joined=await sharedRpc<{status:string;establishmentId:string}|null>(admin,'join_available_shared_restaurant',{
+        p_org:job.organization_id,p_user:job.user_id,p_google:job.expected_google_id,p_language:job.preferred_language,
+        p_query:job.query,p_candidate:{},
+      })
+      if(joined?.status==='completed')return {jobId:job.id,status:'completed',establishmentId:joined.establishmentId,shared:true}
+    }
+    const shared = await sharedInitialReservation(admin,job)
+    sharedAttempt = shared.state !== 'legacy'
+    if (shared.state==='blocked') throw Error('SHARED_INITIAL_IMPORT_BLOCKED')
+    if (shared.state==='waiting') {
+      await continueJob(admin,job.id,worker,30)
+      return {jobId:job.id,status:'shared_waiting'}
+    }
+    if (shared.state==='completed' && shared.result) {
+      return await persistResult(admin,job,worker,{...shared.result,providerRequests:0},config.leaseSeconds)
+    }
     if(job.request_kind==='reload'){
       if(await requireSuccess<boolean>(admin.rpc('review_reload_stage_ready',{p_job:job.id,p_worker:worker}))){
         return await requireSuccess(admin.rpc('apply_review_reload',{p_job:job.id,p_worker:worker}))
@@ -376,10 +403,10 @@ async function processJob(
       p_job_id: job.id,
       p_worker_id: worker,
       p_error_code: policy.code,
-      p_retryable: policy.retryable,
+      p_retryable: sharedAttempt ? false : policy.retryable,
       p_max_attempts: config.maxAttempts,
       p_backoff_seconds: policy.backoffSeconds,
-      p_reset_provider: resetProvider,
+      p_reset_provider: sharedAttempt ? false : resetProvider,
     }))
     return { jobId: job.id, status, error: policy.code }
   }

@@ -7,6 +7,7 @@ import { sendPushToUser } from '../_shared/push.ts'
 import { isDuplicateNotificationError, runNonBlockingNotification, shouldCreateReviewNotification } from '../_shared/notification-rules.ts'
 import { shouldAutomaticallyAnalyzeReview } from '../_shared/ai-rules.ts'
 import { preferredLanguageForOrganization, preferredLanguageForUser } from '../_shared/preferences.ts'
+import {SharedAnalysisWaiting,sharedReviewAnalysis} from '../_shared/shared-operation-supabase.ts'
 
 interface ReviewRow {
   id: string
@@ -137,11 +138,12 @@ Deno.serve(async (request) => {
   let fourStarCheckClaimed = false
 
   try {
-    const body = await request.json() as { review_id?: string; regenerate?: boolean }
+    const body = await request.json() as { review_id?: string; regenerate?: boolean; shared_operation_key?:string;shared_language?:'fr'|'vi' }
     reviewId = body.review_id?.trim() ?? ''
     if (!reviewId) return json({ error: 'REVIEW_ID_REQUIRED' }, 400)
 
     const automatic = await webhookAuthorized(admin, request.headers.get('x-home-reviews-webhook'))
+    if(body.shared_operation_key && (!automatic || !/^[a-f0-9]{64}$/.test(body.shared_operation_key) || !['fr','vi'].includes(body.shared_language??'')))return json({error:'FORBIDDEN'},403)
     let reader: SupabaseClient = admin
     let userId: string | null = null
 
@@ -160,8 +162,10 @@ Deno.serve(async (request) => {
     if (error || !data) return json({ error: 'REVIEW_NOT_FOUND' }, 404)
 
     const review = data as ReviewRow
+    const subscription=await admin.from('establishments').select('active').eq('id',review.establishment_id).single()
+    if(subscription.data?.active===false)return json({skipped:true,reason:'UNSUBSCRIBED'})
     legacySuggestionExists = Boolean(review.ai_suggested_reply)
-    if (automatic && !shouldAutomaticallyAnalyzeReview(review)) {
+    if (automatic && !body.shared_operation_key && !shouldAutomaticallyAnalyzeReview(review)) {
       return json({ ai_status: review.ai_status, skipped: true, reason: 'HISTORICAL_IMPORT' })
     }
     if (review.rating > 4) return json({ error: 'ANALYSIS_NOT_REQUIRED' }, 400)
@@ -175,6 +179,7 @@ Deno.serve(async (request) => {
     workingLanguage = userId
       ? await preferredLanguageForUser(admin, userId)
       : await preferredLanguageForOrganization(admin, review.organization_id)
+    if(body.shared_operation_key)workingLanguage=body.shared_language!
 
     const { data: existingData, error: existingError } = await admin
       .from('review_reply_drafts')
@@ -215,12 +220,14 @@ Deno.serve(async (request) => {
       if (!claimed) return json({ error: 'ANALYSIS_IN_PROGRESS' }, 409)
       fourStarCheckClaimed = true
 
-      const result = await analyzeFourStarReviewWithOpenAI(
+      const result = await sharedReviewAnalysis(admin,{establishment:review.establishment_id,
+        content:{text:review.original_text||review.text,detailedRating:review.review_detailed_rating,context:review.review_context},
+        language:workingLanguage,model:'gpt-5.6-terra',configuration:'four-star-triage-reply-20261108-v1',expectedKey:body.shared_operation_key},()=>analyzeFourStarReviewWithOpenAI(
         review.original_text || review.text,
         workingLanguage,
         review.review_detailed_rating,
         review.review_context,
-      )
+      ))
       const analyzedAt = new Date().toISOString()
       const commonUpdate = {
         has_negative_feedback: result.has_negative_feedback,
@@ -333,7 +340,10 @@ Deno.serve(async (request) => {
     const { error: pendingError } = await admin.from('reviews').update(pendingReviewUpdate).eq('id', review.id)
     if (pendingError) throw pendingError
 
-    const result = await analyzeReviewWithOpenAI(review.rating, review.original_text || review.text, workingLanguage)
+    const result = await sharedReviewAnalysis(admin,{establishment:review.establishment_id,
+      content:{rating:review.rating,text:review.original_text||review.text},language:workingLanguage,
+      model:Deno.env.get('REVIEW_REPLY_MODEL')?.trim()||'gpt-6.1-sol',configuration:'review-reply-20261108-v1',expectedKey:body.shared_operation_key},
+      ()=>analyzeReviewWithOpenAI(review.rating,review.original_text||review.text,workingLanguage!))
     const analyzedAt = new Date().toISOString()
     const currentDraftVersion = localized.draft_version ?? 0
     const nextDraftVersion = currentDraftVersion + 1
@@ -427,6 +437,12 @@ Deno.serve(async (request) => {
         failedReviewUpdate.ai_error = code
       }
       await admin.from('reviews').update(failedReviewUpdate).eq('id', reviewId)
+    }
+    if(error instanceof SharedAnalysisWaiting && reviewId && workingLanguage){
+      const pending=await admin.rpc('defer_shared_review_analysis',{p_key:error.key,p_review:reviewId,p_language:workingLanguage,
+        p_worker_url:Deno.env.get('SUPABASE_URL')+'/functions/v1/analyze-review'})
+      if(pending.error)return json({error:'SHARED_ANALYSIS_DEFER_FAILED'},500)
+      return json({ai_status:'pending',shared:true},202)
     }
     return json({ error: code }, code === 'UNAUTHORIZED' ? 401 : code === 'RATE_LIMITED' ? 429 : 500)
   }

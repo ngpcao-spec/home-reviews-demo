@@ -958,12 +958,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const removedReviewIds = new Set(reviews.filter((item) => item.establishmentId === id).map((item) => item.id))
     if (!demoMode) {
       if (!supabase || !authUser) throw new Error('UNAUTHORIZED')
-      const { data, error } = await supabase
-        .from('establishments')
-        .delete()
-        .eq('id', id)
-        .select('id')
-        .maybeSingle()
+      const { data, error } = await supabase.rpc('remove_establishment_subscription', {p_establishment:id})
       if (error) throw error
       if (!data) throw new Error('ESTABLISHMENT_NOT_FOUND_OR_FORBIDDEN')
     }

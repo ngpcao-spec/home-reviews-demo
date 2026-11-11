@@ -2,6 +2,7 @@ import { assertMembership, requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { preferredLanguageForUser } from '../_shared/sync-service.ts'
+import {sharedRpc,sharedRuntimeRequested} from '../_shared/shared-operation-supabase.ts'
 
 interface RequestBody {
   organizationId?: unknown
@@ -64,6 +65,11 @@ Deno.serve(async (request) => {
 
     await assertMembership(admin, user.id, organizationId, ['owner', 'admin', 'manager'])
     const language = await preferredLanguageForUser(admin, user.id)
+    if(sharedRuntimeRequested()){
+      const shared=await sharedRpc(admin,'join_available_shared_restaurant',{p_org:organizationId,p_user:user.id,
+        p_google:body.expectedGoogleId.trim(),p_language:language,p_query:body.query.trim(),p_candidate:candidateSnapshot(body.candidate)})
+      if(shared)return json(shared,202)
+    }
     const { data: job, error: enqueueError } = await admin.rpc('enqueue_initial_import_job', {
       p_organization_id: organizationId,
       p_user_id: user.id,

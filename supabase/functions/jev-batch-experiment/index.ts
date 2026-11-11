@@ -8,6 +8,7 @@ import {CURRENT_BATCH_VERSION} from '../_shared/current-batch-report.ts';
 import {SUPPORTED_EVIDENCE_SELECTORS} from '../_shared/report-evidence-selector.ts';
 import {rehearseCurrentBatches} from '../_shared/current-batch-probe.ts';
 import {saveBatchReceipt} from '../_shared/jev-batch-receipt.ts';
+import {sharedRuntimeRequested} from '../_shared/shared-operation-supabase.ts';
 declare const EdgeRuntime:{waitUntil(p:Promise<unknown>):void};
 Deno.serve(async request=>{
  const early=preflight(request);if(early)return early;
@@ -44,6 +45,7 @@ Deno.serve(async request=>{
    draft:(id,b,s)=>rpc('jev_batch_save_draft',{p_run:id,p_body:b,p_sha:s}),
    envelope:(id,b,s)=>rpc('jev_batch_save_envelope',{p_run:id,p_body:b,p_sha:s}),
    claimSol:(id,w)=>rpc('jev_batch_claim_sol',{p_run:id,p_worker:w}),
+   reserveSharedSol:(id,sha)=>sharedRuntimeRequested()?rpc('reserve_shared_report_sol',{p_run:id,p_sha:sha}):Promise.resolve({state:'legacy'}),
    receiveSol:(id,w,b,s)=>rpc('jev_batch_receive_sol',{p_run:id,p_worker:w,p_body:b,p_sha:s}),
    finish:(id,s,b,u,e)=>rpc('jev_batch_finish',{p_run:id,p_status:s,p_result:b,p_usage:u,p_error:e??null}),
   };
@@ -61,7 +63,7 @@ Deno.serve(async request=>{
    .catch(async e=>{
     const code=e instanceof Error&&/^[A-Z_0-9]+$/.test(e.message)?e.message:'BATCH_STEP_FAILED_NO_RETRY';
     const r=await admin.from('analysis_jev_batch_runs').select('stage').eq('id',body.run_id).single();
-    if(['auto_prepare','auto_plan','prepare_evidence','measure_sol'].includes(r.data?.stage))await rpc('jev_batch_stop',{p_run:body.run_id,p_error:code});
+    if(['auto_prepare','auto_plan','prepare_evidence','measure_sol'].includes(r.data?.stage)||code==='BATCH_SHARED_SOL_PREVIOUS_FAILED')await rpc('jev_batch_stop',{p_run:body.run_id,p_error:code});
     console.error('BATCH_STEP_STOPPED_RECEIPTS_RETAINED_NO_RETRY',code);
    }));
   return json({accepted:true,automatic_retry:false},202);

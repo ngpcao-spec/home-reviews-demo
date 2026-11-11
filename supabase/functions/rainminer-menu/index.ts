@@ -31,7 +31,9 @@ async function work(admin: Admin, token: string) {
   };
   try {
     const restaurant = await admin.from('establishments').select('place_id,active').eq('id',job.establishment_id).single();
-    if (restaurant.error || !restaurant.data.active || restaurant.data.place_id !== job.place_id)
+    const sharedSource = !restaurant.error && !restaurant.data.active && Deno.env.get('SHARED_RESTAURANTS_ENABLED')==='true'
+      ? await admin.rpc('shared_menu_source_valid',{p_establishment:job.establishment_id,p_place:job.place_id,p_require_subscribers:job.status==='starting'}) : null;
+    if (restaurant.error || (!restaurant.data.active && sharedSource?.data!==true) || restaurant.data.place_id !== job.place_id)
       throw Error('MENU_PLACE_ID_CHANGED');
     if (job.status === 'starting') {
       const {data: actor} = await api(actorPath);
@@ -72,7 +74,9 @@ async function work(admin: Admin, token: string) {
       status:run.status,costUsd:run.usageTotalUsd,
     }, job.place_id);
     const current = await admin.from('establishments').select('place_id,active').eq('id',job.establishment_id).single();
-    if (current.error || !current.data.active || current.data.place_id !== job.place_id) throw Error('MENU_PLACE_ID_CHANGED');
+    const finalSharedSource = !current.error && !current.data.active && Deno.env.get('SHARED_RESTAURANTS_ENABLED')==='true'
+      ? await admin.rpc('shared_menu_source_valid',{p_establishment:job.establishment_id,p_place:job.place_id,p_require_subscribers:false}) : null;
+    if (current.error || (!current.data.active && finalSharedSource?.data!==true) || current.data.place_id !== job.place_id) throw Error('MENU_PLACE_ID_CHANGED');
     await update({status:'completed',raw,result,lease_until:null});
     return json({status:'completed',counts:result.counts});
   } catch (error) {
@@ -127,7 +131,15 @@ Deno.serve(async request => {
       admin.from(table).select('result').eq('establishment_id',restaurant.data.id).eq('place_id',restaurant.data.place_id)
         .eq('status','completed').order('created_at',{ascending:false}).limit(1).maybeSingle()]);
     if (latest.error || completed.error) return json({error:'MENU_STATUS_FAILED'},500);
-    return json({job:latest.data,result:completed.data?.result??null,canStart});
+    let result = completed.data?.result ?? null;
+    let currentJob=latest.data;
+    if (Deno.env.get('SHARED_RESTAURANTS_ENABLED') === 'true') {
+      const shared = await admin.rpc('read_shared_establishment_menu', {p_establishment:restaurant.data.id,p_user:user.id});
+      if (shared.error) return json({error:'MENU_STATUS_FAILED'},500);
+      result = shared.data?.result ?? result;
+      currentJob=shared.data?.job??currentJob;
+    }
+    return json({job:currentJob,result,canStart});
   } catch {
     return json({error:'MENU_REQUEST_REJECTED'},403);
   }

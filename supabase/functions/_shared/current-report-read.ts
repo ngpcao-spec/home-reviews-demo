@@ -2,14 +2,22 @@
 import type {AuthContext} from './auth.ts';
 import {assertMembership} from './auth.ts';
 import {currentHistoricalStatus} from './current-report-status.ts';
-export async function readCurrentReports(c:AuthContext,input:{establishment_id:string;comparison_id?:string}){
- const e=await c.client.from('establishments').select('id,organization_id').eq('id',input.establishment_id).single();if(e.error)throw Error('FORBIDDEN');
+import {sharedRuntimeRequested} from './shared-operation-supabase.ts';
+export async function readCurrentReports(c:AuthContext,input:{establishment_id:string;comparison_id?:string;shared_report_id?:string}){
+ const e=await c.client.from('establishments').select('id,organization_id').eq('id',input.establishment_id).eq('active',true).single();if(e.error||!e.data)throw Error('FORBIDDEN');
  await assertMembership(c.client,c.user.id,e.data.organization_id);
  const profile=await c.client.from('profiles').select('preferred_language').eq('user_id',c.user.id).single();if(profile.error||!['fr','vi'].includes(profile.data.preferred_language))throw Error('PREFERRED_LANGUAGE_REQUIRED');
  const org=e.data.organization_id,language=profile.data.preferred_language;
  const policyRead=await c.client.from('review_corpus_policy').select('version,enabled,paused,epoch').eq('id',true).single();if(policyRead.error)throw Error('REVIEW_POLICY_UNAVAILABLE');
+ const selectedShared=input.shared_report_id;
+ const sharedVersions=sharedRuntimeRequested()?await c.admin.rpc('list_shared_report_versions',{p_establishment:e.data.id,p_user:c.user.id}):{data:[],error:null};
+ if(sharedVersions.error)throw Error('SHARED_REPORT_VERSIONS_READ_FAILED');
+ const selected=selectedShared?(sharedVersions.data as {id:string;language:string}[]).find(v=>v.id===selectedShared):undefined;
+ if(selectedShared&&!selected)throw Error('FORBIDDEN');
  const policy=policyRead.data;if(policy.enabled)input={establishment_id:input.establishment_id};
- const publication=policy.enabled?await c.admin.rpc('read_current_report_publication',{p_establishment:e.data.id,p_language:language}):{data:null,error:null};
+ let publication=policy.enabled?await c.admin.rpc('read_current_report_publication',{p_establishment:e.data.id,p_language:language}):{data:null,error:null};
+ if(selected)publication=await c.admin.rpc('read_shared_report_version',{p_establishment:e.data.id,p_language:selected.language,p_user:c.user.id,p_report:selected.id});
+ if(!publication.error&&!publication.data&&sharedRuntimeRequested())publication=await c.admin.rpc('read_shared_report_publication',{p_establishment:e.data.id,p_language:language,p_user:c.user.id});
  if(publication.error)throw Error('CURRENT_PUBLICATION_READ_FAILED');
  const [routing,legacy,versions,request,abandoned]=await Promise.all([
   c.client.from('report_pipeline_settings').select('engine,jev_transport,updated_at').eq('id',true).single(),
@@ -59,6 +67,6 @@ export async function readCurrentReports(c:AuthContext,input:{establishment_id:s
  }
  const refresh=policy.enabled?await c.admin.rpc('read_report_refresh_state',{p_establishment:e.data.id,p_language:language}):{data:null,error:null};
  if(refresh.error)throw Error('REPORT_REFRESH_STATE_READ_FAILED');
- return {refresh:refresh.data,retention,routing:routing.data,current_transport:request.data?.jev_transport??routing.data.jev_transport??'individual',request_run,legacy_report:policy.enabled?null:legacy.data,versions:policy.enabled?[]:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
+ return {shared_versions:sharedVersions.data,refresh:refresh.data,retention,routing:routing.data,current_transport:request.data?.jev_transport??routing.data.jev_transport??'individual',request_run,legacy_report:policy.enabled?null:legacy.data,versions:policy.enabled?[]:versions.data,experimental:row,run,tasks,operation,batch_progress,provider_calls:0};
 }
 
