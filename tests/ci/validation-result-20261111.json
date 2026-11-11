@@ -1,0 +1,13 @@
+{
+  "runUrl": "https://github.com/ngpcao-spec/home-reviews-demo/actions/runs/42952760483",
+  "runId": 42952760483,
+  "jobId": 130300675433,
+  "testedCommit": "5da1928cad94de5f834c7066e492c00527e03b86",
+  "conclusion": "success",
+  "browserSeconds": 35.7,
+  "passed": ["real-auth", "simultaneous-add", "existing-data-and-proofs", "shared-negative-sync", "single-analysis", "private-isolation", "unsubscribe", "outside-pilot", "disable-and-rollback"],
+  "providerPostCounts": {"simulatedApify": 2, "simulatedAI": 1, "realPaidProviders": 0},
+  "productionWrites": false,
+  "productionPilotEnabled": false,
+  "limits": ["External push delivery not executed", "Cron disabled; worker cycles and cached callbacks invoked by test", "Saved synthetic menu and report, no fresh generation or extraction", "Outside-pilot path tested through legacy reservation", "Small review corpus does not saturate 150-review retention", "No migration rehearsal on full production data copy"]
+}
