@@ -97,9 +97,9 @@ test('complete mutualization with real browser Auth database and workers',async(
   for(let i=0;i<2;i++){await pages[i].reload();await expect(pages[i].getByRole('textbox')).toHaveValue(/Merci pour votre retour/)}
   mark('single-analysis')
   await pages[0].getByRole('textbox').fill('Brouillon privé de la première organisation.');await pages[0].getByRole('textbox').blur()
-  await expect.poll(async()=>(await rows('select reply_draft_text from reviews where id=$1',[reviews[0].id]))[0].reply_draft_text).toBe('Brouillon privé de la première organisation.')
-  expect((await rows('select reply_draft_text from reviews where id=$1',[reviews[1].id]))[0].reply_draft_text).not.toBe('Brouillon privé de la première organisation.')
-  const forbidden=await pages[1].evaluate(async id=>{const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');return (await supabase.from('reviews').select('id,reply_draft_text').eq('id',id)).data},reviews[0].id)
+  await expect.poll(async()=>(await rows("select draft_text from review_reply_drafts where review_id=$1 and language='fr'",[reviews[0].id]))[0].draft_text).toBe('Brouillon privé de la première organisation.')
+  expect((await rows("select draft_text from review_reply_drafts where review_id=$1 and language='fr'",[reviews[1].id]))[0].draft_text).not.toBe('Brouillon privé de la première organisation.')
+  const forbidden=await pages[1].evaluate(async id=>{const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');return (await supabase.from('review_reply_drafts').select('review_id,draft_text').eq('review_id',id)).data},reviews[0].id)
   expect(forbidden).toEqual([])
   for(let i=0;i<2;i++){await pages[i].goto('/notifications');await expect(pages[i].getByText('Le repas était froid et le service très lent.',{exact:true})).toBeVisible()}
   await pages[0].locator('button.notification-item').filter({hasText:'Le repas était froid'}).click()

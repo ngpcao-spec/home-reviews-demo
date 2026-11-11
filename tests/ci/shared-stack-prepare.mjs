@@ -60,6 +60,16 @@ try{
     await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
    }
   }
+  const auditPrerequisites={
+   '20261009034656_ai_reference_dual_jev_benchmark.sql':['record_approved_jev_ai_rechecks_separately','create_english_translation_overrides_for_ai_audit'],
+   '20261009071542_experimental_jev_v12_semantic_boundaries.sql':['record_v12_ai_missed_negative_diagnostics_separately'],
+   '20261009141601_independent_jev_holdout_benchmark.sql':['independent_jev_holdout_post_prediction_ai_diagnostics_v1'],
+   '20261010010456_experimental_jev_v13_targeted_recall.sql':['v13_fresh_blind_ai_notes_for_sealed_review_set','fix_v13_fresh_source_ambiguous_plpgsql_json_alias','v13_third_holdout_posthoc_ai_audit_18_cases'],
+  }
+  for(const restored of auditPrerequisites[file]??[]){
+   console.log('RECONSTRUCTION',restored)
+   await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+  }
  }
  console.log('SCHEMA_BOOTSTRAP_OK')
  const endpoint=new URL(status.API_URL)
