@@ -1,0 +1,24 @@
+{
+  "version": "empty-home-reviews-schema-v1",
+  "target": "Disposable local Supabase only; never production",
+  "base": {
+    "repository": "20260926064355_home_reviews_v1.sql",
+    "productionHistory": "20260927021039_home_reviews_sync_engine_v1",
+    "comparison": "Same SQL definitions; name/date and trailing whitespace differ"
+  },
+  "recoveredFromReadOnlyHistory": {
+    "after 20260926064355_home_reviews_v1.sql": ["20260927041042_home_reviews_hourly_scheduler_schema"],
+    "after 20260927080953_simplify_review_ai.sql": ["20260927115917_track_review_ai_processing_and_usage", "20260927121048_track_review_ai_retry_history", "20260927121840_retain_rejected_ai_outputs_for_audit"],
+    "after 20261008122506_artisan_negative_validation.sql": ["20261008235232_add_separate_ai_preannotations_for_negative_validation", "20261009011957_isolated_jev_ai_reference_exploration_v1", "20261009012823_prepare_independent_artisan_v11_holdout_tables", "20261009094500_blind_32_review_holdout_ai_references_with_immutable_seal"]
+  },
+  "hostedPrerequisites": ["pg_cron extension (cron.launch_active_jobs=off)", "rls_auto_enable and ensure_rls event trigger: exact read-only catalog definitions"],
+  "excludedOperations": {
+    "home_reviews_hourly_scheduler_schema": "Credential provisioning DO block omitted; no credential copied. Synthetic scheduler token provisioned locally after schema load.",
+    "20260928160000_scalable_sync_runtime_retention_load_test.sql": "Final invocation of historical 100/1000/10000 establishment benchmark only; definitions and grants preserved.",
+    "20261025022056_recent_text_retention_cleanup.sql": "Historical backup-gated tenant purge and temporary trigger switches omitted; exact persistent FK replacement and policy update preserved.",
+    "20261025095207_reset_restaurant_content.sql": "Historical tenant purge with no persistent schema definition omitted. No production data copied or purged."
+  },
+  "network": "Production callback URL replaced only in executed copies by loopback port 9. Cron execution disabled. Browser and worker application HTTP restricted to local services and synthetic providers.",
+  "activation": "Deployed migrations remain untouched, with empty pilot allowlist. K.HOUSE fixture is enabled only in disposable test database.",
+  "browserVerdict": "Preparation must pass; every required scenario receipt must exist. Auth-only smoke is insufficient."
+}

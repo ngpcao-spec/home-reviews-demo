@@ -26,6 +26,9 @@ test('complete mutualization with real browser Auth database and workers',async(
  try{
   for(let i=0;i<2;i++){
    const page=await contexts[i].newPage();pages.push(page)
+   await page.addLocatorHandler(page.getByRole('dialog',{name:'Restez informé des nouveaux avis'}),async()=>{
+    await page.getByRole('button',{name:'Plus tard',exact:true}).click()
+   })
    await page.route('**/*',route=>['127.0.0.1','localhost'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort())
    await page.goto('/')
    const id=await page.evaluate(async user=>{const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');const r=await supabase.auth.signInWithPassword(user);if(r.error)throw r.error;return (await supabase.auth.getUser()).data.user.id},{email:fixture.users[i].email,password:fixture.users[i].password})
