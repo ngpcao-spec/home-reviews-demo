@@ -56,6 +56,11 @@ test('complete mutualization with real browser Auth database and workers',async(
   expect(establishments[0].id).not.toBe(establishments[1].id)
   for(const e of establishments)expect(Number((await rows('select count(*) n from reviews where establishment_id=$1',[e.id]))[0].n)).toBe(1)
   mark('simultaneous-add')
+  for(const page of pages){
+   // Complete the real onboarding acknowledgement, so a later visit to Add
+   // does not resume this still-unacknowledged successful import screen.
+   await page.getByRole('button',{name:'Retour aux établissements',exact:true}).click()
+  }
   const raw=[{name:'Riz aux légumes',category:'Food',price:null,placeId},{name:'Riz aux légumes',category:'Food',price:null,placeId},{name:'Green tea',category:'Tea - Coffee',placeId}]
   const menu=importRainminerMenu(raw,{actor:{name:'rainminer/google-maps-menu-scraper'},runId:'fixture-menu',datasetId:'fixture-menu-data',input:{placeIds:[placeId]}},placeId)
   await rows("insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,run_id,raw,result) values($1,$2,$3,'completed','fixture-menu',$4,$5)",[establishments[0].id,placeId,crypto.randomUUID(),JSON.stringify(raw),JSON.stringify(menu)])
@@ -151,5 +156,5 @@ test('complete mutualization with real browser Auth database and workers',async(
   await pages[1].goto('/avis/'+reviews[1].id);await expect(pages[1].getByText('Le repas était froid et le service très lent.',{exact:true})).toBeVisible()
   expect((await provider()).runs).toHaveLength(2);expect((await provider()).aiCalls).toBe(1)
   mark('disable-and-rollback')
- }finally{await Promise.all(contexts.map(c=>c.close()));await db.end()}
+ }finally{await Promise.allSettled(contexts.map(c=>c.close()));await db.end()}
 })
