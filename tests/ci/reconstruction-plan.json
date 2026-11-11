@@ -40,11 +40,12 @@
     "20261009053221_create_english_translation_overrides_for_ai_audit",
     "20261009090714_record_v12_ai_missed_negative_diagnostics_separately",
     "20261009153815_independent_jev_holdout_post_prediction_ai_diagnostics_v1",
-    "20261010013059_v13_fresh_blind_ai_notes_for_sealed_review_set",
-    "20261010013729_fix_v13_fresh_source_ambiguous_plpgsql_json_alias",
-    "20261010063953_v13_third_holdout_posthoc_ai_audit_18_cases (schema prefix only; annotation INSERT and validation DO omitted)",
     "20261023095555_isolated_nha_trang_jev_eleven_batch_experiment",
     "20261023095730_fix_isolated_jev_batch_claim_alias",
     "20261026085252_khouse_english_isolated_experiment"
-  ]
+  ],
+  "renamedDefinitionsAlreadyPresent": {
+    "20261010064000_v13_fresh_posthoc_ai_audit_18_cases.sql": "Same schema as production v13_third_holdout_posthoc_ai_audit_18_cases; final historical data INSERT and DO assertion excluded on an empty database",
+    "20261010015200_v13_fresh_ai_notes_and_source_reader_fix.sql": "Combines production v13_fresh_blind_ai_notes_for_sealed_review_set and fix_v13_fresh_source_ambiguous_plpgsql_json_alias"
+  }
 }

@@ -22,6 +22,7 @@ try{
   console.log('MIGRATION',file)
   const before={
    '20261024052532_jev_batch_experimental_adapter.sql':['isolated_nha_trang_jev_eleven_batch_experiment','fix_isolated_jev_batch_claim_alias'],
+   '20261025014412_recent_text_retention_transition.sql':['experiment_nha_trang_jev_five_batches','nha_trang_jev_corrected_isolated_experiment','nha_trang_jev_minimal_isolated_experiment'],
    '20261028083600_manual_atomic_review_reload.sql':['khouse_english_isolated_experiment'],
   }
   for(const restored of before[file]??[])await restore(restored)
