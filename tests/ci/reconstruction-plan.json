@@ -30,7 +30,8 @@
     "home_reviews_hourly_scheduler_schema": "Credential provisioning DO block omitted; no credential copied. Synthetic scheduler token provisioned locally after schema load.",
     "20260928160000_scalable_sync_runtime_retention_load_test.sql": "Final invocation of historical 100/1000/10000 establishment benchmark only; definitions and grants preserved.",
     "20261025022056_recent_text_retention_cleanup.sql": "Historical backup-gated tenant purge and temporary trigger switches omitted; exact persistent FK replacement and policy update preserved.",
-    "20261025095207_reset_restaurant_content.sql": "Historical tenant purge with no persistent schema definition omitted. No production data copied or purged."
+    "20261025095207_reset_restaurant_content.sql": "Historical tenant purge with no persistent schema definition omitted. No production data copied or purged.",
+    "experiment_nha_trang_jev_five_batches": "Historical experiment authorization INSERT omitted; exact tables, functions and grants preserved."
   },
   "network": "Production callback URL replaced only in executed copies by loopback port 9. Cron execution disabled. Browser and worker application HTTP restricted to local services and synthetic providers.",
   "activation": "Deployed migrations remain untouched, with empty pilot allowlist. K.HOUSE fixture is enabled only in disposable test database.",
@@ -42,7 +43,10 @@
     "20261009153815_independent_jev_holdout_post_prediction_ai_diagnostics_v1",
     "20261023095555_isolated_nha_trang_jev_eleven_batch_experiment",
     "20261023095730_fix_isolated_jev_batch_claim_alias",
-    "20261026085252_khouse_english_isolated_experiment"
+    "20261026085252_khouse_english_isolated_experiment",
+    "20261023150606_experiment_nha_trang_jev_five_batches",
+    "20261024013806_nha_trang_jev_corrected_isolated_experiment",
+    "20261024023725_nha_trang_jev_minimal_isolated_experiment"
   ],
   "renamedDefinitionsAlreadyPresent": {
     "20261010064000_v13_fresh_posthoc_ai_audit_18_cases.sql": "Same schema as production v13_third_holdout_posthoc_ai_audit_18_cases; final historical data INSERT and DO assertion excluded on an empty database",

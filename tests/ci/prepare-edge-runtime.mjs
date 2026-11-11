@@ -7,6 +7,12 @@ const target=join(root,'supabase/functions');cpSync('supabase/functions',target,
 for(const file of ['pilot-evidence-v3-gpt6-reserved40-reference-20261011.json','jev-economic-pilot-gpt6-posthoc-audit-20261011.json']){
  cpSync(join('docs',file),join(root,'docs',file),{recursive:true})
 }
+// Edge Runtime disallows Deno.env.set. Substitute only the endpoint in temporary
+// source copies; the real service key, Auth and business logic stay unchanged.
+for(const file of readdirSync(target,{recursive:true}).filter(name=>name.endsWith('.ts'))){
+ const path=join(target,file)
+ writeFileSync(path,readFileSync(path,'utf8').replace(/Deno\.env\.get\(['"]SUPABASE_URL['"]\)/g,"'https://home-reviews-ci.invalid'"))
+}
 writeFileSync(join(target,'_shared/ci-isolated-fetch.ts'),readFileSync('tests/ci/isolated-fetch.ts'))
 for(const name of readdirSync(target,{withFileTypes:true}).filter(x=>x.isDirectory()&&!x.name.startsWith('_')).map(x=>x.name)){
  const path=join(target,name,'index.ts')

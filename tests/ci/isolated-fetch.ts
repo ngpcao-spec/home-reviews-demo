@@ -2,7 +2,6 @@
 // Every application HTTP request is local or simulated; fail closed otherwise.
 const actualFetch=globalThis.fetch.bind(globalThis)
 const localSupabase=Deno.env.get('SUPABASE_URL')!
-Deno.env.set('SUPABASE_URL','https://home-reviews-ci.invalid')
 globalThis.fetch=(input:RequestInfo|URL,init?:RequestInit)=>{
  const source=input instanceof Request?input.url:String(input),url=new URL(source)
  let target:string

@@ -68,7 +68,7 @@ jobs:
         shell: bash
         run: |
           if [ -f "$RUNNER_TEMP/functions.log" ]; then
-            grep -E 'Error|error|FAILED|failed|BOOT' "$RUNNER_TEMP/functions.log" | tail -60 || true
+            tail -100 "$RUNNER_TEMP/functions.log"
           fi
       - name: Remove disposable services
         if: always()
