@@ -70,6 +70,7 @@ jobs:
           if [ -f "$RUNNER_TEMP/functions.log" ]; then
             tail -100 "$RUNNER_TEMP/functions.log"
           fi
+          find test-results -name error-context.md -exec cat {} \; 2>/dev/null || true
       - name: Remove disposable services
         if: always()
         shell: bash
