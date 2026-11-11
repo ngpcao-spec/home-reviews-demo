@@ -119,6 +119,7 @@ test('complete mutualization with real browser Auth database and workers',async(
   expect(forbidden).toEqual([])
   for(let i=0;i<2;i++){await pages[i].goto('/notifications');await expect(pages[i].getByText('Le repas était froid et le service très lent.',{exact:true})).toBeVisible()}
   await pages[0].locator('button.notification-item').filter({hasText:'Le repas était froid'}).click()
+  await expect.poll(async()=>(await rows('select read_at from notifications where review_id=$1',[reviews[0].id]))[0].read_at).not.toBeNull()
   const notices=await rows('select organization_id,read_at from notifications where review_id=any($1::uuid[])',[reviews.map((r:{id:string})=>r.id)])
   expect(notices.find((n:{organization_id:string;read_at:string|null})=>n.organization_id===fixture.users[0].organizationId).read_at).not.toBeNull()
   expect(notices.find((n:{organization_id:string;read_at:string|null})=>n.organization_id===fixture.users[1].organizationId).read_at).toBeNull()
