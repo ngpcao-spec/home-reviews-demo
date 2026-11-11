@@ -17,6 +17,22 @@ try{
   console.log('MIGRATION',file)
   // Historical cron definitions must never address production, even with no secrets.
   let sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
+  if(file==='20261025095207_reset_restaurant_content.sql'){
+   // Historical tenant-data purge: only locks, temporary trigger switches and DML.
+   // It has no lasting schema definitions and must never run during reconstruction.
+   if(/\bcreate\s+(?:or\s+replace\s+)?(?:function|table|index|trigger|policy)/i.test(sql))throw Error('RESET_SCHEMA_CHANGED')
+   console.log('OMIT_HISTORICAL_RESTAURANT_PURGE');continue
+  }
+  if(file==='20261025022056_recent_text_retention_cleanup.sql'){
+   // Preserve its exact persistent FK and policy configuration, excluding the
+   // historical backup-gated data deletion and temporary trigger disable/enable.
+   const lines=sql.split(/\r?\n/)
+   const schema=lines.filter(line=>line.startsWith('alter table public.analysis_jev_compact_items ')&&!line.includes('trigger user'))
+   const policy=lines.filter(line=>line.startsWith('update public.review_corpus_policy set enabled=true,'))
+   if(schema.length!==2||policy.length!==1)throw Error('RETENTION_CLEANUP_SCHEMA_CHANGED')
+   sql=[...schema,...policy].join('\n')
+   console.log('OMIT_HISTORICAL_RETENTION_DELETES_KEEP_SCHEMA_AND_CONFIGURATION')
+  }
   if(file==='20260928160000_scalable_sync_runtime_retention_load_test.sql'){
    const start=sql.indexOf('insert into public.review_sync_load_test_results(')
    if(start<0||!sql.slice(start).includes('private.run_review_sync_queue_load_test(10000)'))throw Error('LOAD_TEST_SUFFIX_CHANGED')
