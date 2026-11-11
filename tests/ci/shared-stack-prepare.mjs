@@ -27,6 +27,12 @@ try{
   for(const restored of before[file]??[])await restore(restored)
   // Historical cron definitions must never address production, even with no secrets.
   let sql=isolatedSql(readFileSync(join('supabase/migrations',file),'utf8'))
+  if(file==='20261010064000_v13_fresh_posthoc_ai_audit_18_cases.sql'){
+   const start=sql.search(/\r?\nWITH\r?\n/)
+   if(start<0||!sql.slice(start).includes('V13_POSTHOC_AUDIT_INCOMPLETE'))throw Error('POSTHOC_AUDIT_SUFFIX_CHANGED')
+   sql=sql.slice(0,start)
+   console.log('OMIT_HISTORICAL_18_REVIEW_ANNOTATIONS_KEEP_SCHEMA')
+  }
   if(file==='20261025095207_reset_restaurant_content.sql'){
    // Historical tenant-data purge: only locks, temporary trigger switches and DML.
    // It has no lasting schema definitions and must never run during reconstruction.
@@ -71,7 +77,6 @@ try{
    '20261009034656_ai_reference_dual_jev_benchmark.sql':['record_approved_jev_ai_rechecks_separately','create_english_translation_overrides_for_ai_audit'],
    '20261009071542_experimental_jev_v12_semantic_boundaries.sql':['record_v12_ai_missed_negative_diagnostics_separately'],
    '20261009141601_independent_jev_holdout_benchmark.sql':['independent_jev_holdout_post_prediction_ai_diagnostics_v1'],
-   '20261010010456_experimental_jev_v13_targeted_recall.sql':['v13_fresh_blind_ai_notes_for_sealed_review_set','fix_v13_fresh_source_ambiguous_plpgsql_json_alias','v13_third_holdout_posthoc_ai_audit_18_cases'],
   }
   for(const restored of auditPrerequisites[file]??[]){
    await restore(restored)
