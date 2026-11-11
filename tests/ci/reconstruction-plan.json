@@ -46,7 +46,9 @@
     "20261026085252_khouse_english_isolated_experiment",
     "20261023150606_experiment_nha_trang_jev_five_batches",
     "20261024013806_nha_trang_jev_corrected_isolated_experiment",
-    "20261024023725_nha_trang_jev_minimal_isolated_experiment"
+    "20261024023725_nha_trang_jev_minimal_isolated_experiment",
+    "20261108063824_order_shared_jev_scope_pin",
+    "20261108064520_notification_read_retention_guard"
   ],
   "renamedDefinitionsAlreadyPresent": {
     "20261010064000_v13_fresh_posthoc_ai_audit_18_cases.sql": "Same schema as production v13_third_holdout_posthoc_ai_audit_18_cases; final historical data INSERT and DO assertion excluded on an empty database",
