@@ -10,20 +10,19 @@ if(!['127.0.0.1','localhost'].includes(url.hostname)||url.port!=='54322')throw E
 const db=new Client({connectionString:status.DB_URL});await db.connect()
 try{
  if((await db.query("select current_setting('cron.launch_active_jobs') value")).rows[0].value!=='off')throw Error('CRON_MUST_BE_DISABLED')
+ if((await db.query("select to_regclass('public.organizations') is not null present")).rows[0].present)throw Error('EMPTY_DATABASE_REQUIRED')
+ await db.query("select set_config('home.reconstruction','empty-ci-v1',false)")
  for(const file of readdirSync('supabase/migrations').filter(n=>n.endsWith('.sql')).sort()){
   console.log('MIGRATION',file)
   // Historical cron definitions must never address production, even with no secrets.
   let sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
-  if(file==='20260927022000_harden_home_reviews_sync.sql'){
-   // Cloud installs this optional event helper; the local image does not.
-   // Revoking a nonexistent helper has no effect. All application RLS still runs.
-   const exists=(await db.query("select to_regprocedure('public.rls_auto_enable()') is not null present")).rows[0].present
-   if(!exists){
-    sql=sql.replace('revoke execute on function public.rls_auto_enable() from public, anon, authenticated;','')
-    console.log('LOCAL_PLATFORM_DIFFERENCE: absent rls_auto_enable helper; no grant to revoke')
+  try{await db.query(sql)}catch(error){console.error('MIGRATION_FAILED',file,error.code,error.message);throw Error('SCHEMA_BOOTSTRAP_FAILED')}
+  if(file==='20260926064355_home_reviews_v1.sql'){
+   for(const restored of ['after-v1','home_reviews_hourly_scheduler_schema','track_review_ai_processing_and_usage','track_review_ai_retry_history','retain_rejected_ai_outputs_for_audit']){
+    console.log('RECONSTRUCTION',restored)
+    await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
    }
   }
-  try{await db.query(sql)}catch(error){console.error('MIGRATION_FAILED',file,error.code,error.message);throw Error('SCHEMA_BOOTSTRAP_FAILED')}
  }
  console.log('SCHEMA_BOOTSTRAP_OK')
  const endpoint=new URL(status.API_URL)
