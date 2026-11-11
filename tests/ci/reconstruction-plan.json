@@ -7,11 +7,25 @@
     "comparison": "Same SQL definitions; name/date and trailing whitespace differ"
   },
   "recoveredFromReadOnlyHistory": {
-    "after 20260926064355_home_reviews_v1.sql": ["20260927041042_home_reviews_hourly_scheduler_schema"],
-    "after 20260927080953_simplify_review_ai.sql": ["20260927115917_track_review_ai_processing_and_usage", "20260927121048_track_review_ai_retry_history", "20260927121840_retain_rejected_ai_outputs_for_audit"],
-    "after 20261008122506_artisan_negative_validation.sql": ["20261008235232_add_separate_ai_preannotations_for_negative_validation", "20261009011957_isolated_jev_ai_reference_exploration_v1", "20261009012823_prepare_independent_artisan_v11_holdout_tables", "20261009094500_blind_32_review_holdout_ai_references_with_immutable_seal"]
+    "after 20260926064355_home_reviews_v1.sql": [
+      "20260927041042_home_reviews_hourly_scheduler_schema"
+    ],
+    "after 20260927080953_simplify_review_ai.sql": [
+      "20260927115917_track_review_ai_processing_and_usage",
+      "20260927121048_track_review_ai_retry_history",
+      "20260927121840_retain_rejected_ai_outputs_for_audit"
+    ],
+    "after 20261008122506_artisan_negative_validation.sql": [
+      "20261008235232_add_separate_ai_preannotations_for_negative_validation",
+      "20261009011957_isolated_jev_ai_reference_exploration_v1",
+      "20261009012823_prepare_independent_artisan_v11_holdout_tables",
+      "20261009094500_blind_32_review_holdout_ai_references_with_immutable_seal"
+    ]
   },
-  "hostedPrerequisites": ["pg_cron extension (cron.launch_active_jobs=off)", "rls_auto_enable and ensure_rls event trigger: exact read-only catalog definitions"],
+  "hostedPrerequisites": [
+    "pg_cron extension (cron.launch_active_jobs=off)",
+    "rls_auto_enable and ensure_rls event trigger: exact read-only catalog definitions"
+  ],
   "excludedOperations": {
     "home_reviews_hourly_scheduler_schema": "Credential provisioning DO block omitted; no credential copied. Synthetic scheduler token provisioned locally after schema load.",
     "20260928160000_scalable_sync_runtime_retention_load_test.sql": "Final invocation of historical 100/1000/10000 establishment benchmark only; definitions and grants preserved.",
@@ -20,5 +34,17 @@
   },
   "network": "Production callback URL replaced only in executed copies by loopback port 9. Cron execution disabled. Browser and worker application HTTP restricted to local services and synthetic providers.",
   "activation": "Deployed migrations remain untouched, with empty pilot allowlist. K.HOUSE fixture is enabled only in disposable test database.",
-  "browserVerdict": "Preparation must pass; every required scenario receipt must exist. Auth-only smoke is insufficient."
+  "browserVerdict": "Preparation must pass; every required scenario receipt must exist. Auth-only smoke is insufficient.",
+  "additionalRecoveredSchema": [
+    "20261009052035_record_approved_jev_ai_rechecks_separately",
+    "20261009053221_create_english_translation_overrides_for_ai_audit",
+    "20261009090714_record_v12_ai_missed_negative_diagnostics_separately",
+    "20261009153815_independent_jev_holdout_post_prediction_ai_diagnostics_v1",
+    "20261010013059_v13_fresh_blind_ai_notes_for_sealed_review_set",
+    "20261010013729_fix_v13_fresh_source_ambiguous_plpgsql_json_alias",
+    "20261010063953_v13_third_holdout_posthoc_ai_audit_18_cases (schema prefix only; annotation INSERT and validation DO omitted)",
+    "20261023095555_isolated_nha_trang_jev_eleven_batch_experiment",
+    "20261023095730_fix_isolated_jev_batch_claim_alias",
+    "20261026085252_khouse_english_isolated_experiment"
+  ]
 }

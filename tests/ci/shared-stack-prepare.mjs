@@ -8,6 +8,11 @@ const status=JSON.parse(readFileSync(process.env.CI_SUPABASE_STATUS,'utf8'))
 const url=new URL(status.DB_URL)
 if(!['127.0.0.1','localhost'].includes(url.hostname)||url.port!=='54322')throw Error('LOCAL_DATABASE_REQUIRED')
 const db=new Client({connectionString:status.DB_URL});await db.connect()
+const isolatedSql=sql=>sql.replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
+const restore=async name=>{
+ console.log('RECONSTRUCTION',name)
+ await db.query(isolatedSql(readFileSync(`supabase/reconstruction/${name}.sql`,'utf8')))
+}
 try{
  if((await db.query("select current_setting('cron.launch_active_jobs') value")).rows[0].value!=='off')throw Error('CRON_MUST_BE_DISABLED')
  if((await db.query("select to_regclass('public.organizations') is not null present")).rows[0].present)throw Error('EMPTY_DATABASE_REQUIRED')
@@ -15,8 +20,13 @@ try{
  await db.query('create extension if not exists pg_cron')
  for(const file of readdirSync('supabase/migrations').filter(n=>n.endsWith('.sql')).sort()){
   console.log('MIGRATION',file)
+  const before={
+   '20261024052532_jev_batch_experimental_adapter.sql':['isolated_nha_trang_jev_eleven_batch_experiment','fix_isolated_jev_batch_claim_alias'],
+   '20261028083600_manual_atomic_review_reload.sql':['khouse_english_isolated_experiment'],
+  }
+  for(const restored of before[file]??[])await restore(restored)
   // Historical cron definitions must never address production, even with no secrets.
-  let sql=readFileSync(join('supabase/migrations',file),'utf8').replaceAll('https://ihuztjkblywzjdruusdj.supabase.co','http://127.0.0.1:9')
+  let sql=isolatedSql(readFileSync(join('supabase/migrations',file),'utf8'))
   if(file==='20261025095207_reset_restaurant_content.sql'){
    // Historical tenant-data purge: only locks, temporary trigger switches and DML.
    // It has no lasting schema definitions and must never run during reconstruction.
@@ -44,20 +54,17 @@ try{
   try{await db.query(sql)}catch(error){console.error('MIGRATION_FAILED',file,error.code,error.message);throw Error('SCHEMA_BOOTSTRAP_FAILED')}
   if(file==='20260926064355_home_reviews_v1.sql'){
    for(const restored of ['after-v1','home_reviews_hourly_scheduler_schema']){
-    console.log('RECONSTRUCTION',restored)
-    await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+    await restore(restored)
    }
   }
   if(file==='20260927080953_simplify_review_ai.sql'){
    for(const restored of ['track_review_ai_processing_and_usage','track_review_ai_retry_history','retain_rejected_ai_outputs_for_audit']){
-    console.log('RECONSTRUCTION',restored)
-    await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+    await restore(restored)
    }
   }
   if(file==='20261008122506_artisan_negative_validation.sql'){
    for(const restored of ['add_separate_ai_preannotations_for_negative_validation','isolated_jev_ai_reference_exploration_v1','prepare_independent_artisan_v11_holdout_tables','holdout_ai_reference_schema']){
-    console.log('RECONSTRUCTION',restored)
-    await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+    await restore(restored)
    }
   }
   const auditPrerequisites={
@@ -67,8 +74,7 @@ try{
    '20261010010456_experimental_jev_v13_targeted_recall.sql':['v13_fresh_blind_ai_notes_for_sealed_review_set','fix_v13_fresh_source_ambiguous_plpgsql_json_alias','v13_third_holdout_posthoc_ai_audit_18_cases'],
   }
   for(const restored of auditPrerequisites[file]??[]){
-   console.log('RECONSTRUCTION',restored)
-   await db.query(readFileSync(`supabase/reconstruction/${restored}.sql`,'utf8'))
+   await restore(restored)
   }
  }
  console.log('SCHEMA_BOOTSTRAP_OK')
