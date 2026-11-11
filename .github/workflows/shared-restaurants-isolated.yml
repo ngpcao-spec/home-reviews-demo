@@ -67,6 +67,9 @@ jobs:
         if: failure()
         shell: bash
         run: |
+          if [ -f "$RUNNER_TEMP/supabase-start.log" ]; then
+            grep -Ei 'error|failed|unhealthy|timeout|rate limit|connection refused' "$RUNNER_TEMP/supabase-start.log" | tail -30 || true
+          fi
           if [ -f "$RUNNER_TEMP/functions.log" ]; then
             tail -100 "$RUNNER_TEMP/functions.log"
           fi
