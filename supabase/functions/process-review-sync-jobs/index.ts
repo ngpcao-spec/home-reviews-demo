@@ -149,6 +149,11 @@ export async function processApifyJob(
         job.provider_start_attempted_at=new Date().toISOString();job.incremental_version=INCREMENTAL_SYNC_VERSION;job.incremental_input=input
       })
       cursor = { provider: 'apify', runId: run.runId, datasetId: run.datasetId, language }
+      // Preserve the provider identity in correlated logs even if the database
+      // checkpoint fails. Never log credentials, raw responses or review input.
+      console.info('REVIEW_SYNC_APIFY_START_RECEIVED', {
+        job_id: job.id, run_id: run.runId, dataset_id: run.datasetId,
+      })
       const saved = await requireSuccess(admin.rpc('checkpoint_review_sync_job', {
         p_job_id: job.id,
         p_worker_id: worker,
@@ -217,7 +222,7 @@ export async function processApifyJob(
 
 }
 
-async function processJob(
+export async function processJob(
   admin: SupabaseClient,
   job: SyncJob,
   worker: string,
@@ -236,7 +241,14 @@ async function processJob(
       return await processApifyJob(admin, job, worker, config)
     } catch (error) {
       const policy = retryPolicy(error, job.attempts, config.backoffSeconds)
-      if(job.provider_start_attempted_at&&!job.apify_run_id){policy.code='APIFY_START_OUTCOME_UNKNOWN';policy.retryable=false}
+      if(job.provider_start_attempted_at&&!job.apify_run_id){
+        console.warn('REVIEW_SYNC_APIFY_START_UNRESOLVED', {
+          job_id: job.id,
+          cause_code: error instanceof ApifyError ? error.code : 'SYNC_INTERNAL_ERROR',
+          mapped_http_status: error instanceof ApifyError ? error.httpStatus : null,
+        })
+        policy.code='APIFY_START_OUTCOME_UNKNOWN';policy.retryable=false
+      }
       const status = await requireSuccess(admin.rpc('fail_review_sync_job', {
         p_job_id: job.id,
         p_worker_id: worker,
