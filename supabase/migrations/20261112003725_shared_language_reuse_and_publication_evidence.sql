@@ -1,5 +1,8 @@
 -- Additive pilot correction. No backfill, provider request, activation or retry.
 -- Original migrations and production publication rows remain untouched.
+-- The existing join is SECURITY INVOKER and restricted to service_role. Its new
+-- coverage check needs read-only access; no client role receives these grants.
+grant select on private.shared_restaurant_reviews,private.shared_restaurant_review_translations to service_role;
 create function pg_temp.shared_patch(signature text, old_text text, new_text text) returns void
 language plpgsql as $$declare d text;begin
  d:=pg_get_functiondef(signature::regprocedure);
@@ -82,6 +85,9 @@ select pg_temp.shared_patch('public.archive_shared_restaurant_reports(uuid)',
 do $$declare f text;begin foreach f in array array[
  'public.read_shared_report_publication(uuid,text,uuid)',
  'public.read_shared_report_version(uuid,text,uuid,uuid)'] loop
+ perform pg_temp.shared_patch(f,
+  $old$'generated_at',v.generated_at,$old$,
+  $new$'language',v.language,'generated_at',v.generated_at,$new$);
  perform pg_temp.shared_patch(f,
   $old$'stale_reason','SHARED_DATED_PUBLICATION'$old$,
   $new$'stale_reason',coalesce(v.evidence->>'publication_stale_reason','SHARED_DATED_PUBLICATION'),

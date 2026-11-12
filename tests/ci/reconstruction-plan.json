@@ -31,11 +31,13 @@
     "20260928160000_scalable_sync_runtime_retention_load_test.sql": "Final invocation of historical 100/1000/10000 establishment benchmark only; definitions and grants preserved.",
     "20261025022056_recent_text_retention_cleanup.sql": "Historical backup-gated tenant purge and temporary trigger switches omitted; exact persistent FK replacement and policy update preserved.",
     "20261025095207_reset_restaurant_content.sql": "Historical tenant purge with no persistent schema definition omitted. No production data copied or purged.",
-    "experiment_nha_trang_jev_five_batches": "Historical experiment authorization INSERT omitted; exact tables, functions and grants preserved."
+    "experiment_nha_trang_jev_five_batches": "Historical experiment authorization INSERT omitted; exact tables, functions and grants preserved.",
+    "20261010064000_v13_fresh_posthoc_ai_audit_18_cases.sql": "Historical 18-review annotations INSERT and final data-completeness assertion omitted on an empty database; table/function/grant definitions retained. No historical review identities are created to satisfy the assertion."
   },
   "network": "Production callback URL replaced only in executed copies by loopback port 9. Cron execution disabled. Browser and worker application HTTP restricted to local services and synthetic providers.",
   "activation": "Deployed migrations remain untouched, with empty pilot allowlist. K.HOUSE fixture is enabled only in disposable test database.",
   "browserVerdict": "Preparation must pass; every required scenario receipt must exist. Auth-only smoke is insufficient.",
+  "dependencyChecks": "After applying the ordered chain, assert real scheduler token verification, queue, ingestion, incremental commit, language join, archive/read and JEV allocation functions, plus monitoring interval, next_sync_at, collection language and source text hash columns. Run the real Auth and worker browser paths. No placeholder definitions are generated.",
   "additionalRecoveredSchema": [
     "20261009052035_record_approved_jev_ai_rechecks_separately",
     "20261009053221_create_english_translation_overrides_for_ai_audit",

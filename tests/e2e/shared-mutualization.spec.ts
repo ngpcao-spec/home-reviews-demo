@@ -21,7 +21,7 @@ test('complete mutualization with real browser Auth database and workers',async(
   const data=await r.json();expect(r.status,JSON.stringify(data)).toBeLessThan(300);return data
  }
  const invoke=async(page:Page,name:string,body:unknown)=>page.evaluate(async({name,body})=>{
-  const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');const {data,error}=await supabase.functions.invoke(name,{body});if(error)throw Error(error.message);return data
+  const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');const {data,error}=await supabase.functions.invoke(name,{body});if(error){const detail=error.context instanceof Response?await error.context.json():null;throw Error(name+': '+JSON.stringify(detail??error.message))}return data
  },{name,body})
  try{
   for(let i=0;i<2;i++){
