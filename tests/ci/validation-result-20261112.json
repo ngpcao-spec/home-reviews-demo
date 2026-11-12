@@ -1,0 +1,19 @@
+{
+  "testedCommit": "bb4ab6d1843a3202c160336f5bd4d4a9e2307530",
+  "runUrl": "https://github.com/ngpcao-spec/home-reviews-demo/actions/runs/43130513980",
+  "runId": 43130513980,
+  "jobId": 130893197253,
+  "conclusion": "success",
+  "playwrightSeconds": 48.8,
+  "realAuthSessions": 4,
+  "languages": ["fr", "vi"],
+  "passed": ["real-auth", "simultaneous-add", "existing-data-and-proofs", "shared-negative-sync", "single-analysis", "private-isolation", "unsubscribe", "language-provider-reuse", "publication-only-evidence", "outside-pilot", "disable-and-rollback"],
+  "publicationAssertions": {"sourceBindings": 150, "evidenceBindings": 32, "exactJsonEquality": true, "parallelAnalysisRowAbsent": true, "sourceTextAvailable": false, "stale": true},
+  "providerPostCounts": {"simulatedApify": 5, "simulatedAI": 1, "realPaidProviders": 0},
+  "localTestsPassed": 19,
+  "schemaBootstrap": "passed with documented historical data-only exclusions",
+  "applicationDependencyChecks": "passed",
+  "productionWrites": false,
+  "productionPilotEnabled": false,
+  "limits": ["Synthetic representative archive contents, not a production data copy", "External push not executed", "Cron disabled; actual workers invoked by test", "No real Apify/AI extraction or analysis quality test", "Publication has 150 source references, but review retention saturation is not tested"]
+}
