@@ -202,7 +202,7 @@ test('complete mutualization with real browser Auth database and workers',async(
   mark('language-provider-reuse')
 
   const archivedId=crypto.randomUUID(),sourceRun=crypto.randomUUID(),dated='2026-10-28T04:15:34.709276Z'
-  const sources=Array.from({length:150},(_,i)=>({id:`retired-source-${i}`,rating:2,published_at:'2026-10-01T00:00:00Z',original_language:'en',analysis_language:'vi',analysis_source:'apify',analysis_text_sha256:i.toString(16).padStart(64,'0'),original_text_sha256:(i+150).toString(16).padStart(64,'0'),review_context:{mealType:'Dinner'},review_detailed_rating:{Food:2},translation_provenance:{provider:'apify',language:'vi'}}))
+  const sources=Array.from({length:150},(_,i)=>({id:crypto.randomUUID(),rating:2,published_at:'2026-10-01T00:00:00Z',original_language:'en',analysis_language:'vi',analysis_source:'apify',analysis_text_sha256:i.toString(16).padStart(64,'0'),original_text_sha256:(i+150).toString(16).padStart(64,'0'),review_context:{mealType:'Dinner'},review_detailed_rating:{Food:2},translation_provenance:{provider:'apify',language:'vi'}}))
   const evidence=Array.from({length:32},(_,i)=>({evidence_id:`binding-${i}`,review_id:sources[i].id,category:'service',polarity:'negative',quote_sha256:(i+300).toString(16).padStart(64,'0')}))
   const oldReport={...parallelPresentationRow('vi'),id:archivedId,generated_at:dated,current_source_run_id:sourceRun,source_reviews:[],original_report:null,raw_response:null,corrections:null,controls:{technical_checks_passed:true,dated_publication:true}}
   const doc=(await rows('select private.publication_generated_report($1::jsonb) doc',[JSON.stringify(oldReport)]))[0].doc
