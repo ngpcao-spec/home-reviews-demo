@@ -142,6 +142,98 @@ test('complete mutualization with real browser Auth database and workers',async(
   await expect.poll(async()=>(await rows('select active from establishments where id=$1',[establishments[0].id]))[0].active).toBe(true)
   expect((await provider()).runs).toHaveLength(2)
   expect(Number((await rows("select count(*) n from notifications where organization_id=$1 and type='new_negative_review'",[fixture.users[0].organizationId]))[0].n)).toBe(0)
+  // Representative real archive shapes: an original plus a single Apify target
+  // language, and a publication whose disposable analysis was already retired.
+  // No customer text, real identity or provider response is exported into CI.
+  const extraUsers=[]
+  for(let i=0;i<2;i++){
+   const email=`pilot-vi-${i}@example.test`,password=crypto.randomUUID()+'Aa1!'
+   const response=await fetch(status.API_URL+'/auth/v1/admin/users',{method:'POST',headers:{apikey:status.SERVICE_ROLE_KEY,Authorization:'Bearer '+status.SERVICE_ROLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password,email_confirm:true})})
+   expect(response.ok).toBe(true);const user=await response.json()
+   await rows("update profiles set preferred_language='vi' where user_id=$1",[user.id])
+   const org=(await rows('select organization_id from organization_members where user_id=$1',[user.id]))[0].organization_id
+   const context=await browser.newContext();contexts.push(context);const page=await context.newPage();pages.push(page)
+   await page.route('**/*',route=>['127.0.0.1','localhost'].includes(new URL(route.request().url()).hostname)?route.continue():route.abort())
+   await page.goto('/')
+   await page.evaluate(async credentials=>{const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');const r=await supabase.auth.signInWithPassword(credentials);if(r.error)throw r.error},{email,password})
+   extraUsers.push({id:user.id,organizationId:org,page})
+  }
+  const addBody={confirmed:true,query:`https://www.google.com/maps?query_place_id=${placeId}`,expectedGoogleId:'10272778536914778056',candidate:{name:'K.HOUSE Restaurant',placeId}}
+  const additions=await Promise.all(extraUsers.map(u=>invoke(u.page,'add-establishment',addBody)))
+  expect(additions.every(a=>a.status==='queued')).toBe(true)
+  await Promise.all([worker('process-initial-import-jobs'),worker('process-initial-import-jobs')])
+  await rows("update initial_import_jobs set available_at=now() where status in ('queued','retry') and provider_start_attempted_at is null")
+  await worker('process-initial-import-jobs')
+  const viEst=await Promise.all(extraUsers.map(async u=>(await rows('select * from establishments where organization_id=$1',[u.organizationId]))[0]))
+  expect(viEst.every(e=>e?.review_collection_status==='complete'&&e.collection_language==='vi')).toBe(true)
+  expect((await provider()).runs).toHaveLength(3)
+  expect((await provider()).runs.filter((r:{input:{language:string}})=>r.input.language==='vi')).toHaveLength(1)
+  for(let i=0;i<2;i++){
+   const ids=(await rows('select id from reviews where establishment_id=$1 order by external_review_id',[viEst[i].id])).map((r:{id:string})=>r.id)
+   const display=await extraUsers[i].page.evaluate(async ids=>{const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');const r=await supabase.rpc('read_review_display',{p_reviews:ids});if(r.error)throw r.error;return r.data},ids)
+   expect(display.every((r:{status:string;language:string})=>r.status==='translated'&&r.language==='vi')).toBe(true)
+   expect(display.map((r:{translated_text:string})=>r.translated_text).sort()).toEqual(['Bữa ăn nguội và phục vụ chậm.','Đón tiếp tốt.'].sort())
+  }
+  expect(Number((await rows('select count(*) n from private.shared_restaurants'))[0].n)).toBe(1)
+  expect(Number((await rows('select count(*) n from private.shared_restaurant_reviews where restaurant_id=$1',[restaurant]))[0].n)).toBe(2)
+  expect((await rows('select language from private.shared_restaurant_collections where restaurant_id=$1 order by language',[restaurant])).map(r=>r.language)).toEqual(['fr','vi'])
+  // Same-language later subscription: real remove/add endpoints, no new run.
+  await extraUsers[1].page.evaluate(async id=>{const {supabase}=await import(/* @vite-ignore */'/src/lib/supabase.ts');const r=await supabase.rpc('remove_establishment_subscription',{p_establishment:id});if(r.error)throw r.error},viEst[1].id)
+  const rejoined=await invoke(extraUsers[1].page,'add-establishment',addBody)
+  expect(rejoined.status).toBe('completed');expect(rejoined.establishmentId).toBe(viEst[1].id)
+  expect((await provider()).runs).toHaveLength(3);expect((await provider()).aiCalls).toBe(1)
+  expect(Number((await rows("select count(*) n from notifications where organization_id=any($1::uuid[]) and type='new_negative_review'",[extraUsers.map(u=>u.organizationId)]))[0].n)).toBe(0)
+  // A lagging VI checkpoint must not advance when FR distributes the same review.
+  await rows("update establishments set last_review_id='fixture-old',last_review_at='2026-11-01T10:00:00Z' where id=any($1::uuid[])",[viEst.map(e=>e.id)])
+  await rows("update private.shared_restaurant_collections set last_success_at=case when language='fr' then now()-interval '4 hours' else now() end where restaurant_id=$1",[restaurant])
+  await worker('schedule-google-reviews');await worker('process-review-sync-jobs')
+  await rows("update review_sync_jobs set available_at=now() where status in ('queued','retry')")
+  await worker('process-review-sync-jobs')
+  expect((await provider()).runs).toHaveLength(4)
+  expect((await rows('select last_review_id from establishments where id=any($1::uuid[])',[viEst.map(e=>e.id)])).every(e=>e.last_review_id==='fixture-old')).toBe(true)
+  await rows("update private.shared_restaurant_collections set last_success_at=now()-interval '25 hours' where restaurant_id=$1 and language='vi'",[restaurant])
+  await Promise.all([worker('schedule-google-reviews'),worker('schedule-google-reviews')])
+  await Promise.all([worker('process-review-sync-jobs'),worker('process-review-sync-jobs')])
+  await rows("update review_sync_jobs set available_at=now() where status in ('queued','retry')")
+  await worker('process-review-sync-jobs')
+  expect((await provider()).runs).toHaveLength(5)
+  expect((await rows('select last_review_id from establishments where id=any($1::uuid[])',[viEst.map(e=>e.id)])).every(e=>e.last_review_id==='fixture-negative')).toBe(true)
+  for(const e of viEst)expect(Number((await rows('select count(*) n from reviews where establishment_id=$1',[e.id]))[0].n)).toBe(2)
+  mark('language-provider-reuse')
+
+  const archivedId=crypto.randomUUID(),sourceRun=crypto.randomUUID(),dated='2026-10-28T04:15:34.709276Z'
+  const sources=Array.from({length:150},(_,i)=>({id:`retired-source-${i}`,rating:2,published_at:'2026-10-01T00:00:00Z',original_language:'en',analysis_language:'vi',analysis_source:'apify',analysis_text_sha256:i.toString(16).padStart(64,'0'),original_text_sha256:(i+150).toString(16).padStart(64,'0'),review_context:{mealType:'Dinner'},review_detailed_rating:{Food:2},translation_provenance:{provider:'apify',language:'vi'}}))
+  const evidence=Array.from({length:32},(_,i)=>({evidence_id:`binding-${i}`,review_id:sources[i].id,category:'service',polarity:'negative',quote_sha256:(i+300).toString(16).padStart(64,'0')}))
+  const oldReport={...parallelPresentationRow('vi'),id:archivedId,generated_at:dated,current_source_run_id:sourceRun,source_reviews:[],original_report:null,raw_response:null,corrections:null,controls:{technical_checks_passed:true,dated_publication:true}}
+  const doc=(await rows('select private.publication_generated_report($1::jsonb) doc',[JSON.stringify(oldReport)]))[0].doc
+  await rows(`insert into current_report_publications(establishment_id,organization_id,language,report_id,source_run_id,source_created_at,generated_at,scope,document,source_bindings,evidence_bindings,stale,stale_reason)
+   values($1,$2,'vi',$3,$4,$5,$5,$6,$7,$8,$9,true,'CORPUS_CHANGED')`,[viEst[0].id,extraUsers[0].organizationId,archivedId,sourceRun,dated,JSON.stringify({review_count:150,stale:true}),JSON.stringify(doc),JSON.stringify(sources),JSON.stringify(evidence)])
+  expect(Number((await rows('select count(*) n from analysis_parallel_reports where id=$1',[archivedId]))[0].n)).toBe(0)
+  // Replay capture and repair the exact prior incomplete-archive shape.
+  await rows("update private.shared_restaurant_report_versions set evidence=evidence-'evidence_bindings' where report_id=$1",[archivedId])
+  await rows('select archive_shared_restaurant_reports($1)',[viEst[0].id])
+  await rows('select archive_shared_restaurant_reports($1)',[viEst[0].id])
+  const stored=(await rows('select * from private.shared_restaurant_report_versions where report_id=$1',[archivedId]))[0]
+  expect(stored.document).toEqual(doc);expect(stored.language).toBe('vi')
+  expect(stored.evidence.source_bindings).toEqual(sources);expect(stored.evidence.evidence_bindings).toEqual(evidence)
+  expect(stored.evidence.source_reviews).toEqual([]);expect(stored.evidence.source_available).toBe(false)
+  for(const u of extraUsers){
+   const e=viEst[extraUsers.indexOf(u)]
+   const result=await invoke(u.page,'parallel-reports',{action:'read_current',establishment_id:e.id,shared_report_id:archivedId})
+   expect(result.experimental.id).toBe(archivedId);expect(Date.parse(result.experimental.generated_at)).toBe(Date.parse(dated))
+   expect(result.experimental.derived_report).toEqual(doc.derived_report)
+   expect(result.experimental.source_bindings).toEqual(sources);expect(result.experimental.evidence_bindings).toEqual(evidence)
+   expect(result.experimental.controls.evidence).toEqual(evidence);expect(result.experimental.controls.source_available).toBe(false)
+   expect(result.retention.scope.stale).toBe(true);expect(result.retention.scope.stale_reason).toBe('CORPUS_CHANGED')
+   await u.page.goto('/analyses?mode=historical&establishment='+e.id)
+   await expect(u.page.locator('[data-report-id="'+archivedId+'"]')).toBeVisible()
+  }
+  // Dated VI version is not silently reused as a FR report.
+  await rows('set role service_role')
+  expect((await rows('select read_shared_report_version($1,$2,$3,$4) result',[establishments[0].id,'fr',fixture.users[0].id,archivedId]))[0].result).toBeNull()
+  await rows('reset role')
+  expect((await provider()).runs).toHaveLength(5);expect((await provider()).aiCalls).toBe(1)
+  mark('publication-only-evidence')
   const outsider=await invoke(pages[0],'add-establishment',{confirmed:true,query:'https://www.google.com/maps?cid=123456',expectedGoogleId:'123456',candidate:{name:'Outside pilot',placeId:'ChIJOutsidePilotFixture'}})
   expect(outsider.importJobId).toBeTruthy()
   await rows('set role service_role')
@@ -154,7 +246,7 @@ test('complete mutualization with real browser Auth database and workers',async(
   await rows(readFileSync('supabase/maintenance/disable-shared-restaurants.sql','utf8'))
   expect(await rows('select id,external_review_id from reviews order by id')).toEqual(before)
   await pages[1].goto('/avis/'+reviews[1].id);await expect(pages[1].getByText('Le repas était froid et le service très lent.',{exact:true})).toBeVisible()
-  expect((await provider()).runs).toHaveLength(2);expect((await provider()).aiCalls).toBe(1)
+  expect((await provider()).runs).toHaveLength(5);expect((await provider()).aiCalls).toBe(1)
   mark('disable-and-rollback')
  }finally{await Promise.allSettled(contexts.map(c=>c.close()));await db.end()}
 })

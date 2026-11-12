@@ -84,6 +84,21 @@ try{
    await restore(restored)
   }
  }
+ // Assert real application dependencies in addition to applying all DDL. These
+ // are catalog checks, never substitute function definitions for missing ones.
+ for(const signature of ['public.verify_review_scheduler_token(text)',
+  'public.enqueue_due_review_sync_jobs(integer)','public.commit_incremental_review_sync(uuid,text,jsonb,jsonb)',
+  'public.join_available_shared_restaurant(uuid,uuid,text,text,text,jsonb)',
+  'public.archive_shared_restaurant_reports(uuid)','public.read_shared_report_version(uuid,text,uuid,uuid)',
+  'public.jev_shared_allocate(uuid,jsonb)','public.ingest_recent_reviews(uuid,uuid,jsonb,text)']){
+  const r=await db.query('select to_regprocedure($1) is not null present',[signature])
+  if(!r.rows[0].present)throw Error('APPLICATION_SCHEMA_DEPENDENCY_MISSING: '+signature)
+ }
+ for(const [table,column] of [['organizations','monitoring_interval_hours'],['establishments','next_sync_at'],['establishments','collection_language'],['review_translations','source_text_sha256']]){
+  const r=await db.query("select 1 from information_schema.columns where table_schema='public' and table_name=$1 and column_name=$2",[table,column])
+  if(r.rowCount!==1)throw Error('APPLICATION_COLUMN_MISSING: '+table+'.'+column)
+ }
+ console.log('APPLICATION_SCHEMA_DEPENDENCIES_OK')
  console.log('SCHEMA_BOOTSTRAP_OK')
  const endpoint=new URL(status.API_URL)
  if(!['127.0.0.1','localhost'].includes(endpoint.hostname))throw Error('LOCAL_AUTH_REQUIRED')

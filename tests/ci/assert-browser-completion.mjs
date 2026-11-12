@@ -1,5 +1,5 @@
 import {readFileSync,existsSync} from 'node:fs'
-export const required=['real-auth','simultaneous-add','existing-data-and-proofs','shared-negative-sync','single-analysis','private-isolation','unsubscribe','outside-pilot','disable-and-rollback']
+export const required=['real-auth','simultaneous-add','existing-data-and-proofs','shared-negative-sync','single-analysis','private-isolation','unsubscribe','outside-pilot','disable-and-rollback','language-provider-reuse','publication-only-evidence']
 const path=process.env.CI_BROWSER_RECEIPT
 if(!path)throw Error('BROWSER_RECEIPT_REQUIRED')
 const result=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):{passed:[]}

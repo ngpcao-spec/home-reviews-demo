@@ -18,7 +18,7 @@ createServer(async(req,res)=>{
    runs.push(run);await new Promise(r=>setTimeout(r,2000));return json({data:run})
   }
   if(url.pathname.startsWith('/apify/v2/actor-runs/')){const run=runs.find(r=>r.id===url.pathname.split('/').at(-1));if(!run)throw Error('RUN_NOT_FOUND');return json({data:run})}
-  if(url.pathname.startsWith('/apify/v2/datasets/')){const run=runs.find(r=>r.defaultDatasetId===url.pathname.split('/')[4]);if(!run)throw Error('DATASET_NOT_FOUND');return json(run.negative?[newer,old]:[old])}
+  if(url.pathname.startsWith('/apify/v2/datasets/')){const run=runs.find(r=>r.defaultDatasetId===url.pathname.split('/')[4]);if(!run)throw Error('DATASET_NOT_FOUND');return json((run.negative?[newer,old]:[old]).map(review=>run.input.language==='vi'?{...review,textTranslated:review.reviewId==='fixture-negative'?'Bữa ăn nguội và phục vụ chậm.':'Đón tiếp tốt.',translatedLanguage:'vi'}:review))}
   if(url.pathname==='/openai/v1/responses'&&req.method==='POST'){
    aiCalls++;await new Promise(r=>setTimeout(r,700));return json({output_text:JSON.stringify({ai_suggested_reply:'Merci pour votre retour. Nous regrettons que le repas ait été froid et le service lent. Nous allons examiner ces points avec notre équipe.',detected_language:'fr'}),usage:{input_tokens:100,output_tokens:35,total_tokens:135}})
   }
