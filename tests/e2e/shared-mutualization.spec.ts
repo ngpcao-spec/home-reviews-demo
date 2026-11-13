@@ -287,6 +287,7 @@ test('complete mutualization with real browser Auth database and workers',async(
   for(const order of [[viE,frE],[frE,viE]]){
    await rows('begin')
    try{
+    await rows("select set_config('home.retention_ingest','on',true)")
     const plain='생일 이벤트도 따로 해주시고 한국인 사장님 계셔서 편했어요!!\n분위기도 좋아용 ❤️'
     const html=plain.replaceAll('\n','<br>')
     await rows('delete from private.shared_restaurant_reviews where restaurant_id=$1 and external_id=$2',[restaurant,editedId])
@@ -304,7 +305,7 @@ test('complete mutualization with real browser Auth database and workers',async(
     for(const e of [...order,...order])await rows('select capture_shared_review_corpus($1)',[e.id])
     for(const e of [viE,frE]){
      const bundle=(await rows('select shared_review_projection_bundle($1,false) data',[e.id]))[0].data
-     expect(bundle.find((x:any)=>x.row.external_review_id===editedId).translations).toHaveLength(2)
+     expect(bundle.find((x:{row:{external_review_id:string}})=>x.row.external_review_id===editedId).translations).toHaveLength(2)
      await rows("select ingest_recent_reviews($1,$2,$3::jsonb,'apify')",[e.id,e.organization_id,JSON.stringify(bundle)])
     }
     expect(await rows('select id,published_at,rating,status,requires_ai_analysis from reviews order by id')).toEqual(preserved)
@@ -314,7 +315,7 @@ test('complete mutualization with real browser Auth database and workers',async(
     // New content cannot inherit a translation, even if identity is unchanged.
     await rows("update reviews set original_text='실제 수정',text='실제 수정',published_at='2026-11-12',provider_scraped_at='2026-11-12' where establishment_id=$1 and external_review_id=$2",[frE.id,editedId])
     await rows('select capture_shared_review_corpus($1)',[frE.id])
-    const changed=(await rows('select shared_review_projection_bundle($1,false) data',[viE.id]))[0].data.find((x:any)=>x.row.external_review_id===editedId)
+    const changed=(await rows('select shared_review_projection_bundle($1,false) data',[viE.id]))[0].data.find((x:{row:{external_review_id:string}})=>x.row.external_review_id===editedId)
     expect(changed.row.original_text).toBe('실제 수정');expect(changed.translations).toEqual([])
     expect(Number((await rows('select count(*) n from private.shared_restaurant_review_translations where restaurant_id=$1 and external_id=$2',[restaurant,editedId]))[0].n)).toBeGreaterThanOrEqual(2)
    }finally{await rows('rollback')}
