@@ -249,7 +249,7 @@ test('complete mutualization with real browser Auth database and workers',async(
   }
   // Seed the stale canonical shape observed in production, independent of public retention.
   await rows(`insert into private.shared_restaurant_reviews(restaurant_id,external_id,published_at,rating,original_text,public_payload)
-   values($1,$2,$3,5,'Before edit',jsonb_build_object('external_review_id',$2::text,'published_at',$3::text,'original_text','Before edit'))
+   values($1,$2,$3::timestamptz,5,'Before edit',jsonb_build_object('external_review_id',$2::text,'published_at',$3::timestamptz,'original_text','Before edit'))
    on conflict(restaurant_id,external_id) do update set published_at=excluded.published_at,original_text=excluded.original_text,public_payload=excluded.public_payload`,[restaurant,editedId,oldDate])
   await rows("update establishments set last_review_id=$2,last_review_at=$3,last_sync_at=now(),review_collection_status='complete' where id=$1",[frE.id,editedId,editDate])
   const checkpoints=await rows('select id,last_review_id,last_review_at from establishments where id=any($1::uuid[]) order by id',[[viE.id,frE.id]])
