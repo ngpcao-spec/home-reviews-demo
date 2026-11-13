@@ -36,6 +36,13 @@ const item = {
 }
 
 describe('ApifyReviewProvider normalization', () => {
+  it('never substitutes a localized translation for the original source',()=>{
+    const raw={...item,text:'원문<br>둘째 줄',textTranslated:'Texte français',language:'fr',originalLanguage:'ko'}
+    const result=normalizeApifyReview(raw)!
+    expect(result.text).toBe(raw.text);expect(result.language).toBe('ko')
+    expect(result.translatedText).toBe('Texte français');expect(result.rawPayload).toEqual(raw)
+    expect(normalizeApifyReview({...raw,text:null})!.text).toBe('')
+  })
   afterEach(() => vi.unstubAllGlobals())
   it.each([
     'https://maps.app.goo.gl/6La6uPKKozVswAJ4A?g_st=ic',

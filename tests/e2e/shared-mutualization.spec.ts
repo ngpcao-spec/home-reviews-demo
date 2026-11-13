@@ -282,6 +282,46 @@ test('complete mutualization with real browser Auth database and workers',async(
   expect((await provider()).runs).toHaveLength(5);expect((await provider()).aiCalls).toBe(1)
   mark('edited-review-date-and-checkpoints')
 
+  // Source-format regression: real SQL capture/projection/ingest, both arrival
+  // orders, replay, and a genuine edit. Exact Korean text from saved originals.
+  for(const order of [[viE,frE],[frE,viE]]){
+   await rows('begin')
+   try{
+    const plain='생일 이벤트도 따로 해주시고 한국인 사장님 계셔서 편했어요!!\n분위기도 좋아용 ❤️'
+    const html=plain.replaceAll('\n','<br>')
+    await rows('delete from private.shared_restaurant_reviews where restaurant_id=$1 and external_id=$2',[restaurant,editedId])
+    await rows('delete from private.shared_restaurant_review_translations where restaurant_id=$1 and external_id=$2',[restaurant,editedId])
+    await rows('delete from private.shared_review_source_versions where restaurant_id=$1 and external_id=$2',[restaurant,editedId])
+    for(const e of [viE,frE]){
+     await rows('update reviews set original_text=$2,text=$2,published_at=$3,provider_scraped_at=$3 where establishment_id=$1 and external_review_id=$4',[e.id,e.id===viE.id?plain:html,editDate,editedId])
+     await rows(`insert into review_translations(review_id,language,translated_text)
+      select id,$2,$3 from reviews where establishment_id=$1 and external_review_id=$4
+      on conflict(review_id,language) do update set translated_text=excluded.translated_text`,[e.id,e.id===viE.id?'vi':'fr',e.id===viE.id?'Tổ chức sinh nhật.':'Anniversaire.',editedId])
+    }
+    const preserved=await rows('select id,published_at,rating,status,requires_ai_analysis from reviews order by id')
+    const notices=await rows('select id from notifications order by id')
+    const heads=await rows('select id,last_review_id,last_review_at,next_sync_at from establishments order by id')
+    for(const e of [...order,...order])await rows('select capture_shared_review_corpus($1)',[e.id])
+    for(const e of [viE,frE]){
+     const bundle=(await rows('select shared_review_projection_bundle($1,false) data',[e.id]))[0].data
+     expect(bundle.find((x:any)=>x.row.external_review_id===editedId).translations).toHaveLength(2)
+     await rows("select ingest_recent_reviews($1,$2,$3::jsonb,'apify')",[e.id,e.organization_id,JSON.stringify(bundle)])
+    }
+    expect(await rows('select id,published_at,rating,status,requires_ai_analysis from reviews order by id')).toEqual(preserved)
+    expect(await rows('select id from notifications order by id')).toEqual(notices)
+    expect(await rows('select id,last_review_id,last_review_at,next_sync_at from establishments order by id')).toEqual(heads)
+    expect((await rows('select document,evidence,generated_at,language from private.shared_restaurant_report_versions where report_id=$1',[archivedId]))[0]).toEqual(archiveBefore)
+    // New content cannot inherit a translation, even if identity is unchanged.
+    await rows("update reviews set original_text='실제 수정',text='실제 수정',published_at='2026-11-12',provider_scraped_at='2026-11-12' where establishment_id=$1 and external_review_id=$2",[frE.id,editedId])
+    await rows('select capture_shared_review_corpus($1)',[frE.id])
+    const changed=(await rows('select shared_review_projection_bundle($1,false) data',[viE.id]))[0].data.find((x:any)=>x.row.external_review_id===editedId)
+    expect(changed.row.original_text).toBe('실제 수정');expect(changed.translations).toEqual([])
+    expect(Number((await rows('select count(*) n from private.shared_restaurant_review_translations where restaurant_id=$1 and external_id=$2',[restaurant,editedId]))[0].n)).toBeGreaterThanOrEqual(2)
+   }finally{await rows('rollback')}
+  }
+  expect((await provider()).runs).toHaveLength(5);expect((await provider()).aiCalls).toBe(1)
+  mark('source-format-orders-replay-and-real-edit')
+
   const outsider=await invoke(pages[0],'add-establishment',{confirmed:true,query:'https://www.google.com/maps?cid=123456',expectedGoogleId:'123456',candidate:{name:'Outside pilot',placeId:'ChIJOutsidePilotFixture'}})
   expect(outsider.importJobId).toBeTruthy()
   await rows('set role service_role')
