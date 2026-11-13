@@ -234,6 +234,54 @@ test('complete mutualization with real browser Auth database and workers',async(
   await rows('reset role')
   expect((await provider()).runs).toHaveLength(5);expect((await provider()).aiCalls).toBe(1)
   mark('publication-only-evidence')
+
+  // Exact production regression: same Google review ID, edited provider date.
+  // Only ID/date observations are real; author/content are deliberately synthetic.
+  const editedId='Ci9DQUlRQUNvZENodHljRjlvT2pObFpUWnpSR1ZxUkdwSE1tMU9aVVJqV1ZRNWRGRRAB'
+  const oldDate='2026-11-02T07:46:52.453Z',editDate='2026-11-11T00:36:06.978Z'
+  const frE=establishments[0],viE=viEst[0]
+  const archiveBefore=(await rows('select document,evidence,generated_at,language from private.shared_restaurant_report_versions where report_id=$1',[archivedId]))[0]
+  for(const e of [viE,frE]){
+   await rows(`insert into public.reviews(organization_id,establishment_id,external_review_id,rating,text,original_text,original_language,published_at,historical_import,status,requires_attention,requires_ai_analysis)
+    select $1,$2,'edited-fixture-'||g,5,'Original fixture','Original fixture','en','2026-10-15T00:00:00Z'::timestamptz+g*interval '1 minute',true,'ignored',false,false from generate_series(1,150) g`,[e.organization_id,e.id])
+   await rows(`insert into public.reviews(organization_id,establishment_id,external_review_id,rating,text,original_text,original_language,published_at,historical_import,status,requires_attention,requires_ai_analysis)
+    values($1,$2,$3,5,$4,$4,'en',$5,true,'ignored',false,false)`,[e.organization_id,e.id,editedId,e.id===viE.id?'Before edit':'After edit',e.id===viE.id?oldDate:editDate])
+  }
+  // Seed the stale canonical shape observed in production, independent of public retention.
+  await rows(`insert into private.shared_restaurant_reviews(restaurant_id,external_id,published_at,rating,original_text,public_payload)
+   values($1,$2,$3,5,'Before edit',jsonb_build_object('external_review_id',$2::text,'published_at',$3::text,'original_text','Before edit'))
+   on conflict(restaurant_id,external_id) do update set published_at=excluded.published_at,original_text=excluded.original_text,public_payload=excluded.public_payload`,[restaurant,editedId,oldDate])
+  await rows("update establishments set last_review_id=$2,last_review_at=$3,last_sync_at=now(),review_collection_status='complete' where id=$1",[frE.id,editedId,editDate])
+  const checkpoints=await rows('select id,last_review_id,last_review_at from establishments where id=any($1::uuid[]) order by id',[[viE.id,frE.id]])
+  const fixedSeed=(await rows("select pg_get_functiondef('public.seed_verified_shared_restaurant(uuid,text,uuid)'::regprocedure) d"))[0].d
+  const fixedPredicate=`and exists(select 1 from public.reviews
+      where establishment_id=e.id and organization_id=e.organization_id
+       and external_review_id=e.last_review_id and published_at=e.last_review_at)`
+  const brokenPredicate=`and exists(select 1 from private.shared_restaurant_reviews
+      where restaurant_id=restaurant and external_id=e.last_review_id and published_at=e.last_review_at)`
+  expect(fixedSeed.includes(fixedPredicate)).toBe(true)
+  await rows("update private.shared_restaurant_collections set initialized_at=null,last_success_at=null where restaurant_id=$1 and language='fr'",[restaurant])
+  await rows(fixedSeed.replace(fixedPredicate,brokenPredicate))
+  await rows('select seed_verified_shared_restaurant($1,$2,$3)',[frE.id,placeId,fixture.users[0].id])
+  expect((await rows("select last_success_at from private.shared_restaurant_collections where restaurant_id=$1 and language='fr'",[restaurant]))[0].last_success_at).toBeNull()
+  await rows(fixedSeed)
+  await rows('select attach_verified_shared_establishment($1,$2,$3)',[frE.id,placeId,fixture.users[0].id])
+  expect((await rows("select last_success_at from private.shared_restaurant_collections where restaurant_id=$1 and language='fr'",[restaurant]))[0].last_success_at).not.toBeNull()
+  const edited=(await rows('select * from private.shared_restaurant_reviews where restaurant_id=$1 and external_id=$2',[restaurant,editedId]))[0]
+  expect(new Date(edited.published_at).toISOString()).toBe(editDate)
+  expect(edited.original_text).toBe('After edit')
+  expect(Date.parse(edited.public_payload.published_at)).toBe(Date.parse(editDate))
+  // Replay a stale language snapshot after the newer FR version.
+  await rows('select capture_shared_review_corpus($1)',[viE.id])
+  expect((await rows('select published_at,original_text,public_payload from private.shared_restaurant_reviews where restaurant_id=$1 and external_id=$2',[restaurant,editedId]))[0]).toEqual({published_at:edited.published_at,original_text:edited.original_text,public_payload:edited.public_payload})
+  expect(await rows('select id,last_review_id,last_review_at from establishments where id=any($1::uuid[]) order by id',[[viE.id,frE.id]])).toEqual(checkpoints)
+  expect(Number((await rows('select count(*) n from private.shared_restaurant_reviews where restaurant_id=$1',[restaurant]))[0].n)).toBe(150)
+  expect(Number((await rows("select count(*) n from private.shared_restaurant_reviews where restaurant_id=$1 and external_id='edited-fixture-1'",[restaurant]))[0].n)).toBe(0)
+  expect((await rows('select document,evidence,generated_at,language from private.shared_restaurant_report_versions where report_id=$1',[archivedId]))[0]).toEqual(archiveBefore)
+  for(const e of [viE,frE])expect(Number((await rows('select count(*) n from reviews where establishment_id=$1',[e.id]))[0].n)).toBeLessThanOrEqual(150)
+  expect((await provider()).runs).toHaveLength(5);expect((await provider()).aiCalls).toBe(1)
+  mark('edited-review-date-and-checkpoints')
+
   const outsider=await invoke(pages[0],'add-establishment',{confirmed:true,query:'https://www.google.com/maps?cid=123456',expectedGoogleId:'123456',candidate:{name:'Outside pilot',placeId:'ChIJOutsidePilotFixture'}})
   expect(outsider.importJobId).toBeTruthy()
   await rows('set role service_role')

@@ -1,7 +1,7 @@
 name: Shared restaurant isolated validation
 on:
   push:
-    branches: [codex/shared-restaurants-auth-validation-20261109]
+    branches: [codex/shared-restaurants-auth-validation-20261109, codex/khouse-edited-review-20261113]
 permissions:
   contents: read
 jobs:
