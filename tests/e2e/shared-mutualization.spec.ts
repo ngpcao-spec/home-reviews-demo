@@ -306,7 +306,9 @@ test('complete mutualization with real browser Auth database and workers',async(
     for(const e of [viE,frE]){
      const bundle=(await rows('select shared_review_projection_bundle($1,false) data',[e.id]))[0].data
      expect(bundle.find((x:{row:{external_review_id:string}})=>x.row.external_review_id===editedId).translations).toHaveLength(2)
+     await rows('set local role service_role')
      await rows("select ingest_recent_reviews($1,$2,$3::jsonb,'apify')",[e.id,e.organization_id,JSON.stringify(bundle)])
+     await rows('reset role')
     }
     expect(await rows('select id,published_at,rating,status,requires_ai_analysis from reviews order by id')).toEqual(preserved)
     expect(await rows('select id from notifications order by id')).toEqual(notices)
