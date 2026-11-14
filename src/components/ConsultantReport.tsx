@@ -12,17 +12,18 @@ function ReportSection({index,title,className='',children}:{index:number;title:s
   </article></section>
 }
 
-export function ConsultantReport({report}: {report: ConsultantReportData}) {
+export function ConsultantReport({report,summaryFirst=false}: {report: ConsultantReportData;summaryFirst?:boolean}) {
   const {messages, language} = useI18n()
   const m = messages.reputation
   if (report.language !== language) return <p role="status">{m.languageUnavailable}</p>
-  if (report.version === 5 || report.version === 6 || report.version === 7 || report.version === 8 || report.version === 9 || report.version === 10 || report.version === 11) return <ConsultantReportV5 report={report}/>
+  if (report.version === 5 || report.version === 6 || report.version === 7 || report.version === 8 || report.version === 9 || report.version === 10 || report.version === 11) return <ConsultantReportV5 report={report} summaryFirst={summaryFirst}/>
   const label = {service:m.service,quality:m.quality,price:m.price,atmosphere:m.atmosphere}
   const aspects = (items: ConsultantReportData['positive_aspects'] = [], compact = false, countOnly = false) => {
     const displayed = compact ? [...items].sort((a,b)=>b.mentions-a.mentions).slice(0,5) : items
     return displayed.length ? <ul className="consultant-count-list">{displayed.map(item=><li key={`${item.theme_key}:${item.sentiment}`}><span>- {item.label}</span><strong>{compact || countOnly ? item.mentions : m.exactReviews.replace('{count}',String(item.mentions))}</strong></li>)}</ul> : <p>{m.noSubrating}</p>
   }
   return <div className="consultant-report">
+    {summaryFirst&&<section className="report-summary card"><h2>{language==='fr'?'Synthèse':'Tổng hợp'}</h2><p>{report.conclusion || m.noSubrating}</p></section>}
     <ReportSection index={1} title={m.consultantOverview}><dl className="reputation-replies">
       <div><dt>{m.analyzedTotal}</dt><dd>{report.total}</dd></div><div><dt>{m.positive}</dt><dd>{report.positive}</dd></div><div><dt>{m.analyticalNegative}</dt><dd>{report.negative}</dd></div>
     </dl><small>{m.analyticalNote}</small></ReportSection>

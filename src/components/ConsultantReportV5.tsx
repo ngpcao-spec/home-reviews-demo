@@ -11,7 +11,7 @@ import {crossRatingMessages} from '../i18n/cross-rating'
 import {consultantReportCopy as copy} from '../lib/consultant-report-copy'
 import {ConsultantReportLayout,ConsultantQuickGrid} from './ConsultantReportLayout'
 
-export function ConsultantReportV5({report}:{report:ConsultantReportData}) {
+export function ConsultantReportV5({report,summaryFirst=false}:{report:ConsultantReportData;summaryFirst?:boolean}) {
   const {language}=useI18n(),m=copy[language]
   const diagnostics=report.axis_diagnostics,decision=report.decision_summary,cross=(report.version===8||report.version===9||report.version===10||report.version===11)?report.cross_rating_analysis:undefined,crossWords=crossRatingMessages[language]
   if(!diagnostics || !decision) return <p role="status">{m.empty}</p>
@@ -23,7 +23,7 @@ export function ConsultantReportV5({report}:{report:ConsultantReportData}) {
       <p className="v5-coverage">{m.levels[d.coverage_level]} · <span style={{whiteSpace:'nowrap'}}>{Math.round(d.coverage_rate*100)} %</span></p>{key==='price'&&!compact&&<small>{Math.round(d.textual_coverage_rate*100)} % {m.textCoverage}</small>}
       <p><span className={`v5-status v5-${d.status}`}>{m.statuses[d.status]}</span></p></>
   }
-  return <ConsultantReportLayout
+  return <ConsultantReportLayout summaryFirst={summaryFirst}
     introduction={<>
       {report.version===9&&<V9ReportInfo report={report}/>}
       {report.version===10&&<V10ReportInfo report={report}/>}

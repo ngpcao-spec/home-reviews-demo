@@ -9,7 +9,7 @@ import './ReputationReport.css'
 
 interface Example { id: string; rating: number; original_text: string | null; text: string | null; author_name: string; published_at: string | null; review_translations: {language:string;translated_text:string}[] }
 
-export function ReputationReport({ report }: {report: HistoricalReport}) {
+export function ReputationReport({ report,summaryFirst=false }: {report: HistoricalReport;summaryFirst?:boolean}) {
   const { messages, language } = useI18n()
   const m = messages.reputation
   const data = report.reputation
@@ -44,6 +44,7 @@ export function ReputationReport({ report }: {report: HistoricalReport}) {
     })}
   </div>
   return <>
+    {summaryFirst&&<section className="report-summary"><h2>{language==='fr'?'Synthèse':'Tổng hợp'}</h2><ExecutiveSummary key={`${report.establishmentId}:${language}`} report={report}/></section>}
     <section className="weekly-section">{heading('01',messages.analytics.overview)}<div className="weekly-kpis">
       <article className="weekly-kpi card"><MessageSquareText/><strong>{number(data.sample_reviews_count,0)}</strong><span>{m.analyzed}</span></article>
       <article className="weekly-kpi card"><Star/><strong>{number(data.sample_average_rating)} ★</strong><span>{m.sampleRating}</span></article>
@@ -56,7 +57,7 @@ export function ReputationReport({ report }: {report: HistoricalReport}) {
         return <div className="historical-rating-row reputation-rating-row" key={rating}><strong>{rating}★</strong><span className="historical-rating-track"><i style={{width:`${percentage}%`}}/></span><b>{count}</b><small>{number(percentage)} %</small></div>
       })}
     </article></section>
-    <section className="weekly-section">{heading('03',m.summary)}<ExecutiveSummary key={`${report.establishmentId}:${language}`} report={report}/></section>
+    {!summaryFirst&&<section className="weekly-section">{heading('03',m.summary)}<ExecutiveSummary key={`${report.establishmentId}:${language}`} report={report}/></section>}
     <section className="weekly-section">{heading('04',`${m.food} · ${m.service} · ${m.atmosphere}`)}<div className="reputation-categories">
       {(['food','service','atmosphere'] as const).map(category=><article className="card reputation-category" key={category}>
         <h3>{m[category]}</h3><strong className="reputation-score">{number(data[`${category}_average`],2)} / 5</strong>

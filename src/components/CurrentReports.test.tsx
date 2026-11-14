@@ -11,7 +11,7 @@ it('shows a saved shared report even when the next generation uses the legacy en
  draw('fr','sol_legacy','/analyses',{shared_versions:[{id:'mock-derived',language:'fr',generated_at:'2026-10-21T00:00:00Z'}]});
  expect(await screen.findByText('EXPLICIT UNCHANGED CONCLUSION')).toBeVisible();
  expect(document.querySelector('[data-report-id="mock-derived"]')).toBeVisible();
- expect(screen.getByText(/Parcours de retour arrière/)).toBeVisible();
+ expect(screen.getByText(/Parcours de retour arrière/)).not.toBeVisible();
  expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
 });
 it('opens a shared dated report in its recorded language using read requests only',async()=>{
@@ -24,8 +24,8 @@ it('opens a shared dated report in its recorded language using read requests onl
 });
 it.each(['fr','vi'] as const)('shows refresh counts and localized automatic failure without technical details (%s)',async(language)=>{
  draw(language,'jev_sol_v2','/analyses',{refresh:{enabled:true,reference_usable:true,reference_report_id:'dated',new_reviews:24,negative_reviews:2,threshold_met:false,state:'failed',origin:'automatic_thresholds',request_id:'auto'}});
- expect(await screen.findByRole('region',{name:language==='fr'?'Actualisation du rapport':'Cập nhật báo cáo'})).toHaveTextContent('24');
- expect(screen.getByText(language==='fr'?/Aucun nouvel essai automatique/:/Không tự động thử lại/)).toBeVisible();
+ expect(await screen.findByText(language==='fr'?'24 nouveaux avis depuis ce rapport, dont 2 avis de 1 à 3 étoiles.':'24 đánh giá mới kể từ báo cáo này, gồm 2 đánh giá từ 1 đến 3 sao.')).toBeVisible();
+ expect(screen.getByText(language==='fr'?/Aucun nouvel essai automatique/:/Không tự động thử lại/)).toBeInTheDocument();
  expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
 });
 function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',initial='/analyses',extra:Partial<CurrentReportsView>={}){
@@ -36,7 +36,7 @@ function draw(language:'fr'|'vi',engine:'jev_sol_v2'|'sol_legacy'='jev_sol_v2',i
 }
 it('shows retained scope and sparse limits, hides archives and preserves negative/mixed access',async()=>{
  draw('fr','jev_sol_v2','/analyses?variant=legacy',{retention:{policy:{version:'recent_text_100_6m_v1',enabled:true},state:{retained_count:2,period_start:'2026-07-01',period_end:'2026-10-01'},scope:{as_of:'2026-10-25',review_count:2,period_start:'2026-07-01',period_end:'2026-10-01',stale:true},retired:null}});
- expect(await screen.findByText(/Les 150 derniers avis uniques/)).toBeVisible();
+ expect(await screen.findByText(/Les 150 derniers avis uniques/)).not.toBeVisible();fireEvent.click(screen.getByText('Détails du rapport'));
  expect(screen.queryByRole('tab',{name:'Rapports précédents'})).not.toBeInTheDocument();expect(screen.getByText(/Peu de témoignages/)).toBeVisible();expect(screen.getByText(/pas actualisé automatiquement/)).toBeVisible();
  expect(screen.getAllByRole('button',{name:/Avis négatifs, mixtes inclus/}).length).toBeGreaterThan(0);
 });
@@ -61,9 +61,9 @@ it('a committed reload cannot reuse the cached V2 report while the new corpus re
 it('keeps a dated stale report visible after a failed regeneration and explains unavailable sources',async()=>{
  const row=parallelPresentationRow('fr');row.current_source_run_id='old-source';row.controls={...row.controls,dated_publication:true,source_availability:[{review_id:'removed',available:false,reason:'review_removed'}]};row.source_reviews=[];
  draw('fr','jev_sol_v2','/analyses',{experimental:row,retention:{policy:{version:'recent_text_100_6m_v1',enabled:true},state:{retained_count:0,period_start:null,period_end:null},scope:{as_of:'2026-10-25',review_count:3,period_start:'2026-07-01',period_end:'2026-10-01',stale:true},retired:null},request_run:{source_run_id:'failed-source',establishment_id:'est',preferred_language:'fr',generation_id:'failed',status:'failed',progress:0,total_steps:0,resumable:false,error_code:'SYNTHETIC_FAILED',created_at:'2026-10-25'} as never});
- expect(await screen.findByText('À actualiser')).toBeVisible();expect(screen.getByText(/ce rapport daté décrit son ancien corpus/)).toBeVisible();expect(screen.getByText(/Aucun avis disponible/)).toBeVisible();
+ expect(await screen.findByText('À actualiser')).toBeInTheDocument();expect(screen.queryByText(/ce rapport daté décrit son ancien corpus/)).not.toBeInTheDocument();fireEvent.click(screen.getByText('Détails du rapport'));expect(screen.getByText(/Aucun avis disponible/)).toBeVisible();
  expect(screen.getByText(/SYNTHETIC_FAILED/)).toBeVisible();
- expect(screen.getByText(/textes sources sont devenus indisponibles/)).toBeVisible();
+ expect(screen.getByText(/1 sources retirées ou modifiées/)).toBeInTheDocument();
  fireEvent.click(screen.getAllByRole('button',{name:/Avis négatifs, mixtes inclus/})[0]);
  expect(await screen.findByText(/référence\(s\) devenue\(s\) indisponible/)).toBeVisible();
  expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
@@ -79,7 +79,7 @@ it('keeps a completed available report separate from a newer request and attache
  expect(await screen.findByText(/Rapport précédent disponible/)).toBeVisible();
  const progress=screen.getByText(/1 \/ 9 lots · 50 \/ 441 avis/).closest('[data-request-id]');expect(progress).toHaveAttribute('data-request-id','new-request');
  expect(progress).toHaveAttribute('data-batch-run-id','new-batches');expect(screen.queryByText(/9 \/ 9 lots/)).not.toBeInTheDocument();
- expect(screen.getByText('Terminé')).toBeVisible();expect(screen.getByText(/Demande new-requ/)).toHaveTextContent('En cours');
+ expect(screen.getByText('Terminé')).toBeInTheDocument();expect(screen.getByText(/Demande new-requ/)).toHaveTextContent('En cours');
  expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);
 });
 it('shows batch progress and resumes only the selected experiment without changing normal generation',async()=>{
@@ -106,7 +106,7 @@ it('shows current batch progress and its captured transport after the server opt
  mock.invoke.mockResolvedValue({data,error:null});
  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter initialEntries={['/analyses']}><I18nProvider language="fr"><CurrentReports establishmentId="est" account="account" languageKey="fr" enabled current={null} generating={false} generationAction={<button>NORMAL GENERATE</button>}>LEGACY PRESERVED</CurrentReports></I18nProvider></MemoryRouter></QueryClientProvider>);
  expect(await screen.findByText(/1 \/ 2 lots · 50 \/ 51 avis/)).toBeVisible();
- expect(screen.getByText(/Parcours V2 de cette demande : JEV par lots/)).toBeVisible();
+ expect(screen.getByText(/Parcours V2 de cette demande : JEV par lots/)).toBeInTheDocument();
  expect(screen.getByRole('button',{name:'NORMAL GENERATE'})).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'Poursuivre les étapes non commencées'}));
  await waitFor(()=>expect(mock.invoke).toHaveBeenCalledWith('jev-batch-experiment',{body:{action:'resume',run_id:'current-batches'}}));
@@ -115,17 +115,17 @@ it('shows current batch progress and its captured transport after the server opt
  fireEvent.click(negative[0]);expect(await screen.findByRole('dialog')).toBeVisible();
 });
 it.each(['fr','vi'] as const)('makes V2 current, preserves archived Sol and never generates on read/tab switch (%s)',async language=>{
- const {generate}=draw(language);await screen.findByRole('tab',{name:language==='fr'?'Rapport courant · V2':'Báo cáo hiện tại · V2'});
+ const {generate}=draw(language,'jev_sol_v2','/analyses',{versions:[{id:'archived-sol',current_source_run_id:'previous',created_at:'2026-10-20',generated_at:'2026-10-20',state:'completed'}]});await screen.findByText(language==='fr'?'Historique des rapports':'Lịch sử báo cáo');fireEvent.click(screen.getByText(language==='fr'?'Historique des rapports':'Lịch sử báo cáo'));await screen.findByRole('tab',{name:language==='fr'?'Rapport courant · V2':'Báo cáo hiện tại · V2'});
  expect(screen.getByRole('button',{name:'NORMAL GENERATE'})).toBeVisible();expect(screen.getByText('LEGACY SOL PRESERVED')).not.toBeVisible();
  expect(mock.invoke.mock.calls.every(c=>c[1].body.action==='read_current')).toBe(true);expect(generate).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole('tab',{name:language==='fr'?'Rapports précédents':'Báo cáo trước đây'}));expect(screen.getByText('LEGACY SOL PRESERVED')).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'NORMAL GENERATE'}));expect(generate).toHaveBeenCalledTimes(1);
 });
 it('shows rollback as Sol without launching a second pipeline',async()=>{
- const {generate}=draw('fr','sol_legacy');await screen.findByRole('tab',{name:'Rapport courant · Sol'});expect(screen.getAllByText('LEGACY SOL PRESERVED').some(e=>e.checkVisibility?.()??true)).toBe(true);expect(generate).not.toHaveBeenCalled();
+ const {generate}=draw('fr','sol_legacy');await screen.findAllByText('LEGACY SOL PRESERVED');expect(screen.getAllByText('LEGACY SOL PRESERVED').some(e=>e.checkVisibility?.()??true)).toBe(true);expect(generate).not.toHaveBeenCalled();
 });
 it('retains negative/mixed review access and omits generic source links in the current body',async()=>{
- draw('vi');await screen.findByRole('tab',{name:'Báo cáo hiện tại · V2'});
+ draw('vi');await screen.findByText('EXPLICIT UNCHANGED CONCLUSION');
  expect(screen.queryByRole('button',{name:'Xem đánh giá nguồn'})).not.toBeInTheDocument();
  const buttons=screen.getAllByRole('button',{name:/Đánh giá tiêu cực, gồm hỗn hợp/});fireEvent.click(buttons[0]);await screen.findByRole('dialog');fireEvent.click(screen.getByRole('button',{name:'Đóng và quay lại báo cáo'}));await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });

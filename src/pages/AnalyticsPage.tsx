@@ -15,7 +15,6 @@ import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
 import {
   buildDemoHistoricalReport,
-  formatHistoricalGeneratedAt,
   formatHistoricalPeriodStart,
   mapHistoricalReport,
   type HistoricalReport,
@@ -85,7 +84,7 @@ export function AnalyticsPage() {
     cache.setSelection(nextSelection)
     const next=new URLSearchParams(searchParams)
     next.set('establishment',nextSelection.establishmentId);next.set('mode',nextSelection.mode)
-    if(patch.establishmentId)next.delete('comparison')
+    if(patch.establishmentId){next.delete('comparison');next.delete('shared_report');next.delete('variant')}
     setSearchParams(next)
   }
   const demoReport = useMemo(() => selected && preferredLanguage && demoMode
@@ -146,16 +145,15 @@ export function AnalyticsPage() {
   const number = new Intl.NumberFormat(language === 'vi' ? 'vi-VN' : 'fr-FR')
 
   const generationStage=language==='vi'?{preparing:'Chuẩn bị dữ liệu',jev:'Phân tích đánh giá mới',shared_wait:'Đang phân tích đánh giá',prepare_evidence:'Chuẩn bị báo cáo',measure_sol:'Chuẩn bị báo cáo',sol:'Soạn báo cáo',validate_sol:'Kiểm tra và lưu báo cáo'}:{preparing:'Préparation du corpus',jev:'Analyse des nouveaux avis',shared_wait:'Analyse des avis en cours',prepare_evidence:'Préparation du rapport',measure_sol:'Préparation du rapport',sol:'Rédaction du rapport',validate_sol:'Contrôles et sauvegarde'};
-  const historicalAction=(<div className="historical-report-action" data-generation-request-id={generation.run?.request_id}>
-        <button className="primary-button historical-generate-button" type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
+  const historicalAction=(hasReport=!!visibleHistoricalReport)=>(<div className="historical-report-action" data-generation-request-id={generation.run?.request_id}>
+        <button className={`${hasReport?'secondary-button':'primary-button'} historical-generate-button`} type="button" onClick={() => void generateHistoricalReport()} disabled={historicalGenerating}>
           {historicalGenerating ? <span className="weekly-report-spinner" aria-hidden="true"/> : <Sparkles aria-hidden="true"/>}
-          <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : visibleHistoricalReport?.reputation || visibleHistoricalReport?.consultant ? messages.reputation.regenerate : messages.analytics.generateHistorical}</span>
+          <span>{historicalGenerating ? (generation.run?.status === 'queued' ? (language === 'vi' ? 'Đang chuẩn bị phân tích…' : 'Analyse en préparation…') : (language === 'vi' ? 'Đang phân tích' : 'Analyse en cours')) : generation.phase === 'failed' ? messages.common.retry : hasReport ? (language==='fr'?'Mettre à jour le rapport':'Cập nhật báo cáo') : (language==='fr'?'Créer un rapport':'Tạo báo cáo')}</span>
         </button>
         <AbandonFailedGeneration run={generation.run} abandon={generation.abandon} onAbandoned={()=>{const next=new URLSearchParams(searchParams);next.delete('comparison');setSearchParams(next,{replace:true});setRequestVersion(v=>v+1)}} />
         {historicalGenerating && historicalProgress && <small role="status">{historicalProgress}</small>}
         {historicalGenerating && generation.run?.stage && <small role="status">{generationStage[generation.run.stage as keyof typeof generationStage]}</small>}
         {historicalGenerating && <small role="status">{language === 'vi' ? 'Bạn có thể đóng ứng dụng. Máy chủ sẽ tiếp tục phân tích.' : 'Vous pouvez fermer l’application. L’analyse continue côté serveur.'}</small>}
-        {visibleHistoricalReport?.generatedAt && <small>{language==='vi'?'Báo cáo Sol trước đây tạo lúc':'Rapport Sol précédent généré le'}: {formatHistoricalGeneratedAt(visibleHistoricalReport.generatedAt)}</small>}
         {historicalFeedback === 'success' && <p className="historical-feedback success" role="status">{messages.analytics.historicalUpdated}</p>}
         {historicalFeedback === 'empty' && <p className="historical-feedback" role="status">{messages.analytics.historicalNoData}</p>}
         {historicalFeedback === 'abandoned' && <p className="historical-feedback" role="status">{language==='fr'?'Génération annulée. Vous pouvez créer un nouveau rapport depuis zéro.':'Đã hủy lần tạo báo cáo này. Bạn có thể tạo báo cáo mới từ đầu.'}</p>}
@@ -164,21 +162,22 @@ export function AnalyticsPage() {
 
   return <>
     <BrandHeader />
-    <section className="reference-intro analytics-intro">
-      <h1>{periodMode === 'historical' ? messages.analytics.historicalAnalysis : messages.analytics.weeklyTitle}</h1>
-      <p>{periodMode === 'historical' ? messages.reputation.intro : messages.analytics.weeklyIntro}</p>
+    <section className="reference-intro analytics-intro analysis-intro">
+      <h1>{language==='fr'?'Analyse des avis':'Phân tích đánh giá'}</h1>
     </section>
     {establishments.length > 0 && <div className="analytics-filters weekly-report-filter">
-      <label htmlFor="weekly-establishment">{messages.analytics.establishmentLabel}</label>
+      {establishments.length===1?<p className="analysis-restaurant-name">{selected?.name}</p>:<><label htmlFor="weekly-establishment">{messages.analytics.establishmentLabel}</label>
       <select id="weekly-establishment" value={resolvedEstablishmentId} onChange={(event) => changeSelection({establishmentId:event.target.value})}>
         {establishments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
+      </>}
+      <details className="analysis-generation-options"><summary>{language==='fr'?'Options de génération':'Tùy chọn tạo báo cáo'}</summary>
       <label htmlFor="weekly-period-mode">{messages.analytics.periodLabel}</label>
       <select id="weekly-period-mode" value={periodMode} onChange={(event) => changeSelection({mode:event.target.value as AnalyticsMode})}>
         <option value="current">{messages.analytics.currentWeek}</option>
         <option value="completed">{messages.analytics.completedWeek}</option>
         <option value="historical">{messages.analytics.historicalMode}</option>
-      </select>
+      </select></details>
     </div>}
 
     {!establishments.length && <section className="weekly-report-state card"><p>{messages.analytics.noEstablishment}</p></section>}

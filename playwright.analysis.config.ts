@@ -1,0 +1,2 @@
+import {defineConfig,devices} from '@playwright/test'
+export default defineConfig({testDir:'./tests/e2e',testMatch:'analysis-mobile.spec.ts',workers:1,retries:0,use:{...devices['iPhone 14'],browserName:'chromium',baseURL:'http://127.0.0.1:4187'},webServer:{command:'node node_modules/vite/bin/vite.js --config tests/e2e/vite.analysis.config.ts --host 127.0.0.1 --port 4187',url:'http://127.0.0.1:4187',reuseExistingServer:false}})

@@ -7,7 +7,7 @@ import { AnalyticsPage } from './AnalyticsPage'
 import { resetAnalyticsCache } from '../lib/analytics-cache'
 // This suite covers navigation/cache and the manual generation controller.
 // Server-authorized current report visibility is covered by CurrentReports.test.
-vi.mock('../components/CurrentReports',()=>({CurrentReports:({generationAction,children}:{generationAction:React.ReactNode;children:React.ReactNode})=><>{generationAction}{children}</>}))
+vi.mock('../components/CurrentReports',()=>({CurrentReports:({generationAction,children}:{generationAction:React.ReactNode|((exists?:boolean)=>React.ReactNode);children:React.ReactNode})=><>{typeof generationAction==='function'?generationAction():generationAction}{children}</>}))
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -85,7 +85,7 @@ describe('manual historical report generation', () => {
   it('does not generate an AI report when the historical view opens', async () => {
     renderPage()
     await selectHistoricalMode()
-    expect(screen.getByRole('button', { name: 'Tạo báo cáo AI' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Tạo báo cáo' })).toBeVisible()
     expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(0)
   })
 
@@ -97,7 +97,7 @@ describe('manual historical report generation', () => {
       : Promise.resolve({ data: name === 'get-historical-report-status' ? {run:null} : { error: 'WEEKLY_TEST_RESPONSE' }, error: null }))
     renderPage()
     await selectHistoricalMode()
-    const button = screen.getByRole('button', { name: 'Tạo báo cáo AI' })
+    const button = screen.getByRole('button', { name: 'Tạo báo cáo' })
     fireEvent.click(button)
     fireEvent.click(button)
     await waitFor(() => expect(mocks.invoke.mock.calls.filter(([name]) => name === 'generate-historical-report')).toHaveLength(1))
@@ -116,7 +116,7 @@ describe('manual historical report generation', () => {
         : { data: { error: 'NO_REVIEWS_AVAILABLE' }, error: null }))
     renderPage()
     await selectHistoricalMode()
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo báo cáo AI' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tạo báo cáo' }))
     expect(await screen.findByText('Phân tích theo nhóm: 1 / 3')).toBeVisible()
     const calls=mocks.invoke.mock.calls.filter(([name])=>name==='generate-historical-report')
     expect(calls).toHaveLength(1)
@@ -127,7 +127,7 @@ describe('manual historical report generation', () => {
     mocks.maybeSingle.mockResolvedValue({data:reportRow(),error:null})
     renderPage('/analyses?establishment=est-2&mode=historical')
     expect(await screen.findByText('summary-est-2-vi')).toBeVisible()
-    expect(screen.getByRole('button',{name:'Tạo lại phân tích'})).toBeVisible()
+    expect(screen.getByRole('button',{name:'Cập nhật báo cáo'})).toBeVisible()
     fireEvent.click(screen.getByText('test-leave'))
     fireEvent.click(screen.getByText('test-return'))
     expect(screen.getByText('summary-est-2-vi')).toBeVisible()

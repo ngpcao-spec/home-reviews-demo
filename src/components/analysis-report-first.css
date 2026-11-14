@@ -1,0 +1,11 @@
+.analysis-report-first{display:flex;flex-direction:column;gap:12px;padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+.report-lead{order:0}.report-action{order:1}.analysis-report-first>#current-report-panel{order:2}.report-details{order:3}.report-history{order:4}.analysis-report-first>#archive-report-panel{order:5}
+.report-lead p{margin:4px 0}.report-date{font-size:.85rem;color:var(--text-muted,#b7b0a5)}
+.report-details,.report-history,.analysis-generation-options{font-size:.9rem}.report-details summary,.report-history summary,.analysis-generation-options summary{cursor:pointer;padding:10px 0;font-weight:600}
+.analysis-intro{margin-bottom:12px!important}.analysis-intro h1{font-size:1.65rem!important}.analysis-restaurant-name{font-weight:600;margin:0}
+.analysis-report-first .historical-report-action{margin:0;gap:6px}.analysis-report-first .historical-generate-button{min-height:44px;padding:10px 16px}
+.analysis-report-first #current-report-panel{display:flex;flex-direction:column;gap:8px}.analysis-report-first #current-report-panel[hidden]{display:none}
+.analysis-report-first #current-report-panel>.consultant-report{order:-1}
+.report-summary{padding:18px!important;margin:0 0 12px}.report-summary h2{font-size:1.2rem;margin:0 0 10px}.report-summary p{margin:0;line-height:1.55}
+.analysis-report-first .parallel-tabs{margin:8px 0}.analysis-report-first .weekly-section{margin-top:12px}
+@media(max-width:600px){.analytics-filters.weekly-report-filter{gap:6px;margin-bottom:10px}.report-details .card{padding:12px}.analysis-report-first .consultant-section-body{padding:14px}}

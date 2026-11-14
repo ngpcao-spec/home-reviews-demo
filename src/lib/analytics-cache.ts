@@ -15,7 +15,7 @@ const FRESH_MS = 30_000
 export function resolveAnalyticsSelection(params: URLSearchParams, saved: AnalyticsSelection | undefined, accessibleIds: string[]): AnalyticsSelection {
   const explicit = params.has('establishment') || params.has('mode')
   const candidate = params.get('establishment') ?? (explicit ? '' : saved?.establishmentId ?? '')
-  const mode = params.get('mode') ?? (explicit ? 'completed' : saved?.mode ?? 'completed')
+  const mode = params.get('mode') ?? (explicit ? 'historical' : saved?.mode ?? 'historical')
   return { establishmentId: accessibleIds.includes(candidate) ? candidate : accessibleIds[0] ?? '',
     mode: mode === 'historical' || mode === 'current' ? mode : 'completed' }
 }
