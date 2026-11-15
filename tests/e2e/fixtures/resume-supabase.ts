@@ -59,6 +59,14 @@ class Query implements PromiseLike<{data: unknown;error:null}> {
 export const isSupabaseConfigured=true
 export const supabase={
   from:(table:string)=>new Query(table,user().id),
+  // Local read-only display RPC introduced after this resume harness was created.
+  rpc:async(name:string,args:{p_reviews?:string[];p_prepare?:boolean})=>{
+    if(name!=='read_review_display'||args.p_prepare!==false)return{data:null,error:new Error('UNSUPPORTED_TEST_RPC')}
+    const fixture=notificationFixture(),row=fixture?.review,language=reviewLanguage()
+    if(!row||!args.p_reviews?.includes(row.id))return{data:[],error:null}
+    const translated=row.review_translations?.find((t:{language:string})=>t.language===language)?.translated_text
+    return{data:[{review_id:row.id,language,original_text:row.original_text,status:translated?'translated':'missing',translated_text:translated??null}],error:null}
+  },
   auth:{
     getSession:async()=>({data:{session:{user:user()}}}),
     getUser:async()=>({data:{user:user()}}),

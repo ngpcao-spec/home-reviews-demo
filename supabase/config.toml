@@ -587,3 +587,7 @@ verify_jwt = false
 
 [functions.rainminer-menu]
 verify_jwt = false # Authenticates in the handler.
+
+# Dedicated server-only scheduler credential, verified inside the handler.
+[functions.process-review-notifications]
+verify_jwt = false
