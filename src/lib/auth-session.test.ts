@@ -18,6 +18,21 @@ describe('iOS Google callback across browser storage contexts',()=>{
     await prepareAuthReturn(auth,base+'#access_token=FAKE&refresh_token=FAKE',replace)
     expect(order).toEqual(['initialize','session','clean']);expect(replace).toHaveBeenCalledWith(base);expect(authStartupError()).toBe('')
   })
+  it('discards the Supabase marker and future callback metadata rather than creating an invalid route',()=>{
+    expect(cleanAuthReturnUrl(base+'#access_token=FAKE&refresh_token=FAKE&sb=&future_metadata=value')).toBe(base)
+    expect(cleanAuthReturnUrl(base+'#error=access_denied&error_description=PRIVATE&sb=')).toBe(base)
+    expect(cleanAuthReturnUrl(base+'?view=all&code=FAKE&sb_flow_id=FAKE#sb=')).toBe(base+'?view=all')
+    expect(cleanAuthReturnUrl(base+'#/avis/review-1?sb=ordinary-query')).toBe(base+'#/avis/review-1?sb=ordinary-query')
+    expect(authReturnKind(base+'#/avis/review-1?sb=ordinary-query')).toBe('none')
+  })
+  it('repairs an already-consumed callback without exchanging tokens or starting another sign-in',async()=>{
+    const auth={initialize:vi.fn(),getSession:vi.fn(),exchangeCodeForSession:vi.fn()},replace=vi.fn()
+    expect(authReturnKind(base+'#sb=')).toBe('marker')
+    await prepareAuthReturn(auth,base+'#sb=',replace)
+    expect(replace).toHaveBeenCalledWith(base)
+    expect(auth.initialize).not.toHaveBeenCalled();expect(auth.getSession).not.toHaveBeenCalled();expect(auth.exchangeCodeForSession).not.toHaveBeenCalled()
+    expect(authStartupError()).toBe('')
+  })
   it('missing local PKCE state gives a visible restart message and strips the one-time code instead of silently looping',async()=>{
     const auth={initialize:vi.fn(async()=>({error:null})),getSession:vi.fn(async()=>({data:{session:null},error:null})),exchangeCodeForSession:vi.fn(async()=>({data:{session:null},error:new Error('missing verifier')}))},replace=vi.fn()
     await prepareAuthReturn(auth,base+'?code=FAKE',replace);expect(authStartupError()).toContain('recommencer ici');expect(replace).toHaveBeenCalledWith(base)

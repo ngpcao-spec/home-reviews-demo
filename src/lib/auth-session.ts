@@ -1,9 +1,12 @@
-export type AuthReturn='none'|'pkce'|'implicit'|'error'
+export type AuthReturn='none'|'pkce'|'implicit'|'error'|'marker'
 export function authReturnKind(href:string):AuthReturn {
   const url=new URL(href),hash=new URLSearchParams(url.hash.slice(1))
   if(hash.has('access_token')&&hash.has('refresh_token'))return 'implicit'
   if(url.searchParams.has('code'))return 'pkce'
   if(['error','error_code','error_description'].some(k=>url.searchParams.has(k)||hash.has(k)))return 'error'
+  // Supabase adds sb= to its callback fragment. Also repair URLs left behind
+  // by older clients after the session had already been saved successfully.
+  if(!url.hash.startsWith('#/')&&hash.has('sb'))return 'marker'
   return 'none'
 }
 export function browserAuthFlow(href:string,userAgent:string,platform:string,touchPoints:number):'implicit'|'pkce' {
@@ -12,12 +15,15 @@ export function browserAuthFlow(href:string,userAgent:string,platform:string,tou
   const ios=/iPhone|iPad|iPod/i.test(userAgent)||(platform==='MacIntel'&&touchPoints>1)
   return ios?'implicit':'pkce'
 }
-const AUTH_KEYS=['code','sb_flow_id','access_token','refresh_token','provider_token','provider_refresh_token','token_type','expires_in','expires_at','error','error_code','error_description','type']
+const AUTH_KEYS=['code','sb','sb_flow_id','access_token','refresh_token','provider_token','provider_refresh_token','token_type','expires_in','expires_at','error','error_code','error_description','type']
 export function cleanAuthReturnUrl(href:string) {
   const url=new URL(href),kind=authReturnKind(href)
   if(kind==='none')return href
   AUTH_KEYS.forEach(k=>url.searchParams.delete(k))
-  if(!url.hash.startsWith('#/')){const hash=new URLSearchParams(url.hash.slice(1));AUTH_KEYS.forEach(k=>hash.delete(k));url.hash=hash.toString()}
+  // A callback parameter fragment is not an application route. Discard it in
+  // full, including new provider metadata, rather than restoring leftovers
+  // after the SDK has cleared it. Preserve explicit #/ application links.
+  if(!url.hash.startsWith('#/'))url.hash=''
   return url.toString()
 }
 let startupError=''
@@ -32,6 +38,7 @@ interface AuthCallbackClient {
 export async function prepareAuthReturn(auth:AuthCallbackClient,href=window.location.href,replace:(url:string)=>void=url=>window.history.replaceState(window.history.state,'',url)) {
   const kind=authReturnKind(href);if(kind==='none')return
   startupError=''
+  if(kind==='marker'){replace(cleanAuthReturnUrl(href));return}
   const original=new URL(href),fragment=new URLSearchParams(original.hash.slice(1))
   startupRecovery=original.searchParams.get('type')==='recovery'||fragment.get('type')==='recovery'
   const listener=auth.onAuthStateChange?.(event=>{if(event==='PASSWORD_RECOVERY')startupRecovery=true})
