@@ -7,6 +7,7 @@ import {
 } from './outscraper.ts'
 import {
   fetchApifyReviews,
+  fetchApifyPlace,
   type PreferredLanguage,
 } from './apify.ts'
 import { reviewClassification, reviewsForPersistence } from './review-classification.ts'
@@ -365,11 +366,9 @@ export async function resolveEstablishmentCandidate(
   const result = provider === 'mock'
     ? getMockGoogleReviews(query)
     : provider === 'apify'
-      ? await fetchApifyReviews(apifyToken(), {
+      ? await fetchApifyPlace(apifyToken(), {
         placeUrl: query,
         language,
-        sort: 'newest',
-        limit: 1,
       }, observe)
       : await fetchOutscraperReviews({
       query,

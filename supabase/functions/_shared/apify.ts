@@ -8,6 +8,7 @@ import type {
 } from './outscraper.ts'
 
 const APIFY_ACTOR = 'compass~google-maps-reviews-scraper'
+const APIFY_PLACE_ACTOR = 'compass~crawler-google-places'
 const APIFY_API = 'https://api.apify.com/v2'
 
 type JsonRecord = Record<string, unknown>
@@ -355,4 +356,52 @@ export async function fetchApifyReviews(
   const items = await fetchApifyDataset(token, completed.datasetId)
   observe?.('normalization')
   return normalizeApifyDataset(items, request.placeUrl, run.resolvedPlaceUrl)
+}
+
+/** Place lookup only. Keep the review actor and its import/sync options unchanged. */
+export function apifyPlaceInput(placeUrl: string, language: ProviderLanguage) {
+  return {
+    startUrls: [{ url: apifyGoogleMapsUrl(placeUrl) }],
+    language: collectionLanguage(language),
+    maxCrawledPlacesPerSearch: 1,
+    maxReviews: 0,
+    maxImages: 0,
+    scrapePlaceDetailPage: false,
+  }
+}
+
+export async function fetchApifyPlace(
+  token: string,
+  request: Pick<ApifyReviewRequest, 'placeUrl' | 'language'>,
+  observe?: import('./resolution-diagnostics.ts').ResolutionObserver,
+): Promise<{ establishment: NormalizedEstablishment }> {
+  collectionLanguage(request.language)
+  if (!token.trim()) throw new ApifyError('APIFY_TOKEN_MISSING', 503)
+  observe?.('link_resolution')
+  const resolvedUrl = await resolvePlaceUrl(request.placeUrl)
+  const input = apifyPlaceInput(resolvedUrl, request.language)
+  // A lookup has its own small charge cap; never inherit a bulk review budget.
+  observe?.('run_start')
+  const payload = await apiJson(token, `/acts/${APIFY_PLACE_ACTOR}/runs?maxTotalChargeUsd=0.1`, {
+    method: 'POST',
+    headers: apiHeaders(token, true),
+    body: JSON.stringify(input),
+  })
+  const run = runFromPayload(payload)
+  console.info('GOOGLE_PLACE_LOOKUP_STARTED', { run_id: run.runId, language: request.language })
+  observe?.('run_wait')
+  const completed = await waitForApifyRun(token, run)
+  observe?.('dataset_fetch')
+  const items = await fetchApifyDataset(token, completed.datasetId)
+  observe?.('normalization')
+  if (!items.length) throw new ApifyError('ESTABLISHMENT_NOT_FOUND', 404)
+  // Never turn an error/empty/multiple-place dataset into a plausible candidate.
+  const first = items[0]
+  if (items.length !== 1 || first.error || !stringValue(first.title)
+    || !(stringValue(first.placeId) || stringValue(first.cid))) {
+    throw new ApifyError('APIFY_INVALID_DATASET', 502)
+  }
+  const { establishment } = normalizeApifyDataset(items, request.placeUrl, resolvedUrl)
+  console.info('GOOGLE_PLACE_LOOKUP_COMPLETED', { run_id: completed.runId, language: request.language })
+  return { establishment }
 }

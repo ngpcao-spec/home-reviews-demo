@@ -1,7 +1,7 @@
 import { requireUser } from '../_shared/auth.ts'
 import { json, preflight } from '../_shared/cors.ts'
 import { OutscraperError } from '../_shared/outscraper.ts'
-import { ApifyError } from '../_shared/apify.ts'
+import { ApifyError, resolvePlaceUrl } from '../_shared/apify.ts'
 import { enforceRateLimit } from '../_shared/rate-limit.ts'
 import { preferredLanguageForUser, resolveEstablishmentCandidate } from '../_shared/sync-service.ts'
 import { normalizeGoogleMapsLink } from '../_shared/google-maps-link.ts'
@@ -49,10 +49,14 @@ Deno.serve(async (request) => {
     diagnostics.step('language')
     const language = await preferredLanguageForUser(admin, user.id)
     diagnostics.step('provider')
-    const placeId = placeIdFromMapsLink(normalizedLink)
+    // Expand before looking up an exact Place ID, without opening the pilot gate.
+    diagnostics.step('link_resolution')
+    const resolvedLink = normalizeGoogleMapsLink(await resolvePlaceUrl(normalizedLink))
+    if (!resolvedLink) throw new ApifyError('GOOGLE_MAPS_LINK_RESOLUTION_FAILED', 400)
+    const placeId = placeIdFromMapsLink(resolvedLink)
     const cached = sharedRuntimeRequested() && placeId
       ? await sharedRpc<NormalizedEstablishment|null>(admin,'read_shared_restaurant_resolution',{p_place_id:placeId}) : null
-    const resolved = cached ? {establishment:cached} : await resolveEstablishmentCandidate(normalizedLink, language, diagnostics.step)
+    const resolved = cached ? {establishment:cached} : await resolveEstablishmentCandidate(resolvedLink, language, diagnostics.step)
     if (sharedRuntimeRequested() && resolved.establishment.placeId) {
       await sharedRpc(admin,'register_shared_restaurant_resolution',{p_place:resolved.establishment})
     }

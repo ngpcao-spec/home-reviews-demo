@@ -15,7 +15,12 @@ export async function saveSharedInitialResult(admin:SupabaseClient,job:{id:strin
 
 /** An exact identifier only. A name in the link is never an identity. */
 export function placeIdFromMapsLink(link:string):string|null {
-  const url=new URL(link)
-  const value=url.searchParams.get('query_place_id') ?? url.searchParams.get('q')?.replace(/^place_id:/,'')
-  return value && /^ChIJ[\w-]+$/.test(value) ? value : null
+  try {
+    const url=new URL(link)
+    const value=url.searchParams.get('query_place_id') ?? url.searchParams.get('q')?.replace(/^place_id:/,'')
+      ?? decodeURIComponent(url.pathname).match(/!(?:1|19)s((?:ChIJ|GhIJ)[\w-]+)(?:!|\/|$)/)?.[1]
+    return value && /^(?:ChIJ|GhIJ)[\w-]+$/.test(value) ? value : null
+  } catch {
+    return null
+  }
 }
