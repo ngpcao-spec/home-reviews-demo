@@ -15,7 +15,8 @@ les métadonnées du restaurant. L'import confirmé était un autre traitement.
 - compass/crawler-google-places : un startUrls, langue du compte,
   maxCrawledPlacesPerSearch=1, maxReviews=0, maxImages=0,
   scrapePlaceDetailPage=false.
-- Plafond propre à la recherche : maxTotalChargeUsd=0.1.
+- Plafond propre à la recherche : maxTotalChargeUsd=0.5 (corrigé le 18 novembre ;
+  0.1 était inférieur au minimum admis par l'actor).
 - Une seule tentative POST par recherche ; aucune relance ni repli payant
   automatique si le POST, le run ou le dataset échoue.
 - Le dataset doit contenir une seule fiche avec nom et identifiant.
@@ -62,6 +63,28 @@ Le gain en secondes n'est pas encore mesuré : le démarrage d'un actor
 Apify reste nécessaire pour une fiche absente du cache autorisé.
 Comparer les diagnostics de la prochaine recherche normale aux mesures
 ci-dessus ; ne pas déclencher une collecte supplémentaire pour le contrôle.
+
+### Incident du 18 novembre à 19:02 Vietnam
+
+Deux requêtes, diagnostics 9cdc5f50-45fb-4230-b897-e38fce44de46 et
+5078cafb-7c0a-4bb8-9e7d-ca0b756e3dd5, échouent à run_start :
+APIFY_HTTP_400, respectivement après 3 138 et 1 063 ms. Le lien court
+a été résolu ; aucune identité de run n'a été reçue.
+
+La lecture publique de la configuration Apify constate
+minimalMaxTotalChargeUsd=0.5, tarification effective depuis le 30 juin 2026.
+Le plafond 0.1 introduit dans v28 est donc invalide. Le corps des deux
+réponses 400 n'ayant pas été conservé, ce constat s'appuie sur les
+paramètres déployés et les contraintes fournisseur, sans prétendre
+avoir récupéré le message détaillé de ces réponses.
+
+Correction : plafond 0.5, toujours une seule fiche, zéro avis et zéro image
+supplémentaire, sans repli ni relance automatique. Le plafond n'est pas
+une facture minimale. Aucune nouvelle extraction pour diagnostiquer.
+La fixture apify-place-contract-20261118.json provient des endpoints
+publics actor/build (build 0.14.793) ; elle conserve le minimum financier
+et le schéma des paramètres utilisés. Le test reproduit le rejet de 0.1
+et vérifie la requête réelle corrigée contre ce contrat en FR et VI.
 
 ## Déploiement et retour arrière
 

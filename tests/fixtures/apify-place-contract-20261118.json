@@ -1,0 +1,130 @@
+{
+  "actor": "compass/crawler-google-places",
+  "actorId": "nwua9Gu5YrADL7ZDj",
+  "build": "0.14.793",
+  "buildId": "eXQIRsX0Vs4SapbsM",
+  "retrievedAt": "2026-11-18T12:05:51.925Z",
+  "source": "https://api.apify.com/v2/acts/compass~crawler-google-places",
+  "pricing": {
+    "pricingModel": "PAY_PER_EVENT",
+    "startedAt": "2026-06-30T13:23:33.247Z",
+    "minimalMaxTotalChargeUsd": 0.5
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "startUrls": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "title": "URL",
+              "type": "string",
+              "description": "A single Google Maps URL to scrape."
+            }
+          }
+        }
+      },
+      "maxCrawledPlacesPerSearch": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "maxReviews": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0
+      },
+      "maxImages": {
+        "type": "integer",
+        "default": 0,
+        "minimum": 0
+      },
+      "scrapePlaceDetailPage": {
+        "type": "boolean",
+        "default": false
+      },
+      "language": {
+        "enum": [
+          "en",
+          "af",
+          "az",
+          "id",
+          "ms",
+          "bs",
+          "ca",
+          "cs",
+          "da",
+          "de",
+          "et",
+          "es",
+          "es-419",
+          "eu",
+          "fil",
+          "fr",
+          "gl",
+          "hr",
+          "zu",
+          "is",
+          "it",
+          "sw",
+          "lv",
+          "lt",
+          "hu",
+          "nl",
+          "no",
+          "uz",
+          "pl",
+          "pt-BR",
+          "pt-PT",
+          "ro",
+          "sq",
+          "sk",
+          "sl",
+          "fi",
+          "sv",
+          "vi",
+          "tr",
+          "el",
+          "bg",
+          "ky",
+          "kk",
+          "mk",
+          "mn",
+          "ru",
+          "sr",
+          "uk",
+          "ka",
+          "hy",
+          "iw",
+          "ur",
+          "ar",
+          "fa",
+          "am",
+          "ne",
+          "hi",
+          "mr",
+          "bn",
+          "pa",
+          "gu",
+          "ta",
+          "te",
+          "kn",
+          "ml",
+          "si",
+          "th",
+          "lo",
+          "my",
+          "km",
+          "ko",
+          "ja",
+          "zh-CN",
+          "zh-TW"
+        ],
+        "type": "string",
+        "default": "en"
+      }
+    },
+    "additionalProperties": false
+  }
+}

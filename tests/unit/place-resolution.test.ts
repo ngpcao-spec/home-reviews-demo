@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { apifyActorInput, apifyPlaceInput, fetchApifyPlace } from '../../supabase/functions/_shared/apify'
 import { resolveEstablishmentCandidate } from '../../supabase/functions/_shared/sync-service'
 import { placeIdFromMapsLink } from '../../supabase/functions/_shared/shared-initial-import'
+import Ajv from 'ajv'
+import contract from '../fixtures/apify-place-contract-20261118.json'
 
 const placeId = 'ChIJTQBISo9ncDERyPcP3aY9kI4'
 const url = 'https://www.google.com/maps?query_place_id=' + placeId
@@ -20,7 +22,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 it.each(['fr', 'vi'] as const)('requests only one place in %s, with no reviews, details or extra images', async language => {
   http.mockResolvedValueOnce(run()).mockResolvedValueOnce(Response.json([item]))
   const result = await fetchApifyPlace('synthetic-only', { placeUrl: url, language })
-  expect(http.mock.calls[0][0]).toBe('https://api.apify.com/v2/acts/compass~crawler-google-places/runs?maxTotalChargeUsd=0.1')
+  expect(http.mock.calls[0][0]).toBe('https://api.apify.com/v2/acts/compass~crawler-google-places/runs?maxTotalChargeUsd=0.5')
   expect(JSON.parse(http.mock.calls[0][1].body)).toEqual({
     startUrls: [{ url }], language, maxCrawledPlacesPerSearch: 1, maxReviews: 0, maxImages: 0, scrapePlaceDetailPage: false,
   })
@@ -33,6 +35,27 @@ it('wires the actual resolution service to the place actor, not the review actor
   http.mockResolvedValueOnce(run()).mockResolvedValueOnce(Response.json([item]))
   await resolveEstablishmentCandidate(url, 'vi')
   expect(http.mock.calls[0][0]).toContain('/acts/compass~crawler-google-places/runs')
+})
+
+it.each(['fr', 'vi'] as const)('reproduces the rejected old ceiling and accepts the real provider contract in %s', async language => {
+  const validate = new Ajv().compile(contract.inputSchema)
+  const providerStart = (endpoint: string, body: unknown) => {
+    expect(validate(body), JSON.stringify(validate.errors)).toBe(true)
+    const ceiling = Number(new URL(endpoint).searchParams.get('maxTotalChargeUsd'))
+    return ceiling < contract.pricing.minimalMaxTotalChargeUsd
+      ? Response.json({ error: { type: 'max-total-charge-usd-below-minimum' } }, { status: 400 })
+      : run()
+  }
+  // The former value deterministically violates the saved public pricing metadata.
+  expect(providerStart('https://api.apify.com/v2/acts/test/runs?maxTotalChargeUsd=0.1',
+    apifyPlaceInput(url, language)).status).toBe(400)
+  http.mockImplementationOnce(async (endpoint: string, init: RequestInit) =>
+    providerStart(endpoint, JSON.parse(String(init.body))))
+    .mockResolvedValueOnce(Response.json([item]))
+  expect((await fetchApifyPlace('synthetic-only', { placeUrl: url, language })).establishment.placeId).toBe(placeId)
+  expect(http.mock.calls.filter(c => c[1]?.method === 'POST')).toHaveLength(1)
+  expect(Number(new URL(http.mock.calls[0][0]).searchParams.get('maxTotalChargeUsd')))
+    .toBe(contract.pricing.minimalMaxTotalChargeUsd)
 })
 
 it('expands a short link once and preserves the exact large CID from the iOS ftid', async () => {

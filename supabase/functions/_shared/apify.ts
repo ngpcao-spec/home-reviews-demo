@@ -380,9 +380,11 @@ export async function fetchApifyPlace(
   observe?.('link_resolution')
   const resolvedUrl = await resolvePlaceUrl(request.placeUrl)
   const input = apifyPlaceInput(resolvedUrl, request.language)
-  // A lookup has its own small charge cap; never inherit a bulk review budget.
+  // Actor pricing requires minimalMaxTotalChargeUsd=0.5 (checked 2026-11-18).
+  // This is the minimum allowed ceiling, not the price of one place.
+  // Keep the lookup bounded to one place and never inherit a bulk review budget.
   observe?.('run_start')
-  const payload = await apiJson(token, `/acts/${APIFY_PLACE_ACTOR}/runs?maxTotalChargeUsd=0.1`, {
+  const payload = await apiJson(token, `/acts/${APIFY_PLACE_ACTOR}/runs?maxTotalChargeUsd=0.5`, {
     method: 'POST',
     headers: apiHeaders(token, true),
     body: JSON.stringify(input),
