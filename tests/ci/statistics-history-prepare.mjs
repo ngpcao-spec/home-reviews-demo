@@ -23,7 +23,9 @@ try{
   privateEstablishments.push((await db.query("insert into public.establishments(organization_id,name,google_id,google_maps_url,collection_language,initialized_at) values($1,$2,$3,'https://www.google.com/maps?cid=900',$4,now()) returning id",[user.organizationId,'Private '+languages[i],'private-'+i,languages[i]])).rows[0].id)
  }
  const bundle=(id,days)=>({row:{establishment_id:establishments[0],organization_id:fixture.users[0].organizationId,external_review_id:id,published_at:date(days),rating:5,original_text:'Original '+id,text:'Original '+id,original_language:'en',provider_scraped_at:date(0),author_name:'Synthetic customer',historical_import:true,requires_attention:false,requires_ai_analysis:false,status:'ignored'},translations:[{language:'fr',translated_text:'Traduction française '+id},{language:'vi',translated_text:'Bản dịch tiếng Việt '+id}]})
+ await db.query('set role service_role')
  await db.query("select public.ingest_recent_reviews($1,$2,$3,'apify')",[establishments[0],fixture.users[0].organizationId,JSON.stringify(Array.from({length:150},(_,i)=>bundle('seed-'+(i+1),i+10)))])
+ await db.query('reset role')
  await db.query('select public.capture_shared_review_corpus($1)',[establishments[0]])
  // Linearization point: the migration obtains its actual table locks before
  // seeding. A real ingest submitted during this interval must wait, then be captured.
