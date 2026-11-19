@@ -1,0 +1,152 @@
+{
+  "date": "2026-11-19",
+  "status": "ready_for_review_not_deployed",
+  "branch": "codex/statistics-rating-volume-chart",
+  "base_commit": "a4424fd576443a1efb4cb55088357ea5258f98e6",
+  "scope": "Client combined statistics chart only. The production data source, filters, aggregations, rating distribution, reports, imports and synchronization are unchanged.",
+  "data_mapping": {
+    "observations": "series rows with count > 0, sorted by date; no fabricated buckets or values",
+    "bar": "series[].count",
+    "point": "series[].average, unrounded",
+    "label": "series[].average formatted to one decimal in the account language",
+    "date": "series[].date; detail shows the bucket interval clipped to the selected period",
+    "axes": "Left: 1 to 5 stars. Right: zero to an adaptive integer maximum.",
+    "interaction": "One local selection for the bar and point belonging to the same row. Touch, Enter/Space, Escape and close control; no API request when selecting."
+  },
+  "screenshots": {
+    "source": "Synthetic test fixtures only, not production screenshots or real current restaurant totals. No mockup volumes or fallback datasets are embedded in the application.",
+    "browser": "Playwright Chromium with iPhone touch emulation (390 x 844); extra iPad check (820 x 1180). Physical iOS/Safari not tested.",
+    "languages": [
+      "fr",
+      "vi"
+    ],
+    "scenarios": [
+      {
+        "name": "stable-volume",
+        "period": "6m",
+        "counts": [
+          4,
+          24,
+          8,
+          40,
+          12,
+          28
+        ],
+        "averages": [
+          4.5,
+          4.5,
+          4.5,
+          4.5,
+          4.5,
+          4.5
+        ],
+        "bar_sum": 116,
+        "metric_total": 116,
+        "distribution_total": 116,
+        "count_ticks": [
+          0,
+          10,
+          20,
+          30,
+          40
+        ]
+      },
+      {
+        "name": "sparse-weeks",
+        "period": "3m",
+        "observations": 10,
+        "continuous_line": true,
+        "empty_weeks_omitted": true,
+        "counts": [
+          16,
+          24,
+          6,
+          8,
+          5,
+          5,
+          4,
+          1,
+          7,
+          2
+        ],
+        "bar_sum": 78,
+        "metric_total": 78,
+        "distribution_total": 78,
+        "last_average": 1.5,
+        "count_ticks": [
+          0,
+          10,
+          20,
+          30
+        ]
+      },
+      {
+        "name": "single-period",
+        "period": "3m",
+        "observations": 1,
+        "bar_sum": 3,
+        "metric_total": 3,
+        "distribution_total": 3,
+        "average": 3.3333333333333335,
+        "label": "3,3 / 5",
+        "point_and_bar_centered": true,
+        "line": false,
+        "count_ticks": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "selection": "All iPhone captures show the period, count and average after tapping a point. Both bar taps and point taps were exercised separately."
+  },
+  "verification": [
+    {
+      "command": "npx playwright test --config playwright.statistics.config.ts",
+      "result": "30 passed (1.8m)",
+      "scope": "Combined chart, statistics navigation, history review list, translations, empty/error/loading states and existing report states."
+    },
+    {
+      "command": "npx playwright test --config playwright.statistics.config.ts statistics-chart.spec.ts",
+      "result": "11 passed (32.4s)",
+      "scope": "Final CSS and screenshots after removing the browser's transient tap highlight."
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "scope": "Final source and CSS"
+    },
+    {
+      "command": "npx eslint [all changed TS/TSX files]",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "assertions": [
+    "Exactly one chart with one bar and one point per non-empty source row.",
+    "Bar center equals point x coordinate; sorted, equal spacing; continuous line painted above all bars.",
+    "Bar heights proportional to counts, count ticks integer and zero-based.",
+    "Unrounded point position verified with 10/3; label is 3.3 or 3,3 according to locale.",
+    "Empty state translated; single observation centered without line.",
+    "Touching either a bar or a point shows its own period/count/mean; keyboard access works.",
+    "Labels do not overlap; chart fits above fixed navigation when scrolled into view.",
+    "Sum of bar counts equals headline count and rating-distribution total in all three scenarios.",
+    "Additional actual RPC execution against isolated PostgreSQL: same totals for three months and 1,205 retained reviews with All selected.",
+    "Rating-distribution DOM unchanged when a chart observation is selected.",
+    "No extra network request is made by chart selection."
+  ],
+  "limitations": [
+    "Mobile screenshots are emulations, not captures from a physical iPhone."
+  ],
+  "production_server_changes": false,
+  "migrations": [],
+  "production_data_writes": 0,
+  "production_data_reads": 0,
+  "apify_calls": 0,
+  "ai_calls": 0,
+  "deployed": false
+}

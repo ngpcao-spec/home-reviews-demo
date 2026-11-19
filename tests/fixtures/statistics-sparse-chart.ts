@@ -25,3 +25,22 @@ export function greenHomeChart(data: Statistics): Statistics {
     series: [{ date: '2026-10-01', count: 10, average: 5 }, { date: '2026-11-01', count: 20, average: 5 }],
   }
 }
+
+// Synthetic test data only. The production chart never supplies its own counts.
+export function stableVolumeChart(data: Statistics): Statistics {
+  const counts = [4, 24, 8, 40, 12, 28]
+  return { ...data, start_date:'2026-05-19', end_date:'2026-11-19', bucket:'month',
+    metrics:{count:116,average:4.5,low_count:0,low_percent:0},
+    distribution:[58,58,0,0,0].map((count,i)=>({rating:5-i,count})),
+    series:counts.map((count,i)=>({date:`2026-${String(i+6).padStart(2,'0')}-01`,count,average:4.5})),
+  }
+}
+
+export function singlePeriodChart(data: Statistics): Statistics {
+  // Three integer ratings (2, 3, 5): the point must use 10/3, not the 3.3 label.
+  return { ...data, start_date:'2026-08-19', end_date:'2026-11-19', bucket:'week',
+    metrics:{count:3,average:10/3,low_count:2,low_percent:100*2/3},
+    distribution:[1,0,1,1,0].map((count,i)=>({rating:5-i,count})),
+    series:[{date:'2026-11-09',count:3,average:10/3}],
+  }
+}

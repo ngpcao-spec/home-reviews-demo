@@ -53,7 +53,7 @@ function StatisticsContent({ data: d, t, language, account }: { data: Statistics
       </div>
       {d.comparison?.reliable && <p className="statistics-comparison">{t.comparison} · {date(d.comparison.previous_start)} – {date(d.comparison.previous_end)}</p>}
       {d.metrics.count === 0 && <p role="status">{t.empty}</p>}
-      <section className="statistics-panel"><h2>{t.evolving}</h2><p className="statistics-muted">{d.bucket === 'week' ? t.weeklyMean : t.monthlyMean}</p><StatisticsRatingChart data={d} locale={locale} t={t} /></section>
+      <section className="statistics-panel statistics-combined-panel"><h2>{t.evolving}</h2><StatisticsRatingChart data={d} locale={locale} t={t} /></section>
       <section className="statistics-panel statistics-distribution"><h2>{t.distribution}</h2>{d.distribution.map(row => <button key={row.rating} onClick={() => setView({ ratings: [row.rating] })} aria-label={`${row.rating} ★ : ${number(row.count)} ${t.reviews}`}><span>{row.rating} ★</span><span className="statistics-track"><span className={row.rating >= 4 ? 'statistics-bar' : 'statistics-bar statistics-low'} style={{ width: `${100 * row.count / Math.max(1, ...d.distribution.map(v => v.count))}%` }} /></span><strong>{number(row.count)}</strong></button>)}</section>
       <button className="statistics-topic-entry statistics-panel" onClick={() => setView('topics')}><MessageSquare aria-hidden="true" /><span><strong>{t.topics}</strong><small>{t.topicHint}</small></span><ChevronRight aria-hidden="true" /></button>
     </>}

@@ -1,6 +1,6 @@
 import type { Plugin } from 'vite'
 import { statisticsDatabase, estA, estB, userA, userB, restaurant } from '../fixtures/statistics-database'
-import { sparseChart, greenHomeChart } from '../fixtures/statistics-sparse-chart'
+import { sparseChart, greenHomeChart, stableVolumeChart, singlePeriodChart } from '../fixtures/statistics-sparse-chart'
 import type { Statistics } from '../../src/lib/restaurant-statistics'
 
 // Test-only HTTP adapter -> actual PostgreSQL RPCs. No provider or production access.
@@ -49,8 +49,9 @@ export function statisticsServer(): Plugin {
               data = { ...chart, series: [...chart.series].reverse() } // exercise chronological sorting
             }
             if (name === 'read_restaurant_statistics' && state === 'two-point-chart') data = { ...greenHomeChart(data as unknown as Statistics) }
-            if (name === 'read_restaurant_statistics' && state === 'one-point-chart') data = { ...data, series: [{ date:'2026-11-09', count:2, average:1.5 }] }
-            if (name === 'read_restaurant_statistics' && state === 'zero-point-chart') data = { ...data, series: [{ date:'2026-11-09', count:0, average:0 }] }
+            if (name === 'read_restaurant_statistics' && state === 'stable-volume-chart') data = { ...stableVolumeChart(data as unknown as Statistics) }
+            if (name === 'read_restaurant_statistics' && state === 'one-point-chart') data = { ...singlePeriodChart(data as unknown as Statistics) }
+            if (name === 'read_restaurant_statistics' && state === 'zero-point-chart') data = { ...data, metrics:{count:0,average:null,low_count:0,low_percent:null},distribution:[5,4,3,2,1].map(rating=>({rating,count:0})), series: [{ date:'2026-11-09', count:0, average:0 }] }
             if (name === 'read_restaurant_statistics') data.establishment_id = args.p_establishment // fixture route alias only
             res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data,error:null}))
           } finally { await db.exec('rollback') }
