@@ -20,7 +20,7 @@ for(const language of ['fr','vi'])for(const tablet of [false,true])test(`${langu
  await expect(page.locator('.statistics-review')).toHaveCount(3)
 })
 test('full historical drilldown reaches beyond 150; translations, original and textless review are preserved',async({page})=>{
- await page.goto('/tests/e2e/fixtures/analysis-mobile.html?tab=statistics&language=fr')
+ await page.goto('/tests/e2e/fixtures/analysis-mobile.html?tab=statistics&language=fr&state=evicted')
  await page.getByRole('button',{name:'Tout',exact:true}).click()
  await expect(page.locator('.statistics-metrics button').first()).toContainText('1 205')
  await page.locator('.statistics-metrics button').first().click()
@@ -65,12 +65,16 @@ test('rapid period/restaurant changes never show another context and report navi
  await expect(page.getByRole('heading',{name:'Analyse des avis',exact:true})).toBeVisible()
  await expect(page.locator('.report-summary')).toBeVisible()
 })
-test('verified comparisons show favorable changes and preserve a gap with no reviews',async({page})=>{
+test('initial retention does not certify Google-wide coverage and preserves a gap with no reviews',async({page})=>{
  await page.goto('/tests/e2e/fixtures/analysis-mobile.html?tab=statistics&state=complete')
- await expect(page.locator('.statistics-good')).toHaveCount(3)
- await expect(page.locator('.statistics-metrics button').last()).toContainText('-50,0 pts')
+ await expect(page.locator('.statistics-good')).toHaveCount(0)
+ await expect(page.locator('.statistics-comparison')).toHaveCount(0)
+ await page.getByText('À propos des données',{exact:true}).click()
+ await expect(page.getByText('Conservation de l’historique depuis',{exact:true})).toBeVisible()
+ await expect(page.getByText('Comparaison indisponible : couverture précédente non vérifiée.',{exact:true})).toBeVisible()
  await expect(page.locator('.statistics-chart circle')).toHaveCount(2)
  await expect(page.locator('.statistics-line')).toHaveCount(0)
+  await page.locator('.statistics-help dl').scrollIntoViewIfNeeded()
  await page.screenshot({path:'test-results/statistics-fr-comparison-iphone.png'})
  await page.getByRole('button',{name:'Tout',exact:true}).click()
  await expect(page.locator('.statistics-metrics button').first().locator('strong')).toHaveText('3')

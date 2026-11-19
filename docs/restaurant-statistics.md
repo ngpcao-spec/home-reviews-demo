@@ -1,19 +1,19 @@
 # Écran Statistiques HOME Reviews
 
-Version préparée le 19 novembre 2026 sur `codex/restaurant-statistics`, à partir de `8384fd54c9e8bbc401334a3e21b65fb8afcc22a0`. Le correctif ajoute le sous-onglet Statistiques, ses lectures serveur et sa consultation paginée des avis. Il n'est pas déployé. Aucun appel Apify ou IA et aucune écriture en production n'ont été effectués.
+Version préparée le 19 novembre 2026 sur `codex/restaurant-statistics`. Le correctif ajoute le sous-onglet Statistiques, ses lectures serveur et sa consultation paginée des avis. Le [raccordement à l'historique durable](review-history.md) complète maintenant cette version : migrations, contrôles, déploiement et retour arrière y sont décrits. Rien n'est déployé. Aucun appel Apify ou IA et aucune écriture en production n'ont été effectués.
 
 ## Sources et historique disponible
 
-L'audit en lecture seule trouve 28 établissements actifs, 4 077 lignes dans leurs projections `public.reviews` et un maximum de 150 lignes par établissement. Ce total de lignes n'est pas un total mondial d'avis uniques entre organisations. La conservation actuelle retire les avis anciens ; elle n'est pas modifiée ici. Les preuves figées des rapports ne constituent pas un historique exhaustif des notes et ne sont pas transformées en nouveaux avis statistiques.
+L'audit préalable en lecture seule avait trouvé 28 établissements actifs, 4 077 lignes dans leurs projections `public.reviews` et un maximum de 150 lignes par établissement. Ce total n'est pas un total mondial d'avis uniques entre organisations. Le nouveau corpus est initialisé avec les seules lignes actuellement présentes, puis conserve les avis reçus au-delà de la fenêtre active des 150. Aucune ancienne archive n'est recherchée ou restaurée. Les preuves figées des rapports ne sont pas transformées en nouveaux avis statistiques.
 
-La nouvelle lecture utilise toutes les lignes encore conservées pour l'établissement autorisé et, lorsque le pilote existant l'autorise, le catalogue partagé. Elle ne passe ni par `retained_review_ids` ni par une vue limitée à 150. Les copies locales et communes sont regroupées par identifiant source ; la version canonique commune est prioritaire. Les traductions ne créent aucune ligne statistique supplémentaire.
+La nouvelle lecture utilise toutes les lignes de `private.review_history` pour l'établissement autorisé et, lorsque le pilote existant l'autorise, le restaurant partagé. Elle ne passe ni par `retained_review_ids` ni par une vue limitée à 150. Les copies locales et communes sont regroupées par identifiant source ; la version canonique commune est prioritaire. Les traductions et modifications ne créent aucune ligne statistique supplémentaire. La liste détaillée utilise exactement cette même source.
 
 Le total annoncé par Google, le nombre conservé, les dates extrêmes et les lignes non exploitables sont distincts dans l'aide. L'écran indique une couverture partielle ou non vérifiée lorsque l'exhaustivité ne peut pas être établie. Il ne récupère pas les avis déjà supprimés de la base.
 
 ## Calculs et accès
 
 - Période initiale : trois mois glissants. Les limites sont calculées en jours civils dans le fuseau de la politique existante, actuellement `Asia/Ho_Chi_Minh`. Le schéma ne fournit pas de fuseau propre à chaque établissement. Trente jours incluent aujourd'hui et les 29 jours précédents ; les autres fenêtres commencent à la date civile obtenue en retirant trois mois, six mois ou un an, avec ajustement de fin de mois. Aujourd'hui est une journée en cours ; les avis futurs sont exclus.
-- La période précédente contient le même nombre de jours civils et se termine juste avant la période choisie. Les variations ne sont visibles que si une collecte déclarée complète et vérifiée aujourd'hui correspond au total Google, au nombre unique conservé et au nombre exploitable, sans événement de purge enregistré. Cette règle volontairement conservatrice masque les comparaisons ordinaires lorsque la couverture n'est pas prouvée. « Tout » n'a jamais de variation.
+- La période précédente contient le même nombre de jours civils et se termine juste avant la période choisie. La date de début de conservation est affichée séparément des dates des avis. Le lot initial et le total Google ne prouvent pas une couverture continue : les comparaisons restent masquées tant que cette couverture n'est pas certifiée. Aucune certification automatique des périodes n'est ajoutée dans ce correctif. « Tout » n'a jamais de variation.
 - Les notes sans texte comptent. Les notes invalides, dates absentes et dates futures sont exclues des indicateurs, et leur nombre figure dans l'aide. Une période vide a un volume nul mais aucune moyenne ni proportion inventée. Un dénominateur précédent nul produit une variation non calculable.
 - La courbe utilise les semaines pour 30 jours et 3 mois, les mois au-delà. Les premières et dernières tranches peuvent être partielles. Aucun point zéro ni segment reliant deux tranches séparées par une tranche vide n'est ajouté. Les valeurs exactes restent disponibles dans un tableau repliable.
 - Les trois indicateurs, les cinq barres et les polarités des sujets ouvrent la liste dédiée, avec les mêmes critères. Pagination par date et identifiant source, 30 avis par page dans le client, 50 maximum par requête serveur, sans plafond total.
@@ -24,9 +24,9 @@ Le total annoncé par Google, le nombre conservé, les dates extrêmes et les li
 
 Les deux RPC publiques sont `read_restaurant_statistics` et `read_restaurant_statistic_reviews`. Elles appellent des fonctions privées qui vérifient la session, l'appartenance à l'organisation, l'établissement actif et la langue du profil. L'accès commun réutilise la fonction existante qui vérifie le pilote et l'abonnement. Les brouillons, notes et états privés ne sont jamais sélectionnés.
 
-L'exécution anonyme et l'accès direct aux auxiliaires sont retirés. Les entrées autorisées ont un `search_path` vide et un contrôle d'appartenance explicite, conformément aux [règles de sécurité des fonctions Supabase](https://supabase.com/docs/guides/database/functions#security-definer-vs-invoker). La migration ne crée aucun déclencheur ni traitement fournisseur.
+L'exécution anonyme et l'accès direct aux auxiliaires sont retirés. Les entrées autorisées ont un `search_path` vide et un contrôle d'appartenance explicite, conformément aux [règles de sécurité des fonctions Supabase](https://supabase.com/docs/guides/database/functions#security-definer-vs-invoker). La migration de lecture ne crée aucun traitement fournisseur ; les migrations d'historique ajoutent uniquement les captures locales décrites dans le dossier associé.
 
-Les index existants couvrent les avis par établissement et identifiant source, ainsi que les dates. Un index partiel sur les analyses réussies par identifiant source complète la recherche commune. Sur la base PGlite locale de 1 205 avis : trois agrégations mesurées à 65, 61 et 70 ms ; première page à 66 ms. Ces mesures locales ne constituent pas une mesure réseau ni un engagement de latence en production. Les détails des avis restent côté serveur tant que la page correspondante n'est pas demandée.
+Les index de l'historique couvrent portée, date et identifiant source. Un index partiel sur les analyses réussies par identifiant source complète la recherche commune. Sur la base PGlite locale de 1 205 avis : trois agrégations mesurées à 417, 414 et 424 ms ; première page à 482 ms. Ces mesures locales ne constituent pas une mesure réseau ni un engagement de latence en production. Les détails des avis restent côté serveur tant que la page correspondante n'est pas demandée.
 
 ## Contrôles exécutés
 
@@ -43,7 +43,7 @@ Les index existants couvrent les avis par établissement et identifiant source, 
 | Interactions | Chargement lent, erreur et bouton de réessai, état vide, changement rapide de période et restaurant, annulation de réponse dépassée, retour à Rapport. |
 | Rapport existant | Les dix scénarios FR/VI passent : absent, à jour, nouveaux avis, génération en cours, échec. Synthèse conservée, détails repliés et accès aux actions inchangés. |
 
-Résultats : **64 tests Vitest ciblés réussis**, **19 scénarios Playwright réussis**, compilation de production et ESLint réussis. Les tests navigateur utilisent des données synthétiques exclusivement dans `tests/`, sans remplacement des données du produit. Ils exécutent le rôle PostgreSQL `authenticated` avec des claims de test ; ils ne testent pas une connexion réelle au service Supabase Auth. Le moteur est Chromium aux dimensions mobiles, pas Safari sur un appareil physique.
+Résultats du raccordement : **66 tests Vitest ciblés réussis**, **1 test PostgreSQL natif de concurrence et de droits réussi**, **19 scénarios Playwright réussis**, compilation de production et ESLint des fichiers concernés réussis. Les tests navigateur utilisent des données synthétiques exclusivement dans `tests/`, sans remplacement des données du produit. Ils exécutent le rôle PostgreSQL `authenticated` avec des claims de test ; ils ne testent pas une connexion réelle au service Supabase Auth. Le moteur est Chromium aux dimensions mobiles, pas Safari sur un appareil physique. Le [dossier de conservation](review-history.md) précise les fonctions réelles exécutées et les limites.
 
 Commandes reproductibles :
 
@@ -64,13 +64,13 @@ Ces captures représentent le jeu de test, pas les chiffres réels de K.HOUSE.
 - [iPad vietnamien](evidence/restaurant-statistics-20261119/statistics-vi-ipad.png)
 - [Répartition des notes](evidence/restaurant-statistics-20261119/statistics-charts-fr-iphone.png)
 - [Sujets cités](evidence/restaurant-statistics-20261119/statistics-topics-fr-iphone.png)
-- [Comparaison vérifiée](evidence/restaurant-statistics-20261119/statistics-fr-comparison-iphone.png)
+- [Couverture initiale et date de conservation](evidence/restaurant-statistics-20261119/statistics-fr-comparison-iphone.png)
 - [Avis sources](evidence/restaurant-statistics-20261119/statistics-reviews-fr-iphone.png)
 
 ## Livraison et retour arrière
 
-Après validation du correctif, appliquer uniquement la migration additive `20261119105944_restaurant_statistics_readonly.sql`, puis publier le client. Aucun script de purge, de rattrapage, d'import ou de génération n'est nécessaire. La migration ne change ni les politiques de conservation ni les réservations du pilote.
+Après validation, appliquer dans l'ordre les migrations `20261119105944_restaurant_statistics_readonly.sql`, `20261119120255_retained_review_history.sql`, `20261119120531_statistics_retained_history.sql`, puis le worker de synchronisation et le client, selon le [dossier de déploiement](review-history.md#déploiement-proposé--non-exécuté). Aucun script de purge, rattrapage, import ou génération n'est nécessaire. La fenêtre active et les réservations du pilote restent inchangées.
 
-Pour revenir en arrière : restaurer d'abord le client précédent, puis appliquer `scripts/rollback/restaurant-statistics.sql` si la suppression des RPC est souhaitée. Ce script retire uniquement les sept fonctions et le nouvel index. Il ne modifie aucune donnée de restaurant, avis, traduction, menu ou rapport. Le maintien des RPC inutilisées est également possible pendant un retour arrière du client.
+Pour revenir en arrière, distinguer le client, les captures d'historique et les RPC : voir la [procédure précise](review-history.md#retour-arrière). `scripts/rollback/review-history.sql` arrête les captures sans effacer les données conservées. Le retrait ultérieur des seules RPC reste possible via `scripts/rollback/restaurant-statistics.sql`. Ne pas rejouer une migration de création sur des tables conservées.
 
 Les limites restantes sont la disponibilité réelle de l'historique, l'absence de fuseau individuel dans le schéma actuel, le contrôle Safari physique et la validation réseau après un éventuel déploiement. Le correctif ne promet pas de reconstituer les avis déjà purgés.

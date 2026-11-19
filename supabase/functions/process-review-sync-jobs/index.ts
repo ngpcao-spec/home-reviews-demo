@@ -213,6 +213,7 @@ export async function processApifyJob(
     p_job:job.id,p_worker:worker,p_bundle:bundle,p_result:{
       run_id:cursor.runId,dataset_id:cursor.datasetId,receipt,since:plan.since,
       received:plan.received,unique:plan.unique,external_ids:plan.external_ids,outside_window:plan.outside_window,
+      history_bundle:reviewIngestionBundle({id:job.establishment_id,organization_id:job.organization_id},plan.historyReviews,false,'apify'),
       head_id:plan.head.id,head_at:plan.head.at,legacy_reused:plan.legacy,empty:plan.empty,
       place:plan.page.establishment,
     },

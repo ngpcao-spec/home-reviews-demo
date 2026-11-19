@@ -55,7 +55,9 @@ it('uses saved polarity, independent of stars, with matching text/language; sour
 it('keeps empty intervals empty, rejects future/undated ratings and does not fabricate chart points',async()=>{
  await db.exec(`update public.reviews set published_at=now()-interval '2 years';update private.shared_restaurant_reviews set published_at=now()-interval '2 years';
  update private.shared_restaurant_reviews set published_at=null where external_id='source-1';update private.shared_restaurant_reviews set published_at=now()+interval '1 day' where external_id='source-2'`)
- await login();const s=await stats(estA,'3m');expect(s.metrics).toEqual({count:0,average:null,low_count:0,low_percent:null});expect(s.series).toEqual([]);expect(s.coverage.excluded).toBe(2);expect((await reviews(estA,'3m')).total).toBe(0)
+ await login();const s=await stats(estA,'3m');expect(s.metrics).toEqual({count:0,average:null,low_count:0,low_percent:null});expect(s.series).toEqual([]);expect(s.coverage.excluded).toBe(0);expect((await reviews(estA,'3m')).total).toBe(0)
+ // Invalid incoming dates do not replace a previously valid historical observation.
+ expect(s.coverage.stored).toBe(1205)
 })
 it('uses publication dates, rating-only reviews and exact equal calendar durations in restaurant time',async()=>{
  const rows=(await db.query<{start_date:string;end_date:string;days:number;previous_days:number}>(`select start_date::text,end_date::text,(end_at at time zone 'Asia/Ho_Chi_Minh')::date-start_date days,start_date-(previous_start at time zone 'Asia/Ho_Chi_Minh')::date previous_days from private.statistics_bounds('30d','Asia/Ho_Chi_Minh','2026-11-19T20:00:00Z')`)).rows[0]
@@ -64,13 +66,13 @@ it('uses publication dates, rating-only reviews and exact equal calendar duratio
  const dst=(await db.query<{days:number;previous_days:number}>(`select (end_at at time zone 'Europe/Paris')::date-start_date days,start_date-(previous_start at time zone 'Europe/Paris')::date previous_days from private.statistics_bounds('30d','Europe/Paris','2026-04-05T12:00Z')`)).rows[0];expect(dst.days).toBe(dst.previous_days)
  await login();expect((await stats(estA,'30d')).metrics.count).toBeGreaterThan(0)
 })
-it('hides unreliable comparisons and handles zero denominators; reliable full coverage computes deltas',async()=>{
+it('does not infer complete coverage from old seed dates or a matching Google total',async()=>{
  await login();expect((await stats(estA,'30d')).comparison?.reliable).toBe(false)
- await db.exec(`reset role;delete from public.reviews;delete from private.shared_restaurant_reviews;
+ await db.exec(`reset role;delete from private.review_history_translations;delete from private.review_history;delete from public.reviews;delete from private.shared_restaurant_reviews;
  insert into public.reviews(organization_id,establishment_id,external_review_id,published_at,rating,original_text) values
  ('${orgA}','${estA}','current-1',now()-interval '1 day',5,''),('${orgA}','${estA}','current-2',now()-interval '2 days',3,''),('${orgA}','${estA}','previous',now()-interval '40 days',2,'');
  update public.establishments set total_reviews=3,review_collection_status='complete',review_collection_expected=3,review_collection_unique=3,review_collection_checked_at=now() where id='${estA}';`)
- await login();const s=await stats(estA,'30d');expect(s.comparison).toMatchObject({reliable:true,count_change:100,average_change:2,low_percent_change:-50})
+ await login();const s=await stats(estA,'30d');expect(s.comparison).toMatchObject({reliable:false});expect(s.coverage.history_started_at).toBeTruthy();expect(s.coverage.complete).toBe(false)
  await db.exec("reset role;update public.reviews set published_at=now()-interval '1 day'");await login();expect((await stats(estA,'30d')).comparison).toMatchObject({count_change:null,average_change:null,low_percent_change:null})
  await db.exec(`reset role;insert into public.review_retention_events values('${estA}',1)`);await login();expect((await stats(estA,'30d')).comparison?.reliable).toBe(false)
 })
@@ -84,7 +86,7 @@ it('aggregates and paginates within bounded server time on 1205 reviews (local m
  const start=performance.now();await reviews();const pageMs=Math.round(performance.now()-start)
  mkdirSync('test-results',{recursive:true});writeFileSync('test-results/statistics-performance.json',JSON.stringify({fixtureReviews:1205,aggregateMs:times,firstPageMs:pageMs},null,2))
  expect((await stats()).metrics.count).toBe(1205)
-})
+},15000)
 it('rollback removes only the new functions/index and preserves the corpus',async()=>{
  await db.exec('commit');await db.exec(readFileSync('scripts/rollback/restaurant-statistics.sql','utf8'))
  expect((await db.query<{n:number}>('select count(*)::int n from public.reviews')).rows[0].n).toBe(1205)

@@ -29,12 +29,13 @@ export function statisticsServer(): Plugin {
           if (state === 'error') { res.statusCode = 500; res.end(JSON.stringify({error:'TEST_UNAVAILABLE'})); return }
           await db.exec('begin')
           try {
-            if (state === 'complete') await db.exec(`delete from public.reviews;delete from private.shared_restaurant_reviews;
+            if (state === 'complete') await db.exec(`delete from private.review_history_translations;delete from private.review_history;delete from public.reviews;delete from private.shared_restaurant_reviews;
               insert into private.shared_restaurant_reviews(restaurant_id,external_id,published_at,rating,original_text,public_payload) values
               ('${restaurant}','new-1',now()-interval '1 day',5,'','{}'),('${restaurant}','new-2',now()-interval '16 days',3,'','{}'),('${restaurant}','old',now()-interval '100 days',2,'','{}');
               update public.establishments set total_reviews=3,review_collection_status='complete',review_collection_expected=3,review_collection_unique=3,review_collection_checked_at=now();`)
-            if (state === 'empty') await db.exec('delete from public.reviews;delete from private.shared_restaurant_reviews')
-            if (args.p_establishment === 'other') await db.exec('delete from private.shared_restaurant_pilot_places;delete from public.reviews')
+            if (state === 'evicted') await db.exec(`delete from public.reviews where id not in(select id from public.reviews order by published_at desc limit 150);delete from private.shared_restaurant_reviews where external_id not in(select external_id from private.shared_restaurant_reviews order by published_at desc limit 150)`)
+            if (state === 'empty') await db.exec('delete from private.review_history_translations;delete from private.review_history;delete from public.reviews;delete from private.shared_restaurant_reviews')
+            if (args.p_establishment === 'other') await db.exec('delete from private.shared_restaurant_pilot_places;delete from private.review_history_translations;delete from private.review_history;delete from public.reviews')
             await db.exec(`set request.jwt.claim.sub='${language === 'vi' ? userB : userA}';set role authenticated`)
             const id = language === 'vi' ? estB : estA
             const result = name === 'read_restaurant_statistics'

@@ -48,5 +48,7 @@ export function prepareIncrementalResult(items:Record<string,unknown>[],job:Incr
  const reviews=unique.filter(r=>Date.parse(r.publishedAt!)>=Date.parse(since));
  const newest=reviews[0];
  const head=newest&&Date.parse(newest.publishedAt!)>Date.parse(job.checkpoint_review_at!)?{id:newest.externalReviewId,at:newest.publishedAt}:{id:job.checkpoint_review_id,at:job.checkpoint_review_at};
- return {page,reviews,head,since,received:items.length,unique:unique.length,external_ids:unique.map(r=>r.externalReviewId),outside_window:unique.length-reviews.length,empty:items.length===0,legacy};
+ // History receives the already-validated overlap too; the active commit keeps
+ // its original date/novelty filters and watermark behavior.
+ return {page,reviews,historyReviews:unique,head,since,received:items.length,unique:unique.length,external_ids:unique.map(r=>r.externalReviewId),outside_window:unique.length-reviews.length,empty:items.length===0,legacy};
 }

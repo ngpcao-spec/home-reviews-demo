@@ -3,6 +3,7 @@
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { readFileSync } from 'node:fs'
+import { installReviewHistory } from './install-review-history'
 export const orgA='10000000-0000-4000-8000-000000000001',orgB='10000000-0000-4000-8000-000000000002'
 export const userA='20000000-0000-4000-8000-000000000001',userB='20000000-0000-4000-8000-000000000002'
 export const estA='30000000-0000-4000-8000-000000000001',estB='30000000-0000-4000-8000-000000000002',restaurant='40000000-0000-4000-8000-000000000001'
@@ -13,8 +14,8 @@ const definition=(file:string,name:string)=>{
  const end=text.indexOf('$$;',text.indexOf('$$',start)+2)
  return text.slice(start,end+3)
 }
-export async function statisticsDatabase(count=1205){
- const db=new PGlite({extensions:{pgcrypto}});await db.waitReady
+export async function statisticsDatabase(count=1205,database?:PGlite){
+ const db=database??new PGlite({extensions:{pgcrypto}});await db.waitReady
  await db.exec(`create role anon;create role authenticated;create schema auth;create schema private;create schema extensions;create extension pgcrypto with schema extensions;
  create function auth.uid() returns uuid language sql as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  create table public.organization_members(organization_id uuid,user_id uuid);
@@ -50,5 +51,6 @@ export async function statisticsDatabase(count=1205){
  await db.exec(definition(pilot,'private.shared_pilot_establishment'))
  await db.exec(definition(bridge,'public.shared_restaurant_for_establishment').replace('public.shared_restaurant_runtime_enabled()','private.shared_pilot_establishment(p_establishment)'))
  await db.exec(migration)
+ await installReviewHistory(db)
  return db
 }

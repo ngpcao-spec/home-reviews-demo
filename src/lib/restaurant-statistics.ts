@@ -9,7 +9,7 @@ export interface Statistics {
   start_date: string | null; end_date: string; bucket: 'week' | 'month'
   metrics: { count: number; average: number | null; low_count: number; low_percent: number | null }
   comparison: null | { reliable: boolean; previous_start: string; previous_end: string; count_change: number | null; average_change: number | null; low_percent_change: number | null }
-  coverage: { stored: number; dated: number; excluded: number; google_total: number | null; complete: boolean; first_date: string | null; last_date: string | null; checked_at: string | null }
+  coverage: { stored: number; dated: number; excluded: number; google_total: number | null; complete: boolean; first_date: string | null; last_date: string | null; checked_at: string | null; history_started_at?: string | null; history_version?: string }
   series: { date: string; average: number; count: number }[]
   distribution: { rating: number; count: number }[]
   topics: { text_count: number; analyzed: number; items: { key: Topic; positive: number; negative: number }[] }
