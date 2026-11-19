@@ -5,7 +5,8 @@ import { ChevronRight, MessageSquare } from 'lucide-react'
 import { useApp } from '../app/AppContext'
 import { useI18n } from '../i18n'
 import { statisticsMessages } from '../i18n/statistics'
-import { adjacentBuckets, periods, readStatistics, readStatisticReviews, type Statistics, type StatisticsPeriod, type ReviewFilter, type ReviewPage, type StatisticsReview } from '../lib/restaurant-statistics'
+import { StatisticsRatingChart } from '../components/StatisticsRatingChart'
+import { periods, readStatistics, readStatisticReviews, type Statistics, type StatisticsPeriod, type ReviewFilter, type ReviewPage, type StatisticsReview } from '../lib/restaurant-statistics'
 
 type Labels = typeof statisticsMessages.fr | typeof statisticsMessages.vi
 export function StatisticsPage() {
@@ -52,27 +53,12 @@ function StatisticsContent({ data: d, t, language, account }: { data: Statistics
       </div>
       {d.comparison?.reliable && <p className="statistics-comparison">{t.comparison} · {date(d.comparison.previous_start)} – {date(d.comparison.previous_end)}</p>}
       {d.metrics.count === 0 && <p role="status">{t.empty}</p>}
-      <section className="statistics-panel"><h2>{t.evolving}</h2><p className="statistics-muted">{t.receivedMean}</p><RatingChart data={d} locale={locale} t={t} /></section>
+      <section className="statistics-panel"><h2>{t.evolving}</h2><p className="statistics-muted">{d.bucket === 'week' ? t.weeklyMean : t.monthlyMean}</p><StatisticsRatingChart data={d} locale={locale} t={t} /></section>
       <section className="statistics-panel statistics-distribution"><h2>{t.distribution}</h2>{d.distribution.map(row => <button key={row.rating} onClick={() => setView({ ratings: [row.rating] })} aria-label={`${row.rating} ★ : ${number(row.count)} ${t.reviews}`}><span>{row.rating} ★</span><span className="statistics-track"><span className={row.rating >= 4 ? 'statistics-bar' : 'statistics-bar statistics-low'} style={{ width: `${100 * row.count / Math.max(1, ...d.distribution.map(v => v.count))}%` }} /></span><strong>{number(row.count)}</strong></button>)}</section>
       <button className="statistics-topic-entry statistics-panel" onClick={() => setView('topics')}><MessageSquare aria-hidden="true" /><span><strong>{t.topics}</strong><small>{t.topicHint}</small></span><ChevronRight aria-hidden="true" /></button>
     </>}
     <details className="statistics-help"><summary>{t.help}</summary><p>{t.explanation}</p>{d.comparison && !d.comparison.reliable && <p>{t.noComparison}</p>}<dl>{d.coverage.history_started_at && <><dt>{t.historyStart}</dt><dd>{date(d.coverage.history_started_at)}</dd></>}<dt>{t.history}</dt><dd>{number(d.coverage.stored)}</dd><dt>{t.google}</dt><dd>{number(d.coverage.google_total)}</dd><dt>{t.range}</dt><dd>{date(d.coverage.first_date)} – {date(d.coverage.last_date)}</dd><dt>{t.excluded}</dt><dd>{number(d.coverage.excluded)}</dd><dt>{t.time}</dt><dd>{d.timezone}</dd></dl></details>
   </>
-}
-function RatingChart({ data, locale, t }: { data: Statistics; locale: string; t: Labels }) {
-  const rows = data.series
-  if (!rows.length) return <p>{t.empty}</p>
-  const number = (n: number) => n.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-  const shortDate = (s: string) => new Date(`${s}T12:00:00Z`).toLocaleDateString(locale, { day: data.bucket === 'week' ? 'numeric' : undefined, month: 'short', timeZone: 'UTC' })
-  const times = rows.map(r => Date.parse(r.date)), first = times[0], last = times.at(-1)!
-  const minimum = Math.max(1, Math.min(...rows.map(r => r.average)) - 0.25), maximum = Math.min(5, Math.max(...rows.map(r => r.average)) + 0.25)
-  const x = (i: number) => first === last ? 180 : 40 + 285 * (times[i] - first) / (last - first)
-  const y = (n: number) => 152 - 122 * (n - minimum) / Math.max(0.1, maximum - minimum)
-  const labelIndexes = new Set([0, Math.floor((rows.length - 1) / 2), rows.length - 1])
-  return <><svg className="statistics-chart" viewBox="0 0 360 190" role="img" aria-label={t.evolving}>
-    {[0, 1, 2, 3].map(i => { const n = minimum + (maximum - minimum) * i / 3; return <g key={i}><line x1="40" x2="335" y1={y(n)} y2={y(n)} className="statistics-grid" /><text x="32" y={y(n) + 4} textAnchor="end">{number(n)}</text></g> })}
-    {rows.map((r, i) => <g key={r.date}>{i > 0 && adjacentBuckets(rows[i - 1].date, r.date, data.bucket) && <line x1={x(i - 1)} y1={y(rows[i - 1].average)} x2={x(i)} y2={y(r.average)} className="statistics-line" />}<circle cx={x(i)} cy={y(r.average)} r="3.5"><title>{r.date} : {number(r.average)} / 5 · {r.count}</title></circle>{labelIndexes.has(i) && <><text x={x(i)} y={y(r.average) - 10} textAnchor="middle" className="statistics-point-label">{number(r.average)}</text><text x={x(i)} y="177" textAnchor="middle">{shortDate(r.date)}</text></>}</g>)}
-  </svg><details className="statistics-values"><summary>{t.values}</summary><table><tbody>{rows.map(r => <tr key={r.date}><th>{r.date}</th><td>{number(r.average)} / 5</td><td>{r.count} {t.reviews}</td></tr>)}</tbody></table></details></>
 }
 function StatisticsReviews({ data, filter, t, language, account }: { data: Statistics; filter: ReviewFilter; t: Labels; language: 'fr' | 'vi'; account: string }) {
   const query = useInfiniteQuery({ queryKey: ['statistic-reviews', account, language, data.establishment_id, data.period, filter, data.as_of], initialPageParam: null as ReviewPage['next'],

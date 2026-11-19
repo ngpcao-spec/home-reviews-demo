@@ -1,5 +1,7 @@
 import type { Plugin } from 'vite'
 import { statisticsDatabase, estA, estB, userA, userB, restaurant } from '../fixtures/statistics-database'
+import { sparseChart } from '../fixtures/statistics-sparse-chart'
+import type { Statistics } from '../../src/lib/restaurant-statistics'
 
 // Test-only HTTP adapter -> actual PostgreSQL RPCs. No provider or production access.
 // Supabase JWT verification is outside this fixture; database authorization runs as
@@ -41,7 +43,8 @@ export function statisticsServer(): Plugin {
             const result = name === 'read_restaurant_statistics'
               ? await db.query<{data:Record<string,unknown>}>('select public.read_restaurant_statistics($1,$2) data',[id,args.p_period])
               : await db.query<{data:Record<string,unknown>}>('select public.read_restaurant_statistic_reviews($1,$2,$3,$4,$5,$6,$7,$8) data',[id,args.p_period,args.p_ratings,args.p_topic,args.p_polarity,args.p_before,args.p_before_id,args.p_limit])
-            const data = result.rows[0].data
+            let data = result.rows[0].data
+            if (name === 'read_restaurant_statistics' && state === 'sparse-chart') data = { ...sparseChart(data as unknown as Statistics) }
             if (name === 'read_restaurant_statistics') data.establishment_id = args.p_establishment // fixture route alias only
             res.setHeader('Content-Type','application/json');res.end(JSON.stringify({data,error:null}))
           } finally { await db.exec('rollback') }
