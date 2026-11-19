@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-19",
+  "status": "ready_for_review_not_deployed",
+  "branch": "codex/statistics-observation-chart",
+  "base_commit": "6666b834121db99d880170e55c23101304914a7d",
+  "scope": "Only StatisticsRatingChart presentation, its labels/styles, and isolated UI test fixtures. No aggregation, filter, API, migration, import, report or retention changes.",
+  "screenshots": {
+    "source": "Isolated synthetic fixtures reproducing the requested visual cases. These screenshots are not current restaurant metrics or production screenshots.",
+    "green_home": {
+      "period": "6m",
+      "start": "2026-05-19",
+      "end": "2026-11-19",
+      "points": [
+        {
+          "date": "2026-10-01",
+          "count": 10,
+          "average": 5
+        },
+        {
+          "date": "2026-11-01",
+          "count": 20,
+          "average": 5
+        }
+      ],
+      "observed": "Two points at 5 connected across the entire plotting axis; no empty month slots."
+    },
+    "tito": {
+      "period": "3m",
+      "start": "2026-08-19",
+      "end": "2026-11-19",
+      "count": 78,
+      "observed": "Ten observed weeks, nine continuous connecting segments, equal spacing, last point 1.5. Input order deliberately reversed; display remains chronological."
+    },
+    "languages": [
+      "fr",
+      "vi"
+    ],
+    "devices": [
+      {
+        "name": "iPhone emulation",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      {
+        "name": "iPad emulation",
+        "viewport": {
+          "width": 820,
+          "height": 1180
+        }
+      }
+    ],
+    "browser": "Playwright Chromium. Not a physical iOS/Safari test."
+  },
+  "checks": [
+    {
+      "command": "npx playwright test --config playwright.statistics.config.ts",
+      "result": "29 passed (1.4m). Report states, statistics navigation, historical drilldown, language display and chart scenarios.",
+      "stage": "Before final x-label density adjustment"
+    },
+    {
+      "command": "npx playwright test --config playwright.statistics.config.ts statistics-chart.spec.ts",
+      "result": "10 passed (30.7s)",
+      "stage": "Final component and screenshots"
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "stage": "Final component"
+    },
+    {
+      "command": "npx eslint [all changed TypeScript/TSX files]",
+      "result": "passed"
+    },
+    {
+      "assertions": [
+        "No gray bands or legend",
+        "No values or slots for empty buckets",
+        "Single point centered with no line",
+        "Localized empty state",
+        "Only actual observation dates on x-axis; full filter dates remain above",
+        "Labels do not overlap",
+        "Chart above fixed bottom navigation when scrolled into view",
+        "Table retains all actual means/counts and correctly clips first selected week",
+        "No horizontal overflow"
+      ]
+    }
+  ],
+  "test_infrastructure_note": "One intermediate run timed out at the 5-second data assertion while isolated PostgreSQL was still starting (UI remained in Loading). The initial data wait now allows 15 seconds. All final chart tests passed.",
+  "provider_calls": 0,
+  "production_writes": 0,
+  "deployed": false
+}

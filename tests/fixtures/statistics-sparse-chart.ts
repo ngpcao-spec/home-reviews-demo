@@ -15,3 +15,13 @@ export function sparseChart(data: Statistics): Statistics {
     ],
   }
 }
+
+// Explicit presentation scenarios requested for review, not current restaurant
+// figures. Both means are exactly five without altering any production data.
+export function greenHomeChart(data: Statistics): Statistics {
+  return { ...data, start_date: '2026-05-19', end_date: '2026-11-19', bucket: 'month',
+    metrics: { count: 30, average: 5, low_count: 0, low_percent: 0 },
+    distribution: [30, 0, 0, 0, 0].map((count, i) => ({ rating: 5 - i, count })),
+    series: [{ date: '2026-10-01', count: 10, average: 5 }, { date: '2026-11-01', count: 20, average: 5 }],
+  }
+}

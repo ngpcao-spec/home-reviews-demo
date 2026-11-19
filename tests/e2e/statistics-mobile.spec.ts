@@ -65,7 +65,7 @@ test('rapid period/restaurant changes never show another context and report navi
  await expect(page.getByRole('heading',{name:'Analyse des avis',exact:true})).toBeVisible()
  await expect(page.locator('.report-summary')).toBeVisible()
 })
-test('initial retention does not certify Google-wide coverage and preserves a gap with no reviews',async({page})=>{
+test('initial retention does not certify Google-wide coverage and adds no points for empty weeks',async({page})=>{
  await page.goto('/tests/e2e/fixtures/analysis-mobile.html?tab=statistics&state=complete')
  await expect(page.locator('.statistics-good')).toHaveCount(0)
  await expect(page.locator('.statistics-comparison')).toHaveCount(0)
@@ -73,7 +73,8 @@ test('initial retention does not certify Google-wide coverage and preserves a ga
  await expect(page.getByText('Conservation de l’historique depuis',{exact:true})).toBeVisible()
  await expect(page.getByText('Comparaison indisponible : couverture précédente non vérifiée.',{exact:true})).toBeVisible()
  await expect(page.locator('.statistics-chart circle')).toHaveCount(2)
- await expect(page.locator('.statistics-line')).toHaveCount(0)
+ await expect(page.locator('.statistics-line')).toHaveCount(1)
+ await expect(page.locator('.statistics-chart-gap')).toHaveCount(0)
   await page.locator('.statistics-help dl').scrollIntoViewIfNeeded()
  await page.screenshot({path:'test-results/statistics-fr-comparison-iphone.png'})
  await page.getByRole('button',{name:'Tout',exact:true}).click()
