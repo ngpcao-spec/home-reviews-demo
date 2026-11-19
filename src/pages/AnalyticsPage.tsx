@@ -11,6 +11,8 @@ import { ConsultantReport } from '../components/ConsultantReport'
 import { CurrentReports } from '../components/CurrentReports'
 import { AbandonFailedGeneration } from '../components/AbandonFailedGeneration'
 import { BrandHeader } from '../components/ui/BrandHeader'
+import { StatisticsPage } from './StatisticsPage'
+import './StatisticsPage.css'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
 import { useI18n } from '../i18n'
 import {
@@ -34,6 +36,16 @@ import {
 interface GenerateWeeklyReportPayload { report?: WeeklyReportRow; error?: string }
 type HistoricalFeedback = 'success' | 'error' | 'empty' | null
 export function AnalyticsPage() {
+  const { language } = useI18n()
+  const [params, setParams] = useSearchParams()
+  const statistics = params.get('tab') === 'statistics'
+  return <><BrandHeader /><nav className="analysis-tabs" aria-label={language === 'fr' ? 'Analyse' : 'Phân tích'}>
+    {[false, true].map(value => <button key={String(value)} aria-current={statistics === value ? 'page' : undefined} onClick={() => {
+      const next = new URLSearchParams(params); if (value) next.set('tab', 'statistics'); else next.delete('tab'); setParams(next)
+    }}>{value ? (language === 'fr' ? 'Statistiques' : 'Thống kê') : (language === 'fr' ? 'Rapport' : 'Báo cáo')}</button>)}
+  </nav>{statistics ? <StatisticsPage /> : <ReportPage />}</>
+}
+function ReportPage() {
   const { reviews, establishments, demoMode, preferredLanguage, currentUser } = useApp()
   const { messages, language } = useI18n()
   const cache = analyticsSession(currentUser.id ?? currentUser.email)
@@ -161,7 +173,6 @@ export function AnalyticsPage() {
       </div>)
 
   return <>
-    <BrandHeader />
     <section className="reference-intro analytics-intro analysis-intro">
       <h1>{language==='fr'?'Analyse des avis':'Phân tích đánh giá'}</h1>
     </section>

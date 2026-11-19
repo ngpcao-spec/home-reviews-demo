@@ -12,6 +12,7 @@
     "test:selector-replay": "vitest run --config vitest.selector-replay.config.ts",
     "test:mixed-selector-replay": "vitest run --config vitest.mixed-selector-integration.config.ts",
     "test:e2e": "playwright test",
+    "test:statistics": "vitest run tests/unit/restaurant-statistics.test.ts tests/unit/statistics-buckets.test.ts --maxWorkers=1 && playwright test --config playwright.statistics.config.ts",
     "test:pwa": "playwright test --config playwright.resume.config.ts",
     "test:pwa:offline": "vite build --config tests/e2e/vite.shell.config.ts && node scripts/prepare-pwa-test.mjs && playwright test --config playwright.shell.config.ts",
     "screenshots": "node scripts/capture-screenshots.mjs",
