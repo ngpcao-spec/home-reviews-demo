@@ -19,6 +19,7 @@ try{
  await db.query("select set_config('home.reconstruction','empty-ci-v1',false)")
  await db.query('create extension if not exists pg_cron')
  for(const file of readdirSync('supabase/migrations').filter(n=>n.endsWith('.sql')).sort()){
+  if(process.env.CI_DEFER_REVIEW_HISTORY==='1'&&['20261119120255_retained_review_history.sql','20261119120531_statistics_retained_history.sql'].includes(file)){console.log('DEFER_UNTIL_CONCURRENT_HISTORY_TEST',file);continue}
   console.log('MIGRATION',file)
   const before={
    '20261108071048_avoid_duplicate_jev_projection_refresh.sql':['order_shared_jev_scope_pin','notification_read_retention_guard'],
