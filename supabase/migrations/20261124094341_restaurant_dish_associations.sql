@@ -246,10 +246,12 @@ begin
  ), accessible as (
   select e.id,e.name,private.dish_scope(e.id) scope from public.establishments e where e.active and exists(select 1 from public.organization_members m where m.organization_id=e.organization_id and m.user_id=auth.uid())
  ), matches as (
-  select e.id,e.name,d.name dish,case when p.specialty_id in(select id from wanted) then p.specialty_status else a.status end status,p.specialty_id in(select id from wanted) specialized,
+  select e.id,e.name,case when p.specialty_id in(select id from wanted) then specialty.name else d.name end dish,
+   case when p.specialty_id in(select id from wanted) then p.specialty_status else a.status end status,p.specialty_id in(select id from wanted) specialized,
    row_number() over(partition by e.id order by (p.specialty_id in(select id from wanted)) desc nulls last,(a.status='confirmed') desc,d.key) n
   from accessible e join private.restaurant_dishes a on a.scope=e.scope and a.enabled
   join wanted w on w.id=a.dish_id join private.dish_names d on d.id=w.id join private.restaurant_dish_profiles p on p.scope=e.scope
+  left join private.dish_names specialty on specialty.id=p.specialty_id
   where a.status='confirmed' or exists(select 1 from jsonb_array_elements(a.evidence) v where v->>'reason' in ('exact_menu_name','explicit_menu_context'))
  ) select coalesce(jsonb_agg(jsonb_build_object('establishmentId',id,'name',name,'dish',dish,'kind',case when specialized then 'specialty' else 'menu' end,'status',status)
  order by specialized desc nulls last,(status='confirmed') desc,name,id),'[]') from matches where n=1);

@@ -31,7 +31,7 @@ it('replays all 16 saved raw rows, proposes bánh căn and ten contextual varian
  expect(decisions).toContainEqual({decision:'excluded',reason:'beverage',n:4})
  expect(decisions).toContainEqual({decision:'excluded',reason:'non_food',n:1})
  expect((await db.query('select raw from rainminer_menu_jobs')).rows[0].raw).toEqual(savedMenu.raw)
- expect((await find('BANH CAN'))[0]).toMatchObject({establishmentId:id,kind:'specialty',status:'proposed'})
+ expect((await find('BANH CAN'))[0]).toMatchObject({establishmentId:id,kind:'specialty',dish:'Bánh căn',status:'proposed'})
  expect(p.associations[0].evidence[0]).toHaveProperty('runId')
 })
 it('does not globally convert eggs/assortment into dishes or infer availability from descriptions',async()=>{

@@ -27,7 +27,7 @@ test('saved menus, two real Auth accounts, permissions, manual corrections and m
   const r=await rpc<DishProfile>(page,'read_restaurant_dishes',{p_establishment:id});expect(r.error).toBeNull();return r.data
  }
  const capture=async(page:Page,name:string,anchor?:Locator)=>{
-  if(anchor)await anchor.scrollIntoViewIfNeeded()
+  if(anchor)await anchor.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}))
   await page.evaluate(()=>document.fonts.ready)
   const size=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}))
   expect(size.scroll).toBeLessThanOrEqual(size.viewport)
@@ -150,6 +150,8 @@ test('saved menus, two real Auth accounts, permissions, manual corrections and m
   await expect(pages[1].getByText('Đề xuất cần xác nhận',{exact:false})).toBeVisible()
   const viMatches=await rpc<DishMatch[]>(pages[1],'search_restaurants_by_dish',{p_query:'banh can'})
   expect(viMatches.data.map(m=>m.establishmentId)).toEqual([establishments[1]])
+  expect(viMatches.data[0]).toMatchObject({kind:'specialty',dish:'Bánh căn',status:'proposed'})
+  await expect(pages[1].locator('.dish-match')).toHaveText('Đặc sản · Bánh căn · Đề xuất')
   await capture(pages[1],'search-banh-can-vi',pages[1].getByRole('searchbox'))
   expect((await rpc<DishMatch[]>(pages[0],'search_restaurants_by_dish',{p_query:'pho mai'})).data).toEqual([])
   mark('normalized-general-precise-search-proposals-not-availability')
