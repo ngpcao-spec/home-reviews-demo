@@ -182,6 +182,34 @@ it('client roles cannot access private jobs, configuration or paid-launch RPCs d
  const denied=(await db.query("select has_table_privilege('authenticated','rainminer_menu_jobs','select') jobs,has_table_privilege('authenticated','private.rainminer_menu_requests','select') targets,has_function_privilege('authenticated','authorize_rainminer_start(uuid,timestamptz,jsonb,jsonb)','execute') launch,has_function_privilege('service_role','enqueue_rainminer_menu_before_sharing(uuid,uuid,uuid)','execute') bypass")).rows[0]
  expect(denied).toEqual({jobs:false,targets:false,launch:false,bypass:false})
 })
+it('a saved run ID after a checkpoint error resumes only reads of that run',async()=>{
+ const a=await newImport(db);await finalizeMenuImport(db,a)
+ const real=menuAdmin(db),fake=provider();let writes=0
+ const admin={rpc:async(name:string,args:Record<string,unknown>={})=>{
+  if(name==='checkpoint_rainminer_menu'&&++writes===1)return {data:null,error:{message:'synthetic database disconnect'}}
+  return real.rpc(name,args)
+ }} as typeof real
+ expect((await advanceRainminerMenu(admin,'synthetic',{fetch:fake.fetch})).error).toBe('START_OUTCOME_UNKNOWN')
+ expect((await jobs())[0]).toMatchObject({status:'unknown',run_id:'menu-run'})
+ expect((await advanceRainminerMenu(real,'synthetic',{fetch:fake.fetch})).status).toBe('completed')
+ expect(fake.calls.filter(c=>c.method==='POST')).toHaveLength(1)
+})
+it('an HTTP read failure resumes the dataset, never the paid run',async()=>{
+ const a=await newImport(db);await finalizeMenuImport(db,a)
+ const fake=provider();await advanceRainminerMenu(menuAdmin(db),'synthetic',{fetch:fake.fetch})
+ expect((await advanceRainminerMenu(menuAdmin(db),'synthetic',{fetch:async()=>new Response('',{status:503})})).error).toBe('APIFY_HTTP_503')
+ expect((await jobs())[0].status).toBe('running')
+ expect((await advanceRainminerMenu(menuAdmin(db),'synthetic',{fetch:fake.fetch})).status).toBe('completed')
+ expect(fake.calls.filter(c=>c.method==='POST')).toHaveLength(1)
+})
+it('failed menu enqueue is recorded without undoing import success',async()=>{
+ const a=await newImport(db)
+ await db.exec("create function pg_temp.fail_menu_fixture() returns trigger language plpgsql as $$begin raise exception 'SYNTHETIC_QUEUE_FAILURE';end$$;create trigger fail_menu before insert on rainminer_menu_jobs for each row execute function pg_temp.fail_menu_fixture()")
+ expect(await finalizeMenuImport(db,a)).toBe(true)
+ expect((await db.query('select status from initial_import_jobs where id=$1',[a.id])).rows[0].status).toBe('completed')
+ expect((await read(a.est)).job).toMatchObject({status:'failed',error_code:'MENU_ENQUEUE_FAILED'})
+ expect((await db.query('select sqlstate from private.rainminer_menu_enqueue_errors')).rows[0].sqlstate).toBe('P0001')
+})
 it('refuses actor substitution, unsupported pricing and unbounded platform charges',()=>{
  const actor={id:ACTOR,notice:'NONE',pricingInfos:[{startedAt:'2020-01-01',pricingModel:'PAY_PER_EVENT'}]}
  expect(rainminerPricing(actor).actorId).toBe(ACTOR)

@@ -15,9 +15,10 @@ export function rainminerPricing(actor: Record<string, unknown>, now = Date.now(
   const entries = Array.isArray(actor.pricingInfos) ? actor.pricingInfos as Record<string, unknown>[] : []
   const pricing = entries.filter(p => Date.parse(String(p.startedAt)) <= now)
     .sort((a,b) => Date.parse(String(b.startedAt))-Date.parse(String(a.startedAt)))[0]
+  const minimum = Number(pricing?.minimalMaxTotalChargeUsd ?? 0)
   if (actor.id !== RAINMINER_ACTOR_ID || actor.notice !== 'NONE' ||
       pricing?.pricingModel !== 'PAY_PER_EVENT' || pricing.isPPEPlatformUsagePaidByUser === true ||
-      Number(pricing.minimalMaxTotalChargeUsd ?? 0) > .5)
+      !Number.isFinite(minimum) || minimum < 0 || minimum > .5)
     throw Error('MENU_ACTOR_PRICING_UNSUPPORTED')
   return {actorId:actor.id, actorName:RAINMINER_ACTOR, checkedAt:new Date(now).toISOString(), pricing}
 }

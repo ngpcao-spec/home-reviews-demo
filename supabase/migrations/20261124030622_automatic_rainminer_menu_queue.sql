@@ -334,7 +334,8 @@ begin
  from public.rainminer_menu_jobs j join private.shared_restaurants r on r.id=restaurant and r.place_id=j.place_id
  where (j.establishment_id=p_establishment or exists(select 1 from private.rainminer_menu_requests q where q.job_id=j.id and q.establishment_id=p_establishment and q.place_id=j.place_id))
   and j.status='completed' and coalesce(j.run_id,j.reused_run_id) is not null and j.raw is not null and j.result is not null
- on conflict(restaurant_id,run_id) do nothing;
+ on conflict(restaurant_id,run_id) do update set menu_references=excluded.menu_references
+  where private.shared_restaurant_menu_versions.menu_references is distinct from excluded.menu_references;
  get diagnostics copied=row_count;
  return copied;
 end$$;
@@ -356,8 +357,8 @@ revoke all on function private.lock_rainminer_configuration(),private.rainminer_
  from public,anon,authenticated,service_role;
 revoke all on function public.authorize_rainminer_start(uuid,timestamptz,jsonb,jsonb),
  public.checkpoint_rainminer_menu(uuid,timestamptz,jsonb),public.read_rainminer_menu(uuid,uuid),
- public.enqueue_rainminer_menu(uuid,uuid,uuid),public.claim_rainminer_menu() from public,anon,authenticated;
+ public.enqueue_rainminer_menu(uuid,uuid,uuid),public.claim_rainminer_menu(),public.seed_shared_establishment_menus(uuid) from public,anon,authenticated;
 grant execute on function public.authorize_rainminer_start(uuid,timestamptz,jsonb,jsonb),
  public.checkpoint_rainminer_menu(uuid,timestamptz,jsonb),public.read_rainminer_menu(uuid,uuid),
- public.enqueue_rainminer_menu(uuid,uuid,uuid),public.claim_rainminer_menu() to service_role;
+ public.enqueue_rainminer_menu(uuid,uuid,uuid),public.claim_rainminer_menu(),public.seed_shared_establishment_menus(uuid) to service_role;
 commit;
