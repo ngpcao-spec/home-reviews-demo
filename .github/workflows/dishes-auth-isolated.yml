@@ -1,0 +1,77 @@
+name: Dish associations real Auth validation
+on:
+  push:
+    branches: [codex/restaurant-dish-associations]
+permissions:
+  contents: read
+jobs:
+  dishes-auth:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      CI_PG_PACKAGE: ${{ runner.temp }}/pg-client
+      CI_SUPABASE_STATUS: ${{ runner.temp }}/local-status.json
+      CI_AUTH_FIXTURE: ${{ runner.temp }}/auth-fixture.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install test tools
+        run: |
+          npm ci
+          npm install --prefix "$RUNNER_TEMP/pg-client" pg@8.16.3
+          npx playwright install --with-deps chromium
+      - name: Start disposable Supabase without production credentials
+        run: |
+          docker info --format '{{.ServerVersion}}'
+          mkdir -p "$RUNNER_TEMP/home-reviews-isolated"
+          cd "$RUNNER_TEMP/home-reviews-isolated"
+          npx --yes supabase@2.118.0 init
+          npx --yes supabase@2.118.0 start > "$RUNNER_TEMP/supabase-start.log" 2>&1
+          npx --yes supabase@2.118.0 status -o json > "$RUNNER_TEMP/local-status.json"
+          curl --fail --silent http://127.0.0.1:54321/auth/v1/health
+          docker exec supabase_db_home-reviews-isolated psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c "alter system set cron.launch_active_jobs='off'"
+          docker exec supabase_db_home-reviews-isolated psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c 'select pg_reload_conf()'
+      - name: Reconstruct schema and create two real Auth users
+        run: node tests/ci/shared-stack-prepare.mjs
+      - name: Serve real menu status with local-only providers
+        run: |
+          node tests/ci/prepare-edge-runtime.mjs
+          node tests/ci/provider-server.mjs > "$RUNNER_TEMP/providers.log" 2>&1 &
+          cd "$RUNNER_TEMP/home-reviews-isolated"
+          npx --yes supabase@2.118.0 functions serve --no-verify-jwt --env-file test-functions.env > "$RUNNER_TEMP/functions.log" 2>&1 &
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:54321/functions/v1/add-establishment)
+            if [ "$code" = 401 ]; then exit 0; fi
+            sleep 2
+          done
+          echo 'EDGE_RUNTIME_NOT_READY'; exit 1
+      - name: Two real sessions and mobile page captures
+        run: npx playwright test --config playwright.dishes-auth.config.ts
+      - name: Require complete browser evidence
+        if: always()
+        run: node tests/ci/assert-dishes-auth-completion.mjs
+      - name: Targeted regression checks and production build
+        run: |
+          npm run lint
+          npx vitest run tests/unit/dish-associations.test.ts src/components/RestaurantDishes.test.tsx src/lib/use-dish-search.test.ts tests/unit/rainminer-menu-automation.test.ts tests/unit/restaurant-recommendation-sheets.test.ts --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000
+          npm run build
+      - name: Save screenshots and non-secret receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dishes-auth-mobile-evidence
+          path: test-results/dishes-auth/
+          if-no-files-found: error
+          retention-days: 2
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          grep -Ei 'error|failed|unhealthy|timeout|rate limit|connection refused' "$RUNNER_TEMP/supabase-start.log" | tail -20 || true
+          find test-results -name error-context.md -exec cat {} \; 2>/dev/null || true
+      - name: Remove isolated stack
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/home-reviews-isolated"
+          npx --yes supabase@2.118.0 stop --no-backup > /dev/null 2>&1 || true
