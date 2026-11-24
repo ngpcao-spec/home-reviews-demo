@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {beforeAll,afterAll,beforeEach,afterEach,it,expect} from 'vitest'
 import type {PGlite} from '@electric-sql/pglite'
-import {dishDatabase,savedMenu,ORG,ORG2,USER,USER2} from '../fixtures/dish-associations-database'
+import {dishDatabase,savedMenu,ORG,ORG2,USER,USER2,PHO_MIGRATION} from '../fixtures/dish-associations-database'
 import {readFileSync} from 'node:fs'
 let db:PGlite
 beforeAll(async()=>{db=await dishDatabase()},30000)
@@ -20,6 +20,55 @@ async function menu(id:string,rows=savedMenu.raw,run=crypto.randomUUID()){
  await db.query("insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,run_id,raw,result,retrieved_at) values($1,$2,$3,'completed',$4,$5,$6,clock_timestamp())",[id,p,crypto.randomUUID(),run,rows,{placeId:p,references:[]}]);return run
 }
 const row=(name:string,category:string|null=null)=>({placeId:savedMenu.placeId,name,category,description:'Sauce au vin et café',menuImageUrl:'https://example.test/menu.jpg'})
+it('reprocesses a saved numbered phở menu and preserves source lines and manual edits', async () => {
+ const isolated = await dishDatabase(undefined,true)
+ try {
+  const id = crypto.randomUUID()
+  const raw = [
+   ...['19.Phở Tái + Nạm','20.Phở Đuôi Bò','21.Phở Steak + Đuôi','23.Phở Tái, Nạm, Gẫu, Gân',
+    '7. Phở Bò Tái + Bò Chín','9. Phở Tái + Lõi','105. Phở Tái + Gầu','13.Phở Đuôi Bò',
+    '107.Phở Sườn Bò','2. Phở Tái','3. Phở Nạm','4. Phở Chín','5. Phở Gầu','6. Phở Sốt Vang'].map(name => row(name)),
+   row('51.Đuôi Bò', 'GỌI THÊM'),
+   row('52. Phở tái', 'GỌI THÊM'),
+   row('30. Trà đá'),
+   row('39.Mì Xào Bò Rau Cải'),
+   row('11.Phô mai'),
+  ]
+  await isolated.query('insert into establishments(id,name,organization_id,place_id) values($1,$2,$3,$4)', [id,'Phở Thìn',ORG,savedMenu.placeId])
+  await isolated.query("insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,run_id,raw,result) values($1,$2,$3,'completed','saved-pho',$4,'{}')", [id,savedMenu.placeId,crypto.randomUUID(),raw])
+  await isolated.query("select set_config('request.jwt.claim.sub',$1,false)", [USER])
+  const readProfile = async () => (await isolated.query<{p:{revision:number;specialty:unknown;associations:{name:string;parentName:string}[]}}>(
+   'select public.read_restaurant_dishes($1) p', [id],
+  )).rows[0].p
+  const before = await readProfile()
+  expect(before.specialty).toBeNull()
+  expect(before.associations).toEqual([])
+  await isolated.exec(readFileSync('supabase/migrations/'+PHO_MIGRATION,'utf8'))
+  await isolated.query('update private.restaurant_dish_profiles set source_run=null where scope=private.dish_scope($1)',[id])
+  await isolated.query('select private.refresh_restaurant_dishes($1)',[id])
+  let after = await readProfile()
+  expect(after.specialty).toMatchObject({name:'Phở',status:'proposed'})
+  expect(after.associations).toHaveLength(13)
+  expect(after.associations).toContainEqual(expect.objectContaining({name:'Phở Đuôi Bò',parentName:'Phở bò'}))
+  expect(after.associations).toContainEqual(expect.objectContaining({name:'Phở Tái',parentName:'Phở'}))
+  for (const query of ['pho','phở bò','phở gà','pho mai']) {
+   const matches = (await isolated.query<{m:{establishmentId:string}[]}>('select public.search_restaurants_by_dish($1) m',[query])).rows[0].m
+   expect(matches.map(match=>match.establishmentId)).toEqual(query==='pho'||query==='phở bò'?[id]:[])
+  }
+  const evidence = (await isolated.query<{original:unknown;decision:string}>('select original,decision from private.dish_menu_evidence where run_id=$1 order by source_row',['saved-pho'])).rows
+  expect(evidence.map(e=>e.original)).toEqual(raw)
+  expect(evidence.map(e=>e.decision)).toEqual([...Array(14).fill('associated'),'review','review','excluded','review','review'])
+  expect((await isolated.query('select raw from rainminer_menu_jobs where run_id=$1',['saved-pho'])).rows[0].raw).toEqual(raw)
+  await isolated.query('select public.edit_restaurant_dishes($1,$2,$3,null)',[id,after.revision,'specialty'])
+  await isolated.query('update private.restaurant_dish_profiles set source_run=null where scope=private.dish_scope($1)',[id])
+  await isolated.query('select private.refresh_restaurant_dishes($1)',[id])
+  after = await readProfile()
+  expect(after.specialty).toBeNull()
+  const revision = after.revision
+  await isolated.query('select private.refresh_restaurant_dishes($1)',[id])
+  expect((await readProfile()).revision).toBe(revision)
+ } finally { await isolated.close() }
+}, 30000)
 it('replays all 16 saved raw rows, proposes bánh căn and ten contextual variants, excludes four drinks and tissue',async()=>{
  const id=await est();await menu(id)
  const p=await read(id)
