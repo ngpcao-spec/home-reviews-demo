@@ -26,6 +26,9 @@ test('automatic menus through real Auth, imports, PostgreSQL and Edge worker wit
  const mark=(name:string)=>{passed.push(name);writeFileSync('test-results/automatic-menus/receipt.json',JSON.stringify({passed}));console.log('MENU_SCENARIO_PASSED',name)}
  try{
   expect((await rows('select automatic_enabled,launches_enabled,budget_limit_usd from private.rainminer_menu_config'))[0]).toEqual({automatic_enabled:false,launches_enabled:false,budget_limit_usd:'0.000000'})
+  const cron=await rows("select command from cron.job where jobname='home-reviews-rainminer-menu'")
+  expect(cron).toHaveLength(1)
+  expect(cron[0].command).toContain('private.rainminer_menu_work_due()')
   await rows("update private.rainminer_menu_config set automatic_enabled=true,launches_enabled=true,configured_at=now(),budget_limit_usd=2")
   await rows("select vault.create_secret('https://home-reviews-ci.invalid/functions/v1/rainminer-menu','home_reviews_rainminer_worker_url')")
   for(let i=0;i<2;i++){

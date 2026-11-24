@@ -106,6 +106,13 @@ language sql stable security definer set search_path='' as $$
  or exists(select 1 from private.rainminer_menu_requests r join public.establishments e
   on e.id=r.establishment_id and e.place_id=r.place_id and e.active where r.job_id=p_job)
 $$;
+create function private.rainminer_menu_work_due() returns boolean
+language sql stable security definer set search_path='' as $$
+ select exists(select 1 from public.rainminer_menu_jobs
+  where (status in ('queued','starting','running') or (status='unknown' and run_id is not null
+   and run_receipt->>'id'=run_id and run_receipt->>'actId'='8GGZ9N7j2JhqnQ3oT'))
+  and (lease_until is null or lease_until<=now()))
+$$;
 
 -- Shared menu reuse still respects the existing pilot allowlist.
 create function private.rainminer_shared_saved(p_place text) returns jsonb
@@ -352,7 +359,7 @@ begin
 end$$;
 
 revoke all on function private.lock_rainminer_configuration(),private.rainminer_budget_used(),
- private.rainminer_launch_block(boolean),private.rainminer_live_target(uuid),private.rainminer_shared_saved(text),
+ private.rainminer_launch_block(boolean),private.rainminer_live_target(uuid),private.rainminer_menu_work_due(),private.rainminer_shared_saved(text),
  private.enqueue_rainminer_target(uuid,uuid,boolean),private.enqueue_menu_after_initial_import()
  from public,anon,authenticated,service_role;
 revoke all on function public.authorize_rainminer_start(uuid,timestamptz,jsonb,jsonb),
@@ -361,4 +368,16 @@ revoke all on function public.authorize_rainminer_start(uuid,timestamptz,jsonb,j
 grant execute on function public.authorize_rainminer_start(uuid,timestamptz,jsonb,jsonb),
  public.checkpoint_rainminer_menu(uuid,timestamptz,jsonb),public.read_rainminer_menu(uuid,uuid),
  public.enqueue_rainminer_menu(uuid,uuid,uuid),public.claim_rainminer_menu(),public.seed_shared_establishment_menus(uuid) to service_role;
+-- Continue the same Cron, including a known run whose first checkpoint failed.
+-- Unknown starts without an identified run are never eligible for a new POST.
+select cron.schedule('home-reviews-rainminer-menu','* * * * *',$cron$
+ select net.http_post(
+  url := worker.decrypted_secret,
+  headers := jsonb_build_object('Content-Type','application/json','x-home-reviews-scheduler',token.decrypted_secret),
+  body := '{"action":"work"}'::jsonb,
+  timeout_milliseconds := 120000
+ ) from vault.decrypted_secrets worker cross join vault.decrypted_secrets token
+ where worker.name='home_reviews_rainminer_worker_url' and token.name='home_reviews_scheduler_token'
+  and private.rainminer_menu_work_due();
+$cron$);
 commit;

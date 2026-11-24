@@ -37,7 +37,8 @@ Le navigateur ne fait que lire l'état et éventuellement confirmer une relance.
 - Un bail expiré avant l'autorisation de POST peut reprendre le précontrôle.
   Après l'autorisation, il devient **unknown** et ne peut jamais provoquer un
   nouveau POST automatiquement. Un ID de run et un reçu d'identité déjà sauvés
-  permettent uniquement de reprendre les GET de ce run.
+  permettent uniquement de reprendre les GET de ce run. Le Cron reconnaît aussi
+  ce cas après un échec du premier checkpoint ; sans ID vérifié, il ne reprend pas.
 
 ## Données et interface
 

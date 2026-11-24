@@ -67,7 +67,9 @@ export async function menuDatabase(){
    sql=sql.replaceAll('public.shared_restaurant_runtime_enabled()','private.shared_pilot_place((select place_id from public.establishments where id=p_establishment))')
   await db.exec(sql)
  }
- await db.exec(menuSql(MENU_MIGRATION))
+ // PGlite lacks pg_cron/pg_net; omit only the registration statement. Its
+ // work_due predicate is real SQL tested below; CI registers the actual Cron.
+ await db.exec(menuSql(MENU_MIGRATION).replace(/select cron\.schedule\([\s\S]*?\$cron\$\);/,''))
  await db.exec('create trigger capture_shared_rainminer_menu after insert or update of status,result on rainminer_menu_jobs for each row execute function private.capture_shared_rainminer_menu()')
  return db
 }

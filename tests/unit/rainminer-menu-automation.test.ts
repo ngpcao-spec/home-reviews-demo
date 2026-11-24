@@ -191,8 +191,14 @@ it('a saved run ID after a checkpoint error resumes only reads of that run',asyn
  }} as typeof real
  expect((await advanceRainminerMenu(admin,'synthetic',{fetch:fake.fetch})).error).toBe('START_OUTCOME_UNKNOWN')
  expect((await jobs())[0]).toMatchObject({status:'unknown',run_id:'menu-run'})
+ expect((await db.query('select private.rainminer_menu_work_due() due')).rows[0].due).toBe(true)
  expect((await advanceRainminerMenu(real,'synthetic',{fetch:fake.fetch})).status).toBe('completed')
  expect(fake.calls.filter(c=>c.method==='POST')).toHaveLength(1)
+})
+it('the Cron does not wake an isolated unknown start without a saved run ID',async()=>{
+ const a=await newImport(db);await finalizeMenuImport(db,a)
+ await db.exec("update rainminer_menu_jobs set status='unknown',provider_start_attempted_at=now(),reserved_cost_usd=.5")
+ expect((await db.query('select private.rainminer_menu_work_due() due')).rows[0].due).toBe(false)
 })
 it('an HTTP read failure resumes the dataset, never the paid run',async()=>{
  const a=await newImport(db);await finalizeMenuImport(db,a)
