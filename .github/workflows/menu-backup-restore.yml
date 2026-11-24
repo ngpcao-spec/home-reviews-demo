@@ -1,0 +1,60 @@
+name: Menu deployment backup and isolated restore
+on:
+  push:
+    branches: [codex/menu-backup-restore-20261124]
+permissions:
+  contents: read
+concurrency:
+  group: menu-deployment-backup
+  cancel-in-progress: false
+jobs:
+  backup-restore:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated backup tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/backup-tools" pg@8.16.3
+          docker pull postgres:17 > "$RUNNER_TEMP/backup-tools.log" 2>&1
+      - name: Read-only snapshot and database backup
+        env:
+          MENU_BACKUP_DB: ${{ secrets.MENU_DEPLOY_BACKUP_DB_20261124 }}
+        run: node scripts/deployment/menu-backup-restore.mjs backup
+      - name: Start isolated Supabase PostgreSQL
+        run: |
+          mkdir -p "$RUNNER_TEMP/menu-restore-isolated"
+          cd "$RUNNER_TEMP/menu-restore-isolated"
+          npx --yes supabase@2.118.0 init > "$RUNNER_TEMP/local-init.log" 2>&1
+          npx --yes supabase@2.118.0 start > "$RUNNER_TEMP/local-start.log" 2>&1
+          docker exec supabase_db_menu-restore-isolated psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c "alter system set cron.launch_active_jobs='off'" > /dev/null
+          docker exec supabase_db_menu-restore-isolated psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c "alter system set cron.database_name='menu_restore'" > /dev/null
+          docker restart supabase_db_menu-restore-isolated > /dev/null
+          for i in $(seq 1 30); do
+            if docker exec supabase_db_menu-restore-isolated pg_isready -U supabase_admin > /dev/null; then break; fi
+            sleep 1
+          done
+          for network in $(docker inspect --format '{{range $key,$value := .NetworkSettings.Networks}}{{$key}} {{end}}' supabase_db_menu-restore-isolated); do
+            docker network disconnect "$network" supabase_db_menu-restore-isolated
+          done
+      - name: Restore backup, compare every table and rehearse only two migrations
+        run: node scripts/deployment/menu-backup-restore.mjs restore
+      - name: Encrypt backup and private diagnostics
+        if: always()
+        run: node scripts/deployment/menu-backup-restore.mjs encrypt
+      - name: Save encrypted backup and non-secret receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-supabase-backup-encrypted
+          path: ${{ runner.temp }}/menu-backup-delivery/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove isolated services
+        if: always()
+        run: |
+          cd "$RUNNER_TEMP/menu-restore-isolated" 2>/dev/null || exit 0
+          npx --yes supabase@2.118.0 stop --no-backup > /dev/null 2>&1 || true
