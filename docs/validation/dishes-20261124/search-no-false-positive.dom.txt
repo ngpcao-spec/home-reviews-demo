@@ -1,0 +1,27 @@
+- paragraph: TEST ISOLÉ · données sauvegardées / fournisseurs désactivés
+- main:
+  - button "Ouvrir le menu":
+  - generic: Mes établissements
+  - button "Ajouter":
+    - text: Ajouter
+  - text: Rechercher les restaurants par plat
+  - searchbox "Rechercher les restaurants par plat" [active]: pho mai
+  - generic: Selon la spécialité et les menus enregistrés.
+  - status: Aucun restaurant associé à ce plat dans les données disponibles.
+- navigation "Navigation principale":
+  - link "Accueil":
+    - /url: /
+    - generic: Accueil
+  - link "Établissements":
+    - /url: /etablissements
+    - generic: Établissements
+  - link "Avis":
+    - /url: /avis
+    - generic: Avis
+  - link "Analyses":
+    - /url: /analyses
+    - generic: Analyses
+  - link "Plus":
+    - /url: /plus
+    - generic: Plus
+- button

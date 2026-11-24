@@ -1,0 +1,13 @@
+import {readFileSync} from 'node:fs'
+import {menuDatabase,ORG,ORG2,USER,USER2} from './rainminer-menu-database'
+import {sqlMigrationSource} from './sql-migration-source'
+import type {PGlite} from '@electric-sql/pglite'
+export {ORG,ORG2,USER,USER2}
+export const DISH_MIGRATION='20261124094341_restaurant_dish_associations.sql'
+export const savedMenu=JSON.parse(readFileSync('tests/fixtures/banh-can-menu-saved.json','utf8'))
+export async function dishDatabase(beforeMigration?:(db:PGlite)=>Promise<void>){
+ const db=await menuDatabase()
+ await beforeMigration?.(db)
+ await db.exec(sqlMigrationSource(readFileSync('supabase/migrations/'+DISH_MIGRATION,'utf8')))
+ return db
+}

@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-24T10:20:09.228Z",
+  "environment": "Local Vite + PGlite; authenticated SQL roles; browser Auth stub; no paid providers",
+  "dimensions": {
+    "documentWidth": 371,
+    "height": 844,
+    "specialty": "Đặc sản : Bánh cănĐã xác nhận",
+    "width": 390
+  },
+  "observed": [
+    "FR proposed specialty under restaurant name",
+    "FR manual confirmation persisted by SQL RPC",
+    "VI second account sees the same confirmed specialty",
+    "VI search returns only its own establishment",
+    "pho returns generic and chicken variant",
+    "PHỞ GÀ excludes the generic Phở result",
+    "pho mai has no false positive"
+  ],
+  "screenshots": {
+    "status": "blocked",
+    "error": "Page.captureScreenshot timed out; native Chrome window could not be activated"
+  },
+  "productionModified": false
+}

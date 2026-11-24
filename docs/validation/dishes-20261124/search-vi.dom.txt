@@ -1,0 +1,37 @@
+- paragraph: TEST ISOLÉ · données sauvegardées / fournisseurs désactivés
+- main:
+  - button "Ouvrir le menu":
+  - generic: Cơ sở của tôi
+  - button "Ajouter":
+    - text: Ajouter
+  - text: Tìm nhà hàng theo món
+  - searchbox "Tìm nhà hàng theo món" [active]: banh can
+  - generic: Theo đặc sản và thực đơn đã lưu.
+  - status: 1 nhà hàng
+  - link "Tiệm Bánh Căn Tháng Năm Tiệm Bánh Căn Tháng Năm 4.3 (150 avis) Restaurant Nha Trang Đặc sản · Bánh căn · Đã xác nhận 0 đánh giá cần xử lý":
+    - /url: /etablissements/30000000-0000-4000-8000-000000000002
+    - generic "Tiệm Bánh Căn Tháng Năm":
+    - heading "Tiệm Bánh Căn Tháng Năm" [level=2]
+    - strong: "4.3"
+    - generic: (150 avis)
+    - paragraph: Restaurant
+    - text: Nha Trang
+    - generic: Đặc sản · Bánh căn · Đã xác nhận
+    - generic "0 đánh giá cần xử lý": "0"
+- navigation "Điều hướng chính":
+  - link "Trang chủ":
+    - /url: /
+    - generic: Trang chủ
+  - link "Cơ sở":
+    - /url: /etablissements
+    - generic: Cơ sở
+  - link "Đánh giá":
+    - /url: /avis
+    - generic: Đánh giá
+  - link "Phân tích":
+    - /url: /analyses
+    - generic: Phân tích
+  - link "Thêm":
+    - /url: /plus
+    - generic: Thêm
+- button

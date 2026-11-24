@@ -1,0 +1,588 @@
+{
+  "raw": [
+    {
+      "name": "THẬP CẨM",
+      "price": 50000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CĂN THÁNG NĂM",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "50,000 VND",
+      "scrapedAt": "2026-11-24T09:05:05.940Z",
+      "confidence": 1,
+      "description": "MIXED MINICAKES\n혼합\n什锦",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRÀ ĐÁ",
+      "price": 5000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "ĐỒ UỐNG DRINKS",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "5,000 VND/LY\n/GLASS\n/杯",
+      "scrapedAt": "2026-11-24T09:05:05.940Z",
+      "confidence": 1,
+      "description": "ICED TEA\n아이스녹차\n冰茶",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+    },
+    {
+      "name": "NƯỚC SUỐI",
+      "price": 10000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "ĐỒ UỐNG DRINKS",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "10,000 VND/CHAI\n/BOTTLE\n/병",
+      "scrapedAt": "2026-11-24T09:05:05.940Z",
+      "confidence": 1,
+      "description": "SPRING WATER\n생수\n泉水",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+    },
+    {
+      "name": "NƯỚC NGỌT",
+      "price": 20000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "ĐỒ UỐNG DRINKS",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "20,000 VND/LON\n/CAN\n/罐",
+      "scrapedAt": "2026-11-24T09:05:05.940Z",
+      "confidence": 1,
+      "description": "SOFT DRINKS\n청량음료\n甜饮料",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG GÀ",
+      "price": 25000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "25,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "CHICKEN EGGS\n달걀 鸡蛋",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG CÚT",
+      "price": 25000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "25,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "QUAIL EGGS\n메추리알 鹌鹑蛋",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG GÀ + TRỨNG CÚT",
+      "price": 30000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "30,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "CHICKEN EGGS + QUAIL EGGS\n달걀 + 메추리알 鸡蛋+鹌鹑蛋",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG GÀ + BÒ",
+      "price": 50000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "50,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "CHICKEN EGGS + BEEF\n소고기 + 달걀 鸡蛋+牛肉",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG CÚT + BÒ",
+      "price": 50000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "50,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "QUAIL EGGS + BEEF\n소고기 + 메추리알 鹌鹑蛋+牛肉",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG GÀ + TÔM",
+      "price": 75000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "75,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "CHICKEN EGGS + SHRIMP\n새우 + 달걀 鸡蛋+虾",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG CÚT + TÔM",
+      "price": 75000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "75,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "QUAIL EGGS + SHRIMP\n새우 + 메추리알 鹌鹑蛋+虾",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG GÀ + MỰC",
+      "price": 75000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "75,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "CHICKEN EGGS + SQUID\n오징어 + 달걀 鸡蛋+鱿鱼",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "TRỨNG CÚT + MỰC",
+      "price": 75000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "THỰC ĐƠN BÁNH CẦN",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "75,000 VND",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "QUAIL EGGS + SQUID\n오징어 + 메추리알 鹌鹑蛋+鱿鱼",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "XÍU MẠI",
+      "price": 10000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "MÓN ĂN KÈM SIDE DISHES",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "10,000 VND /VIÊN",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "MEATBALL\n씨우마이 烧卖",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "KHĂN LẠNH",
+      "price": 3000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "MÓN ĂN KÈM SIDE DISHES",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "3,000 VND /CÁI",
+      "scrapedAt": "2026-11-24T09:05:04.132Z",
+      "confidence": 1,
+      "description": "COLD WET TISSUE\n물티슈 湿巾",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+    },
+    {
+      "name": "DỪA XIEM",
+      "price": 20000,
+      "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+      "category": "ĐỒ UỐNG",
+      "currency": "VND",
+      "language": "vi",
+      "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+      "placeName": "Tiệm Bánh Căn Tháng Năm",
+      "priceText": "20,000 VND /quả",
+      "scrapedAt": "2026-11-24T09:06:48.513Z",
+      "confidence": 1,
+      "description": "COCONUT",
+      "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9QXM0SAY82Cbey7377R6sEWnqJRKdLoMFsMQ4hvk8NeCntOWX-UnEWu2fXkzXM4MAz8jJu5GlYUDab6ZhacZ8gCHuvuTMY8Kw9OrREeBvmCqcqX5n0MdIRGcOoUslnF7gp75OyHO0B_7Zw=w2048-h2048-k-no"
+    }
+  ],
+  "runId": "H8pfAHVslAWq1uno1",
+  "result": {
+    "counts": {
+      "food": 0,
+      "review": 15,
+      "received": 16,
+      "retained": 15,
+      "excludedDrinks": 1
+    },
+    "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+    "provenance": {
+      "actor": {
+        "id": "8GGZ9N7j2JhqnQ3oT",
+        "name": "rainminer/google-maps-menu-scraper"
+      },
+      "build": "1.0.35",
+      "input": {
+        "maxItems": 100,
+        "placeIds": [
+          "ChIJU5uiuU5dcDERmQdmaA0SUXk"
+        ],
+        "maxMenuImages": 10,
+        "maxPlacesPerQuery": 5
+      },
+      "runId": "H8pfAHVslAWq1uno1",
+      "status": "SUCCEEDED",
+      "buildId": "XnSWuFuMbeMssz0bR",
+      "costUsd": 0.0703,
+      "datasetId": "xWuqgjQbr7Pajq8m9",
+      "startedAt": "2026-11-24T09:04:03.267Z",
+      "finishedAt": "2026-11-24T09:07:17.244Z",
+      "retrievedAt": "2026-11-24T09:08:02.720Z"
+    },
+    "references": [
+      {
+        "row": {
+          "name": "THẬP CẨM",
+          "price": 50000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CĂN THÁNG NĂM",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "50,000 VND",
+          "scrapedAt": "2026-11-24T09:05:05.940Z",
+          "confidence": 1,
+          "description": "MIXED MINICAKES\n혼합\n什锦",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+        },
+        "sourceRow": 1,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRÀ ĐÁ",
+          "price": 5000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "ĐỒ UỐNG DRINKS",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "5,000 VND/LY\n/GLASS\n/杯",
+          "scrapedAt": "2026-11-24T09:05:05.940Z",
+          "confidence": 1,
+          "description": "ICED TEA\n아이스녹차\n冰茶",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+        },
+        "sourceRow": 2,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "NƯỚC NGỌT",
+          "price": 20000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "ĐỒ UỐNG DRINKS",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "20,000 VND/LON\n/CAN\n/罐",
+          "scrapedAt": "2026-11-24T09:05:05.940Z",
+          "confidence": 1,
+          "description": "SOFT DRINKS\n청량음료\n甜饮料",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+        },
+        "sourceRow": 4,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG GÀ",
+          "price": 25000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "25,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "CHICKEN EGGS\n달걀 鸡蛋",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 5,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG CÚT",
+          "price": 25000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "25,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "QUAIL EGGS\n메추리알 鹌鹑蛋",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 6,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG GÀ + TRỨNG CÚT",
+          "price": 30000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "30,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "CHICKEN EGGS + QUAIL EGGS\n달걀 + 메추리알 鸡蛋+鹌鹑蛋",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 7,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG GÀ + BÒ",
+          "price": 50000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "50,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "CHICKEN EGGS + BEEF\n소고기 + 달걀 鸡蛋+牛肉",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 8,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG CÚT + BÒ",
+          "price": 50000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "50,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "QUAIL EGGS + BEEF\n소고기 + 메추리알 鹌鹑蛋+牛肉",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 9,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG GÀ + TÔM",
+          "price": 75000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "75,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "CHICKEN EGGS + SHRIMP\n새우 + 달걀 鸡蛋+虾",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 10,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG CÚT + TÔM",
+          "price": 75000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "75,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "QUAIL EGGS + SHRIMP\n새우 + 메추리알 鹌鹑蛋+虾",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 11,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG GÀ + MỰC",
+          "price": 75000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "75,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "CHICKEN EGGS + SQUID\n오징어 + 달걀 鸡蛋+鱿鱼",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 12,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "TRỨNG CÚT + MỰC",
+          "price": 75000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "THỰC ĐƠN BÁNH CẦN",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "75,000 VND",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "QUAIL EGGS + SQUID\n오징어 + 메추리알 鹌鹑蛋+鱿鱼",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 13,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "XÍU MẠI",
+          "price": 10000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "MÓN ĂN KÈM SIDE DISHES",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "10,000 VND /VIÊN",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "MEATBALL\n씨우마이 烧卖",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 14,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "KHĂN LẠNH",
+          "price": 3000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "MÓN ĂN KÈM SIDE DISHES",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "3,000 VND /CÁI",
+          "scrapedAt": "2026-11-24T09:05:04.132Z",
+          "confidence": 1,
+          "description": "COLD WET TISSUE\n물티슈 湿巾",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SBWOOsnUJR39VDzCfGPpy1hDAv0mHGEU5fvY1N1j8JkqQssoM3qvrrcWgUGNg2ePWAA7d0ykZQ9hkE4K2v8H3lpjAqZVLtoxzwOX_8nLcfBbkisTIWU-dF8AvkdrFsMDTWDAwT7SqZKKY=w2048-h2048-k-no"
+        },
+        "sourceRow": 15,
+        "classification": "review"
+      },
+      {
+        "row": {
+          "name": "DỪA XIEM",
+          "price": 20000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "ĐỒ UỐNG",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "20,000 VND /quả",
+          "scrapedAt": "2026-11-24T09:06:48.513Z",
+          "confidence": 1,
+          "description": "COCONUT",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9QXM0SAY82Cbey7377R6sEWnqJRKdLoMFsMQ4hvk8NeCntOWX-UnEWu2fXkzXM4MAz8jJu5GlYUDab6ZhacZ8gCHuvuTMY8Kw9OrREeBvmCqcqX5n0MdIRGcOoUslnF7gp75OyHO0B_7Zw=w2048-h2048-k-no"
+        },
+        "sourceRow": 16,
+        "classification": "review"
+      }
+    ],
+    "excludedDrinks": [
+      {
+        "row": {
+          "name": "NƯỚC SUỐI",
+          "price": 10000,
+          "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+          "category": "ĐỒ UỐNG DRINKS",
+          "currency": "VND",
+          "language": "vi",
+          "placeUrl": "https://www.google.com/maps/place/Ti%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m/@12.238219299999999,109.18273219999999,14z/data=!4m8!1m2!2m1!1sTi%E1%BB%87m+B%C3%A1nh+C%C4%83n+Th%C3%A1ng+N%C4%83m!3m4!1s0x31705d4eb9a29b53:0x7951120d68660799!8m2!3d12.238219299999999!4d109.18273219999999",
+          "placeName": "Tiệm Bánh Căn Tháng Năm",
+          "priceText": "10,000 VND/CHAI\n/BOTTLE\n/병",
+          "scrapedAt": "2026-11-24T09:05:05.940Z",
+          "confidence": 1,
+          "description": "SPRING WATER\n생수\n泉水",
+          "menuImageUrl": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9Rvi7Ze0tXmMPgrd7xZJ9mHNANnjPwUze6Qv6h0pRIJHbdtMRW9E81qEyEbA_MVBITb3VEKCrPthbua4MNlLdi7WjZpssjrd_k9pqVKeg5ZBWEjS-72KpaHBjsyLWs3JMhwHa6-ARPZS6I=w2048-h2048-k-no"
+        },
+        "sourceRow": 3,
+        "classification": "drink"
+      }
+    ]
+  },
+  "placeId": "ChIJU5uiuU5dcDERmQdmaA0SUXk",
+  "establishment": "Tiệm Bánh Căn Tháng Năm"
+}

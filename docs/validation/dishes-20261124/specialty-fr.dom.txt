@@ -1,0 +1,69 @@
+- paragraph: TEST ISOLÉ · données sauvegardées / fournisseurs désactivés
+- main:
+  - button "Retour":
+  - heading "Tiệm Bánh Căn Tháng Năm" [level=1]
+  - button "0 notifications non lues":
+  - generic "Tiệm Bánh Căn Tháng Năm":
+  - heading "Tiệm Bánh Căn Tháng Năm" [level=2]
+  - region "Spécialité et plats":
+    - paragraph:
+      - strong: "Spécialité : Bánh căn"
+      - generic: Proposée
+    - generic "Plats et variantes (11)"
+    - button "Confirmer ou corriger les plats"
+  - strong: "4.3"
+  - generic "4 étoiles sur 5":
+  - generic: 150 avis
+  - paragraph:
+    - text: 32 Cửu Long, Nha Trang
+  - paragraph: Les 150 derniers avis uniques, avec ou sans texte, sans limite d’ancienneté.
+  - paragraph: 0 avis dont 0 commentaires textuels · — → —
+  - strong: Notes des clients
+  - paragraph: "Note globale : — (0 notes)"
+  - term: Qualité
+  - definition: — (0 notes)
+  - term: Service
+  - definition: — (0 notes)
+  - term: Ambiance
+  - definition: — (0 notes)
+  - term: Prix
+  - definition: — (0 notes)
+  - text: Ces notes sont fournies par les clients. Les sentiments JEV proviennent des commentaires et ne remplacent pas ces notes. Une valeur absente reste indisponible.
+  - text: Notes et statistiques sur ce corpus uniquement. Une note par rubrique compte seulement si elle est renseignée. JEV analyse uniquement les commentaires.
+  - heading "Recharger tous les avis" [level=2]
+  - paragraph: Après validation des nouveaux avis, les anciens avis et traductions seront remplacés et les rapports liés seront supprimés. La fiche de l’établissement est conservée.
+  - button "Recharger tous les avis"
+  - region "Plats du restaurant":
+    - heading "Plats du restaurant" [level=2]
+    - status: Menu non récupéré
+    - button "Récupérer les plats" [disabled]
+  - strong: Surveillance active
+  - generic: À jour
+  - paragraph:
+    - text: Dernier contrôle
+    - strong: 24 novembre 2026 à 16:00
+  - paragraph:
+    - text: Prochain contrôle
+    - strong: Dans environ 4 h 48 min
+  - text: Google Maps
+  - heading "Avis négatifs récents" [level=2]
+  - button "Voir tout"
+  - button "Supprimer de HOME Reviews":
+    - text: Supprimer de HOME Reviews
+- navigation "Navigation principale":
+  - link "Accueil":
+    - /url: /
+    - generic: Accueil
+  - link "Établissements":
+    - /url: /etablissements
+    - generic: Établissements
+  - link "Avis":
+    - /url: /avis
+    - generic: Avis
+  - link "Analyses":
+    - /url: /analyses
+    - generic: Analyses
+  - link "Plus":
+    - /url: /plus
+    - generic: Plus
+- button

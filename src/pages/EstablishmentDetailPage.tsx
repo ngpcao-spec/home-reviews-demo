@@ -14,6 +14,7 @@ import {RetainedCorpusInfo} from '../components/RetainedCorpusInfo'
 import { ReviewCollectionAlert } from '../components/ReviewCollectionAlert'
 import { ReviewReloadPanel } from '../components/ReviewReloadPanel'
 import { RainminerMenuPanel } from '../components/RainminerMenuPanel'
+import { RestaurantDishes } from '../components/RestaurantDishes'
 
 export function EstablishmentDetailPage() {
   const { id } = useParams(); const navigate = useNavigate()
@@ -37,7 +38,7 @@ export function EstablishmentDetailPage() {
     }
   }
   return <><PageHeader title={establishment.name} back />
-    <section className="est-detail-hero card"><div className="est-detail-cover"><EstablishmentAvatar id={establishment.id} name={establishment.name} photoUrl={establishment.photoUrl} large/></div><div className="est-detail-copy"><h2>{establishment.name}</h2><div className="rating-line"><strong>{establishment.currentRating.toFixed(1)}</strong><Stars rating={Math.round(establishment.currentRating)}/><span>{establishment.currentReviewCount} avis</span></div><p><MapPin size={15}/>{establishment.address}, {establishment.city}</p></div></section>
+    <section className="est-detail-hero card"><div className="est-detail-cover"><EstablishmentAvatar id={establishment.id} name={establishment.name} photoUrl={establishment.photoUrl} large/></div><div className="est-detail-copy"><h2>{establishment.name}</h2>{!demoMode && currentUser.id && <RestaurantDishes key={`${currentUser.id}:${establishment.id}`} establishmentId={establishment.id}/>}<div className="rating-line"><strong>{establishment.currentRating.toFixed(1)}</strong><Stars rating={Math.round(establishment.currentRating)}/><span>{establishment.currentReviewCount} avis</span></div><p><MapPin size={15}/>{establishment.address}, {establishment.city}</p></div></section>
     <RetainedCorpusInfo establishmentId={establishment.id}/>
     <ReviewCollectionAlert establishment={establishment}/>
     <ReviewReloadPanel establishment={establishment}/>

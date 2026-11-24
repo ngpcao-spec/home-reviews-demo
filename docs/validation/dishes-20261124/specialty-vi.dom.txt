@@ -1,0 +1,69 @@
+- paragraph: TEST ISOLÉ · données sauvegardées / fournisseurs désactivés
+- main:
+  - button "Quay lại":
+  - heading "Tiệm Bánh Căn Tháng Năm" [level=1]
+  - button "0 notifications non lues":
+  - generic "Tiệm Bánh Căn Tháng Năm":
+  - heading "Tiệm Bánh Căn Tháng Năm" [level=2]
+  - region "Đặc sản và món ăn":
+    - paragraph:
+      - strong: "Đặc sản : Bánh căn"
+      - generic: Đã xác nhận
+    - generic "Món ăn và biến thể (12)"
+    - button "Xác nhận hoặc sửa món ăn"
+  - strong: "4.3"
+  - generic "4 étoiles sur 5":
+  - generic: 150 avis
+  - paragraph:
+    - text: 32 Cửu Long, Nha Trang
+  - paragraph: 150 đánh giá duy nhất mới nhất, có hoặc không có nội dung, không giới hạn thời gian.
+  - paragraph: 0 đánh giá, gồm 0 nội dung · — → —
+  - strong: Điểm khách hàng chấm
+  - paragraph: "Điểm chung : — (0 lượt chấm)"
+  - term: Đồ ăn
+  - definition: — (0 lượt chấm)
+  - term: Dịch vụ
+  - definition: — (0 lượt chấm)
+  - term: Không gian
+  - definition: — (0 lượt chấm)
+  - term: Giá
+  - definition: — (0 lượt chấm)
+  - text: Các điểm này do khách hàng cung cấp. Cảm xúc JEV lấy từ nội dung, không thay cho điểm. Không suy ra điểm còn thiếu.
+  - text: Điểm và thống kê chỉ theo bộ đánh giá này. Điểm nhóm chỉ tính khi được cung cấp. JEV chỉ phân tích nội dung.
+  - heading "Tải lại toàn bộ đánh giá" [level=2]
+  - paragraph: Sau khi xác minh dữ liệu mới, các đánh giá và bản dịch cũ sẽ được thay thế, các báo cáo liên quan sẽ bị xóa. Thông tin cơ sở được giữ nguyên.
+  - button "Tải lại toàn bộ đánh giá"
+  - region "Món ăn":
+    - heading "Món ăn" [level=2]
+    - status: Chưa lấy thực đơn
+    - button "Lấy danh sách món ăn" [disabled]
+  - strong: Đang theo dõi
+  - generic: Đã cập nhật
+  - paragraph:
+    - text: Lần kiểm tra cuối
+    - strong: 24 novembre 2026 à 16:00
+  - paragraph:
+    - text: Lần kiểm tra tiếp theo
+    - strong: Dans environ 4 h 41 min
+  - text: Google Maps
+  - heading "Đánh giá tiêu cực gần đây" [level=2]
+  - button "Xem tất cả"
+  - button "Xóa khỏi HOME Reviews":
+    - text: Xóa khỏi HOME Reviews
+- navigation "Điều hướng chính":
+  - link "Trang chủ":
+    - /url: /
+    - generic: Trang chủ
+  - link "Cơ sở":
+    - /url: /etablissements
+    - generic: Cơ sở
+  - link "Đánh giá":
+    - /url: /avis
+    - generic: Đánh giá
+  - link "Phân tích":
+    - /url: /analyses
+    - generic: Phân tích
+  - link "Thêm":
+    - /url: /plus
+    - generic: Thêm
+- button

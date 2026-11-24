@@ -51,6 +51,7 @@ export function RecommendationTestPage(){
  if(!isAuthenticated||demoMode)return <Navigate to="/connexion" replace/>;
  return <><PageHeader title={m.title} back/><section className="recommendation-test" aria-busy={busy||loading}>
   <header className="recommendation-intro"><span className="eyebrow">{m.private}</span><h1>{m.menu}</h1><p>{m.intro}</p><p className="recommendation-muted">{m.scope}</p></header>
+  <Link className="text-button" to="/etablissements?plat=">{language==='vi'?'Tìm món trong thực đơn đã lưu':'Rechercher un plat dans les menus enregistrés'}</Link>
   {loading&&<p role="status">{m.loading}</p>}
   {options&&<form className="recommendation-filters card" onSubmit={submit} noValidate>
    {options.organizations.length>1&&<label>{m.organization}<select aria-label={m.organization} value={options.organization_id} onChange={e=>{change();setOrganization(e.target.value);}}>{options.organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>}

@@ -1,0 +1,37 @@
+- paragraph: TEST ISOLÉ · données sauvegardées / fournisseurs désactivés
+- main:
+  - button "Ouvrir le menu":
+  - generic: Mes établissements
+  - button "Ajouter":
+    - text: Ajouter
+  - text: Rechercher les restaurants par plat
+  - searchbox "Rechercher les restaurants par plat" [active]: PHỞ GÀ
+  - generic: Selon la spécialité et les menus enregistrés.
+  - status: 1 restaurant(s)
+  - link "Bistro Phở gà — test Bistro Phở gà — test 4.5 (150 avis) Restaurant Nha Trang Présent au menu · Phở gà · Proposé 0 avis à traiter":
+    - /url: /etablissements/30000000-0000-4000-8000-000000000004
+    - generic "Bistro Phở gà — test":
+    - heading "Bistro Phở gà — test" [level=2]
+    - strong: "4.5"
+    - generic: (150 avis)
+    - paragraph: Restaurant
+    - text: Nha Trang
+    - generic: Présent au menu · Phở gà · Proposé
+    - generic "0 avis à traiter": "0"
+- navigation "Navigation principale":
+  - link "Accueil":
+    - /url: /
+    - generic: Accueil
+  - link "Établissements":
+    - /url: /etablissements
+    - generic: Établissements
+  - link "Avis":
+    - /url: /avis
+    - generic: Avis
+  - link "Analyses":
+    - /url: /analyses
+    - generic: Analyses
+  - link "Plus":
+    - /url: /plus
+    - generic: Plus
+- button
