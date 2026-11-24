@@ -3,7 +3,7 @@
 import {mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, statSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
-import {createHash, randomBytes, publicEncrypt, createCipheriv} from 'node:crypto';
+import {createHash, randomBytes, publicEncrypt, createCipheriv, createDecipheriv} from 'node:crypto';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
 const root = process.env.RUNNER_TEMP;
@@ -74,7 +74,6 @@ function restore(){
  assert.equal(psql("select current_setting('cron.database_name')",'postgres'),'menu_restore');
  assert.equal(psql("select count(*) from pg_database where datname='menu_restore'",'postgres'),'0');
  psql('create database menu_restore template template0;','postgres','create_isolated_database');
- psql('drop schema public;');
  const {roles}=JSON.parse(readFileSync(join(dir,'roles-without-passwords.json')));
  const existing=JSON.parse(psql('select json_agg(rolname) from pg_roles','postgres'));
  for(const role of roles)if(!existing.includes(role.rolname))psql('create role '+quote(role.rolname)+' nologin;','postgres','create_isolated_owner_role');
@@ -105,6 +104,21 @@ function encrypt(){
  writeFileSync(join(delivery,'receipt.json'),JSON.stringify({...receipt,encrypted_backup_sha256:hash(readFileSync(join(delivery,'supabase-before-menu-deploy.enc')))},null,2));
  console.log('ENCRYPTED_BACKUP_READY');
 }
+function unpack(){
+ const source=join(root,'source-encrypted-backup');
+ const previous=JSON.parse(readFileSync(join(source,'receipt.json'),'utf8'));
+ assert.equal(previous.project,'ihuztjkblywzjdruusdj');
+ const data=readFileSync(join(source,'supabase-before-menu-deploy.enc'));
+ assert.equal(hash(data),previous.encrypted_backup_sha256);
+ assert.equal(data.subarray(0,4).toString(),'HRB1');
+ const key=Buffer.from(process.env.MENU_RESTORE_KEY||'','base64');assert.equal(key.length,32,'RESTORE_KEY_MISSING');
+ const decipher=createDecipheriv('aes-256-gcm',key,data.subarray(4,16));decipher.setAuthTag(data.subarray(16,32));
+ const tar=Buffer.concat([decipher.update(data.subarray(34+data.readUInt16BE(32))),decipher.final()]);
+ run('tar',['-xf','-','-C',dir],{input:tar},'unpack_backup');
+ assert.equal(hash(readFileSync(join(dir,'database.dump'))),previous.backup.sha256);
+ Object.assign(receipt,previous,{source_backup_run:45340614932,restore_commit:process.env.GITHUB_SHA});delete receipt.failure;
+ save();console.log('EXISTING_BACKUP_AUTHENTICATED_AND_DECRYPTED_NO_PRODUCTION_ACCESS');
+}
 try{
- const mode=process.argv[2];if(mode==='backup')await backup();else if(mode==='restore')restore();else if(mode==='encrypt')encrypt();else throw Error('MODE_REQUIRED');
+ const mode=process.argv[2];if(mode==='backup')await backup();else if(mode==='restore')restore();else if(mode==='encrypt')encrypt();else if(mode==='unpack')unpack();else throw Error('MODE_REQUIRED');
 }catch(e){receipt.failure={stage:process.argv[2],code:e.code??e.name};save();console.error('BACKUP_GATE_FAILED',process.argv[2],e.code??e.name,String(e.message).replace(/postgres(?:ql)?:\/\/\S+/gi,'[CONNECTION_REDACTED]').slice(0,300));process.exitCode=1;}

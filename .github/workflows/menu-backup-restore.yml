@@ -4,6 +4,7 @@ on:
     branches: [codex/menu-backup-restore-20261124]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: menu-deployment-backup
   cancel-in-progress: false
@@ -20,10 +21,17 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/backup-tools" pg@8.16.3
           docker pull postgres:17 > "$RUNNER_TEMP/backup-tools.log" 2>&1
-      - name: Read-only snapshot and database backup
+      - name: Reuse encrypted database backup already saved
+        uses: actions/download-artifact@v4
+        with:
+          name: menu-supabase-backup-encrypted
+          run-id: 45340614932
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/source-encrypted-backup/
+      - name: Decrypt existing backup only inside the isolated runner
         env:
-          MENU_BACKUP_DB: ${{ secrets.MENU_DEPLOY_BACKUP_DB_20261124 }}
-        run: node scripts/deployment/menu-backup-restore.mjs backup
+          MENU_RESTORE_KEY: ${{ secrets.MENU_DEPLOY_RESTORE_KEY_20261124 }}
+        run: node scripts/deployment/menu-backup-restore.mjs unpack
       - name: Start isolated Supabase PostgreSQL
         run: |
           mkdir -p "$RUNNER_TEMP/menu-restore-isolated"
