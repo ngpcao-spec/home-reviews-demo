@@ -50,17 +50,17 @@ test('saved menus, two real Auth accounts, permissions, manual corrections and m
   for(let i=0;i<2;i++){
    const u=fixture.users[i],lang=i===0?'fr':'vi'
    await rows('update public.profiles set preferred_language=$2 where user_id=$1',[u.id,lang])
-   const e=(await rows("insert into public.establishments(organization_id,name,google_id,place_id,collection_language,initialized_at,last_sync_at,sync_status,rating,total_reviews,address) values($1,$2,'saved-banh-fixture',$3,$4,now(),now(),'ok',4.3,0,'Nha Trang — validation isolée') returning id",[u.organizationId,saved.establishment,saved.placeId,lang]))[0].id
+   const e=(await rows("insert into public.establishments(organization_id,name,google_id,place_id,google_maps_url,collection_language,initialized_at,last_sync_at,sync_status,rating,total_reviews,address) values($1,$2,'saved-banh-fixture',$3,'https://www.google.com/maps?query_place_id='||$3,$4,now(),now(),'ok',4.3,0,'Nha Trang — validation isolée') returning id",[u.organizationId,saved.establishment,saved.placeId,lang]))[0].id
    establishments.push(e)
    const r=(await rows('select public.subscribe_verified_shared_restaurant($1,$2,$3,$4,$5,$6) id',[saved.placeId,saved.establishment,'https://www.google.com/maps?query_place_id='+saved.placeId,u.organizationId,u.id,lang]))[0].id
    await rows('insert into private.shared_restaurant_establishments(establishment_id,restaurant_id,organization_id) values($1,$2,$3)',[e,r,u.organizationId])
-   privateEstablishments.push((await rows("insert into public.establishments(organization_id,name,google_id,initialized_at) values($1,$2,$3,now()) returning id",[u.organizationId,'Privé '+lang,'private-dish-'+i]))[0].id)
+   privateEstablishments.push((await rows("insert into public.establishments(organization_id,name,google_id,google_maps_url,initialized_at) values($1,$2,$3,'https://www.google.com/maps?query='||$3,now()) returning id",[u.organizationId,'Privé '+lang,'private-dish-'+i]))[0].id)
   }
   await addMenu(establishments[0],saved.placeId,saved.raw,saved.result,saved.runId)
   const phoIds:string[]=[]
   for(const [index,label] of ['Phở','Phở gà','Phở bò'].entries()){
    const placeId='ChIJIsolatedPho'+index
-   const id=(await rows("insert into public.establishments(organization_id,name,google_id,place_id,initialized_at) values($1,$2,$3,$4,now()) returning id",[fixture.users[0].organizationId,['Phở générique — test','Bistro poulet — test','Bistro bœuf — test'][index],'pho-fixture-'+index,placeId]))[0].id
+   const id=(await rows("insert into public.establishments(organization_id,name,google_id,place_id,google_maps_url,initialized_at) values($1,$2,$3,$4,'https://www.google.com/maps?query_place_id='||$4,now()) returning id",[fixture.users[0].organizationId,['Phở générique — test','Bistro poulet — test','Bistro bœuf — test'][index],'pho-fixture-'+index,placeId]))[0].id
    phoIds.push(id);await addMenu(id,placeId,[{placeId,name:label,category:'Food'}],{references:[]},'isolated-pho-'+index)
   }
   for(let i=0;i<2;i++){
