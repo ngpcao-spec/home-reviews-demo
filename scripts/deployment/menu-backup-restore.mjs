@@ -33,7 +33,9 @@ async function backup(){
  assert(config.PGDATABASE==='postgres'&&config.PGUSER.includes('cli_login_postgres'),'TEMPORARY_CLI_LOGIN_REQUIRED');
  const require=createRequire(join(root,'backup-tools/package.json'));
  const {Client}=require('pg');
- const db=new Client({host:config.PGHOST,port:Number(config.PGPORT),user:config.PGUSER,password:config.PGPASSWORD,database:config.PGDATABASE,ssl:{rejectUnauthorized:true},options:'-c default_transaction_read_only=on',connectionTimeoutMillis:20000});
+ const ca=readFileSync('scripts/deployment/supabase-root.crt','utf8');
+ writeFileSync(join(dir,'supabase-root.crt'),ca);
+ const db=new Client({host:config.PGHOST,port:Number(config.PGPORT),user:config.PGUSER,password:config.PGPASSWORD,database:config.PGDATABASE,ssl:{ca,rejectUnauthorized:true},options:'-c default_transaction_read_only=on',connectionTimeoutMillis:20000});
  await db.connect();
  try{
   await db.query('begin isolation level repeatable read read only');
@@ -46,8 +48,8 @@ async function backup(){
   assert.equal((await db.query("select active from cron.job where jobname='home-reviews-rainminer-menu'")).rows[0].active,false,'MENU_CRON_NOT_PAUSED');
   const env={...process.env,...config,PGSSLMODE:'verify-full',PGCONNECT_TIMEOUT:'20',PGOPTIONS:'-c default_transaction_read_only=on'};
   const envArgs=Object.keys(config).map(k=>['-e',k]).flat();
-  // TLS root certificates are the container system trust store, not a bypass.
-  env.PGSSLROOTCERT='/etc/ssl/certs/ca-certificates.crt';
+  // Supabase's official CA, with full certificate AND hostname verification.
+  env.PGSSLROOTCERT='/backup/supabase-root.crt';
   run('docker',['run','--rm','--network=host',...envArgs,'-e','PGSSLMODE','-e','PGSSLROOTCERT','-e','PGCONNECT_TIMEOUT','-e','PGOPTIONS','-v',dir+':/backup','postgres:17','pg_dump','--format=custom','--role=postgres','--lock-wait-timeout=5s','--snapshot='+state.snapshot,'--file=/backup/database.dump'],{env},'pg_dump');
   const tables=(await db.query(tablesSql)).rows;
   const fingerprints=[];
