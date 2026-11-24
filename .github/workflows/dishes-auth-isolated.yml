@@ -8,10 +8,6 @@ jobs:
   dishes-auth:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
-    env:
-      CI_PG_PACKAGE: ${{ runner.temp }}/pg-client
-      CI_SUPABASE_STATUS: ${{ runner.temp }}/local-status.json
-      CI_AUTH_FIXTURE: ${{ runner.temp }}/auth-fixture.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,6 +15,9 @@ jobs:
           node-version: 22
       - name: Install test tools
         run: |
+          echo "CI_PG_PACKAGE=$RUNNER_TEMP/pg-client" >> "$GITHUB_ENV"
+          echo "CI_SUPABASE_STATUS=$RUNNER_TEMP/local-status.json" >> "$GITHUB_ENV"
+          echo "CI_AUTH_FIXTURE=$RUNNER_TEMP/auth-fixture.json" >> "$GITHUB_ENV"
           npm ci
           npm install --prefix "$RUNNER_TEMP/pg-client" pg@8.16.3
           npx playwright install --with-deps chromium
