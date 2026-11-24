@@ -25,11 +25,11 @@ test('automatic menus through real Auth, imports, PostgreSQL and Edge worker wit
  mkdirSync('test-results/automatic-menus',{recursive:true})
  const mark=(name:string)=>{passed.push(name);writeFileSync('test-results/automatic-menus/receipt.json',JSON.stringify({passed}));console.log('MENU_SCENARIO_PASSED',name)}
  try{
-  expect((await rows('select automatic_enabled,launches_enabled,budget_limit_usd from private.rainminer_menu_config'))[0]).toEqual({automatic_enabled:false,launches_enabled:false,budget_limit_usd:'0.000000'})
+  expect((await rows('select automatic_enabled,launches_enabled,budget_limit_usd,billing_ceiling_evidence,first_test_job_id from private.rainminer_menu_config'))[0]).toEqual({automatic_enabled:false,launches_enabled:false,budget_limit_usd:'5.000000',billing_ceiling_evidence:null,first_test_job_id:null})
   const cron=await rows("select command from cron.job where jobname='home-reviews-rainminer-menu'")
   expect(cron).toHaveLength(1)
   expect(cron[0].command).toContain('private.rainminer_menu_work_due()')
-  await rows("update private.rainminer_menu_config set automatic_enabled=true,launches_enabled=true,configured_at=now(),budget_limit_usd=2")
+  await rows("update private.rainminer_menu_config set automatic_enabled=true,launches_enabled=true,configured_at=now()")
   await rows("select vault.create_secret('https://home-reviews-ci.invalid/functions/v1/rainminer-menu','home_reviews_rainminer_worker_url')")
   for(let i=0;i<2;i++){
    const p=await contexts[i].newPage();pages.push(p)
@@ -59,6 +59,13 @@ test('automatic menus through real Auth, imports, PostgreSQL and Edge worker wit
   expect((await rows('select * from private.rainminer_menu_requests'))).toHaveLength(2)
   expect((await provider()).menuRuns).toHaveLength(0);mark('two-real-imports-one-menu-queue-browser-closed')
   const establishments=await Promise.all(fixture.users.map(async(u:{organizationId:string})=>(await rows('select * from establishments where organization_id=$1',[u.organizationId]))[0]))
+  expect(await worker('rainminer-menu',{action:'work'})).toEqual({claimed:0})
+  expect((await rows('select error_code from rainminer_menu_jobs'))[0].error_code).toBe('MENU_COST_CEILING_UNVERIFIED')
+  expect((await provider()).menuRuns).toHaveLength(0)
+  const unsafe=await invoke(pages[1],'rainminer-menu',{action:'start',establishment_id:establishments[1].id,request_id:crypto.randomUUID(),confirm_paid:true})
+  expect(unsafe.error?.status).toBe(409)
+  mark('unverified-ceiling-blocks-real-worker')
+  await rows("update private.rainminer_menu_config set billing_ceiling_evidence='SIMULATED_PROVIDER_ONLY: no external charges'")
   // Two independent HTTP requests race against actual PostgreSQL and Edge workers.
   await Promise.all([worker('rainminer-menu',{action:'work'}),worker('rainminer-menu',{action:'work'})])
   expect((await provider()).menuRuns).toHaveLength(1)

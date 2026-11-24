@@ -42,7 +42,7 @@ export async function handleRainminerMenu(request: Request) {
         p_establishment:restaurant.data.id,p_request:body.request_id,p_user:user.id,
       })
       if (queued.error) {
-        const code = ['MENU_BUDGET_LIMIT','MENU_LAUNCHES_DISABLED','MENU_PLACE_ID_REQUIRED']
+        const code = ['MENU_BUDGET_LIMIT','MENU_LAUNCHES_DISABLED','MENU_PLACE_ID_REQUIRED','MENU_COST_CEILING_UNVERIFIED','MENU_CONFIGURATION_MISSING']
           .find(value=>queued.error!.message.includes(value))??'MENU_ENQUEUE_FAILED'
         return json({error:code},409)
       }

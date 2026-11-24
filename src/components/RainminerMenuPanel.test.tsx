@@ -59,3 +59,10 @@ it('changing restaurant hides the old menu while its replacement is loading',asy
  view.rerender(<I18nProvider language="fr"><RainminerMenuPanel establishmentId="different" userId="user"/></I18nProvider>)
  expect(screen.queryByText('Menu disponible')).not.toBeInTheDocument();expect(screen.queryByText('Steak au café')).not.toBeInTheDocument()
 })
+it.each(['fr','vi'] as const)('explains an unverified provider ceiling in %s without offering a paid start',async language=>{
+ mock.invoke.mockResolvedValue({data:{job:null,result:null,canStart:false,launchBlock:'MENU_COST_CEILING_UNVERIFIED'},error:null})
+ draw(language)
+ await screen.findByText(language==='fr'?'Plafond fournisseur non vérifié. Nouveaux lancements bloqués.':'Chưa xác minh được giới hạn chi phí. Đã chặn lượt chạy mới.')
+ expect(screen.getByRole('button')).toBeDisabled()
+ expect(mock.invoke).toHaveBeenCalledTimes(1)
+})

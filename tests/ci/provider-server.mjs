@@ -15,7 +15,8 @@ createServer(async(req,res)=>{
    const input=JSON.parse(body)
    if(input.placeIds?.length!==1||!input.placeIds[0].startsWith('ChIJ')||url.searchParams.get('maxTotalChargeUsd')!=='0.5'||url.searchParams.get('restartOnError')!=='false')throw Error('UNSAFE_MENU_INPUT')
    const id='menu-run-'+(menuRuns.length+1)
-   const run={id,defaultDatasetId:id+'-data',defaultKeyValueStoreId:id+'-input',actId:'8GGZ9N7j2JhqnQ3oT',status:'SUCCEEDED',input,buildNumber:'synthetic',startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),usageTotalUsd:0.03}
+   const run={id,defaultDatasetId:id+'-data',defaultKeyValueStoreId:id+'-input',actId:'8GGZ9N7j2JhqnQ3oT',status:'SUCCEEDED',input,buildNumber:'synthetic',startedAt:new Date().toISOString(),finishedAt:new Date().toISOString(),usageTotalUsd:0.03,
+    options:{maxTotalChargeUsd:.5,isMaxTotalChargeUsdSetByUser:true,restartOnError:false},pricingInfo:{pricingModel:'PAY_PER_EVENT',isPPEPlatformUsagePaidByUser:false}}
    menuRuns.push(run);await new Promise(r=>setTimeout(r,500));return json({data:run})
   }
   const menu=menuRuns.find(r=>url.pathname.includes(r.id))

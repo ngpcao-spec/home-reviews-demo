@@ -59,7 +59,7 @@ jobs:
           node --input-type=module <<'JS'
           import {readFileSync} from 'node:fs';import assert from 'node:assert/strict';
           const {passed}=JSON.parse(readFileSync('test-results/automatic-menus/receipt.json','utf8'));
-          for(const name of ['two-real-imports-one-menu-queue-browser-closed','concurrent-real-workers-single-provider-post','fr-vi-panel-raw-preserved-and-authorization','shared-menu-reused-without-new-provider','confirmed-manual-retry-single-provider-post','disabled-no-backfill-no-paid-retries'])assert(passed.includes(name),name);
+          for(const name of ['two-real-imports-one-menu-queue-browser-closed','unverified-ceiling-blocks-real-worker','concurrent-real-workers-single-provider-post','fr-vi-panel-raw-preserved-and-authorization','shared-menu-reused-without-new-provider','confirmed-manual-retry-single-provider-post','disabled-no-backfill-no-paid-retries'])assert(passed.includes(name),name);
           console.log('ALL_AUTOMATIC_MENU_SCENARIOS_PASSED');
           JS
       - name: Quality and regression checks

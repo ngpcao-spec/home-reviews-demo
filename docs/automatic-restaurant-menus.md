@@ -62,17 +62,22 @@ nouveau lancement.
 
 ## Coûts et configuration
 
-Migration : `20261124030622_automatic_rainminer_menu_queue.sql`.
+Migrations : `20261124030622_automatic_rainminer_menu_queue.sql`, puis
+`20261124035425_rainminer_menu_five_dollar_release_guard.sql`.
 
 La nouvelle configuration privée est initialement :
 `automatic_enabled=false`, `launches_enabled=false`,
-`budget_limit_usd=0`, `configured_at=null`, `per_run_limit_usd=0.5`.
+`budget_limit_usd=5`, `configured_at=null`, `per_run_limit_usd=0.5`,
+`billing_ceiling_evidence=null`, `first_test_job_id=null`.
 Aucune dépense n'est autorisée par la migration.
 
 Le plafond global est **cumulatif depuis cette évolution**, pour les nouveaux
 runs automatiques et manuels. Il ne se réinitialise pas chaque jour/mois. Avant
 POST, le serveur réserve atomiquement le plafond de chaque run. Une fois le run
-terminé, le coût communiqué remplace la réserve. Si le coût manque ou si le
+terminé, le coût communiqué dans un reçu terminal compatible remplace la réserve.
+Le reçu doit confirmer l'Actor, le run, PAY_PER_EVENT et le plafond explicite.
+Le montant conserve sa précision numérique, sans arrondi libérant du budget.
+Si le coût manque ou si le
 lancement est incertain, la réserve est conservée. Les anciens runs actifs ou
 inconnus gardent une réserve conservatrice de 0,50 USD ; les anciennes dépenses
 terminées ne sont pas refacturées ni intégrées rétroactivement.
@@ -92,9 +97,23 @@ lancement. Ces montants ne sont pas un reçu réel de ce test.
 Sources : https://apify.com/rainminer/google-maps-menu-scraper et
 https://docs.apify.com/api/v2/actors-runs-post.
 
-Le plafond global doit être choisi explicitement par l'opérateur avant activation.
-Pour l'augmenter, augmenter le plafond cumulé ; ne jamais effacer les réservations
-ni remettre des jobs en queued pour libérer du budget.
+Le plafond global autorisé est **5 USD**, partagé entre tous les établissements,
+organisations et demandes manuelles/automatiques. Une contrainte SQL interdit un
+plafond supérieur. Aucun renouvellement ni remise à zéro. Ne jamais effacer les
+réservations ni remettre des jobs en queued pour libérer du budget.
+
+**Limite tarifaire constatée lors de la préparation** : la documentation Apify
+garantit le plafond des événements PPE, mais indique que les lectures du dataset
+après le run entraînent des frais de plateforme. La garantie d'un total de
+0,50 USD incluant ces opérations n'est donc pas établie pour ce compte.
+`billing_ceiling_evidence` reste NULL : même si les drapeaux sont activés par
+erreur, `MENU_COST_CEILING_UNVERIFIED` interdit tout nouveau POST.
+Ce champ exige une preuve applicable au compte que ces coûts sont inclus dans
+le montant total du reçu ou non facturés ; ni une estimation ni la réussite d'un
+mock ne convient. Aucun contournement n'est prévu dans le déploiement.
+Source : https://docs.apify.com/actors/running/actors-in-store (Post-run storage costs).
+Si un reçu contredit malgré tout le plafond, les lancements sont désactivés et
+la preuve invalidée ; le montant signalé est conservé.
 
 ## Déploiement préparé, non exécuté
 
@@ -105,20 +124,23 @@ ni remettre des jobs en queued pour libérer du budget.
    démarrés par l'ancien worker. La migration refuse une ligne **starting**.
    Si son lancement est incertain, retrouver le run avant toute résolution.
    Aucun changement des Crons d'avis ou de rapports.
-3. Appliquer uniquement la nouvelle migration. Elle garde les jobs et les menus
+3. Appliquer uniquement les deux nouvelles migrations, dans l'ordre ci-dessus. Elles gardent les jobs et les menus
    existants ; elle n'enfile pas les établissements historiques.
 4. Déployer `rainminer-menu` avec son helper, puis le client. Ne pas redéployer les
    workers d'avis, rapports ou recommandations.
-5. Vérifier la configuration et fixer le plafond cumulé approuvé. Le choix
-   `launches_enabled=true, automatic_enabled=false` rend les demandes manuelles
-   disponibles avec confirmation. `configured_at` doit être renseigné après
-   vérification, et le plafond doit être au moins égal au plafond d'un run.
-6. Réactiver le Cron menu, vérifier les lectures et les droits. Puis passer
-   `automatic_enabled=true` pour les **futurs** imports réussis. Aucun scan
-   ni backfill ne s'exécute. Observer un ajout normal, sans extraction massive.
+5. Vérifier le budget 5 USD, le plafond 0,50 USD, les deux drapeaux false,
+   `configured_at` et `billing_ceiling_evidence` NULL. Ne pas armer de test.
+6. Vérifier uniquement les lectures et les droits. Les lancements restent
+   désactivés. La reprise du Cron pour lire un run connu ne doit pas être
+   confondue avec l'autorisation de créer un run.
 
-Le drapeau automatique seul n'autorise pas de coût : les trois conditions
-automatique, lancements autorisés et budget suffisant sont contrôlées en base.
+La préparation, le premier test futur limité à une seule tâche et les contrôles
+de sauvegarde sont détaillés dans [rainminer-production-preparation.md](rainminer-production-preparation.md).
+Le premier test attend une autorisation distincte et la levée documentée du
+blocage tarifaire. Il ne nécessite pas l'activation automatique globale.
+
+Le drapeau automatique seul n'autorise pas de coût : activation, autorisation
+de lancement, garantie tarifaire, périmètre du test et budget sont contrôlés en base.
 La désactivation bloque les nouvelles réservations, y compris après un claim
 mais avant le POST. Les POST déjà autorisés peuvent finir et leurs runs connus
 continuent d'être consultés. Retirer le secret URL du worker couperait aussi ces

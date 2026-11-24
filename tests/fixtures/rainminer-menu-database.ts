@@ -4,6 +4,7 @@ import type {SupabaseClient} from '@supabase/supabase-js'
 import {sqlMigrationSource} from './sql-migration-source'
 
 export const MENU_MIGRATION='20261124030622_automatic_rainminer_menu_queue.sql'
+export const MENU_RELEASE_MIGRATION='20261124035425_rainminer_menu_five_dollar_release_guard.sql'
 export const menuSql=(name:string)=>sqlMigrationSource(readFileSync('supabase/migrations/'+name,'utf8'))
 export function sqlFunction(file:string,name:string) {
  const sql=menuSql(file), start=sql.search(new RegExp('create (?:or replace )?function '+name.replaceAll('.','\\.')+'\\('))
@@ -15,7 +16,7 @@ export const ORG='10000000-0000-4000-8000-000000000001',ORG2='10000000-0000-4000
 export const USER='20000000-0000-4000-8000-000000000001',USER2='20000000-0000-4000-8000-000000000002'
 export const PLACE='ChIJMenuFixtureOnly',ACTOR='8GGZ9N7j2JhqnQ3oT'
 export const pricing={actorId:ACTOR,pricing:{pricingModel:'PAY_PER_EVENT',minimalMaxTotalChargeUsd:0}}
-export async function menuDatabase(){
+export async function menuDatabase(beforeRelease?:(db:PGlite)=>Promise<void>){
  const db=new PGlite();await db.waitReady
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
  create schema private;create schema auth;create schema vault;
@@ -70,11 +71,13 @@ export async function menuDatabase(){
  // PGlite lacks pg_cron/pg_net; omit only the registration statement. Its
  // work_due predicate is real SQL tested below; CI registers the actual Cron.
  await db.exec(menuSql(MENU_MIGRATION).replace(/select cron\.schedule\([\s\S]*?\$cron\$\);/,''))
+ await beforeRelease?.(db)
+ await db.exec(menuSql(MENU_RELEASE_MIGRATION))
  await db.exec('create trigger capture_shared_rainminer_menu after insert or update of status,result on rainminer_menu_jobs for each row execute function private.capture_shared_rainminer_menu()')
  return db
 }
 export async function configureMenus(db:PGlite,automatic=true,cap=2){
- await db.query('update private.rainminer_menu_config set launches_enabled=true,automatic_enabled=$1,budget_limit_usd=$2,configured_at=now()',[automatic,cap])
+ await db.query("update private.rainminer_menu_config set launches_enabled=true,automatic_enabled=$1,budget_limit_usd=$2,configured_at=now(),billing_ceiling_evidence='SIMULATED_PROVIDER_ONLY: no external charges'",[automatic,cap])
 }
 export async function newImport(db:PGlite,{place=PLACE,org=ORG,user=USER,kind='initial',old=false}:{place?:string|null;org?:string;user?:string;kind?:string;old?:boolean}={}){
  const id=crypto.randomUUID(),est=crypto.randomUUID()

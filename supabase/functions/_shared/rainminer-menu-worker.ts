@@ -8,6 +8,7 @@ type Run = {
   id:string; actId:string; status:string; defaultKeyValueStoreId:string; defaultDatasetId:string
   buildNumber?:string; buildId?:string; startedAt?:string; finishedAt?:string
   usageTotalUsd?:number; chargedEventCounts?:Record<string,number>; pricingInfo?:unknown; usage?:unknown
+  options?:{maxTotalChargeUsd?:number;isMaxTotalChargeUsdSetByUser?:boolean;restartOnError?:boolean}
 }
 type WorkerOptions = {fetch?:typeof fetch; now?:()=>number}
 
@@ -29,6 +30,8 @@ function receipt(run: Run) {
     defaultDatasetId:run.defaultDatasetId, defaultKeyValueStoreId:run.defaultKeyValueStoreId,
     startedAt:run.startedAt, finishedAt:run.finishedAt, usageTotalUsd:run.usageTotalUsd,
     chargedEventCounts:run.chargedEventCounts, pricingInfo:run.pricingInfo, usage:run.usage,
+    options:run.options && {maxTotalChargeUsd:run.options.maxTotalChargeUsd,
+      isMaxTotalChargeUsdSetByUser:run.options.isMaxTotalChargeUsdSetByUser,restartOnError:run.options.restartOnError},
   }
 }
 
