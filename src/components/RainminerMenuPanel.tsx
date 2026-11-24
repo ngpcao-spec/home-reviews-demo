@@ -2,9 +2,9 @@ import {useEffect, useRef, useState} from 'react'
 import {supabase} from '../lib/supabase'
 import {useI18n} from '../i18n'
 
-type Job = {request_id?: string; status: string; error_code?: string; trigger_kind?: string}
+type Job = {id?: string; request_id?: string; status: string; error_code?: string; trigger_kind?: string}
 type MenuResult = {
-  provenance?: {retrievedAt?: string; finishedAt?: string}
+  provenance?: {runId?: string; retrievedAt?: string; finishedAt?: string}
   counts: {received: number; excludedDrinks: number; retained: number}
   references: {sourceRow: number; classification: string; row: {
     name?: string; description?: string; category?: string; price?: number | null;
@@ -14,7 +14,11 @@ type MenuResult = {
 type Snapshot = {job: Job | null; canStart: boolean; result: MenuResult | null; maxCostUsd?: number; launchBlock?: string}
 const active = (job?: Job | null) => ['queued','starting','running','unknown'].includes(job?.status ?? '')
 
-export function RainminerMenuPanel({establishmentId, userId}: {establishmentId: string; userId: string}) {
+export function RainminerMenuPanel({establishmentId, userId, onMenuAvailable}: {
+  establishmentId: string;
+  userId: string;
+  onMenuAvailable?: (version: string) => void;
+}) {
   const {language} = useI18n()
   const vi = language === 'vi'
   const [loaded, setSnapshot] = useState<(Snapshot & {scope:string})>()
@@ -23,6 +27,16 @@ export function RainminerMenuPanel({establishmentId, userId}: {establishmentId: 
   const [error, setError] = useState(false)
   const locked = useRef(false)
   const storageKey = `rainminer-menu:${userId}:${establishmentId}`
+  const result = snapshot?.result
+  const job = snapshot?.job
+  const collectedAt = result?.provenance?.retrievedAt ?? result?.provenance?.finishedAt
+  const menuVersion = result && (!job || job.status === 'completed')
+    ? JSON.stringify([result.provenance?.runId, collectedAt, job?.id ?? job?.request_id])
+    : null
+
+  useEffect(() => {
+    if (menuVersion !== null) onMenuAvailable?.(menuVersion)
+  }, [menuVersion, onMenuAvailable])
 
   useEffect(() => {
     if (!supabase) return
@@ -78,8 +92,6 @@ export function RainminerMenuPanel({establishmentId, userId}: {establishmentId: 
   }
 
   if (!supabase) return null
-  const result = snapshot?.result
-  const job = snapshot?.job
   const needsReview = job?.status === 'unknown' || ['MENU_PLACE_ID_REQUIRED','MENU_COST_CEILING_BREACHED'].includes(job?.error_code ?? '')
   const status = !snapshot ? (vi?'Đang tải…':'Chargement…')
     : needsReview ? (vi?'Cần xác minh':'Vérification nécessaire')
@@ -88,7 +100,6 @@ export function RainminerMenuPanel({establishmentId, userId}: {establishmentId: 
     : job?.status === 'failed' ? (vi?'Trích xuất thất bại':'Extraction échouée')
     : result ? (result.counts.retained>0 ? (vi?'Đã có thực đơn':'Menu disponible') : (vi?'Không tìm thấy món ăn':'Aucun plat trouvé'))
     : (vi?'Chưa lấy thực đơn':'Menu non récupéré')
-  const collectedAt = result?.provenance?.retrievedAt ?? result?.provenance?.finishedAt
   const blocked = job?.error_code ?? snapshot?.launchBlock
   return <section className="card" style={{padding:'1rem',overflowWrap:'anywhere'}} aria-label={vi?'Món ăn':'Plats du restaurant'}>
     <h2>{vi?'Món ăn':'Plats du restaurant'}</h2>

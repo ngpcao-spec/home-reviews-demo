@@ -5,6 +5,7 @@ import type {PGlite} from '@electric-sql/pglite'
 import {advanceRainminerMenu,rainminerPricing} from '../../supabase/functions/_shared/rainminer-menu-worker'
 import {importRainminerMenu} from '../../supabase/functions/_shared/rainminer-menu.mjs'
 import {menuDatabase,configureMenus,newImport,finalizeMenuImport,menuAdmin,PLACE,ORG2,USER,USER2,ACTOR,pricing} from '../fixtures/rainminer-menu-database'
+import {dishDatabase} from '../fixtures/dish-associations-database'
 
 let db:PGlite
 beforeAll(async()=>{db=await menuDatabase()},30000)
@@ -57,6 +58,40 @@ it('finalizes the real import, queues automatically and persists food, ambiguous
  await advanceRainminerMenu(menuAdmin(db),'synthetic',{fetch:fake.fetch})
  expect(fake.calls.filter(c=>c.method==='POST')).toHaveLength(1)
 })
+it('projects dishes as part of the real menu checkpoint and when a second establishment reuses it', async () => {
+ const database = await dishDatabase()
+ try {
+  await configureMenus(database)
+  const item = await newImport(database)
+  await database.query("update establishments set name='Phở — validation' where id=$1", [item.est])
+  expect(await finalizeMenuImport(database, item)).toBe(true)
+  const readProfile = async (est: string, user: string) => {
+   await database.query("select set_config('request.jwt.claim.sub',$1,false)", [user])
+   return (await database.query<{ profile: { specialty: unknown; associations: unknown[] } }>(
+    'select public.read_restaurant_dishes($1) profile', [est],
+   )).rows[0].profile
+  }
+  const fake = provider([
+   { placeId: PLACE, name: 'Phở gà', category: 'Món ăn' },
+   { placeId: PLACE, name: 'Trà đá', category: 'Đồ uống' },
+  ])
+  expect(await advanceRainminerMenu(menuAdmin(database), 'synthetic', { fetch: fake.fetch })).toEqual({ status: 'running' })
+  expect((await readProfile(item.est, USER)).specialty).toBeNull()
+  expect(await advanceRainminerMenu(menuAdmin(database), 'synthetic', { fetch: fake.fetch })).toMatchObject({ status: 'completed' })
+  expect((await readProfile(item.est, USER)).specialty).toMatchObject({ name: 'Phở', status: 'proposed' })
+  expect((await readProfile(item.est, USER)).associations).toMatchObject([{ name: 'Phở gà', parentName: 'Phở' }])
+
+  const second = await newImport(database, { org: ORG2, user: USER2 })
+  expect(await finalizeMenuImport(database, second)).toBe(true)
+  expect((await readProfile(second.est, USER2)).associations).toMatchObject([{ name: 'Phở gà', parentName: 'Phở' }])
+  const beforeReuse = fake.calls.length
+  expect(await advanceRainminerMenu(menuAdmin(database), 'synthetic', { fetch: fake.fetch })).toEqual({ claimed: 0 })
+  expect(fake.calls).toHaveLength(beforeReuse)
+  expect(fake.calls.filter(call => call.method === 'POST')).toHaveLength(1)
+ } finally {
+  await database.close()
+ }
+}, 30000)
 it('multiple restaurants may queue, with only one global paid extraction',async()=>{
  const a=await newImport(db),b=await newImport(db,{place:PLACE+'B'})
  await Promise.all([finalizeMenuImport(db,a),finalizeMenuImport(db,b)])

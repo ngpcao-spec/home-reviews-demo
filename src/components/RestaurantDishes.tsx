@@ -3,17 +3,26 @@ import {useI18n} from '../i18n'
 import {dishRpc,readDishes,type DishName,type DishProfile} from '../lib/restaurant-dishes'
 import './RestaurantDishes.css'
 
-export function RestaurantDishes({establishmentId}:{establishmentId:string}){
+export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:string;menuVersion?:string}){
  const {language}=useI18n(),vi=language==='vi'
  const [loaded,setLoaded]=useState<{scope:string;profile:DishProfile}>(),[names,setNames]=useState<DishName[]>([])
  const [open,setOpen]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0)
  const [selected,setSelected]=useState(''),[newName,setNewName]=useState(''),[parent,setParent]=useState('')
  const lock=useRef(false),epoch=useRef({value:0}).current,profile=loaded?.scope===establishmentId?loaded.profile:undefined
  useEffect(()=>{
-  let gone=false;epoch.value++;setBusy(false);setOpen(false);setError('');setSelected('');setNewName('');setParent('')
-  void readDishes(establishmentId).then(profile=>{if(!gone)setLoaded({scope:establishmentId,profile})}).catch(()=>{if(!gone)setError('read')})
-  return()=>{gone=true;epoch.value++}
+  epoch.value++;setBusy(false);setOpen(false);setError('');setSelected('');setNewName('');setParent('')
+  return()=>{epoch.value++}
  },[establishmentId,retry,epoch])
+ useEffect(()=>{
+  let gone=false
+  void readDishes(establishmentId).then(profile=>{
+   if(gone)return
+   setLoaded(current=>current?.scope===establishmentId&&current.profile.revision>profile.revision
+    ?current:{scope:establishmentId,profile})
+   setError(current=>current==='read'?'':current)
+  }).catch(()=>{if(!gone)setError(current=>current||'read')})
+  return()=>{gone=true}
+ },[establishmentId,menuVersion,retry])
  const status=(s:string)=>s==='confirmed'?(vi?'Đã xác nhận':'Confirmée'):(vi?'Đề xuất':'Proposée')
  async function edit(){
   setOpen(!open)
@@ -25,7 +34,11 @@ export function RestaurantDishes({establishmentId}:{establishmentId:string}){
   try{
    const updated=await dishRpc<DishProfile>('edit_restaurant_dishes',{p_establishment:establishmentId,p_revision:profile.revision,p_action:action,p_dish:id,
     ...(create?{p_name:newName.trim(),p_parent:parent||null}:{})})
-   if(version===epoch.value){setLoaded({scope:establishmentId,profile:updated});setNewName('');setSelected('')}
+   if(version===epoch.value){
+    setLoaded(current=>current?.scope===establishmentId&&current.profile.revision>updated.revision
+     ?current:{scope:establishmentId,profile:updated})
+    setNewName('');setSelected('')
+   }
   }catch(e){if(version===epoch.value)setError(e instanceof Error&&e.message==='DISH_CONFLICT'?'conflict':'save')}
   finally{lock.current=false;if(version===epoch.value)setBusy(false)}
  }

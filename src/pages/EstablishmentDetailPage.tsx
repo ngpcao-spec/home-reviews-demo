@@ -1,6 +1,6 @@
 import { ExternalLink, MapPin, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useApp } from '../app/AppContext'
 import { ReviewRow } from '../components/reviews/ReviewRow'
 import { EstablishmentAvatar } from '../components/ui/EstablishmentAvatar'
@@ -23,6 +23,11 @@ export function EstablishmentDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const dishScope = `${currentUser.id}:${id}`
+  const [menu, setMenu] = useState<{scope: string; version: string}>()
+  const menuAvailable = useCallback((version: string) => {
+    setMenu(current => current?.scope === dishScope && current.version === version ? current : {scope: dishScope, version})
+  }, [dishScope])
   const establishment = establishments.find((item) => item.id === id)
   if (!establishment) return <><PageHeader title={messages.reviews.establishment} back/><div className="empty-state"><h2>{messages.establishment.notFound}</h2><button className="secondary-button" onClick={() => navigate('/etablissements')}>{messages.common.back}</button></div></>
   const related = recentNegativeReviews(reviews.filter((item) => item.establishmentId === id))
@@ -38,11 +43,11 @@ export function EstablishmentDetailPage() {
     }
   }
   return <><PageHeader title={establishment.name} back />
-    <section className="est-detail-hero card"><div className="est-detail-cover"><EstablishmentAvatar id={establishment.id} name={establishment.name} photoUrl={establishment.photoUrl} large/></div><div className="est-detail-copy"><h2>{establishment.name}</h2>{!demoMode && currentUser.id && <RestaurantDishes key={`${currentUser.id}:${establishment.id}`} establishmentId={establishment.id}/>}<div className="rating-line"><strong>{establishment.currentRating.toFixed(1)}</strong><Stars rating={Math.round(establishment.currentRating)}/><span>{establishment.currentReviewCount} avis</span></div><p><MapPin size={15}/>{establishment.address}, {establishment.city}</p></div></section>
+    <section className="est-detail-hero card"><div className="est-detail-cover"><EstablishmentAvatar id={establishment.id} name={establishment.name} photoUrl={establishment.photoUrl} large/></div><div className="est-detail-copy"><h2>{establishment.name}</h2>{!demoMode && currentUser.id && <RestaurantDishes key={dishScope} establishmentId={establishment.id} menuVersion={menu?.scope === dishScope ? menu.version : undefined}/>}<div className="rating-line"><strong>{establishment.currentRating.toFixed(1)}</strong><Stars rating={Math.round(establishment.currentRating)}/><span>{establishment.currentReviewCount} avis</span></div><p><MapPin size={15}/>{establishment.address}, {establishment.city}</p></div></section>
     <RetainedCorpusInfo establishmentId={establishment.id}/>
     <ReviewCollectionAlert establishment={establishment}/>
     <ReviewReloadPanel establishment={establishment}/>
-    {!demoMode && currentUser.id && <RainminerMenuPanel key={establishment.id} establishmentId={establishment.id} userId={currentUser.id}/>}
+    {!demoMode && currentUser.id && <RainminerMenuPanel key={dishScope} establishmentId={establishment.id} userId={currentUser.id} onMenuAvailable={menuAvailable}/>}
     <section className="sync-panel card"><div><strong>{messages.establishment.monitoringActive}</strong><SyncBadge status={establishment.syncStatus}/></div><div className="sync-timings"><p>{messages.establishment.lastCheck}<br/><strong>{fullDate(establishment.lastSyncedAt)}</strong></p><p>{messages.establishment.nextCheck}<br/><strong>{establishment.syncStatus !== 'error' && establishment.nextSyncAt ? timeUntil(establishment.nextSyncAt) : messages.establishment.notScheduled}</strong></p></div><div className="button-row"><a className="secondary-button full-width" href={establishment.googleMapsUrl} target="_blank" rel="noreferrer"><ExternalLink size={17}/>Google Maps</a></div></section>
     <div className="section-heading"><h2>{messages.establishment.recentNegative}</h2><button className="text-button" onClick={() => navigate(`/avis?etablissement=${id}&statut=all`)}>{messages.common.viewAll}</button></div>
     {related.map((review) => <ReviewRow key={review.id} review={review}/>)}

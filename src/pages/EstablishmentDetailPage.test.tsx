@@ -1,10 +1,12 @@
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EstablishmentDetailPage } from './EstablishmentDetailPage'
 
 const removeEstablishment = vi.fn().mockResolvedValue(undefined)
+const menuApi = vi.hoisted(() => ({ invoke: vi.fn(), rpc: vi.fn() }))
+vi.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: menuApi.invoke }, rpc: menuApi.rpc } }))
 
 vi.mock('../app/AppContext', () => ({
   useApp: () => ({
@@ -47,7 +49,12 @@ vi.mock('../app/AppContext', () => ({
 }))
 
 describe('EstablishmentDetailPage', () => {
-  afterEach(() => cleanup())
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+    menuApi.invoke.mockReset()
+    menuApi.rpc.mockReset()
+  })
 
   it('affiche la photo enregistrée de l’établissement', () => {
     const { container } = render(
@@ -89,5 +96,36 @@ describe('EstablishmentDetailPage', () => {
 
     expect(removeEstablishment).toHaveBeenCalledWith('green-home')
     expect(await screen.findByText('Liste des établissements')).toBeVisible()
+  })
+
+  it('affiche la spécialité sur la fiche ouverte dès que le menu est terminé', async () => {
+    vi.useFakeTimers()
+    menuApi.invoke.mockResolvedValue({ data: { job: { id: 'menu', status: 'running' }, result: null }, error: null })
+    menuApi.rpc.mockResolvedValue({ data: { revision: 0, associations: [], unresolved: [] }, error: null })
+    await act(async () => {
+      render(<MemoryRouter initialEntries={['/etablissements/green-home']}>
+        <Routes><Route path="/etablissements/:id" element={<EstablishmentDetailPage />} /></Routes>
+      </MemoryRouter>)
+    })
+    expect(screen.getByText('Extraction en cours…')).toBeVisible()
+    expect(screen.queryByText('Spécialité : Bánh căn')).not.toBeInTheDocument()
+    const reads = () => menuApi.rpc.mock.calls.filter(([name]) => name === 'read_restaurant_dishes')
+    expect(reads()).toHaveLength(1)
+
+    menuApi.invoke.mockResolvedValue({ data: {
+      job: { id: 'menu', status: 'completed' },
+      result: { provenance: { runId: 'saved-menu' }, counts: { received: 1, excludedDrinks: 0, retained: 1 }, references: [] },
+    }, error: null })
+    menuApi.rpc.mockResolvedValue({ data: {
+      revision: 1, specialty: { name: 'Bánh căn', status: 'proposed' }, associations: [], unresolved: [],
+    }, error: null })
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(screen.getByText('Menu disponible')).toBeVisible()
+    expect(within(screen.getByRole('region', { name: 'Spécialité et plats' })).getByText('Spécialité : Bánh căn')).toBeVisible()
+    expect(screen.getByText('Proposée')).toBeVisible()
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000) })
+    expect(reads()).toHaveLength(2)
+    expect(menuApi.invoke.mock.calls.every(([, request]) => request.body.action === 'status')).toBe(true)
   })
 })
