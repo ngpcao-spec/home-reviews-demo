@@ -16,7 +16,7 @@ export const ORG='10000000-0000-4000-8000-000000000001',ORG2='10000000-0000-4000
 export const USER='20000000-0000-4000-8000-000000000001',USER2='20000000-0000-4000-8000-000000000002'
 export const PLACE='ChIJMenuFixtureOnly',ACTOR='8GGZ9N7j2JhqnQ3oT'
 export const pricing={actorId:ACTOR,pricing:{pricingModel:'PAY_PER_EVENT',minimalMaxTotalChargeUsd:0}}
-export async function menuDatabase(beforeRelease?:(db:PGlite)=>Promise<void>){
+export async function menuDatabase(beforeRelease?:(db:PGlite)=>Promise<void>,beforeAutomation?:(db:PGlite)=>Promise<void>){
  const db=new PGlite();await db.waitReady
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
  create schema private;create schema auth;create schema vault;
@@ -70,6 +70,7 @@ export async function menuDatabase(beforeRelease?:(db:PGlite)=>Promise<void>){
  }
  // PGlite lacks pg_cron/pg_net; omit only the registration statement. Its
  // work_due predicate is real SQL tested below; CI registers the actual Cron.
+ await beforeAutomation?.(db)
  await db.exec(menuSql(MENU_MIGRATION).replace(/select cron\.schedule\([\s\S]*?\$cron\$\);/,''))
  await beforeRelease?.(db)
  await db.exec(menuSql(MENU_RELEASE_MIGRATION))

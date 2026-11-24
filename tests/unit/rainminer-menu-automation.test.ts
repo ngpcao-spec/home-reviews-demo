@@ -337,3 +337,23 @@ it('the first-test operator script requires authorization and permits only one e
   expect(fake.calls.filter(c=>c.method==='POST')).toHaveLength(1)
  }finally{await isolated.close()}
 })
+it('both release migrations preserve legacy runs and shared raw data, including an uncertain start',async()=>{
+ const select="select id,establishment_id,place_id,request_id,status,run_id,raw,result,error_code,lease_until,created_at from rainminer_menu_jobs order by id"
+ let before:unknown,shared:unknown
+ const isolated=await menuDatabase(undefined,async database=>{
+  const a=await newImport(database),b=await newImport(database,{place:PLACE+'B'})
+  await database.query("insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,run_id,raw,result) values($1,$2,$3,'completed','legacy-run',$4,$5)",[a.est,PLACE,crypto.randomUUID(),raw(),{placeId:PLACE,references:raw()}])
+  await database.query("insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,error_code) values($1,$2,$3,'unknown','START_OUTCOME_UNKNOWN')",[b.est,PLACE+'B',crypto.randomUUID()])
+  const restaurant=crypto.randomUUID()
+  await database.query('insert into private.shared_restaurants values($1,$2)',[restaurant,PLACE])
+  await database.query("insert into private.shared_restaurant_menu_versions values($1,'legacy-run',now(),$2,$3,'{}')",[restaurant,raw(),{placeId:PLACE,references:raw()}])
+  before=(await database.query(select)).rows
+  shared=(await database.query('select * from private.shared_restaurant_menu_versions')).rows
+ })
+ try{
+  expect((await isolated.query(select)).rows).toEqual(before)
+  expect((await isolated.query('select * from private.shared_restaurant_menu_versions')).rows).toEqual(shared)
+  expect(Number((await isolated.query('select private.rainminer_budget_used() used')).rows[0].used)).toBe(.5)
+  const fake=provider();expect(await advanceRainminerMenu(menuAdmin(isolated),'synthetic',{fetch:fake.fetch})).toEqual({claimed:0});expect(fake.calls).toHaveLength(0)
+ }finally{await isolated.close()}
+})
