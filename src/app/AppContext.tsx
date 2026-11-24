@@ -498,15 +498,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setDataError(null)
     }
     try {
-    const [establishmentsResult, reviewsResult, notificationsResult, organizationResult, profileResult, initialImportsResult] = await Promise.all([
+    const onboardingClient = supabase
+    const loadOrganizations = () => onboardingClient.from('organizations').select('id,monitoring_interval_hours')
+    const loadProfile = () => onboardingClient.from('profiles').select('preferred_language').eq('user_id', userId).maybeSingle()
+    const [establishmentsResult, reviewsResult, notificationsResult, initialOrganizations, initialProfile, initialImportsResult] = await Promise.all([
       supabase.from('establishments').select('id,organization_id,name,address,google_maps_url,photo_url,rating,total_reviews,active,last_sync_at,next_sync_at,sync_status,initial_import_job_id,review_collection_status,review_collection_expected,review_collection_unique,review_collection_checked_at,review_reload_job_id,review_reload_request_id,review_reload_status,review_reload_count,review_reload_completed_at').eq('active', true).order('created_at'),
       fetchAllReviewRows(),
       supabase.from('notifications').select('id,organization_id,user_id,review_id,establishment_id,type,title,body,read_at,push_status,created_at').order('created_at', { ascending: false }).limit(100),
-      supabase.from('organizations').select('id,monitoring_interval_hours'),
-      supabase.from('profiles').select('preferred_language').eq('user_id', authUser?.id ?? '').maybeSingle(),
+      loadOrganizations(),
+      loadProfile(),
       supabase.from('initial_import_jobs').select('id,organization_id,user_id,query,expected_google_id,establishment_id,status,reviews_target,reviews_fetched,reviews_inserted,error_code,candidate_snapshot,result,created_at,updated_at').eq('request_kind', 'initial').is('acknowledged_at', null).order('created_at', { ascending: false }).limit(10),
     ])
     if (!current()) return
+    let organizationResult = initialOrganizations
+    let profileResult = initialProfile
+    if (!organizationResult.error && organizationResult.data?.length === 0) {
+      const provision = await supabase.rpc('ensure_home_user')
+      if (!current()) return
+      if (provision.error) throw provision.error
+      const [organizations, profile] = await Promise.all([loadOrganizations(), loadProfile()])
+      if (!current()) return
+      organizationResult = organizations
+      profileResult = profile
+    }
     if (!background) {
       setDataLoading(false)
       setDataReady(true)

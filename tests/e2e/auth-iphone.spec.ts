@@ -54,3 +54,93 @@ for(const language of ['vi','fr'] as const)test(`new ${language} account reaches
   await expect(page.getByText('Cette page n’existe pas')).toHaveCount(0)
   expect(unexpected).toEqual([])
 })
+
+for (const existing of [true, false]) test(`${existing ? 'existing' : 'new'} restaurant account uses the expected onboarding path`, async ({ page }) => {
+  let hasOrganization = existing
+  let provisioningCalls = 0
+  let signOutCalls = 0
+  let authorizationCalls = 0
+  const unexpected: string[] = []
+  const id = '11111111-1111-4111-8111-111111111111'
+  const organizationId = '22222222-2222-4222-8222-222222222222'
+  const user = {
+    id, aud: 'authenticated', role: 'authenticated', email: 'fixture@example.test',
+    app_metadata: { provider: 'google', providers: ['google'] }, user_metadata: {},
+    created_at: '2026-01-01T00:00:00Z',
+  }
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
+  const token = encode({ alg: 'HS256', typ: 'JWT' }) + '.'
+    + encode({ sub: id, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' }) + '.fixture'
+  await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { value: true }))
+  await page.route(/https:\/\/.*/, async route => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const path = url.pathname
+    const reply = (json: unknown) => route.fulfill({
+      status: 200, json, headers: { 'access-control-allow-origin': '*' },
+    })
+    if (url.origin !== 'https://auth-fixture.supabase.co') {
+      unexpected.push(url.origin + path)
+      return route.abort()
+    }
+    if (path === '/auth/v1/authorize') {
+      authorizationCalls += 1
+      expect(url.searchParams.get('provider')).toBe('google')
+      const callback = new URL(url.searchParams.get('redirect_to')!)
+      expect(callback.origin).toBe('http://127.0.0.1:4174')
+      callback.hash = new URLSearchParams({ access_token: token, refresh_token: 'fixture-refresh',
+        expires_in: '3600', token_type: 'bearer', sb: '' }).toString()
+      return route.fulfill({
+        contentType: 'text/html', body: '<script>location.replace(' + JSON.stringify(callback.href) + ')</script>',
+      })
+    }
+    if (path === '/auth/v1/user') return reply(user)
+    if (path === '/auth/v1/logout') {
+      signOutCalls += 1
+      expect(url.searchParams.get('scope')).toBe('local')
+      return reply({})
+    }
+    if (path === '/rest/v1/rpc/ensure_home_user') {
+      expect(request.method()).toBe('POST')
+      expect(request.postDataJSON()).toEqual({})
+      expect(request.headers().authorization).toBe('Bearer ' + token)
+      provisioningCalls += 1
+      hasOrganization = true
+      return reply(organizationId)
+    }
+    if (path === '/rest/v1/organizations') {
+      return reply(hasOrganization ? [{ id: organizationId, monitoring_interval_hours: 12 }] : [])
+    }
+    if (path === '/rest/v1/organization_members') return reply(hasOrganization ? [{ organization_id: organizationId, user_id: id, role: 'owner' }] : [])
+    if (path === '/rest/v1/profiles') return reply(hasOrganization ? [{ preferred_language: 'fr' }] : [])
+    if (path === '/rest/v1/notification_preferences') {
+      return reply([{ notification_onboarding_seen: true, notification_permission_status: 'denied' }])
+    }
+    if (['establishments', 'reviews', 'notifications', 'initial_import_jobs'].some(name => path === '/rest/v1/' + name)) {
+      return reply([])
+    }
+    unexpected.push(path)
+    return route.abort()
+  })
+  await page.routeWebSocket(/wss:\/\/.*/, socket => socket.close())
+
+  const connect = () => page.getByRole('button', { name: /Continuer avec Google/ })
+  const home = () => page.getByRole('heading', { name: 'HOME Reviews', exact: true })
+  await page.goto('/')
+  await connect().click()
+  await expect(home()).toBeVisible()
+  expect(provisioningCalls).toBe(existing ? 0 : 1)
+  await page.reload()
+  await expect(home()).toBeVisible()
+  expect(provisioningCalls).toBe(existing ? 0 : 1)
+
+  await page.locator('a[href="#/plus"]').click()
+  await page.getByRole('button', { name: /Se déconnecter/ }).click()
+  await expect(connect()).toBeVisible()
+  expect(signOutCalls).toBe(1)
+  await connect().click()
+  await expect(home()).toBeVisible()
+  expect(authorizationCalls).toBe(2)
+  expect(provisioningCalls).toBe(existing ? 0 : 1)
+  expect(unexpected).toEqual([])
+})
