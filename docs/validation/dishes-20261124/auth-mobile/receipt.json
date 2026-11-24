@@ -1,0 +1,74 @@
+{
+  "commit": "8dd5fd4986a2ed10e06c8a501502a692c3cd87c7",
+  "passed": [
+    "two-real-auth-sessions-read-scope-and-shared-fr-vi",
+    "manual-confirmation-shared-across-languages",
+    "manual-correction-survives-reprocessing-raw-preserved",
+    "viewer-anonymous-direct-rpc-and-private-tables-denied",
+    "normalized-general-precise-search-proposals-not-availability",
+    "zero-provider-calls-and-no-production-access"
+  ],
+  "captures": [
+    "specialty-fr.png",
+    "specialty-vi.png",
+    "confirmation-fr.png",
+    "confirmation-vi.png",
+    "correction-fr.png",
+    "correction-vi.png",
+    "search-pho-fr.png",
+    "search-pho-ga-fr.png",
+    "search-banh-can-vi.png"
+  ],
+  "dimensions": [
+    {
+      "name": "specialty-fr",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "specialty-vi",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "confirmation-fr",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "confirmation-vi",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "correction-fr",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "correction-vi",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "search-pho-fr",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "search-pho-ga-fr",
+      "viewport": 390,
+      "scroll": 390
+    },
+    {
+      "name": "search-banh-can-vi",
+      "viewport": 390,
+      "scroll": 390
+    }
+  ],
+  "auth": "Two real GoTrue users and independent browser sessions",
+  "database": "Disposable Supabase PostgreSQL; complete schema reconstruction",
+  "sourceRun": "H8pfAHVslAWq1uno1",
+  "providerCalls": 0,
+  "productionModified": false
+}

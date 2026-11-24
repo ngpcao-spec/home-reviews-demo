@@ -58,11 +58,24 @@ Le dictionnaire initial est volontairement conservateur. Les noms non reconnus r
 
 ## Validation
 
-Les tests SQL exécutent la vraie migration dans PGlite, avec les fonctions de partage/menu existantes du banc de test. Les rôles PostgreSQL authentifiés et les deux organisations sont réellement exercés. La session Auth du navigateur est simulée dans le serveur local : ce n'est pas un test de connexion Supabase en production.
+La validation finale est exécutée sur une stack Supabase éphémère dans GitHub Actions, avec reconstruction du schéma applicatif, deux vrais utilisateurs GoTrue, deux organisations et deux sessions de navigateur indépendantes. Le client de l'application, PostgREST, les RPC et le contrôle des rôles sont réellement exécutés. Les fournisseurs sont isolés et n'ont reçu aucun appel.
+
+Commit applicatif testé : `8dd5fd4986a2ed10e06c8a501502a692c3cd87c7`. [Run réussi 45378632840](https://github.com/ngpcao-spec/home-reviews-demo/actions/runs/45378632840), le 24 novembre 2026. Les captures originales, le reçu et les résultats détaillés sont conservés dans [auth-mobile](validation/dishes-20261124/auth-mobile/README.md). Le serveur local avec Auth simulé décrit plus bas reste uniquement un outil de développement ; il n'est plus la preuve de validation finale.
 
 Contrôles ciblés : fixture réelle, contexte/variantes, boissons, recherches précises/générales, plusieurs plats/sans spécialité, corrections manuelles après réimport, idempotence, réutilisation d'un menu existant, isolement des comptes, lecture seule pour viewer, refus des appels directs anonymes et des révisions périmées/nulles, initialisation et retour arrière sans perte.
 
-Résultats du 24 novembre :
+Résultats de la validation finale :
+
+- Un parcours navigateur de 18,7 secondes couvre six groupes d'assertions : deux sessions/lecture isolée/partage FR-VI ; confirmations manuelles ; retraitement après correction ; refus viewer/anonyme/appels directs/tables privées ; recherche générale/précise ; zéro appel fournisseur. Les actions de confirmation et de retrait utilisent les boutons réels.
+- Neuf captures Playwright Chromium, viewport mobile 390 × 844, FR/VI, inspectées visuellement ; largeur du document égale à 390 pixels dans tous les cas.
+- Le compte FR confirme TRỨNG GÀ et le compte VI confirme TRỨNG CÚT. Deux retraits explicites de variantes restent appliqués après retraitement du JSON sauvegardé. Le JSON brut et le résultat d'origine restent exactement identiques. Les deux comptes retrouvent les mêmes corrections.
+- Un compte passé en rôle viewer garde la lecture et perd la modification, y compris par RPC directe. Les accès aux établissements de l'autre organisation, les appels anonymes et la lecture directe des nouvelles tables privées sont refusés.
+- `pho` retrouve les trois restaurants de test (Phở seul, Phở gà, Phở bò) ; `phở gà` ne retrouve que celui associé à Phở gà ; `pho mai` ne correspond à aucun. Les propositions gardent leur statut et une mention explicite d'incertitude sur la disponibilité.
+- Le badge « Spécialité » utilise le nom de la spécialité enregistrée, et non celui d'une variante ayant permis la recherche. Un défaut découvert pendant l'examen des premières captures a été reproduit par une assertion en échec, corrigé dans la migration non déployée, puis vérifié dans le run final.
+- **83/83 tests ciblés réussis** dans cinq fichiers : SQL métier, composants FR/VI, recherche, automatisation Rainminer et fiches de recommandations. Lint global, compilation TypeScript et build de production réussis.
+- Aucun déploiement, aucune écriture de production, aucune collecte ni analyse payante. La stack isolée a été supprimée après le test.
+
+Historique des contrôles précédents du même chantier (distinct du run final) :
 
 - 25 tests spécifiques réussis : 16 SQL, 6 composants FR/VI et 3 recherches/changements de compte/réessai explicite.
 - Suite générale : 3 607 réussis, 4 dépassements du délai de 5 secondes dans deux fichiers existants, 1 test déjà ignoré. La suite a duré 797 secondes sur ce poste.
@@ -80,7 +93,9 @@ npx vite --config tests/e2e/vite.dishes.config.ts --host 127.0.0.1 --port 4191
 
 Pages : `/tests/e2e/fixtures/dishes-mobile.html?language=fr`, `?language=vi&user=b`, `?language=fr&search=pho`.
 
-Les traces des contrôles navigateur sont dans `docs/validation/dishes-20261124`. Le compte B VI retrouve la confirmation faite par A FR et seulement son établissement. Les captures JPEG n'ont pas pu être produites : Chrome renvoie un délai dépassé sur `Page.captureScreenshot` et la fenêtre native ne peut pas être activée. Les traces DOM ne sont pas présentées comme des captures visuelles ; la validation visuelle finale reste à terminer.
+Les anciennes traces DOM restent dans `docs/validation/dishes-20261124` pour traçabilité. Le blocage de capture de fenêtre Chrome a été contourné par les captures de page Playwright du run final ; les neuf PNG ne proviennent pas d'une maquette ni d'une session Auth simulée.
+
+Limites : viewport mobile Chromium, pas de Safari sur iPhone physique ; connexion par mot de passe Supabase Auth, pas de nouveau contrôle Google OAuth. La fixture Bánh Căn provient du menu sauvegardé, tandis que les restaurants Phở, les comptes et leurs organisations sont des données de test. L'activation du partage pour Bánh Căn est limitée à la base éphémère et n'élargit pas le pilote de production. Le menu ne garantit pas la disponibilité actuelle des plats. Aucun contrôle de production n'est revendiqué pour cette fonctionnalité non déployée.
 
 ## Déploiement ultérieur et retour arrière
 
