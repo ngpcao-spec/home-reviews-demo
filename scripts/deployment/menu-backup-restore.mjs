@@ -78,7 +78,21 @@ function restore(){
  const existing=JSON.parse(psql('select json_agg(rolname) from pg_roles','postgres'));
  for(const role of roles)if(!existing.includes(role.rolname))psql('create role '+quote(role.rolname)+' nologin;','postgres','create_isolated_owner_role');
  run('docker',['cp',join(dir,'database.dump'),container+':/tmp/menu-database.dump']);
- run('docker',['exec',container,'pg_restore','--exit-on-error','--no-tablespaces','-U','supabase_admin','-d','menu_restore','/tmp/menu-database.dump'],{},'pg_restore');
+ // Supabase rejects a superuser-owned event trigger whose function is owned by
+ // the non-superuser postgres role. Restore every event trigger as its original
+ // owner instead of creating it as supabase_admin before ALTER OWNER. No archive
+ // item is omitted: the two lists partition all TOC entries.
+ const toc=run('docker',['exec',container,'pg_restore','--list','/tmp/menu-database.dump']);
+ const entries=toc.split('\n');
+ const eventEntries=entries.filter(line=>/^\d+;/.test(line)&&line.includes('EVENT TRIGGER'));
+ assert(eventEntries.length>0,'EXPECTED_SUPABASE_EVENT_TRIGGERS');
+ const baseEntries=entries.filter(line=>!eventEntries.includes(line));
+ assert.equal(baseEntries.filter(line=>/^\d+;/.test(line)).length+eventEntries.length,entries.filter(line=>/^\d+;/.test(line)).length);
+ writeFileSync(join(dir,'base-restore.list'),baseEntries.join('\n'));
+ writeFileSync(join(dir,'event-restore.list'),eventEntries.join('\n')+'\n');
+ for(const name of ['base-restore.list','event-restore.list'])run('docker',['cp',join(dir,name),container+':/tmp/'+name]);
+ run('docker',['exec',container,'pg_restore','--exit-on-error','--no-tablespaces','--use-list=/tmp/base-restore.list','-U','supabase_admin','-d','menu_restore','/tmp/menu-database.dump'],{},'pg_restore');
+ run('docker',['exec',container,'pg_restore','--exit-on-error','--use-set-session-authorization','--use-list=/tmp/event-restore.list','-U','supabase_admin','-d','menu_restore','/tmp/menu-database.dump'],{},'pg_restore_event_owners');
  const expected=JSON.parse(readFileSync(join(dir,'table-fingerprints.json')));
  for(const t of expected){const actual=JSON.parse(psql(fingerprint(t)));assert.deepEqual(actual,t,'TABLE_RESTORE_MISMATCH_'+t.schema+'.'+t.name);}
  const menuBefore=JSON.parse(readFileSync(join(dir,'menu-fingerprint.json')));
