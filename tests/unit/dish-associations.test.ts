@@ -21,7 +21,7 @@ async function menu(id:string,rows=savedMenu.raw,run=crypto.randomUUID()){
 }
 const row=(name:string,category:string|null=null)=>({placeId:savedMenu.placeId,name,category,description:'Sauce au vin et café',menuImageUrl:'https://example.test/menu.jpg'})
 it('reprocesses a saved numbered phở menu and preserves source lines and manual edits', async () => {
- const isolated = await dishDatabase(undefined,true)
+ const isolated = await dishDatabase(undefined,'original')
  try {
   const id = crypto.randomUUID()
   const raw = [
@@ -86,6 +86,39 @@ it('replays all 16 saved raw rows, proposes bánh căn and ten contextual varian
 it('does not globally convert eggs/assortment into dishes or infer availability from descriptions',async()=>{
  const id=await est('Mixed Bistro');await menu(id,[row('Trứng gà'),row('Thập cẩm'),row('Unknown','Other')])
  const p=await read(id);expect(p.specialty).toBeNull();expect(p.associations).toEqual([]);expect(p.unresolved).toHaveLength(3)
+})
+it('uses a precise dish heading for different cuisines, keeping the original label and context', async () => {
+ const pho = await est('Phở Hát Giang')
+ await menu(pho, [
+  row('PHỞ BÒ HÁT GIANG'), row('Tai','PHO BO'), row('Gan','PHO BO'), row('Bo Vien','PHO BO'),
+  row('Nạm','PHỞ NAM / BẮC'), row('Tai','CHICKEN SOUP'), row('Phở gà','PHO BO'),
+  row('Phở bò','PHỞ GÀ'), row('Extra Bo Vien','PHO BO'), row('Phở Tái','GỌI THÊM'),
+ ])
+ const phoProfile = await read(pho)
+ expect(phoProfile.specialty).toMatchObject({name:'Phở',status:'proposed'})
+ expect(phoProfile.associations.map(({name}:{name:string})=>name).sort()).toEqual(
+  ['Phở bò · Bo Vien','Phở bò · Gan','Phở bò · Tai','Phở · Nạm'].sort(),
+ )
+ expect(phoProfile.associations.find(({name}:{name:string})=>name==='Phở bò · Tai').evidence[0]).toMatchObject({
+  name:'Tai',section:'PHO BO',reason:'explicit_menu_context',
+ })
+ expect(phoProfile.unresolved).toHaveLength(6)
+ expect((await find('pho bo')).map((match:{establishmentId:string})=>match.establishmentId)).toEqual([pho])
+ expect(await find('phở gà')).toEqual([])
+
+ const other = await est('Bistro')
+ await menu(other, [
+  row('CONTADINA','GOURMET PIZZA'), row('TUNA','GOURMET PIZZA'), row('Extra cheese','GOURMET PIZZA'),
+  row('Phở Tái','GOURMET PIZZA'), row('Menu','GOURMET PIZZA'), row('-Spaghetti tomato sauce','Spaghetti'),
+  row('Bolognese','PASTA'), row('French fries','STARTER'), row('Bò','Beef'),
+ ])
+ const otherProfile = await read(other)
+ expect(otherProfile.specialty).toBeNull()
+ expect(otherProfile.associations.map(({name}:{name:string})=>name).sort()).toEqual(
+  ['Pizza · CONTADINA','Pizza · TUNA','Spaghetti tomato sauce'].sort(),
+ )
+ expect(otherProfile.unresolved).toHaveLength(6)
+ expect((await find('spaghetti')).map((match:{establishmentId:string})=>match.establishmentId)).toEqual([other])
 })
 it('normalizes accents/case, general searches include variants, precise searches never expand to generic or sibling dishes',async()=>{
  const generic=await est('Phở House'),ga=await est('Mixed Restaurant'),bo=await est('Phở Shop')
