@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {beforeAll,afterAll,beforeEach,afterEach,it,expect} from 'vitest'
 import type {PGlite} from '@electric-sql/pglite'
-import {dishDatabase,savedMenu,ORG,ORG2,USER,USER2,PHO_MIGRATION} from '../fixtures/dish-associations-database'
+import {dishDatabase,savedMenu,ORG,ORG2,USER,USER2,PHO_MIGRATION,CONTEXT_MIGRATION,CONTEXT_IDENTITY_MIGRATION} from '../fixtures/dish-associations-database'
 import {readFileSync} from 'node:fs'
 let db:PGlite
 beforeAll(async()=>{db=await dishDatabase()},30000)
@@ -120,6 +120,29 @@ it('uses a precise dish heading for different cuisines, keeping the original lab
  expect(otherProfile.unresolved).toHaveLength(6)
  expect((await find('spaghetti')).map((match:{establishmentId:string})=>match.establishmentId)).toEqual([other])
 })
+it('keeps the UUID of a previously recognized pizza whose original label already starts with Pizza', async () => {
+ const isolated = await dishDatabase(undefined,'numbered')
+ try {
+  const id = crypto.randomUUID()
+  const raw = [row('Pizza Táo/Gorgonzola Pizza','CLASSIC PIZZA')]
+  await isolated.query('insert into establishments(id,name,organization_id,place_id) values($1,$2,$3,$4)',
+   [id,'Pizzeria',ORG,savedMenu.placeId])
+  await isolated.query("insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,run_id,raw,result) values($1,$2,$3,'completed','existing-pizza',$4,'{}')",
+   [id,savedMenu.placeId,crypto.randomUUID(),raw])
+  const enabled = async () => (await isolated.query(
+   'select a.dish_id,n.name from private.restaurant_dishes a join private.dish_names n on n.id=a.dish_id where a.scope=$1 and a.enabled',
+   ['establishment:'+id],
+  )).rows
+  const before = await enabled()
+  expect(before).toMatchObject([{name:'Pizza · Pizza Táo/Gorgonzola Pizza'}])
+  for (const migration of [CONTEXT_MIGRATION,CONTEXT_IDENTITY_MIGRATION])
+   await isolated.exec(readFileSync('supabase/migrations/'+migration,'utf8'))
+  await isolated.query('update private.restaurant_dish_profiles set source_run=null where scope=private.dish_scope($1)',[id])
+  await isolated.query('select private.refresh_restaurant_dishes($1)',[id])
+  expect(await enabled()).toEqual(before)
+  expect((await isolated.query('select raw from rainminer_menu_jobs where run_id=$1',['existing-pizza'])).rows[0].raw).toEqual(raw)
+ } finally { await isolated.close() }
+},30000)
 it('normalizes accents/case, general searches include variants, precise searches never expand to generic or sibling dishes',async()=>{
  const generic=await est('Phở House'),ga=await est('Mixed Restaurant'),bo=await est('Phở Shop')
  await menu(generic,[row('Phở')]);await menu(ga,[row('Phở gà')]);await menu(bo,[row('Phở bò')])
