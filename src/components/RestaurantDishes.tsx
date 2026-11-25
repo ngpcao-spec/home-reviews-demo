@@ -9,6 +9,16 @@ const reasons:Record<string,[string,string]> = {
  conflicting_context:['Informations contradictoires','Thông tin mâu thuẫn'],
  insufficient_evidence:['Contexte insuffisant','Thiếu căn cứ'],
 }
+const menuProfileLabels={
+ specialized:['Spécialisée','Chuyên một món'],
+ varied:['Variée','Đa dạng'],
+ unknown:['Indéterminée','Chưa xác định'],
+}
+const restaurantTypeLabels={
+ street_food:['Restauration de rue','Ẩm thực đường phố'],
+ family_dining:['Familial','Quán ăn gia đình'],
+ unknown:['Indéterminé','Chưa xác định'],
+}
 
 export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:string;menuVersion?:string}){
  const {language}=useI18n(),vi=language==='vi'
@@ -59,8 +69,15 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
  const safePhoto=(url?:string)=>url&&/^https:\/\/(?:[^/]+\.)?(?:googleusercontent\.com|google\.com)\//.test(url)?url:undefined
  const classification=profile?.classification
  const awaiting=classification?.state==='queued'||classification?.state==='running'
+ const other=profile?.unresolved.filter(row=>row.reason==='other')??[]
+ const toReview=profile?.unresolved.filter(row=>row.reason!=='other')??[]
  return <section className="restaurant-dishes" aria-label={vi?'Đặc sản và món ăn':'Spécialité et plats'}>
   {profile?.specialty&&<p className="dish-specialty"><strong>{vi?'Đặc sản':'Spécialité'} : {profile.specialty.name}</strong><small>{status(profile.specialty.status)}</small></p>}
+  {!profile?.specialty&&classification?.specialtyNeedsConfirmation&&<p className="dish-hint">{vi?'Đặc sản cần xác nhận':'Spécialité à confirmer'}</p>}
+  {(profile?.menuProfile||profile?.restaurantType)&&<dl className="dish-facets">
+   {profile.menuProfile&&<div><dt>{vi?'Thực đơn':'Carte'}</dt><dd>{menuProfileLabels[profile.menuProfile]?.[vi?1:0]}</dd></div>}
+   {profile.restaurantType&&<div><dt>{vi?'Loại hình':'Type'}</dt><dd>{restaurantTypeLabels[profile.restaurantType]?.[vi?1:0]}</dd></div>}
+  </dl>}
   {awaiting&&<p role="status">{vi?'Đang phân loại thực đơn mới…':'Classement du nouveau menu en cours…'}</p>}
   {classification?.state==='failed'&&<p role="status">{vi?'Chưa phân loại được thực đơn mới.':'Le classement du nouveau menu a échoué.'}</p>}
   {classification?.stale&&<p className="dish-hint">{vi?'Các món dưới đây dựa trên thực đơn trước.':'Les plats affichés proviennent du menu précédent.'}</p>}
@@ -77,7 +94,8 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
      {e.runId&&<small>{vi?'Lượt':'Run'} {e.runId} · {vi?'Dòng':'Ligne'} {e.sourceRow}</small>}
     </div>)}</details>
    </li>)}</ul>
-   {profile.unresolved.length>0&&<details><summary>{vi?'Cần xem xét':'À examiner'} ({profile.unresolved.length})</summary><ul>{profile.unresolved.map((x,i)=><li key={i}>{x.name}{x.section&&' · '+x.section}{reasons[x.reason]&&<small>{reasons[x.reason][vi?1:0]}</small>}</li>)}</ul></details>}
+   {other.length>0&&<details><summary>{vi?'Khác':'Autres'} ({other.length})</summary><ul>{other.map(x=><li key={x.sourceRow}>{x.name||(vi?'Không có tên':'Sans nom')}{x.section&&' · '+x.section}</li>)}</ul></details>}
+   {toReview.length>0&&<details><summary>{vi?'Cần xem xét':'À examiner'} ({toReview.length})</summary><ul>{toReview.map(x=><li key={x.sourceRow}>{x.name}{x.section&&' · '+x.section}{reasons[x.reason]&&<small>{reasons[x.reason][vi?1:0]}</small>}</li>)}</ul></details>}
   </details>}
   {profile?.canEdit&&<button type="button" className="text-button" onClick={()=>void edit()} aria-expanded={open}>{vi?'Xác nhận hoặc sửa món ăn':'Confirmer ou corriger les plats'}</button>}
   {open&&profile?.canEdit&&<div className="dish-editor">

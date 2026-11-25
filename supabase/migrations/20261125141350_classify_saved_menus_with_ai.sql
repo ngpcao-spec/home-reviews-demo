@@ -3,6 +3,7 @@ begin;
 create table private.menu_dish_ai_settings (
  singleton boolean primary key default true check (singleton),
  enabled boolean not null default false,
+ enabled_since timestamptz check (not enabled or enabled_since is not null),
  model text not null default 'gpt-5.4-nano' check (model ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$')
 );
 insert into private.menu_dish_ai_settings default values;
@@ -19,6 +20,7 @@ create table private.menu_dish_ai_runs (
  lease_until timestamptz,
  result jsonb,
  usage jsonb,
+ raw_response text,
  error_code text,
  created_at timestamptz not null default now(),
  finished_at timestamptz,
@@ -46,30 +48,15 @@ revoke all on private.menu_dish_ai_settings,private.menu_dish_ai_runs,private.me
 
 -- Identity and projection are separate: cache the interpretation by Google
 -- Place ID, but publish it only through the existing authorized menu scopes.
-create function private.menu_dish_ai_name(p_name text,p_parent uuid)
+create function private.menu_dish_ai_name(p_name text)
 returns uuid language plpgsql set search_path='' as $$
-declare k text:=private.dish_key(p_name); parent private.dish_names; id_out uuid; parent_key text;
+declare k text:=private.dish_key(p_name); id_out uuid;
 begin
  if length(p_name) not between 1 and 100 or k='' then raise exception 'MENU_AI_INVALID_NAME'; end if;
- if p_parent is not null then
-  select * into strict parent from private.dish_names where id=p_parent;
-  parent_key:=private.dish_key(parent.name||' '||p_name);
-  if k=parent.key then raise exception 'MENU_AI_INVALID_PARENT'; end if;
- end if;
  select n.id into id_out from private.dish_names n
- where (n.key=k or k=any(n.aliases) or (p_parent is not null and n.key=parent_key))
-  and (p_parent is null or n.parent_id=p_parent)
- order by (n.key=k) desc,(n.key=parent_key) desc nulls last,n.key limit 1;
- if id_out is not null then return id_out; end if;
- if exists(select 1 from private.dish_names where key=k) then
-  -- An identical label under a different parent must not merge both dishes.
-  k:=parent_key||' contextual '||replace(p_parent::text,'-','');
-  select id into id_out from private.dish_names where key=k and parent_id=p_parent;
-  if id_out is not null then return id_out; end if;
-  insert into private.dish_names(name,key,parent_id,aliases)
-   values(p_name,k,p_parent,array[private.dish_key(p_name)]) returning id into id_out;
- else
-  insert into private.dish_names(name,key,parent_id) values(p_name,k,p_parent) returning id into id_out;
+ where n.key=k or k=any(n.aliases) order by (n.key=k) desc,n.key limit 1;
+ if id_out is null then
+  insert into private.dish_names(name,key) values(p_name,k) returning id into id_out;
  end if;
  return id_out;
 end$$;
@@ -77,7 +64,7 @@ end$$;
 create function private.publish_menu_dish_ai(p_scope text) returns void
 language plpgsql set search_path='' as $$
 declare t private.menu_dish_ai_targets; ai private.menu_dish_ai_runs; item jsonb; source jsonb;
- n int; d uuid; parent uuid; decision text; reason text; proof jsonb; chosen uuid; inserted int;
+ n int; d uuid; decision text; reason text; proof jsonb; chosen uuid; inserted int;
 begin
  select * into strict t from private.menu_dish_ai_targets where scope=p_scope;
  if private.dish_scope(t.establishment_id) is distinct from p_scope then return; end if;
@@ -91,35 +78,29 @@ begin
 
  for item in select value from jsonb_array_elements(ai.result->'items') loop
   d:=null;
-  parent:=null;
-  if item->>'kind' in ('dish','variant') then
-   if item->>'kind'='variant' then parent:=private.menu_dish_ai_name(item->>'parent',null); end if;
-   d:=private.menu_dish_ai_name(item->>'name',parent);
+  if item->>'kind'='dish' then
+   d:=private.menu_dish_ai_name(item->>'name');
    decision:='associated'; reason:='ai_menu_classification';
-  elsif item->>'kind'='ambiguous' then
-   decision:='review'; reason:=item->>'reason';
+  elsif item->>'kind'='other' then
+   decision:='review'; reason:='other';
   else
    decision:='excluded';
-   reason:=case item->>'kind' when 'drink' then 'beverage' when 'extra' then 'supplement' else 'non_food' end;
+   reason:=case item->>'kind' when 'drink' then 'beverage' else 'non_food' end;
   end if;
-  proof:='[]'::jsonb;
-  for n in select value::int from jsonb_array_elements_text(item->'rows') loop
-   source:=t.source_raw->(n-1);
-   if n<1 or source is null or source->>'placeId' is distinct from ai.place_id
-    then raise exception 'MENU_AI_SOURCE_CHANGED'; end if;
-   insert into private.dish_menu_evidence(scope,run_id,source_row,original,decision,reason,dish_id,collected_at)
-    values(p_scope,t.source_run,n,source,decision,reason,d,t.collected_at)
-   on conflict(scope,run_id,source_row) do update
-   set decision=excluded.decision,reason=excluded.reason,dish_id=excluded.dish_id
-   where dish_menu_evidence.original=excluded.original;
-   get diagnostics inserted=row_count;
-   if inserted<>1 then raise exception 'MENU_AI_SOURCE_CHANGED'; end if;
-   if d is not null then
-    proof:=proof||jsonb_build_array(jsonb_build_object('runId',t.source_run,'sourceRow',n,'name',source->>'name',
-      'section',source->>'category','photo',source->>'menuImageUrl','collectedAt',t.collected_at,'reason',reason));
-   end if;
-  end loop;
+  n:=(item->>'row')::int;
+  source:=t.source_raw->(n-1);
+  if n is null or n<1 or source is null or source->>'placeId' is distinct from ai.place_id
+   then raise exception 'MENU_AI_SOURCE_CHANGED'; end if;
+  insert into private.dish_menu_evidence(scope,run_id,source_row,original,decision,reason,dish_id,collected_at)
+   values(p_scope,t.source_run,n,source,decision,reason,d,t.collected_at)
+  on conflict(scope,run_id,source_row) do update
+  set decision=excluded.decision,reason=excluded.reason,dish_id=excluded.dish_id
+  where dish_menu_evidence.original=excluded.original;
+  get diagnostics inserted=row_count;
+  if inserted<>1 then raise exception 'MENU_AI_SOURCE_CHANGED'; end if;
   if d is not null then
+   proof:=jsonb_build_array(jsonb_build_object('runId',t.source_run,'sourceRow',n,'name',source->>'name',
+    'section',source->>'category','photo',source->>'menuImageUrl','collectedAt',t.collected_at,'reason',reason));
    insert into private.restaurant_dishes(scope,dish_id,status,origin,evidence)
     values(p_scope,d,'proposed','automatic',proof)
    on conflict(scope,dish_id) do update set
@@ -130,10 +111,10 @@ begin
   end if;
  end loop;
  if ai.result#>>'{specialty,name}' is not null then
-  chosen:=private.menu_dish_ai_name(ai.result#>>'{specialty,name}',null);
+  chosen:=private.menu_dish_ai_name(ai.result#>>'{specialty,name}');
   -- A manually removed dish cannot still produce an automatic specialty.
-  if not exists(select 1 from private.restaurant_dishes a join private.dish_names n on n.id=a.dish_id
-   where a.scope=p_scope and a.enabled and (n.id=chosen or n.parent_id=chosen)
+  if not exists(select 1 from private.restaurant_dishes a
+   where a.scope=p_scope and a.enabled and a.dish_id=chosen
     and exists(select 1 from private.dish_menu_evidence e
      where e.scope=p_scope and e.run_id=t.source_run and e.dish_id=a.dish_id
       and (ai.result->'specialty'->'rows') @> jsonb_build_array(e.source_row))) then chosen:=null; end if;
@@ -147,6 +128,17 @@ begin
  update private.menu_dish_ai_targets
  set published_id=ai.id,published_source_run=t.source_run,admission_error=null where scope=p_scope;
 end$$;
+
+create function private.menu_dish_ai_packet(p_raw jsonb,p_excluded jsonb,p_restaurant text)
+returns jsonb language sql immutable set search_path='' as $$
+ select jsonb_build_object(
+  'restaurant',coalesce(nullif(btrim(p_raw->0->>'placeName'),''),p_restaurant),
+  'lines',coalesce(jsonb_agg(jsonb_build_object('id',n,'name',r->>'name','section',r->>'category','description',r->>'description',
+   'price',r->'price','priceText',r->>'priceText','currency',r->>'currency',
+   'knownDrink',exists(select 1 from jsonb_array_elements(case when jsonb_typeof(p_excluded)='array' then p_excluded else '[]' end) d
+   where d->>'sourceRow'=n::text)) order by n),'[]'::jsonb))
+ from jsonb_array_elements(case when jsonb_typeof(p_raw)='array' then p_raw else '[]'::jsonb end) with ordinality m(r,n)
+$$;
 
 alter function private.refresh_restaurant_dishes(uuid) rename to refresh_restaurant_dishes_before_ai;
 create function private.refresh_restaurant_dishes(p_establishment uuid) returns void
@@ -180,25 +172,38 @@ begin
    where x->>'placeId' is distinct from e.place_id) then
   gate_error:='MENU_AI_SOURCE_INVALID';
  else
-  select jsonb_build_object(
-   'restaurant',coalesce(nullif(btrim(saved.raw->0->>'placeName'),''),e.name),
-   'lines',coalesce(jsonb_agg(jsonb_build_object('id',n,'name',r->>'name','section',r->>'category','description',r->>'description',
-    'price',r->'price','priceText',r->>'priceText','currency',r->>'currency',
-    'knownDrink',exists(select 1 from jsonb_array_elements(case when jsonb_typeof(saved.excluded)='array' then saved.excluded else '[]' end) d
-    where d->>'sourceRow'=n::text)) order by n),'[]'::jsonb))
-   into input_packet from jsonb_array_elements(saved.raw) with ordinality m(r,n);
+  input_packet:=private.menu_dish_ai_packet(saved.raw,saved.excluded,e.name);
   if octet_length(input_packet::text)>48000 then
    gate_error:='MENU_AI_SOURCE_TOO_LARGE';
   else
    content_hash:=encode(sha256(convert_to(input_packet::text,'UTF8')),'hex');
+   select id,status into id_out,state from private.menu_dish_ai_runs
+    where place_id=e.place_id and fingerprint=content_hash and model=cfg.model and contract='menu-dish-ai-v6';
+   -- Sharing an old menu, or receiving the same content again under a new run ID,
+   -- must not create a billable job for a pre-activation menu.
+   if id_out is null and (saved.collected_at<cfg.enabled_since or exists(
+    select 1 from public.rainminer_menu_jobs old where old.place_id=e.place_id and old.status='completed'
+     and coalesce(old.retrieved_at,old.created_at)<cfg.enabled_since and jsonb_typeof(old.raw)='array'
+     and private.menu_dish_ai_packet(old.raw,old.result->'excludedDrinks',e.name)=input_packet
+    union all
+    select 1 from private.shared_restaurant_menu_versions old join private.shared_restaurants sr on sr.id=old.restaurant_id
+     where sr.place_id=e.place_id and old.collected_at<cfg.enabled_since and jsonb_typeof(old.raw)='array'
+     and private.menu_dish_ai_packet(old.raw,old.menu_references->'excludedDrinks',e.name)=input_packet
+   )) then
+    if not exists(select 1 from private.menu_dish_ai_targets where scope=s) then
+     perform private.refresh_restaurant_dishes_before_ai(p_establishment);
+    end if;
+    return;
+   end if;
    insert into private.menu_dish_ai_runs(place_id,fingerprint,model,contract,packet,status,result,finished_at)
-    values(e.place_id,content_hash,cfg.model,'menu-dish-ai-v1',input_packet,
+    values(e.place_id,content_hash,cfg.model,'menu-dish-ai-v6',input_packet,
      case when jsonb_array_length(saved.raw)=0 then 'succeeded' else 'queued' end,
-     case when jsonb_array_length(saved.raw)=0 then '{"items":[],"specialty":null}'::jsonb end,
+     case when jsonb_array_length(saved.raw)=0 then
+      '{"items":[],"specialty":null,"menu_profile":{"value":"unknown","rows":[],"sections":[]},"restaurant_type":{"value":"unknown","name_evidence":null,"rows":[]}}'::jsonb end,
      case when jsonb_array_length(saved.raw)=0 then now() end)
    on conflict(place_id,fingerprint,model,contract) do nothing;
    select id,status into strict id_out,state from private.menu_dish_ai_runs
-    where place_id=e.place_id and fingerprint=content_hash and model=cfg.model and contract='menu-dish-ai-v1';
+    where place_id=e.place_id and fingerprint=content_hash and model=cfg.model and contract='menu-dish-ai-v6';
   end if;
  end if;
  insert into private.menu_dish_ai_targets(scope,establishment_id,source_run,collected_at,source_raw,run_id,admission_error)
@@ -233,7 +238,7 @@ begin
  from candidate c where r.id=c.id returning r.id,r.lease_id,r.model,r.contract,r.packet;
 end$$;
 
-create function public.finish_menu_dish_ai(p_id uuid,p_lease uuid,p_result jsonb,p_usage jsonb,p_error text)
+create function public.finish_menu_dish_ai(p_id uuid,p_lease uuid,p_result jsonb,p_usage jsonb,p_error text,p_raw_response text default null)
 returns text language plpgsql security definer set search_path='' as $$
 declare target text;
 begin
@@ -242,7 +247,7 @@ begin
  if not found then return null; end if;
  if p_result is not null and p_error is null then
   begin
-   update private.menu_dish_ai_runs set status='succeeded',result=p_result,usage=p_usage,finished_at=now() where id=p_id;
+   update private.menu_dish_ai_runs set status='succeeded',result=p_result,usage=p_usage,raw_response=p_raw_response,finished_at=now() where id=p_id;
    for target in select scope from private.menu_dish_ai_targets where run_id=p_id order by scope loop
     perform private.publish_menu_dish_ai(target);
    end loop;
@@ -251,7 +256,8 @@ begin
    p_error:='MENU_AI_PUBLISH_FAILED';
   end;
  end if;
- update private.menu_dish_ai_runs set status='failed',usage=p_usage,error_code=coalesce(p_error,'MENU_AI_INVALID_RESULT'),finished_at=now() where id=p_id;
+ update private.menu_dish_ai_runs set status='failed',usage=p_usage,raw_response=p_raw_response,
+  error_code=coalesce(p_error,'MENU_AI_INVALID_RESULT'),finished_at=now() where id=p_id;
  return 'failed';
 end$$;
 
@@ -259,7 +265,9 @@ create function private.menu_dish_ai_status(p_scope text) returns jsonb
 language sql stable set search_path='' as $$
  select jsonb_build_object('state',case when t.admission_error is not null then 'failed' else j.status end,
   'sourceRun',t.source_run,'stale',p.source_run is not null and
-   (t.published_id,t.published_source_run) is distinct from (t.run_id,t.source_run))
+   (t.published_id,t.published_source_run) is distinct from (t.run_id,t.source_run),
+  'specialtyNeedsConfirmation',coalesce(j.status='succeeded' and t.admission_error is null and
+   t.published_id=t.run_id and p.specialty_origin='automatic' and p.specialty_id is null,false))
  from private.menu_dish_ai_targets t left join private.menu_dish_ai_runs j on j.id=t.run_id
  left join private.restaurant_dish_profiles p on p.scope=t.scope where t.scope=p_scope
 $$;
@@ -269,13 +277,19 @@ revoke all on function public.read_restaurant_dishes_before_ai(uuid) from public
 create function public.read_restaurant_dishes(p_establishment uuid) returns jsonb
 language sql security definer set search_path='' as $$
  select public.read_restaurant_dishes_before_ai(p_establishment)||
-  jsonb_build_object('classification',private.menu_dish_ai_status(private.dish_access(p_establishment)))
+  jsonb_build_object('classification',private.menu_dish_ai_status(access.scope),
+   'menuProfile',published.result#>>'{menu_profile,value}',
+   'restaurantType',published.result#>>'{restaurant_type,value}')
+ from (select private.dish_access(p_establishment) scope) access
+ left join private.menu_dish_ai_targets t on t.scope=access.scope
+ left join private.menu_dish_ai_runs published on published.id=t.published_id
 $$;
 
-revoke all on function private.menu_dish_ai_name(text,uuid),private.publish_menu_dish_ai(text),
- private.refresh_restaurant_dishes(uuid),private.menu_dish_ai_status(text) from public,anon,authenticated,service_role;
-revoke all on function public.claim_menu_dish_ai(),public.finish_menu_dish_ai(uuid,uuid,jsonb,jsonb,text) from public,anon,authenticated,service_role;
-grant execute on function public.claim_menu_dish_ai(),public.finish_menu_dish_ai(uuid,uuid,jsonb,jsonb,text) to service_role;
+revoke all on function private.menu_dish_ai_name(text),private.publish_menu_dish_ai(text),
+ private.menu_dish_ai_packet(jsonb,jsonb,text),private.refresh_restaurant_dishes(uuid),
+ private.menu_dish_ai_status(text) from public,anon,authenticated,service_role;
+revoke all on function public.claim_menu_dish_ai(),public.finish_menu_dish_ai(uuid,uuid,jsonb,jsonb,text,text) from public,anon,authenticated,service_role;
+grant execute on function public.claim_menu_dish_ai(),public.finish_menu_dish_ai(uuid,uuid,jsonb,jsonb,text,text) to service_role;
 revoke all on function public.read_restaurant_dishes(uuid) from public,anon,service_role;
 grant execute on function public.read_restaurant_dishes(uuid) to authenticated;
 
