@@ -3,6 +3,13 @@ import {useI18n} from '../i18n'
 import {dishRpc,readDishes,type DishName,type DishProfile} from '../lib/restaurant-dishes'
 import './RestaurantDishes.css'
 
+const reasons:Record<string,[string,string]> = {
+ unclear_label:['Libellé indéterminé','Tên món chưa rõ'],
+ unclear_serving:['Plat ou supplément à distinguer','Chưa rõ là món hay phần thêm'],
+ conflicting_context:['Informations contradictoires','Thông tin mâu thuẫn'],
+ insufficient_evidence:['Contexte insuffisant','Thiếu căn cứ'],
+}
+
 export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:string;menuVersion?:string}){
  const {language}=useI18n(),vi=language==='vi'
  const [loaded,setLoaded]=useState<{scope:string;profile:DishProfile}>(),[names,setNames]=useState<DishName[]>([])
@@ -15,13 +22,20 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
  },[establishmentId,retry,epoch])
  useEffect(()=>{
   let gone=false
-  void readDishes(establishmentId).then(profile=>{
-   if(gone)return
-   setLoaded(current=>current?.scope===establishmentId&&current.profile.revision>profile.revision
-    ?current:{scope:establishmentId,profile})
-   setError(current=>current==='read'?'':current)
-  }).catch(()=>{if(!gone)setError(current=>current||'read')})
-  return()=>{gone=true}
+  let timer:number|undefined
+  async function refresh() {
+   try {
+    const profile=await readDishes(establishmentId)
+    if(gone)return
+    setLoaded(current=>current?.scope===establishmentId&&current.profile.revision>profile.revision
+     ?current:{scope:establishmentId,profile})
+    setError(current=>current==='read'?'':current)
+    if(profile.classification?.state==='queued'||profile.classification?.state==='running')
+     timer=window.setTimeout(()=>void refresh(),5000)
+   } catch { if(!gone)setError(current=>current||'read') }
+  }
+  void refresh()
+  return()=>{gone=true;window.clearTimeout(timer)}
  },[establishmentId,menuVersion,retry])
  const status=(s:string)=>s==='confirmed'?(vi?'Đã xác nhận':'Confirmée'):(vi?'Đề xuất':'Proposée')
  async function edit(){
@@ -43,8 +57,13 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
   finally{lock.current=false;if(version===epoch.value)setBusy(false)}
  }
  const safePhoto=(url?:string)=>url&&/^https:\/\/(?:[^/]+\.)?(?:googleusercontent\.com|google\.com)\//.test(url)?url:undefined
+ const classification=profile?.classification
+ const awaiting=classification?.state==='queued'||classification?.state==='running'
  return <section className="restaurant-dishes" aria-label={vi?'Đặc sản và món ăn':'Spécialité et plats'}>
   {profile?.specialty&&<p className="dish-specialty"><strong>{vi?'Đặc sản':'Spécialité'} : {profile.specialty.name}</strong><small>{status(profile.specialty.status)}</small></p>}
+  {awaiting&&<p role="status">{vi?'Đang phân loại thực đơn mới…':'Classement du nouveau menu en cours…'}</p>}
+  {classification?.state==='failed'&&<p role="status">{vi?'Chưa phân loại được thực đơn mới.':'Le classement du nouveau menu a échoué.'}</p>}
+  {classification?.stale&&<p className="dish-hint">{vi?'Các món dưới đây dựa trên thực đơn trước.':'Les plats affichés proviennent du menu précédent.'}</p>}
   {profile&&<details className="dish-details"><summary>{vi?'Món ăn và biến thể':'Plats et variantes'} ({profile.associations.length})</summary>
    <p className="dish-hint">{vi?'Theo thực đơn đã lưu. Không đảm bảo hiện còn bán.':'D’après les menus enregistrés. La disponibilité actuelle n’est pas garantie.'}</p>
    {profile.associations.length===0&&<p>{vi?'Chưa xác định được món ăn.':'Aucun plat identifié avec suffisamment de précision.'}</p>}
@@ -52,13 +71,13 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
     {a.parentName&&<small>{vi?'Biến thể của':'Variante de'} {a.parentName}</small>}
     <details><summary>{vi?'Nguồn và căn cứ':'Sources et justificatifs'} ({a.evidence.length})</summary>{a.evidence.map((e,i)=><div className="dish-evidence" key={i}>
      <p>{e.name}{e.section&&<> · {e.section}</>}</p>
-     <small>{e.reason==='manual_confirmation'?(vi?'Xác nhận thủ công':'Confirmation manuelle'):e.reason==='explicit_menu_context'?(vi?'Diễn giải theo mục thực đơn':'Interprétation selon la rubrique du menu'):(vi?'Tên món ghi rõ trên thực đơn':'Nom explicite dans le menu')}</small>
+     <small>{e.reason==='manual_confirmation'?(vi?'Xác nhận thủ công':'Confirmation manuelle'):e.reason==='ai_menu_classification'?(vi?'AI phân loại theo thực đơn':'Classement IA d’après le menu'):e.reason==='explicit_menu_context'?(vi?'Diễn giải theo mục thực đơn':'Interprétation selon la rubrique du menu'):(vi?'Tên món ghi rõ trên thực đơn':'Nom explicite dans le menu')}</small>
      {e.collectedAt&&<small>{new Date(e.collectedAt).toLocaleDateString(vi?'vi-VN':'fr-FR')}</small>}
      {safePhoto(e.photo)&&<a href={safePhoto(e.photo)} target="_blank" rel="noreferrer">{vi?'Ảnh nguồn':'Photo source'}</a>}
      {e.runId&&<small>{vi?'Lượt':'Run'} {e.runId} · {vi?'Dòng':'Ligne'} {e.sourceRow}</small>}
     </div>)}</details>
    </li>)}</ul>
-   {profile.unresolved.length>0&&<details><summary>{vi?'Cần xem xét':'À examiner'} ({profile.unresolved.length})</summary><ul>{profile.unresolved.map((x,i)=><li key={i}>{x.name} · {x.section}</li>)}</ul></details>}
+   {profile.unresolved.length>0&&<details><summary>{vi?'Cần xem xét':'À examiner'} ({profile.unresolved.length})</summary><ul>{profile.unresolved.map((x,i)=><li key={i}>{x.name}{x.section&&' · '+x.section}{reasons[x.reason]&&<small>{reasons[x.reason][vi?1:0]}</small>}</li>)}</ul></details>}
   </details>}
   {profile?.canEdit&&<button type="button" className="text-button" onClick={()=>void edit()} aria-expanded={open}>{vi?'Xác nhận hoặc sửa món ăn':'Confirmer ou corriger les plats'}</button>}
   {open&&profile?.canEdit&&<div className="dish-editor">
