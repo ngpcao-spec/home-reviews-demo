@@ -14,7 +14,7 @@ Le modèle se règle côté serveur dans `private.menu_dish_ai_settings.model`.
 L'Edge Function Rainminer reçoit une action Cron dédiée via le jeton serveur
 existant. Les lectures de fiche et les recherches ne lancent aucun classement.
 
-Le contrat `menu-dish-ai-v6` traite en priorité la spécialité. Le serveur
+Le contrat `menu-dish-ai-v7` traite en priorité la spécialité. Le serveur
 vérifie les lignes sources, y compris leurs rubriques. Une spécialité peut
 être retenue quand le nom du restaurant concorde avec le menu ou quand le
 profil spécialisé est étayé par des preuves liées au même plat. Elle devient
@@ -34,6 +34,11 @@ Le profil de la carte (`menu_profile`) et le type de restaurant
 affiche les valeurs localisées du résultat publié, y compris lorsqu’un
 nouveau classement est en cours ou échoue. Le type de restaurant
 n'intervient pas dans la validation de la spécialité.
+
+Un type positif doit citer des lignes existantes et admissibles du menu.
+Le modèle choisit le type, y compris une offre familiale déduite de plusieurs
+plats distincts. Le validateur contrôle les références sans interpréter à
+nouveau la carte ni imposer de formule familiale.
 
 Un plat secondaire doit être nommé en toutes lettres dans la ligne et
 figurer dans un contexte compatible avec un plat autonome. Une appellation
@@ -57,10 +62,11 @@ recherche SQL. Les captures mobiles utilisent les résultats SQL rejoués
 comme réponses locales aux lectures de l'interface, avec
 `npx --no-install playwright test --config artifacts/menu-dish-ai-v6-validation/playwright.config.ts`.
 
-Lors d'un déploiement autorisé, appliquer la migration de classement en
-attente, puis publier la fonction `rainminer-menu` avec son helper
-`menu-dish-ai.ts` et le client de la même branche. Contrôler le contrat v6 et
-laisser le classement désactivé lors de la vérification de la migration.
+Pour passer à v7 sur une installation v6, vérifier que le classement est
+suspendu et la file vide. Appliquer uniquement `20261126023212_route_menu_dish_ai_v7.sql` puis publier
+`rainminer-menu` avec son helper `menu-dish-ai.ts`. Le client existant lit le
+même schéma. Le prompt validé porte l'empreinte SHA-256
+`53752fcb024f92e285050dd0f74ab99d2aa3574d9ad7e289a9f3d36f4350d5ea`.
 Le rejeu local et cette migration ne déclenchent aucun retraitement des menus
 existants.
 

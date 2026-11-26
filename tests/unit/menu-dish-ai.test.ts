@@ -15,6 +15,7 @@ beforeAll(async()=>{
  // the existing scheduler token; exercise its actual claim and finish SQL.
  const migration=readFileSync('supabase/migrations/20261125141350_classify_saved_menus_with_ai.sql','utf8')
  await db.exec(migration.replace(/select cron\.schedule\([\s\S]*?\$cron\$\);/,''))
+ await db.exec(readFileSync('supabase/migrations/20261126023212_route_menu_dish_ai_v7.sql','utf8'))
 },30000)
 afterAll(async()=>{await db?.close()})
 beforeEach(async()=>{await db.exec("begin;update private.menu_dish_ai_settings set enabled=true,enabled_since='1970-01-01'")})
@@ -281,6 +282,47 @@ it('offers a clear secondary dish for a mixed menu while leaving its specialty t
  expect(await search('bun bo')).toMatchObject([{establishmentId:id,kind:'menu'}])
  expect(await search('Option du jour')).toEqual([])
  expect((await db.query('select result from private.menu_dish_ai_runs')).rows[0].result).toMatchObject({menu_profile,restaurant_type})
+})
+
+it('publishes the model type from distinct dishes and checks every source reference',async()=>{
+ const place='ChIJvaried-menu'
+ const restaurant='Bistro du marché'
+ const id=await add(restaurant,place)
+ const raw=[
+  {placeId:place,placeName:restaurant,name:'Tom Yum',category:'Soupes'},
+  {placeId:place,placeName:restaurant,name:'Pizza Margherita',category:'Pizzas'},
+  {placeId:place,placeName:restaurant,name:'Trà đá',category:'Đồ uống'},
+ ]
+ const menu_profile={value:'varied',rows:[1,2],sections:[]}
+ const restaurant_type={value:'family_dining',name_evidence:null,rows:[1,2]}
+ const response={specialty:null,menu_profile,restaurant_type,items:[item('dish',1,'Tom Yum'),item('dish',2,'Pizza Margherita')]}
+ await save(id,place,'varied-menu',raw,[3])
+ const ai=fakeAi(response)
+ expect(await ai.run()).toMatchObject({status:'succeeded'})
+ await asUser()
+ expect(await read(id)).toMatchObject({menuProfile:'varied',restaurantType:'family_dining'})
+ expect(await search('Tom Yum')).toMatchObject([{establishmentId:id,kind:'menu'}])
+ const packet=JSON.parse(String(ai.call.mock.calls[0][1]?.body)).input
+ for(const rows of [[1,99],[1,1],[1,3],[]]) {
+  const result=validateMenuClassification({...response,restaurant_type:{...restaurant_type,rows}},JSON.parse(packet))
+  expect(result).toMatchObject({menu_profile,restaurant_type:unknownType})
+ }
+ expect(validateMenuClassification({...response,restaurant_type:unknownType},JSON.parse(packet)).restaurant_type).toEqual(unknownType)
+})
+
+it('shares an exact published v6 result without requesting an extra classification in v7',async()=>{
+ const first=await add(bun.establishment,bun.placeId)
+ const second=await add(bun.establishment,bun.placeId,ORG2)
+ await save(first,bun.placeId,bun.runId,bun.raw,[4,5,6,7])
+ const ai=fakeAi(bunResult)
+ expect(await ai.run()).toMatchObject({status:'succeeded'})
+ await db.exec("update private.menu_dish_ai_runs set contract='menu-dish-ai-v6'")
+ await save(second,bun.placeId,'v6-menu-reused',bun.raw,[4,5,6,7])
+ expect(await ai.run()).toEqual({claimed:0})
+ expect(ai.call).toHaveBeenCalledTimes(1)
+ expect((await db.query('select contract from private.menu_dish_ai_runs')).rows).toEqual([{contract:'menu-dish-ai-v6'}])
+ await asUser(USER2)
+ expect(await read(second)).toMatchObject({specialty:{name:'Bún bò'},classification:{state:'succeeded'}})
 })
 
 it('publishes a menu-backed specialty without a restaurant name match and keeps uncertain restaurant type separate',async()=>{
