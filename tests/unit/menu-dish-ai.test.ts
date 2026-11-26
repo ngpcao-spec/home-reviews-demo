@@ -16,6 +16,7 @@ beforeAll(async()=>{
  const migration=readFileSync('supabase/migrations/20261125141350_classify_saved_menus_with_ai.sql','utf8')
  await db.exec(migration.replace(/select cron\.schedule\([\s\S]*?\$cron\$\);/,''))
  await db.exec(readFileSync('supabase/migrations/20261126023212_route_menu_dish_ai_v7.sql','utf8'))
+ await db.exec(readFileSync('supabase/migrations/20261126151340_route_menu_dish_ai_v8.sql','utf8'))
 },30000)
 afterAll(async()=>{await db?.close()})
 beforeEach(async()=>{await db.exec("begin;update private.menu_dish_ai_settings set enabled=true,enabled_since='1970-01-01'")})
@@ -310,7 +311,7 @@ it('publishes the model type from distinct dishes and checks every source refere
  expect(validateMenuClassification({...response,restaurant_type:unknownType},JSON.parse(packet)).restaurant_type).toEqual(unknownType)
 })
 
-it('shares an exact published v6 result without requesting an extra classification in v7',async()=>{
+it('shares an exact published v6 result without requesting an extra classification in v8',async()=>{
  const first=await add(bun.establishment,bun.placeId)
  const second=await add(bun.establishment,bun.placeId,ORG2)
  await save(first,bun.placeId,bun.runId,bun.raw,[4,5,6,7])
@@ -323,6 +324,26 @@ it('shares an exact published v6 result without requesting an extra classificati
  expect((await db.query('select contract from private.menu_dish_ai_runs')).rows).toEqual([{contract:'menu-dish-ai-v6'}])
  await asUser(USER2)
  expect(await read(second)).toMatchObject({specialty:{name:'Bún bò'},classification:{state:'succeeded'}})
+})
+
+it('prefers the v8 publication when a v7 result exists for the same menu',async()=>{
+ const id=await add(bun.establishment,bun.placeId)
+ await save(id,bun.placeId,bun.runId,bun.raw,[4,5,6,7])
+ const ai=fakeAi({...bunResult,restaurant_type:{value:'street_food',name_evidence:null,rows:[1,2]}})
+ expect(await ai.run()).toMatchObject({status:'succeeded'})
+ const old=await db.query<{id:string}>(`insert into private.menu_dish_ai_runs(place_id,fingerprint,model,contract,packet,status,result,finished_at)
+  select place_id,fingerprint,model,'menu-dish-ai-v7',packet,status,
+  jsonb_set(result,'{restaurant_type}', $1::jsonb),finished_at from private.menu_dish_ai_runs where contract=$2 returning id`,
+  [unknownType,CONTRACT])
+ await db.query('update private.menu_dish_ai_targets set run_id=$1,published_id=$1',[old.rows[0].id])
+ await asUser()
+ expect((await read(id)).restaurantType).toBe('unknown')
+ await db.query('select private.refresh_restaurant_dishes($1)',[id])
+ expect(await read(id)).toMatchObject({
+  restaurantType:'street_food',specialty:{name:'Bún bò',status:'proposed'},classification:{state:'succeeded',stale:false},
+ })
+ expect(await ai.run()).toEqual({claimed:0})
+ expect(ai.call).toHaveBeenCalledTimes(1)
 })
 
 it('publishes a menu-backed specialty without a restaurant name match and keeps uncertain restaurant type separate',async()=>{

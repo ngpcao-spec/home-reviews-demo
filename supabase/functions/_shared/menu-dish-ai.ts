@@ -1,6 +1,6 @@
 import { classifyMenuRow } from './rainminer-menu.mjs'
 
-export const CONTRACT = 'menu-dish-ai-v7'
+export const CONTRACT = 'menu-dish-ai-v8'
 export const DEFAULT_MODEL = 'gpt-5.4-nano'
 export const MAX_OUTPUT_TOKENS = 6000
 
@@ -104,13 +104,13 @@ Ne compte pas les boissons, les suppléments, les garnitures ni les variantes co
 
 3. TYPE DE RESTAURANT — restaurant_type
 
-Évalue le type après avoir établi le profil de la carte. Applique cet ordre :
+Évalue le type à partir du nom et du menu, indépendamment de la spécialité et du profil de la carte. Applique cet ordre :
 
-- street_food : le nom et le menu indiquent clairement que l’offre du restaurant relève de la restauration de rue. Si ce type est établi, retiens-le même si la carte est variée. Un prix bas, une carte courte, un plat de rue ou une rubrique isolée ne suffisent pas.
-- family_dining : si street_food n’a pas été retenu, choisis family_dining lorsque le menu propose explicitement une offre familiale OU lorsque le profil est varied. Dans ce second cas, une formule familiale explicite n’est pas nécessaire : plusieurs plats complets distincts suffisent. Cite les lignes de plusieurs de ces plats pour justifier la déduction.
-- unknown : si aucun des critères précédents n’est rempli. Une carte spécialisée sans autre indice ne permet pas, à elle seule, de choisir un type.
+- street_food : choisis ce type quand le nom du restaurant désigne un plat couramment proposé en restauration de rue et que le menu confirme que l’offre est centrée sur ce même plat et ses variantes. La mention « street food » n’est pas obligatoire. Cite les identifiants des lignes qui montrent que ce plat structure l’offre. Un prix bas, une carte courte, une mention marketing ou un plat de rue isolé dans une carte variée ne suffisent pas.
+- family_dining : si le type street_food n’est pas établi, choisis ce type lorsque le menu montre une offre explicitement familiale ou propose plusieurs plats complets distincts. Cite les lignes de l’offre familiale ou de plusieurs de ces plats. Les variantes, boissons et suppléments ne comptent pas comme des plats distincts.
+- unknown : choisis ce type lorsque les indices restent insuffisants ou contradictoires. Une carte spécialisée ne suffit pas à elle seule pour retenir street_food.
 
-Justifie le type avec les identifiants des lignes du menu. Ne déduis ni le cadre, ni les équipements, ni la capacité d’accueil. Le type de restaurant ne doit pas empêcher de renvoyer une spécialité justifiée.
+Justifie le type avec les identifiants des lignes du menu. Ne déduis ni le cadre, ni les équipements, ni la capacité d’accueil. Le type retenu ne doit modifier ni la spécialité ni le profil de la carte.
 
 4. AUTRES LIGNES DU MENU — items
 
