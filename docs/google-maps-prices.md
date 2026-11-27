@@ -117,7 +117,7 @@ L'acteur de fiches
 documente `price` ; son
 [schéma](https://apify.com/compass/crawler-google-places/input-schema) permet
 `maxReviews=0` et `scrapePlaceDetailPage`. Le worker séparé
-`process-google-place-price-jobs` utilise le build testé `0.14.777`, une URL Google
+`process-google-place-price-jobs` utilise une version publiée de l’acteur, une URL Google
 déjà identifiée, une fiche au maximum, la langue persistée, zéro avis/image et
 aucun enrichissement contacts/leads/IA. L'acteur de collecte des 150 avis, son
 entrée, les traductions et leur disponibilité ne changent pas.
@@ -136,14 +136,16 @@ Il n'existe aucun retry de collecte, même lorsque le fournisseur renvoie une
 erreur HTTP. Une réponse ambiguë exige une décision humaine. La concurrence est
 bornée à une collecte de prix et partage les slots fournisseur existants.
 
-Avant la réservation, un GET des métadonnées de l'acteur vérifie son identité et
-le minimum publié de `maxTotalChargeUsd`. Le plafond est fixé à 0,50 USD,
+Avant la réservation, le worker vérifie en lecture seule l’identité de l’acteur,
+sa facturation à l’événement, le minimum publié de `maxTotalChargeUsd` et le build
+du tag `default`. La réservation fige le numéro et l’identifiant exacts du build.
+Le plafond est fixé à 0,50 USD,
 minimum annoncé par cet acteur ; il ne représente ni un tarif ni le coût prévu
 d'une fiche. Un minimum absent ou supérieur bloque avant tout POST. Le reçu
-conserve cette vérification et les consommations réellement retournées. Un
-échec après réservation garde son résultat inconnu et son diagnostic interne,
-sans nouveau départ. Une ancienne tentative inconnue n'est pas réarmée lors
-d'une correction de configuration.
+conserve cette vérification et les consommations réellement retournées. Un refus
+explicite reconnu termine en `PLACE_PRICE_START_REJECTED`. Une réponse perdue ou
+ambiguë garde le statut `unknown`. Le diagnostic conserve le statut HTTP et le type
+d’erreur fournisseur disponibles. Aucun de ces cas ne déclenche de nouveau départ.
 
 Le réveil serveur immédiat et les continuations bornées traitent la file,
 application fermée. Le cron est un secours de **livraison de cette file** : il
@@ -189,3 +191,17 @@ Les données et le bilan par établissement demeurent privés, hors dépôt. Les
 tests réseau simulé, PostgreSQL embarqué et le rejeu du moteur ne sont pas une
 preuve de la couverture du fournisseur. Les résultats réels sont consignés
 séparément lors de la reprise autorisée.
+
+### Migration du contrôle de build
+
+Appliquer uniquement `20261127105336_resolve_place_price_build_before_start.sql`
+et redéployer `process-google-place-price-jobs` pour ce correctif. Sauvegarder
+la définition de `public.advance_google_place_price_job(uuid,text,text,jsonb)`
+et l’état de la file avant intervention. Faire l’opération pendant une fenêtre
+sans import initial en cours, laisser finir les tâches déjà actives et suspendre
+uniquement la file des fiches Google avant d’appliquer la migration. Le trigger
+n’inscrit pas les imports achevés pendant que cette file est désactivée. Vérifier
+les imports achevés pendant l’intervention avant de rétablir l’état de la file.
+Pour revenir en arrière, suspendre la file, restaurer la définition précédente
+du RPC et le worker compatible, puis vérifier l’accès au build avant de rouvrir
+la file. Conserver les profils, reçus et tentatives existants.

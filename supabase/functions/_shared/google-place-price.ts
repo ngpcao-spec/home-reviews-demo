@@ -2,7 +2,6 @@ import {googleMoneyRange} from './google-maps-prices.ts';
 import {placeProfile} from './google-place-profile.ts';
 
 export const PLACE_PRICE_ACTOR = 'compass~crawler-google-places';
-export const PLACE_PRICE_BUILD = '0.14.777';
 export const PLACE_PRICE_ACTOR_ID = 'nwua9Gu5YrADL7ZDj';
 // Actor metadata minimalMaxTotalChargeUsd, verified before every new paid start.
 // This is a ceiling, not a fee or an estimate of the one-place run's cost.
@@ -49,6 +48,10 @@ export function placePriceObservation(items:unknown,identity:PriceIdentity,now=D
 }
 
 export type PriceRun = {id:string;dataset_id:string;status:string;receipt:Obj};
+type PricePreflight = {
+  actor_id:string; build_number:string; build_id:string; minimum_max_total_charge_usd:number;
+  max_total_charge_usd:number; checked_at:string;
+};
 const receiptFields=['id','actId','buildId','startedAt','finishedAt','status','defaultDatasetId','usage','usageTotalUsd','chargedEventCounts'] as const;
 export function priceRun(payload:unknown):PriceRun {
   const data=record(record(payload).data),id=text(data.id),dataset_id=text(data.defaultDatasetId),status=text(data.status);
@@ -56,28 +59,58 @@ export function priceRun(payload:unknown):PriceRun {
   return {id,dataset_id,status,receipt:Object.fromEntries(receiptFields.filter(k=>data[k]!==undefined).map(k=>[k,data[k]]))};
 }
 
+const rejectedStarts=new Set([
+  'actor-disabled','actor-not-found','actor-not-public','actor-is-not-rented','apify-plan-required-to-use-paid-actor',
+  'build-not-found','build-outdated','invalid-build','unknown-build-tag','tagged-build-required',
+  'invalid-input','schema-validation-error','schema-validation-failed','invalid-parameter',
+  'invalid-token','invalid-credentials','insufficient-permissions','missing-actor-rights',
+  'not-enough-usage-to-run-paid-actor','monthly-usage-limit-too-low','max-total-charge-usd-below-minimum',
+]);
+class PlacePriceHttpError extends Error {
+  constructor(readonly status:number,readonly providerType:string|null) {
+    super('PLACE_PRICE_HTTP_'+status);
+  }
+  get confirmedRejection() {
+    return [400,401,403,404,422].includes(this.status)&&!!this.providerType&&rejectedStarts.has(this.providerType);
+  }
+}
+
 /** No SDK retries, redirect or implicit restart. The secret stays in server memory/headers. */
 export function placePriceProvider(token:string,network:typeof fetch=fetch) {
   if(!token.trim())throw Error('PLACE_PRICE_ACCESS_UNAVAILABLE');
-  let preflight:Obj|null=null;
+  let preflight:PricePreflight|null=null;
   async function get(path:string,init:RequestInit={},timeout=30_000):Promise<unknown> {
     const response=await network('https://api.apify.com/v2'+path,{...init,redirect:'error',
       headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},signal:AbortSignal.timeout(timeout)});
-    if(!response.ok)throw Error('PLACE_PRICE_HTTP_'+response.status);
+    if(!response.ok) {
+      const payload=record(await response.json().catch(()=>null));
+      const type=text(record(payload.error).type);
+      throw new PlacePriceHttpError(response.status,type&&/^[a-z][a-z0-9-]{0,79}$/.test(type)?type:null);
+    }
     return response.json();
   }
   return {
     preflight:async()=>{
+      preflight=null;
       const data=record(record(await get('/acts/'+PLACE_PRICE_ACTOR)).data);
       const entries=Array.isArray(data.pricingInfos)?data.pricingInfos.map(record).filter(p=>typeof p.startedAt==='string'&&Date.parse(p.startedAt)<=Date.now()).sort((a,b)=>Date.parse(String(b.startedAt))-Date.parse(String(a.startedAt))):[];
-      const minimum=entries[0]?.minimalMaxTotalChargeUsd;
-      if(data.id!==PLACE_PRICE_ACTOR_ID || typeof minimum!=='number' || !Number.isFinite(minimum) || minimum>PLACE_PRICE_MAX_CHARGE_USD)throw Error('PLACE_PRICE_PREFLIGHT_CHARGE_LIMIT_INVALID');
-      preflight={actor_id:data.id,minimum_max_total_charge_usd:minimum,max_total_charge_usd:PLACE_PRICE_MAX_CHARGE_USD,checked_at:new Date().toISOString()};
+      const pricing=entries[0],minimum=pricing?.minimalMaxTotalChargeUsd;
+      if(data.id!==PLACE_PRICE_ACTOR_ID || pricing?.pricingModel!=='PAY_PER_EVENT' ||
+        typeof minimum!=='number' || !Number.isFinite(minimum) || minimum<0 || minimum>PLACE_PRICE_MAX_CHARGE_USD)
+        throw Error('PLACE_PRICE_PREFLIGHT_CHARGE_LIMIT_INVALID');
+      // Resolve the published build with a free read and pin its exact number for this attempt.
+      const build=record(record(await get('/acts/'+PLACE_PRICE_ACTOR+'/builds/default')).data);
+      const buildNumber=text(build.buildNumber),buildId=text(build.id);
+      if(build.status!=='SUCCEEDED'||build.actId!==data.id||!buildNumber||!/^\d+[.]\d+[.]\d+$/.test(buildNumber)||
+        !buildId||!/^[A-Za-z0-9]+$/.test(buildId)) throw Error('PLACE_PRICE_BUILD_UNAVAILABLE');
+      preflight={actor_id:data.id,build_number:buildNumber,build_id:buildId,minimum_max_total_charge_usd:minimum,
+        max_total_charge_usd:PLACE_PRICE_MAX_CHARGE_USD,checked_at:new Date().toISOString()};
       return preflight;
     },
     start:async(input:ReturnType<typeof placePriceInput>)=>{
       if(!preflight)throw Error('PLACE_PRICE_PREFLIGHT_REQUIRED');
-      const run=priceRun(await get('/acts/'+PLACE_PRICE_ACTOR+'/runs?build='+PLACE_PRICE_BUILD+'&timeout=120&maxTotalChargeUsd='+PLACE_PRICE_MAX_CHARGE_USD, {method:'POST',body:JSON.stringify(input)}));
+      const run=priceRun(await get('/acts/'+PLACE_PRICE_ACTOR+'/runs?build='+encodeURIComponent(preflight.build_number)+
+        '&timeout=120&maxTotalChargeUsd='+PLACE_PRICE_MAX_CHARGE_USD, {method:'POST',body:JSON.stringify(input)}));
       run.receipt={...run.receipt,preflight};return run;
     },
     run:async(id:string)=>priceRun(await get('/actor-runs/'+encodeURIComponent(id)+'?waitForFinish=20')),
@@ -94,19 +127,23 @@ export async function processPlacePrice(job:PriceJob,port:PricePort) {
   const action=async(name:string,data:Obj={})=>{if(!await port.action(name,data))throw Error('PLACE_PRICE_LEASE_LOST');};
   let reserved=job.start_attempted_at!==null,runId=job.run_id,datasetId=job.dataset_id;
   let receipt=record(job.receipt);
+  let pendingRun:PriceRun|null=null;
   try {
     const input=placePriceInput(job);
     if(!runId) {
       if(reserved)throw Error('PLACE_PRICE_OUTCOME_UNKNOWN');
-      await port.provider.preflight();
-      await action('reserve',{input});reserved=true;
+      const preflight=await port.provider.preflight();
+      await action('reserve',{input,preflight});reserved=true;
       const run=await port.provider.start(input);
-      receipt=run.receipt;
+      pendingRun=run;receipt=run.receipt;
       await action('run',run);runId=run.id;datasetId=run.dataset_id;
+      if(run.receipt.buildId!==preflight.build_id)throw Error('PLACE_PRICE_RUN_BUILD_MISMATCH');
     }
     for(let n=0;n<2;n++) {
       const run=await port.provider.run(runId);
       if(run.id!==runId || datasetId && run.dataset_id!==datasetId)throw Error('PLACE_PRICE_RUN_IDENTITY_MISMATCH');
+      const expectedBuild=text(record(receipt.preflight).build_id);
+      if(expectedBuild&&run.receipt.buildId!==expectedBuild)throw Error('PLACE_PRICE_RUN_BUILD_MISMATCH');
       receipt={...receipt,...run.receipt};await action('run',{...run,receipt});datasetId=run.dataset_id;
       if(['FAILED','TIMED-OUT','ABORTED'].includes(run.status)) {await action('fail',{code:'PLACE_PRICE_PROVIDER_'+run.status});return 'failed';}
       if(run.status==='SUCCEEDED') {
@@ -117,10 +154,21 @@ export async function processPlacePrice(job:PriceJob,port:PricePort) {
     await action('defer');return 'pending';
   } catch(error) {
     const reason=error instanceof Error ? error.message : 'PLACE_PRICE_FAILED';
-    if(reason==='PLACE_PRICE_LEASE_LOST')return 'lease_lost';
-    // A response lost before its durable run binding consumes the attempt forever.
-    const code=reserved && !runId ? 'PLACE_PRICE_OUTCOME_UNKNOWN' : /^PLACE_PRICE_[A-Z0-9_-]+$/.test(reason) ? reason : 'PLACE_PRICE_READ_FAILED';
-    console.warn('PLACE_PRICE_ATTEMPT_STOPPED',{job_id:job.id,code,diagnostic:/^PLACE_PRICE_[A-Z0-9_-]+$/.test(reason)?reason:'PLACE_PRICE_NETWORK_OR_RUNTIME_ERROR'});
-    await port.action('fail',{code});return code;
+    if(reason==='PLACE_PRICE_LEASE_LOST') {
+      if(pendingRun&&!runId) console.warn('PLACE_PRICE_RUN_BINDING_UNCONFIRMED',{job_id:job.id,run_id:pendingRun.id});
+      return 'lease_lost';
+    }
+    const providerFailure=error instanceof PlacePriceHttpError
+      ? {http_status:error.status,provider_type:error.providerType} : null;
+    const unbound=reserved&&!runId;
+    const rejected=unbound&&!pendingRun&&error instanceof PlacePriceHttpError&&error.confirmedRejection;
+    const diagnostic=/^PLACE_PRICE_[A-Z0-9_-]+$/.test(reason)?reason:'PLACE_PRICE_NETWORK_OR_RUNTIME_ERROR';
+    const code=rejected ? 'PLACE_PRICE_START_REJECTED' : unbound ? 'PLACE_PRICE_OUTCOME_UNKNOWN' :
+      diagnostic==='PLACE_PRICE_NETWORK_OR_RUNTIME_ERROR' ? 'PLACE_PRICE_READ_FAILED' : diagnostic;
+    console.warn('PLACE_PRICE_ATTEMPT_STOPPED',{job_id:job.id,code,diagnostic,...providerFailure,
+      ...(pendingRun&&!runId ? {run_id:pendingRun.id}: {})});
+    await port.action('fail',{code,...(providerFailure?{provider_failure:providerFailure}:{}),
+      ...(pendingRun&&!runId?{unbound_run_id:pendingRun.id}:{})});
+    return code;
   }
 }

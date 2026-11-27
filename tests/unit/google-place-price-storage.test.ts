@@ -4,11 +4,12 @@ import {afterAll,afterEach,beforeAll,beforeEach,expect,it,vi} from 'vitest';
 import type {PGlite} from '@electric-sql/pglite';
 import {recommendationDatabase} from '../fixtures/recommendation-sheet-database';
 import {recommendationPublication} from '../fixtures/recommendation-publication';
-import {placePriceInput,placePriceObservation} from '../../supabase/functions/_shared/google-place-price';
+import {placePriceInput,placePriceObservation,placePriceProvider,processPlacePrice,type PriceJob} from '../../supabase/functions/_shared/google-place-price';
 import {placeProfile} from '../../supabase/functions/_shared/google-place-profile';
 let db:PGlite;
 const org='10000000-0000-4000-8000-000000000001',est='20000000-0000-4000-8000-000000000001',other='20000000-0000-4000-8000-000000000002';
 const identity={google_id:'123',place_id:'place',google_maps_url:'https://www.google.com/maps?cid=123',language:'vi' as const};
+const preflight={actor_id:'nwua9Gu5YrADL7ZDj',build_number:'0.14.797',build_id:'newBuild',max_total_charge_usd:0.5};
 const observation=(price:string|null='100-200 N ₫')=>placePriceObservation([{cid:'123',placeId:'place',language:'vi',price,scrapedAt:'2026-10-28T14:51:44.560Z',reviews:[]}],identity);
 const json=(x:unknown)=>JSON.stringify(x);
 async function query<T>(sql:string,args:unknown[]=[]){return (await db.query<{v:T}>(sql,args)).rows[0]?.v;}
@@ -39,11 +40,12 @@ beforeAll(async()=>{
  await db.exec(readFileSync('supabase/migrations/20261028133850_google_maps_price_provenance.sql','utf8'));
  await db.exec(readFileSync('supabase/migrations/20261028151639_google_place_price_jobs.sql','utf8'));
  await db.exec(readFileSync('supabase/migrations/20261028164404_google_place_practical_metadata.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261127105336_resolve_place_price_build_before_start.sql','utf8'));
 },60000);
 beforeEach(async()=>{vi.stubGlobal('fetch',vi.fn(()=>{throw Error('NETWORK_FORBIDDEN')}));await db.exec('begin;update private.google_place_price_config set enabled=true;');});
 afterEach(async()=>{await db.exec('rollback');expect(fetch).not.toHaveBeenCalled();vi.unstubAllGlobals();});afterAll(()=>db.close());
 async function publish(){const p=await recommendationPublication(3,{positive:1});await db.query('insert into public.current_report_publications select * from jsonb_populate_record(null::public.current_report_publications,$1)',[json({...p,updated_at:p.generated_at})]);}
-async function started(){const id=await enqueue();const j=await claim();expect(j?.id).toBe(id);expect(await action(id,'reserve',{input:placePriceInput(identity)})).toBe(true);return id;}
+async function started(){const id=await enqueue();const j=await claim();expect(j?.id).toBe(id);expect(await action(id,'reserve',{input:placePriceInput(identity),preflight})).toBe(true);return id;}
 async function bind(id:unknown){expect(await action(id,'run',{id:'run',dataset_id:'data',status:'SUCCEEDED',receipt:{usageTotalUsd:0.005}})).toBe(true);}
 const profile=()=>placeProfile([{cid:'123',placeId:'place',language:'vi',scrapedAt:'2026-10-28T14:51:44.560Z',reviews:[],categories:['Nhà hàng ý','Nhà hàng pizza'],additionalInfo:{Services:[{Delivery:false}]} }],identity);
 it('atomically saves the curated profile on the SAME completed call, preserves budget/scores/report and reattaches after publication',async()=>{
@@ -108,9 +110,45 @@ it('a failed collection leaves the completed import available, is not automatica
  await db.exec(`insert into public.initial_import_jobs(status,establishment_id) values('running','${est}');update public.initial_import_jobs set status='completed';
  update public.review_sync_provider_slots set locked_by='reviews-worker',lease_until=clock_timestamp()+interval '1 minute';`);
  expect(await claim()).toBeNull();await db.exec('update public.review_sync_provider_slots set locked_by=null,lease_until=null');
- const j=await claim();await action(j?.id,'reserve',{input:placePriceInput(identity)});await action(j?.id,'fail',{code:'PLACE_PRICE_PROVIDER_FAILED'});
+ const j=await claim();await action(j?.id,'reserve',{input:placePriceInput(identity),preflight});await action(j?.id,'fail',{code:'PLACE_PRICE_PROVIDER_FAILED'});
  expect(await query('select status v from private.google_place_price_jobs')).toBe('failed');expect(await claim()).toBeNull();
  expect(await query('select status v from public.initial_import_jobs')).toBe('completed');
+});
+it('keeps an explicit provider refusal and the resolved build, with no retry or profile',async()=>{
+ const id=await started();
+ const provider_failure={http_status:403,provider_type:'build-outdated'};
+ expect(await action(id,'fail',{code:'PLACE_PRICE_START_REJECTED',provider_failure})).toBe(true);
+ expect(await query("select jsonb_build_object('status',status,'attempts',attempts,'build',build,'receipt',receipt,'run_id',run_id) v from private.google_place_price_jobs where id=$1",[id]))
+  .toEqual({status:'failed',attempts:1,build:'0.14.797',receipt:{preflight,provider_failure},run_id:null});
+ expect(await query('select count(*)::int v from private.google_place_profiles')).toBe(0);
+ expect(await claim()).toBeNull();
+});
+it('collects and stores available location, hours and price after a new import, with one simulated launch',async()=>{
+ await db.exec(`insert into public.initial_import_jobs(status,establishment_id) values('running','${est}');update public.initial_import_jobs set status='completed';`);
+ const claimed=await claim();
+ expect(claimed).toMatchObject({establishment_id:est,build:'unresolved'});
+ const realBuild={id:'newBuild',actId:'nwua9Gu5YrADL7ZDj',buildNumber:'0.14.797',status:'SUCCEEDED'};
+ const actor={id:realBuild.actId,pricingInfos:[{startedAt:'2026-01-01',pricingModel:'PAY_PER_EVENT',minimalMaxTotalChargeUsd:0.5}]};
+ const run={id:'newRun',actId:realBuild.actId,buildId:realBuild.id,defaultDatasetId:'newDataset',status:'SUCCEEDED'};
+ const data={title:'Fixture',cid:'123',placeId:'place',language:'vi',scrapedAt:'2026-11-27T05:46:17Z',
+  location:{lat:12.23,lng:109.19},city:'Nha Trang',state:'Khánh Hòa',neighborhood:'Tây Nha Trang',
+  countryCode:'VN',openingHours:[{day:'Thứ Sáu',hours:'11:30 to 18:00'}],price:'1-100.000 ₫',reviews:[]};
+ const network=vi.fn<typeof fetch>()
+  .mockResolvedValueOnce(Response.json({data:actor})).mockResolvedValueOnce(Response.json({data:realBuild}))
+  .mockResolvedValueOnce(Response.json({data:run})).mockResolvedValueOnce(Response.json({data:run}))
+  .mockResolvedValueOnce(Response.json([data]));
+ const result=await processPlacePrice(claimed as unknown as PriceJob,{
+  provider:placePriceProvider('mock-network-key',network),
+  action:(operation,payload)=>action(claimed?.id,operation,payload),
+ });
+ expect(result).toBe('finished');
+ expect(network.mock.calls.filter(([,options])=>options?.method==='POST')).toHaveLength(1);
+ const stored=await query<Record<string,unknown>>('select profile v from private.google_place_profiles where establishment_id=$1',[est]);
+ expect(stored).toMatchObject({binding:{build:'0.14.797',run_id:'newRun',dataset_id:'newDataset'},identity:{
+  coordinates:{latitude:12.23,longitude:109.19},city:'Nha Trang',neighborhood:'Tây Nha Trang',
+ },hours:{weekly:[{day:5,status:'parsed',intervals:[{start:690,end:1080}]}]}});
+ expect(await query("select observation#>>'{raw,price}' v from private.google_place_price_jobs where establishment_id=$1",[est])).toBe(data.price);
+ expect(await query('select status v from public.initial_import_jobs where establishment_id=$1',[est])).toBe('completed');
 });
 it('a pending known run retains its concurrency place during a short defer and a deleted establishment cannot be republished',async()=>{
  const id=await started();await bind(id);await action(id,'defer');await query('select public.enqueue_google_place_price($1) v',[other]);

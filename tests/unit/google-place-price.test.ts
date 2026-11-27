@@ -7,9 +7,13 @@ import {recommendationSheet} from '../fixtures/restaurant-recommendation-catalog
 const identity={google_id:'123',place_id:'place',google_maps_url:'https://www.google.com/maps?cid=123',language:'vi' as const};
 const item={cid:'123',placeId:'place',language:'vi',scrapedAt:'2026-10-28T14:51:44.560Z',price:'100-200\u00a0N\u00a0₫',reviews:[]};
 const job:PriceJob={...identity,id:'job',run_id:null,dataset_id:null,start_attempted_at:null,request_input:null};
-const run={id:'run',dataset_id:'dataset',status:'SUCCEEDED',receipt:{id:'run',status:'SUCCEEDED',usageTotalUsd:0.005}};
+const build={id:'currentBuild',actId:'nwua9Gu5YrADL7ZDj',buildNumber:'0.14.797',status:'SUCCEEDED'};
+const actor={id:build.actId,pricingInfos:[{startedAt:'2026-01-01',pricingModel:'PAY_PER_EVENT',minimalMaxTotalChargeUsd:0.5}]};
+const preflight={actor_id:build.actId,build_number:build.buildNumber,build_id:build.id,minimum_max_total_charge_usd:0.5,
+ max_total_charge_usd:0.5,checked_at:'2026-11-27T05:45:00Z'};
+const run={id:'run',dataset_id:'dataset',status:'SUCCEEDED',receipt:{id:'run',status:'SUCCEEDED',buildId:build.id,usageTotalUsd:0.005}};
 function harness(overrides:Partial<PriceJob>={}) {
- const action=vi.fn(async()=>true),provider={preflight:vi.fn(async()=>({})),start:vi.fn(async()=>run),run:vi.fn(async()=>run),dataset:vi.fn(async()=>[item])};
+ const action=vi.fn(async()=>true),provider={preflight:vi.fn(async()=>preflight),start:vi.fn(async()=>run),run:vi.fn(async()=>run),dataset:vi.fn(async()=>[item])};
  return {action,provider,execute:()=>processPlacePrice({...job,...overrides},{action,provider})};
 }
 it('one exact place, frozen VI/FR language, zero reviews/images/AI/contacts and no broad search',()=>{
@@ -44,19 +48,57 @@ it('continues a known run with GET only and stops a real provider failure withou
  const b=harness();b.provider.run.mockResolvedValueOnce({...run,status:'FAILED'});expect(await b.execute()).toBe('failed');expect(b.provider.dataset).not.toHaveBeenCalled();expect(b.provider.start).toHaveBeenCalledTimes(1);
  const c=harness();c.provider.run.mockResolvedValue({...run,status:'RUNNING'});expect(await c.execute()).toBe('pending');expect(c.provider.run).toHaveBeenCalledTimes(2);expect(c.action).toHaveBeenLastCalledWith('defer',{});
 });
-it('checks the published charge floor with GET before the single raw HTTP start; no SDK retry or redirect',async()=>{
- const network=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({data:{id:'nwua9Gu5YrADL7ZDj',pricingInfos:[{startedAt:'2026-01-01',minimalMaxTotalChargeUsd:0.5}]}}))).mockResolvedValueOnce(new Response('unavailable',{status:503}));const p=placePriceProvider('server-only-test-token',network);
- await p.preflight();
+it('checks billing and pins the current published build before its single raw HTTP start',async()=>{
+ const network=vi.fn().mockResolvedValueOnce(Response.json({data:actor}))
+  .mockResolvedValueOnce(Response.json({data:build})).mockResolvedValueOnce(new Response('unavailable',{status:503}));
+ const p=placePriceProvider('server-only-test-token',network);
+ expect(await p.preflight()).toMatchObject({build_number:build.buildNumber,build_id:build.id});
  await expect(p.start(placePriceInput(identity))).rejects.toThrow('PLACE_PRICE_HTTP_503');
- expect(network).toHaveBeenCalledTimes(2);expect(network.mock.calls[1][0]).toContain('compass~crawler-google-places/runs?build=0.14.777');
- expect(network.mock.calls[1][0]).toContain('maxTotalChargeUsd=0.5');expect(network.mock.calls[1][1]).toMatchObject({method:'POST',redirect:'error'});
+ expect(network).toHaveBeenCalledTimes(3);expect(network.mock.calls[1][0]).toContain('/builds/default');
+ expect(network.mock.calls[2][0]).toContain('compass~crawler-google-places/runs?build='+build.buildNumber);
+ expect(network.mock.calls[2][0]).toContain('maxTotalChargeUsd=0.5');expect(network.mock.calls[2][1]).toMatchObject({method:'POST',redirect:'error'});
 });
 it('refuses a missing/raised charge floor before reservation and never retries the consumed unknown job',async()=>{
- const network=vi.fn(async()=>new Response(JSON.stringify({data:{id:'nwua9Gu5YrADL7ZDj',pricingInfos:[{startedAt:'2026-01-01',minimalMaxTotalChargeUsd:1}]}})));
+ const network=vi.fn(async()=>Response.json({data:{...actor,pricingInfos:[{...actor.pricingInfos[0],minimalMaxTotalChargeUsd:1}]}}));
  const p=placePriceProvider('server-only-test-token',network);await expect(p.preflight()).rejects.toThrow('PLACE_PRICE_PREFLIGHT_CHARGE_LIMIT_INVALID');
  await expect(p.start(placePriceInput(identity))).rejects.toThrow('PLACE_PRICE_PREFLIGHT_REQUIRED');expect(network).toHaveBeenCalledTimes(1);
  const h=harness();h.provider.preflight.mockRejectedValueOnce(Error('PLACE_PRICE_PREFLIGHT_CHARGE_LIMIT_INVALID'));await h.execute();expect(h.provider.start).not.toHaveBeenCalled();expect(h.action.mock.calls.some(c=>c[0]==='reserve')).toBe(false);
  const unknown=harness({start_attempted_at:'2026-10-28'});await unknown.execute();expect(unknown.provider.preflight).not.toHaveBeenCalled();expect(unknown.provider.start).not.toHaveBeenCalled();
+});
+it.each([
+ {error:{type:'build-outdated',message:'provider details'}},'gateway failure',
+])('distinguishes a documented launch refusal from an unverified 403 response',async(body)=>{
+ const network=vi.fn().mockResolvedValueOnce(Response.json({data:actor})).mockResolvedValueOnce(Response.json({data:build}))
+  .mockResolvedValueOnce(typeof body==='string'?new Response(body,{status:403}):Response.json(body,{status:403}));
+ const action=vi.fn(async()=>true);
+ const result=await processPlacePrice(job,{action,provider:placePriceProvider('test',network)});
+ const code=typeof body==='string'?'PLACE_PRICE_OUTCOME_UNKNOWN':'PLACE_PRICE_START_REJECTED';
+ expect(result).toBe(code);
+ expect(action).toHaveBeenLastCalledWith('fail',{code,provider_failure:{http_status:403,provider_type:typeof body==='string'?null:body.error.type}});
+ expect(network.mock.calls.filter(([,options])=>options.method==='POST')).toHaveLength(1);
+});
+it('keeps the attempt unconsumed when the current build cannot be verified',async()=>{
+ const network=vi.fn().mockResolvedValueOnce(Response.json({data:actor}))
+  .mockResolvedValueOnce(Response.json({data:{...build,actId:'wrongActor'}}));
+ const action=vi.fn(async()=>true);
+ expect(await processPlacePrice(job,{action,provider:placePriceProvider('test',network)})).toBe('PLACE_PRICE_BUILD_UNAVAILABLE');
+ expect(action.mock.calls).toEqual([['fail',{code:'PLACE_PRICE_BUILD_UNAVAILABLE'}]]);
+ expect(network).toHaveBeenCalledTimes(2);
+});
+it('does not start when Apify reports that the published build is missing',async()=>{
+ const network=vi.fn().mockResolvedValueOnce(Response.json({data:actor}))
+  .mockResolvedValueOnce(Response.json({error:{type:'record-not-found'}},{status:404}));
+ const action=vi.fn(async()=>true);
+ expect(await processPlacePrice(job,{action,provider:placePriceProvider('test',network)})).toBe('PLACE_PRICE_HTTP_404');
+ expect(action.mock.calls).toEqual([['fail',{code:'PLACE_PRICE_HTTP_404',provider_failure:{http_status:404,provider_type:'record-not-found'}}]]);
+ expect(network.mock.calls.every(([,options])=>options.method!=='POST')).toBe(true);
+});
+it('preserves the returned run ID for reconciliation when durable binding fails',async()=>{
+ const h=harness();h.action.mockResolvedValueOnce(true).mockRejectedValueOnce(Error('PLACE_PRICE_DATABASE_FAILED'));
+ expect(await h.execute()).toBe('PLACE_PRICE_OUTCOME_UNKNOWN');
+ expect(h.action).toHaveBeenLastCalledWith('fail',{code:'PLACE_PRICE_OUTCOME_UNKNOWN',unbound_run_id:run.id});
+ expect(h.provider.start).toHaveBeenCalledTimes(1);
+ expect(h.provider.run).not.toHaveBeenCalled();
 });
 it('uses saved place price in budget filtering, remains indicative, localizes missing values and never calls a provider',()=>{
  const network=vi.fn(()=>{throw Error('NETWORK_FORBIDDEN')});vi.stubGlobal('fetch',network);
