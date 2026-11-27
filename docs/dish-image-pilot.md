@@ -33,6 +33,12 @@ Après examen d’une image existante, `private.regenerate_dish_image(dish_id, g
 
 Pour revenir au catalogue précédent, arrêter les lancements, restaurer la définition de `private.helpeat_read_catalog()` sauvegardée au déploiement et republier si nécessaire le client Helpeat antérieur. Les menus, classifications et illustrations enregistrées demeurent en stockage.
 
+## Exploitation automatique V1
+
+La migration `20261127134409_automate_main_dish_images.sql` ajoute `automatic_enabled` et l’historique privé `private.dish_image_attempts`. Le mode automatique traite toute spécialité éligible déjà en file sans utiliser le quota historique du pilote. Une seule réservation est active à la fois. Les classifications, le déclencheur d’inscription et le worker du pilote sont réutilisés.
+
+Pour mettre en file un historique existant, appeler `private.enqueue_dish_image(d.id)` uniquement pour les `dish_id` éligibles sans image et sans tentative déjà réservée. Sur la ligne `singleton` de `private.dish_image_settings`, `automatic_enabled=true` et `launches_enabled=true` autorisent la file. Pour suspendre la consommation, passer `launches_enabled=false`. Les mises en file et les images restent disponibles. L’historique conserve une ligne par génération, y compris après régénération, avec les tokens fournisseur, la durée, le poids WebP et le coût estimé aux tarifs standard du modèle V1. Une consommation inconnue reste sans estimation.
+
 ## Coût estimé
 
 `gpt-image-2.6-sunburst`, une image WebP de 1024 × 1024 par requête, qualité `low` et aucun fichier en entrée. Le calculateur OpenAI affiche environ 823 tokens image en sortie pour ce réglage, soit 0,02469 USD par image et 0,07407 USD pour trois. Prévoir **environ 0,08 USD** en incluant les courts prompts textuels, hors stockage et trafic. Le tarif observé n’est pas un coût mesuré. [Calculateur OpenAI](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs) · [Tarification OpenAI](https://developers.openai.com/api/docs/pricing#images)

@@ -24,6 +24,7 @@ beforeAll(async()=>{
  alter table storage.objects enable row level security;`);
  await db.exec(migration('20261125141350_classify_saved_menus_with_ai.sql'));
  await db.exec(migration('20261127132010_shared_main_dish_images.sql'));
+ await db.exec(migration('20261127134409_automate_main_dish_images.sql'));
 },30000);
 afterAll(async()=>{await db?.close();});
 beforeEach(async()=>db.exec(`begin;
@@ -121,10 +122,54 @@ it('keeps the old picture while regenerating and never repeats an uncertain atte
  expect(await query('select private.regenerate_dish_image($1,$2) value',[id,replacement.generation_id])).toBe(false);
 });
 
+it('automatically handles newly published street-food specialties and never requeues a ready dish',async()=>{
+ await db.exec("update private.dish_image_settings set automatic_enabled=true, launches_enabled=true, project_url='https://fixture.supabase.co'");
+ const id=await publish('Bún bò','street_food');
+ expect(await publish('Bun Bo','street_food',ORG2)).toBe(id);
+ await publish('Bánh căn','family_dining');
+ const jobs=(await Promise.all([claim(),claim()])).filter(job=>job!==null);
+ expect(jobs.map(job=>job.dish_id)).toEqual([id]);
+ await stored(jobs[0].storage_path);
+ await finish(jobs[0]);
+ const saved=await row(id);
+ expect(await publish('Bún bò','street_food',ORG2)).toBe(id);
+ expect(await row(id)).toEqual(saved);
+ expect(await claim()).toBeNull();
+ await db.exec('update private.dish_image_settings set launches_enabled=false');
+ const queued=await publish('Bún thịt nướng','street_food');
+ expect(await claim()).toBeNull();
+ await db.exec('update private.dish_image_settings set launches_enabled=true');
+ expect((await claim())?.dish_id).toBe(queued);
+});
+
+it('retains the measured cost and original receipt through explicit regeneration and records uncertain attempts',async()=>{
+ await db.exec("update private.dish_image_settings set automatic_enabled=true, launches_enabled=true, project_url='https://fixture.supabase.co'");
+ const id=await publish('Bún bò','street_food');
+ const job=(await claim())!;
+ const receipt={model:DISH_IMAGE_MODEL,quality:'low',generation_ms:12123,webp_bytes:149698,
+  usage:{input_tokens_details:{text_tokens:150,image_tokens:0},output_tokens_details:{image_tokens:824,text_tokens:0}}};
+ await stored(job.storage_path);
+ expect(await finish(job,null,receipt)).toBe(true);
+ expect(await query('select private.regenerate_dish_image($1,$2) value',[id,job.generation_id])).toBe(true);
+ const replacement=(await claim())!;
+ expect(await finish(replacement,'DISH_IMAGE_OUTCOME_UNKNOWN')).toBe(true);
+ const history=(await db.query(`select generation_id,status,model,generation_ms,webp_bytes,usage,estimated_usd,error_code
+  from private.dish_image_attempts where dish_id=$1`,[id])).rows;
+ expect(history).toHaveLength(2);
+ const published=history.find(a=>a.generation_id===job.generation_id)!;
+ expect(published).toMatchObject({status:'ready',model:DISH_IMAGE_MODEL,generation_ms:12123,webp_bytes:149698,usage:receipt.usage});
+ expect(Number(published.estimated_usd)).toBeCloseTo(0.02547,10);
+ expect(history.find(a=>a.generation_id===replacement.generation_id)).toMatchObject({status:'failed',estimated_usd:null,error_code:'DISH_IMAGE_OUTCOME_UNKNOWN'});
+ expect(await claim()).toBeNull();
+ expect(await row(id)).toMatchObject({image_storage_path:job.storage_path});
+ expect(await query('select count(*)::int value from private.menu_dish_ai_targets where published_id is not null')).toBe(1);
+});
+
 it('leaves bucket writes and worker RPCs unavailable to application roles',async()=>{
  for(const role of ['anon','authenticated']){
   expect(await query("select has_function_privilege($1,'public.claim_dish_image()','EXECUTE') value",[role])).toBe(false);
   expect(await query("select has_table_privilege($1,'private.dish_images','SELECT') value",[role])).toBe(false);
+  expect(await query("select has_table_privilege($1,'private.dish_image_attempts','SELECT') value",[role])).toBe(false);
  }
  expect(await query("select count(*)::int value from pg_policies where schemaname='storage' and policyname like 'dish_images_server_%' and permissive='RESTRICTIVE'")).toBe(3);
 });
