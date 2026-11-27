@@ -20,6 +20,24 @@ it('requires edit rights and never invents a specialty when empty',async()=>{
  await screen.findByText(/Aucun plat identifié/)
  expect(screen.queryByRole('button',{name:/corriger/})).toBeNull();expect(screen.queryByText(/Spécialité :/)).toBeNull()
 })
+it.each(['fr','vi'] as const)('groups secondary lines and flags only an unresolved specialty in %s',async language=>{
+ const unresolved={...profile,specialty:null,unresolved:[{name:'Đặc biệt',sourceRow:3,runId:'saved-run',reason:'other'}],
+  classification:{state:'succeeded',sourceRun:'saved-run',stale:false,specialtyNeedsConfirmation:true}}
+ mock.rpc.mockResolvedValue({data:unresolved,error:null})
+ draw(language)
+ await screen.findByText(language==='fr'?'Spécialité à confirmer':'Đặc sản cần xác nhận')
+ expect(screen.getByText(language==='fr'?'Autres (1)':'Khác (1)')).toBeInTheDocument()
+ expect(screen.getByText('Đặc biệt')).toBeInTheDocument()
+ expect(screen.queryByText(/À examiner|Cần xem xét/)).toBeNull()
+})
+it.each(['fr','vi'] as const)('shows the published specialty, menu profile and restaurant type separately in %s',async language=>{
+ mock.rpc.mockResolvedValue({data:{...profile,menuProfile:'specialized',restaurantType:'family_dining'},error:null})
+ draw(language)
+ await screen.findByText(language==='fr'?'Spécialité : Bánh căn':'Đặc sản : Bánh căn')
+ expect(screen.getByText(language==='fr'?'Spécialisée':'Chuyên một món')).toBeInTheDocument()
+ expect(screen.getByText(language==='fr'?'Familial':'Quán ăn gia đình')).toBeInTheDocument()
+ expect(screen.queryByText(/specialized|family_dining/)).toBeNull()
+})
 it('confirms with revision, blocks duplicate clicks and displays a confirmed result',async()=>{
  let finish!:(v:unknown)=>void
  mock.rpc.mockImplementation((name:string)=>name==='read_restaurant_dishes'?Promise.resolve({data:profile}):name==='list_dish_names'?Promise.resolve({data:[{id:'root',name:'Bánh căn'}]}):new Promise(r=>{finish=r}))

@@ -1,0 +1,128 @@
+{
+  "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+  "raw": [
+    {
+      "name": "Bún bò",
+      "price": 50000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BREAKFAST, LUNCH & DINNER",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "50,000₫",
+      "description": "Rice-noodle soup with beef"
+    },
+    {
+      "name": "Bún bò giò",
+      "price": 55000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BREAKFAST, LUNCH & DINNER",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "55,000₫",
+      "description": "Rice-noodle soup with beef and pork"
+    },
+    {
+      "name": "Đặc biệt",
+      "price": 65000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BREAKFAST, LUNCH & DINNER",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "65,000₫",
+      "description": "Bún bò, giò và gân (Special extra)"
+    },
+    {
+      "name": "CocaCola",
+      "price": 15000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BEVERAGES",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "15,000₫",
+      "description": "Coke"
+    },
+    {
+      "name": "Trà đá",
+      "price": 0,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BEVERAGES",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "0₫",
+      "description": "Free ice tea"
+    },
+    {
+      "name": "La Vie",
+      "price": 10000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BEVERAGES",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "10,000₫",
+      "description": "Purified bottled water"
+    },
+    {
+      "name": "Bia Saigon",
+      "price": 15000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BEVERAGES",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "15,000₫",
+      "description": "Saigon beer"
+    },
+    {
+      "name": "Bún với thịt bò (gân bò)",
+      "price": 45000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "MENU QUÁN",
+      "currency": "VND",
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "45.000₫",
+      "description": "Rice noodle with beef (beef tendon)\n쇠고기 국수 (쇠고기 힘줄)\n牛肉面 (牛筋)\nСуп с говяжьей лапшой (говяжье сухожилие)"
+    },
+    {
+      "name": "BÒ (GÂN)",
+      "price": 50000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BẢNG GIÁ",
+      "currency": null,
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": ": 50 K",
+      "description": null
+    },
+    {
+      "name": "BÒ + GIÒ",
+      "price": 55000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BẢNG GIÁ",
+      "currency": null,
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": ": 55 K",
+      "description": null
+    },
+    {
+      "name": "BÒ + GÂN + GIÒ (ĐB)",
+      "price": 65000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BẢNG GIÁ",
+      "currency": null,
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": ": 65 K",
+      "description": null
+    },
+    {
+      "name": "ĐẬU NÀNH",
+      "price": 10000,
+      "placeId": "ChIJO7dmNX9ncDERDE8O7qJ669k",
+      "category": "BẢNG GIÁ",
+      "currency": null,
+      "placeName": "Bún Bò Hương Giang",
+      "priceText": "10 K",
+      "description": null
+    }
+  ],
+  "sample_drink": 4,
+  "runId": "O9lfhnpiZUQFVVhyZ",
+  "establishment": "Bún Bò Hương Giang"
+}
