@@ -16,12 +16,17 @@ Le modèle se règle côté serveur dans `private.menu_dish_ai_settings.model`.
 L'Edge Function Rainminer reçoit une action Cron dédiée via le jeton serveur
 existant. Les lectures de fiche et les recherches ne lancent aucun classement.
 
-Le contrat `menu-dish-ai-v9` traite en priorité la spécialité. Le serveur
+Le contrat `menu-dish-ai-v10` traite en priorité la spécialité. Le serveur
 vérifie les lignes sources, y compris leurs rubriques. Une spécialité peut
 être retenue quand le nom du restaurant concorde avec le menu ou quand le
 profil spécialisé est étayé par des preuves liées au même plat. Elle devient
 alors recherchable avec ou sans accents. Si elle reste indéterminée, la fiche
 indique « Spécialité à confirmer » après un classement réussi.
+
+Si le nom du restaurant et la même rubrique de plats principaux désignent
+plusieurs plats complets distincts, le modèle choisit le premier de ces
+plats dans l'ordre de la rubrique. Un ordre incertain laisse la spécialité
+à confirmer.
 
 Quand les lignes alimentaires sont dépourvues de rubriques, le worker peut
 transmettre une seule photo Rainminer déjà associée au menu dans la même
@@ -73,10 +78,10 @@ recherche SQL. Les captures mobiles utilisent les résultats SQL rejoués
 comme réponses locales aux lectures de l'interface, avec
 `npx --no-install playwright test --config artifacts/menu-dish-ai-v6-validation/playwright.config.ts`.
 
-Pour passer à v9 sur une installation v8, vérifier que la file est vide.
-Appliquer `20261127070943_route_menu_dish_ai_v9.sql`, qui suspend temporairement les nouvelles réservations,
+Pour passer à v10 sur une installation v9, vérifier que la file est vide.
+Appliquer `20261127094323_route_menu_dish_ai_v10.sql`, qui suspend temporairement les nouvelles réservations,
 puis publier `rainminer-menu` avec son helper `menu-dish-ai.ts`. Le client
-existant lit le même schéma. Une réponse v9 compatible a priorité sur les
+existant lit le même schéma. Une réponse v10 compatible a priorité sur les
 résultats historiques du même menu.
 Le rejeu local et cette migration ne déclenchent aucun retraitement des menus
 existants.

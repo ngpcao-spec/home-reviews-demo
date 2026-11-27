@@ -18,6 +18,7 @@ beforeAll(async()=>{
  await db.exec(readFileSync('supabase/migrations/20261126023212_route_menu_dish_ai_v7.sql','utf8'))
  await db.exec(readFileSync('supabase/migrations/20261126151340_route_menu_dish_ai_v8.sql','utf8'))
  await db.exec(readFileSync('supabase/migrations/20261127070943_route_menu_dish_ai_v9.sql','utf8'))
+ await db.exec(readFileSync('supabase/migrations/20261127094323_route_menu_dish_ai_v10.sql','utf8'))
 },30000)
 afterAll(async()=>{await db?.close()})
 beforeEach(async()=>{await db.exec("begin;update private.menu_dish_ai_settings set enabled=true,enabled_since='1970-01-01'")})
@@ -327,13 +328,13 @@ it('shares an exact published v6 result without requesting an extra classificati
  expect(await read(second)).toMatchObject({specialty:{name:'Bún bò'},classification:{state:'succeeded'}})
 })
 
-it('prefers the v9 publication when a v8 result exists for the same menu',async()=>{
+it('prefers the v10 publication when a v9 result exists for the same menu',async()=>{
  const id=await add(bun.establishment,bun.placeId)
  await save(id,bun.placeId,bun.runId,bun.raw,[4,5,6,7])
  const ai=fakeAi({...bunResult,restaurant_type:{value:'street_food',name_evidence:null,rows:[1,2]}})
  expect(await ai.run()).toMatchObject({status:'succeeded'})
  const old=await db.query<{id:string}>(`insert into private.menu_dish_ai_runs(place_id,fingerprint,model,contract,packet,status,result,finished_at)
-  select place_id,fingerprint,model,'menu-dish-ai-v8',packet,status,
+  select place_id,fingerprint,model,'menu-dish-ai-v9',packet,status,
   jsonb_set(result,'{restaurant_type}', $1::jsonb),finished_at from private.menu_dish_ai_runs where contract=$2 returning id`,
   [unknownType,CONTRACT])
  await db.query('update private.menu_dish_ai_targets set run_id=$1,published_id=$1',[old.rows[0].id])
@@ -562,4 +563,45 @@ it('grounds multilingual specialties in repeated dish descriptions rather than i
  expect(result([1,3]).specialty).toBeNull()
  expect(result([1,2],'Rice').specialty).toBeNull()
  expect(result([1,2],'Plain noodles').specialty).toBeNull()
+})
+
+it('sends the main dishes in their saved order and publishes the first concordant dish from a simulated response',async()=>{
+ const place='ChIJordered-main-dishes'
+ const restaurant='Bún Thịt Nướng - Nem Ninh Hoà CÔ PHƯỚC'
+ const entries=[
+  ["Bún thịt nướng","Món chính","Grilled Meat Noodles / 구운 고기 국수",35000,"35k"],
+  ["Nem phần Ninh Hòa","Món chính","Ninh Hoa Traditional Nem / 닌호아 전통 넴",50000,"50k"],
+  ["Nem chua","An kèm","Sour Nem / 신맛 나는 넴",5000,"5k/cái"],
+  ["Chả lụa","An kèm","Cha Lua",5000,"5k/cái"],
+  ["Nem NH đặc biệt","Món chính","(Có thêm thịt nướng) Special With Extra Grilled Meat / 특별식",50000,"50k"],
+  ["Nem nướng","Topping thêm","Grilled Nem / 구운 넴",20000,"20k"],
+  ["Thịt nướng","Topping thêm","Grilled Meat / 구운 고기",20000,"20k"],
+  ["Nem NH phần Đặc Biệt","Món chính","(Có thêm thịt nướng) Special With Extra Grilled Meat / 특별식",50000,"50k"],
+  ["Nem cuốn Ninh Hòa","Món chính","Baked Rolls / 구운 롤빵",10000,"10k"],
+ ] as const
+ const raw=entries.map(([name,category,description,price,priceText])=>({
+  placeId:place,placeName:restaurant,name,category,description,price,priceText,
+ }))
+ const id=await add(restaurant,place)
+ await save(id,place,'saved-ordered-mains',raw,[])
+ const mainRows=[1,2,5,8,9]
+ const ai=fakeAi({
+  specialty:{name:'Bún thịt nướng',rows:[1],source_label:null,photo_title:null},
+  menu_profile:{value:'varied',rows:mainRows,sections:['Món chính']},
+  restaurant_type:unknownType,
+  items:mainRows.slice(1).map(row=>item('dish',row,raw[row-1].name)),
+ })
+ expect(await ai.run()).toEqual({claimed:1,status:'succeeded'})
+ expect(ai.call).toHaveBeenCalledTimes(1)
+ const request=JSON.parse(String(ai.call.mock.calls[0][1]?.body))
+ expect(request.instructions).toContain("choisis le premier de ces plats dans l'ordre de cette rubrique")
+ const packet=JSON.parse(request.input) as MenuPacket
+ expect(packet.lines.filter(line=>line.section==='Món chính').map(line=>line.id)).toEqual(mainRows)
+ expect(packet.lines.slice(0,2).map(line=>line.name)).toEqual(['Bún thịt nướng','Nem phần Ninh Hòa'])
+ await asUser()
+ expect(await read(id)).toMatchObject({specialty:{name:'Bún thịt nướng',status:'proposed',evidence:{rows:[1]}}})
+ for(const term of ['bun thit nuong','Bún thịt nướng']){
+  expect(await search(term)).toMatchObject([{establishmentId:id,kind:'specialty'}])
+ }
+ expect(await search('Nem phần Ninh Hòa')).toMatchObject([{establishmentId:id,kind:'menu'}])
 })

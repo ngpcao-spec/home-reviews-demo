@@ -1,6 +1,6 @@
 import { classifyMenuRow } from './rainminer-menu.mjs'
 
-export const CONTRACT = 'menu-dish-ai-v9'
+export const CONTRACT = 'menu-dish-ai-v10'
 export const DEFAULT_MODEL = 'gpt-5.4-nano'
 export const MAX_OUTPUT_TOKENS = 6000
 
@@ -91,6 +91,8 @@ Identifie d’abord la spécialité, indépendamment du classement des autres li
 Retiens un seul plat principal si :
 - Le nom du restaurant et le menu désignent clairement le même plat ; ou
 - Le menu est clairement centré sur un seul plat et ses déclinaisons, même si le nom du restaurant ne le mentionne pas.
+
+Si plusieurs plats distincts nommés dans le nom du restaurant figurent comme plats complets dans la même rubrique de plats principaux, choisis le premier de ces plats dans l'ordre de cette rubrique. Ignore les variantes, les accompagnements, les suppléments et les boissons pour ce départage. Si l'ordre de présentation est incertain, laisse specialty à null. La position dans le nom du restaurant et le prix ne départagent pas les plats.
 
 Donne le nom vietnamien normalisé du plat et cite les identifiants des lignes alimentaires qui justifient ce choix. Une rubrique qui nomme le plat suffit si ses lignes en présentent les déclinaisons.
 
