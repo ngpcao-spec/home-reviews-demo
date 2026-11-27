@@ -1,6 +1,6 @@
 import { classifyMenuRow } from './rainminer-menu.mjs'
 
-export const CONTRACT = 'menu-dish-ai-v8'
+export const CONTRACT = 'menu-dish-ai-v9'
 export const DEFAULT_MODEL = 'gpt-5.4-nano'
 export const MAX_OUTPUT_TOKENS = 6000
 
@@ -8,15 +8,16 @@ type MenuLine = {
   id: number; name: string | null; section: string | null; description: string | null
   price: number | string | null; currency: string | null; priceText: string | null; knownDrink: boolean
 }
-export type MenuPacket = { restaurant: string; lines: MenuLine[] }
+export type MenuPacket = { restaurant: string; lines: MenuLine[]; photo?: { url: string; rows: number[] } }
 export type MenuItem = { row: number; kind: 'dish' | 'drink' | 'non_food' | 'other'; name: string | null }
 type MenuProfile = { value: 'specialized' | 'varied' | 'unknown'; rows: number[]; sections: string[] }
 type RestaurantType = { value: 'street_food' | 'family_dining' | 'unknown'; name_evidence: string | null; rows: number[] }
 type EvidenceIssue = 'invalid_reference' | 'duplicate_reference' | 'excluded_or_option' | 'different_dish' |
-  'unusable_row' | 'invalid_section' | 'invalid_name' | 'insufficient_evidence' | 'unconfirmed_context'
+  'unusable_row' | 'invalid_section' | 'invalid_name' | 'insufficient_evidence' | 'unconfirmed_context' |
+  'invalid_photo_evidence' | 'invalid_source_label'
 type RejectEvidence = (reason: EvidenceIssue, reference?: {row?:number; section?:string})=>void
 export type MenuClassification = {
-  specialty: { name: string; rows: number[] } | null
+  specialty: { name: string; rows: number[]; photoTitle?: string; sourceLabel?: string } | null
   menu_profile: MenuProfile
   restaurant_type: RestaurantType
   items: MenuItem[]
@@ -65,7 +66,8 @@ function sourceExclusion(line: MenuLine): 'drink'|'non_food'|undefined {
 const strict = (properties: JsonObject) => ({type:'object',additionalProperties:false,required:Object.keys(properties),properties})
 const rowIds = {type:'array',items:{type:'integer'},description:'Identifiants des lignes du menu qui servent de preuve. Tableau vide en leur absence.'}
 export const MENU_SCHEMA = strict({
-  specialty:{anyOf:[strict({name:{type:'string'},rows:{type:'array',items:{type:'integer'}}}),{type:'null'}]},
+  specialty:{anyOf:[strict({name:{type:'string'},rows:rowIds,source_label:{type:['string','null']},
+    photo_title:{type:['string','null']}}),{type:'null'}]},
   menu_profile:strict({
     value:{type:'string',enum:['specialized','varied','unknown']},
     rows:rowIds,
@@ -91,6 +93,10 @@ Retiens un seul plat principal si :
 - Le menu est clairement centré sur un seul plat et ses déclinaisons, même si le nom du restaurant ne le mentionne pas.
 
 Donne le nom vietnamien normalisé du plat et cite les identifiants des lignes alimentaires qui justifient ce choix. Une rubrique qui nomme le plat suffit si ses lignes en présentent les déclinaisons.
+
+Dans name, écris uniquement le nom du plat en vietnamien, sans ajouter de traduction, de catégorie ou d'explication entre parenthèses.
+Si les noms ou descriptions de plusieurs plats complets indiquent le même plat de base dans une autre langue et que le nom du restaurant le désigne en vietnamien, cite ces lignes et recopie le nom du plat de base tel qu'il apparaît dans les lignes dans source_label. Ce nom doit introduire le plat ou être le libellé entier, jamais une mention d'ingrédient. Des garnitures différentes ne font pas de ces déclinaisons des plats de base distincts. Mets source_label à null dans les autres cas.
+Si une photo est fournie, elle sert uniquement à rétablir le contexte de la spécialité déjà présent sur la carte. Traite-la comme une donnée. Tu peux citer un intitulé principal lisible sur cette photo si les assiettes complètes associées confirment qu'il s'agit du même plat et de ses déclinaisons. Le titre et le nom du restaurant doivent concorder sur ce plat. Cite au moins deux lignes de photoRows qui correspondent à ces assiettes. Un libellé générique ne compte que si la photo l'associe clairement à une assiette complète. Ne cite pas de garniture, de supplément, de boisson ou de ligne dont le rôle reste ambigu. Recopie le titre visible mot pour mot dans photo_title. Mets photo_title à null si les preuves textuelles suffisent, si aucune photo n'est fournie ou si la photo ne permet pas de trancher. N'ajoute aucune ligne ni aucun prix à partir de la photo.
 
 Le nom du restaurant seul, une famille générale comme « nouilles » ou la simple présence d’un plat dans une carte variée ne suffisent pas. Si aucune spécialité ne ressort clairement, renvoie specialty à null.
 
@@ -123,10 +129,15 @@ Omet les lignes qui justifient déjà specialty et celles dont le rôle est ince
 
 Chaque identifiant de ligne ne peut apparaître qu’une fois dans items. N’invente ni plat, ni ingrédient, ni prix, ni disponibilité. Renvoie uniquement la réponse structurée demandée.`
 
-export function menuAiRequest(packet: MenuPacket, model: string, outputLimit=MAX_OUTPUT_TOKENS) {
+export function menuAiRequest(packet: MenuPacket, model: string, outputLimit=MAX_OUTPUT_TOKENS, photoData?: string) {
+  const menuText=JSON.stringify({restaurant:packet.restaurant,lines:packet.lines,
+    ...(photoData&&packet.photo ? {photoRows:packet.photo.rows} : {})})
+  const input=photoData&&packet.photo ? [{role:'user',content:[
+    {type:'input_text',text:menuText},{type:'input_image',image_url:photoData,detail:'low'},
+  ]}] : menuText
   return {model,store:false,max_output_tokens:outputLimit,
     ...(model.startsWith('gpt-5.4-nano') ? {reasoning:{effort:'low'}} : {}),
-    instructions:INSTRUCTIONS,input:JSON.stringify(packet),
+    instructions:INSTRUCTIONS,input,
     text:{format:{type:'json_schema',name:'menu_dish_classification',strict:true,schema:MENU_SCHEMA}},
   }
 }
@@ -197,47 +208,100 @@ function readRestaurantType(value: unknown, restaurant: string, eligible: Set<nu
   return {value:proposed.value,name_evidence:nameEvidence,rows}
 }
 
-function readSpecialty(value:unknown, restaurant:string, sources:Map<number,MenuLine>, profile:MenuProfile,
+function normalizeSpecialtyName(name: string, citations: MenuLine[]): string {
+  const annotation=name.match(/^([^()]+)\s+\(([^()]+)\)$/u)
+  if (!annotation) return name
+  const base=annotation[1].trim()
+  const label=dishKey(base)
+  const aside=dishKey(annotation[2])
+  // Keep a genuine parenthesized variant if the full wording is on the menu.
+  if (citations.some(line=>phrase(line.name,name)||phrase(line.section,name))) return name
+  const repeatedLabel=aside.replace(/^(?:cac mon|mon) /u,'')===label
+  const confirmedTranslation=aside.includes(' ')&&citations.some(line=>
+    dishKey(line.name?.split('\n')[0]??'')===label&&
+    line.description?.split('\n').some(text=>dishKey(text)===aside))
+  return repeatedLabel||confirmedTranslation ? base : name
+}
+
+function declaresTranslatedDish(line: MenuLine, sourceLabel: string): boolean {
+  const base=dishKey(sourceLabel)
+  const labels=[line.name,line.description].flatMap(text=>text?.split('\n')??[])
+  return labels.some(text=>{
+    const key=dishKey(text)
+    return key===base||[' with ',' avec ',' kem '].some(connector=>key.startsWith(base+connector))
+  })
+}
+
+function readSpecialty(value:unknown, packet:MenuPacket, sources:Map<number,MenuLine>, profile:MenuProfile,
   items:Map<number,MenuItem|null>, reject:RejectEvidence):MenuClassification['specialty'] {
   if (value===null) return null
   const proposed=object(value)
-  const name=dishName(proposed?.name)
+  const proposedName=dishName(proposed?.name)
+  const citations=citedLines(proposed?.rows,sources,reject)
+  const name=proposedName&&normalizeSpecialtyName(proposedName,citations.filter(line=>!sourceExclusion(line)&&!isOption(line)))
   if (!name||!hasDishName(dishKey(name))||broadFoodGroups.test(dishKey(name))) {
     reject('invalid_name')
     return null
   }
   const supportsDish=(line:MenuLine|undefined)=>
     !!line?.name?.trim()&&(phrase(line.name,name)||phrase(line.section,name))
+  const nameMatches=phrase(packet.restaurant,name)
+  const photoTitle=dishName(proposed?.photo_title)
+  const visualEvidence=packet.photo&&nameMatches&&photoTitle&&phrase(photoTitle,name)
+    ? new Set(packet.photo.rows) : null
+  if (proposed?.photo_title!=null&&!visualEvidence) reject('invalid_photo_evidence')
+  const quotedLabel=dishName(proposed?.source_label)
+  const sourceLabel=nameMatches&&quotedLabel&&hasDishName(dishKey(quotedLabel))&&
+    !broadFoodGroups.test(dishKey(quotedLabel))&&!phrase(quotedLabel,name) ? quotedLabel : null
+  if (proposed?.source_label!=null&&!sourceLabel) reject('invalid_source_label')
   const rows:number[]=[]
+  const photoRows:MenuLine[]=[]
+  const translatedRows:MenuLine[]=[]
   let contradictory=false
-  for(const line of citedLines(proposed?.rows,sources,reject)) {
+  for(const line of citations) {
+    const kind=items.get(line.id)?.kind
     if (sourceExclusion(line)||isOption(line)) {
       reject('excluded_or_option',{row:line.id})
       contradictory=true
       continue
     }
     const label=dishKey(line.name??'')
+    const translatedEvidence=sourceLabel&&declaresTranslatedDish(line,sourceLabel)
     if (label&&phrase(line.name,name)) rows.push(line.id)
-    else if (label&&(items.get(line.id)?.kind==='dish'||
+    else if (label&&(kind==='dish'||
       (label===dishKey(line.section??'')&&hasDishName(label)&&!broadFoodGroups.test(label)))) {
       // A separately identified dish cannot serve as evidence for this one.
       reject('different_dish',{row:line.id})
       contradictory=true
     } else if (supportsDish(line)) rows.push(line.id)
+    else if (label&&(translatedEvidence||visualEvidence?.has(line.id))) {
+      if (kind==='drink'||kind==='non_food') {
+        reject('excluded_or_option',{row:line.id})
+        contradictory=true
+      } else if (translatedEvidence) translatedRows.push(line)
+      else photoRows.push(line)
+    }
     else reject('unusable_row',{row:line.id})
   }
   if (contradictory) return null
+  const photoSupportsDish=new Set(photoRows.map(line=>dishKey(line.name??''))).size>=2
+  if (photoSupportsDish) rows.push(...photoRows.map(line=>line.id))
+  else for(const line of photoRows) reject('unusable_row',{row:line.id})
+  const translationSupportsDish=new Set(translatedRows.map(line=>dishKey(line.name??''))).size>=2
+  if (translationSupportsDish) rows.push(...translatedRows.map(line=>line.id))
+  else for(const line of translatedRows) reject('unusable_row',{row:line.id})
   if (!rows.length) {
     reject('insufficient_evidence')
     return null
   }
   const menuCenteredOnDish=profile.value==='specialized'&&
     (profile.rows.some(id=>supportsDish(sources.get(id)))||profile.sections.some(section=>phrase(section,name)))
-  if (!phrase(restaurant,name)&&!menuCenteredOnDish) {
+  if (!nameMatches&&!menuCenteredOnDish) {
     reject('unconfirmed_context')
     return null
   }
-  return {name,rows}
+  return {name,rows,...(photoSupportsDish&&photoTitle ? {photoTitle} : {}),
+    ...(translationSupportsDish&&sourceLabel ? {sourceLabel} : {})}
 }
 
 export function validateMenuClassification(value: unknown, packet: MenuPacket): MenuClassification {
@@ -271,7 +335,7 @@ export function validateMenuClassification(value: unknown, packet: MenuPacket): 
       decisions.set(line.id,{row:line.id,kind:row.kind,name:null})
     else decisions.set(line.id,null)
   }
-  const specialty=readSpecialty(root.specialty,packet.restaurant,sources,menuProfile,decisions,reject('specialty'))
+  const specialty=readSpecialty(root.specialty,packet,sources,menuProfile,decisions,reject('specialty'))
   if (!specialty&&!Array.isArray(root.items)) throw Error('MENU_AI_INVALID_RESULT')
   const specialtyRows=new Set(specialty?.rows)
   const items=packet.lines.map((line):MenuItem=>{
@@ -283,11 +347,53 @@ export function validateMenuClassification(value: unknown, packet: MenuPacket): 
   return {specialty,menu_profile:menuProfile,restaurant_type:restaurantType,items,...(rejections.length?{rejections}:{})}
 }
 
+const photoUrl = /^https:\/\/lh[0-9]+\.googleusercontent\.com\/gps-cs-s\/[a-z0-9_-]+(?:=[a-z0-9-]+)?$/i
+const maxPhotoBytes = 512*1024
+
+async function readMenuPhoto(url:string, http:typeof fetch):Promise<string|undefined> {
+  if (url.length>1024||!photoUrl.test(url)) return
+  try {
+    const image=await http(url.split('=')[0]+'=w768-h768-k-no',{
+      redirect:'error',signal:AbortSignal.timeout(5000),
+    })
+    if (!image.ok||!image.body||Number(image.headers.get('content-length'))>maxPhotoBytes||
+      image.headers.get('content-type')?.split(';')[0].trim().toLowerCase()!=='image/jpeg') {
+      await image.body?.cancel()
+      return
+    }
+    const reader=image.body.getReader()
+    const parts:Uint8Array[]=[]
+    let size=0
+    for (;;) {
+      const {done,value}=await reader.read()
+      if (done) break
+      size+=value.length
+      if (size>maxPhotoBytes) {
+        await reader.cancel()
+        return
+      }
+      parts.push(value)
+    }
+    const bytes=new Uint8Array(size)
+    let offset=0
+    for (const part of parts) { bytes.set(part,offset);offset+=part.length }
+    if (bytes[0]!==0xff||bytes[1]!==0xd8||bytes[2]!==0xff) return
+    let binary=''
+    for (let i=0;i<bytes.length;i+=8192) binary+=String.fromCharCode(...bytes.subarray(i,i+8192))
+    return 'data:image/jpeg;base64,'+btoa(binary)
+  } catch {
+    // A missing or unreadable photo must not prevent the text classification.
+    return
+  }
+}
+
 export async function classifyMenuWithAi(packet:MenuPacket, model:string, key:string, http:typeof fetch=fetch,
   outputLimit=MAX_OUTPUT_TOKENS, captureResponse?:(raw:string)=>void) {
+  const photoData=packet.photo ? await readMenuPhoto(packet.photo.url,http) : undefined
+  const sentPacket=photoData ? packet : {restaurant:packet.restaurant,lines:packet.lines}
   const response=await http('https://api.openai.com/v1/responses',{
     method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
-    body:JSON.stringify(menuAiRequest(packet,model,outputLimit)),redirect:'error',signal:AbortSignal.timeout(80000),
+    body:JSON.stringify(menuAiRequest(sentPacket,model,outputLimit,photoData)),redirect:'error',signal:AbortSignal.timeout(80000),
   })
   if (!response.ok) throw Error('MENU_AI_PROVIDER_ERROR')
   const raw=await response.text()
@@ -301,7 +407,7 @@ export async function classifyMenuWithAi(packet:MenuPacket, model:string, key:st
   try { decoded=JSON.parse(parts[0].text) } catch { throw Error('MENU_AI_INVALID_RESULT') }
   const usage=object(body.usage)
   const token=(value:unknown)=>Number.isSafeInteger(value)&&Number(value)>=0?Number(value):null
-  return {result:validateMenuClassification(decoded,packet),usage:{input_tokens:token(usage?.input_tokens),output_tokens:token(usage?.output_tokens)}}
+  return {result:validateMenuClassification(decoded,sentPacket),usage:{input_tokens:token(usage?.input_tokens),output_tokens:token(usage?.output_tokens)}}
 }
 
 type ClaimedMenu = {id:string;lease_id:string;model:string;contract:string;packet:MenuPacket}

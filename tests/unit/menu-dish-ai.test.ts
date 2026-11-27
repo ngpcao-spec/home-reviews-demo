@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import type { PGlite } from '@electric-sql/pglite'
 import Ajv from 'ajv'
 import { dishDatabase, ORG, ORG2, USER, USER2, savedMenu } from '../fixtures/dish-associations-database'
-import { advanceMenuDishAi, CONTRACT, menuAiRequest, validateMenuClassification, type MenuClassification, type MenuItem, type MenuPacket } from '../../supabase/functions/_shared/menu-dish-ai'
+import { advanceMenuDishAi, classifyMenuWithAi, CONTRACT, menuAiRequest, validateMenuClassification, type MenuClassification, type MenuItem, type MenuPacket } from '../../supabase/functions/_shared/menu-dish-ai'
 import type { DishProfile, DishMatch } from '../../src/lib/restaurant-dishes'
 import bun from '../fixtures/bun-bo-huong-giang-menu-saved.json'
 
@@ -17,6 +17,7 @@ beforeAll(async()=>{
  await db.exec(migration.replace(/select cron\.schedule\([\s\S]*?\$cron\$\);/,''))
  await db.exec(readFileSync('supabase/migrations/20261126023212_route_menu_dish_ai_v7.sql','utf8'))
  await db.exec(readFileSync('supabase/migrations/20261126151340_route_menu_dish_ai_v8.sql','utf8'))
+ await db.exec(readFileSync('supabase/migrations/20261127070943_route_menu_dish_ai_v9.sql','utf8'))
 },30000)
 afterAll(async()=>{await db?.close()})
 beforeEach(async()=>{await db.exec("begin;update private.menu_dish_ai_settings set enabled=true,enabled_since='1970-01-01'")})
@@ -242,7 +243,7 @@ it('keeps an unsupported suggestion empty and defaults missing, duplicated and i
  expect(request.instructions).toContain('2. PROFIL DE LA CARTE — menu_profile')
  expect(request.instructions).toContain('3. TYPE DE RESTAURANT — restaurant_type')
  const validateSchema=new Ajv().compile(request.text.format.schema)
- expect(validateSchema(bunResult)).toBe(true)
+ expect(validateSchema({...bunResult,specialty:{...bunResult.specialty,photo_title:null,source_label:null}})).toBe(true)
  expect(validateSchema({...bunResult,restaurant_type:{...unknownType,value:'specialized'}})).toBe(false)
  const incomplete=validateMenuClassification({specialty:bunResult.specialty,items:[
   item('dish',8,'Bún với thịt bò (gân bò)'), item('non_food',8), item('dish',999,'Phở'),
@@ -326,13 +327,13 @@ it('shares an exact published v6 result without requesting an extra classificati
  expect(await read(second)).toMatchObject({specialty:{name:'Bún bò'},classification:{state:'succeeded'}})
 })
 
-it('prefers the v8 publication when a v7 result exists for the same menu',async()=>{
+it('prefers the v9 publication when a v8 result exists for the same menu',async()=>{
  const id=await add(bun.establishment,bun.placeId)
  await save(id,bun.placeId,bun.runId,bun.raw,[4,5,6,7])
  const ai=fakeAi({...bunResult,restaurant_type:{value:'street_food',name_evidence:null,rows:[1,2]}})
  expect(await ai.run()).toMatchObject({status:'succeeded'})
  const old=await db.query<{id:string}>(`insert into private.menu_dish_ai_runs(place_id,fingerprint,model,contract,packet,status,result,finished_at)
-  select place_id,fingerprint,model,'menu-dish-ai-v7',packet,status,
+  select place_id,fingerprint,model,'menu-dish-ai-v8',packet,status,
   jsonb_set(result,'{restaurant_type}', $1::jsonb),finished_at from private.menu_dish_ai_runs where contract=$2 returning id`,
   [unknownType,CONTRACT])
  await db.query('update private.menu_dish_ai_targets set run_id=$1,published_id=$1',[old.rows[0].id])
@@ -453,4 +454,112 @@ it('only indexes complete names and keeps labels from explicit option sections i
  for(const [name] of entries.slice(0,7)) expect(await search(name)).toEqual([])
  for(const [name] of entries.slice(7)) expect(await search(name)).toMatchObject([{establishmentId:id,kind:'menu'}])
  expect(await search('crepe au caramel')).toMatchObject([{establishmentId:id,kind:'menu'}])
+})
+
+it('uses an archived menu photo for missing context, preserves the raw rows and reuses the result',async()=>{
+ const place='ChIJbroken-rice-test'
+ const restaurant='Cơm tấm 82 Trịnh Phong'
+ const id=await add(restaurant,place)
+ const second=await add(restaurant,place,ORG2)
+ const image='https://lh3.googleusercontent.com/gps-cs-s/saved-menu-page'
+ const raw=['CHICKEN THIGH','SPECIAL','FRIED EGG','Trà đá'].map(name=>({
+  placeId:place,placeName:restaurant,name,menuImageUrl:image+'=w2048-h2048-k-no',
+ }))
+ await save(id,place,'saved-broken-rice-menu',raw,[4])
+ const proposal={specialty:{name:'Cơm tấm',rows:[1,2],photo_title:'CƠM TẤM 82 TRỊNH PHONG'},
+  menu_profile:unknownProfile,restaurant_type:unknownType,items:[]}
+ const model=fakeAi(proposal)
+ const http=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>{
+  if(String(url)===image+'=w768-h768-k-no') {
+   expect(init).toMatchObject({redirect:'error'})
+   expect(init?.headers).toBeUndefined()
+   return new Response(new Uint8Array([255,216,255,217]),{headers:{'content-type':'image/jpeg'}})
+  }
+  return model.call(url,init)
+ })
+ expect(await advanceMenuDishAi(workerRpc,'simulated-credential',http)).toEqual({claimed:1,status:'succeeded'})
+ const request=JSON.parse(String(model.call.mock.calls[0][1]?.body))
+ const content=request.input[0].content
+ expect(content[1]).toMatchObject({type:'input_image',detail:'low',image_url:'data:image/jpeg;base64,/9j/2Q=='})
+ expect(JSON.parse(content[0].text)).toMatchObject({restaurant,photoRows:[1,2,3]})
+ await asUser()
+ expect(await read(id)).toMatchObject({
+  specialty:{name:'Cơm tấm',status:'proposed',evidence:{rows:[1,2]}},
+  associations:[{name:'Cơm tấm',evidence:[{photo:raw[0].menuImageUrl},{photo:raw[1].menuImageUrl}]}],
+  unresolved:[{name:'FRIED EGG',reason:'other'}],
+ })
+ const stored=(await db.query('select result from private.menu_dish_ai_runs')).rows[0]
+ expect(stored).toMatchObject({result:{specialty:{photoTitle:proposal.specialty.photo_title}}})
+ const archived=(await db.query('select original from private.dish_menu_evidence where run_id=$1 order by source_row',['saved-broken-rice-menu'])).rows
+ expect(archived).toEqual(raw.map(original=>({original})))
+ for(const term of ['com tam','Cơm tấm']) expect(await search(term)).toMatchObject([{establishmentId:id,kind:'specialty'}])
+ expect(await search('SPECIAL')).toEqual([])
+ expect(await search('Trà đá')).toEqual([])
+
+ await save(second,place,'same-page-resized',raw.map(row=>({...row,menuImageUrl:image+'=w1200-h1200-k-no'})),[4])
+ expect(await advanceMenuDishAi(workerRpc,'simulated-credential',http)).toEqual({claimed:0})
+ expect(http).toHaveBeenCalledTimes(2)
+ expect(model.call).toHaveBeenCalledTimes(1)
+ await asUser(USER2)
+ expect(await search('com tam')).toMatchObject([{establishmentId:second,kind:'specialty'}])
+})
+
+it('requires corroborating photo evidence and falls back to text when the photo is unavailable',async()=>{
+ const packet:MenuPacket={
+  restaurant:'Quán Bánh xèo',
+  lines:['Tôm thịt','Thập cẩm','Trà đá','Hải sản'].map((name,i)=>({
+   id:i+1,name,section:null,description:null,price:null,priceText:null,currency:null,knownDrink:i===2,
+  })),
+  photo:{url:'https://lh3.googleusercontent.com/gps-cs-s/saved-menu-page',rows:[1,2,3]},
+ }
+ const specialty={name:'Bánh xèo',rows:[1,2],photo_title:'BÁNH XÈO'}
+ const reply={specialty,menu_profile:unknownProfile,restaurant_type:unknownType,items:[]}
+ expect(validateMenuClassification(reply,packet).specialty).toMatchObject({name:'Bánh xèo',rows:[1,2],photoTitle:'BÁNH XÈO'})
+ for(const evidence of [
+  {...specialty,photo_title:null},{...specialty,photo_title:'MENU'},
+  {...specialty,rows:[1,3]},{...specialty,rows:[1,4]},{...specialty,rows:[1,1]},
+ ]) expect(validateMenuClassification({...reply,specialty:evidence},packet).specialty).toBeNull()
+ expect(validateMenuClassification(reply,{...packet,restaurant:'Le Marché'}).specialty).toBeNull()
+
+ const model=fakeAi(reply)
+ const http=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).startsWith('https://lh3.')
+  ? new Response(null,{status:404}) : model.call(url,init))
+ expect((await classifyMenuWithAi(packet,'gpt-5.4-nano','simulated-credential',http)).result.specialty).toBeNull()
+ expect(http).toHaveBeenCalledTimes(2)
+ expect(model.call).toHaveBeenCalledTimes(1)
+ expect(typeof JSON.parse(String(model.call.mock.calls[0][1]?.body)).input).toBe('string')
+ const invalidPhoto={...packet,photo:{rows:[1,2],url:'https://lh3.googleusercontent.com.example.com/gps-cs-s/photo'}}
+ await classifyMenuWithAi(invalidPhoto,'gpt-5.4-nano','simulated-credential',http)
+ expect(http).toHaveBeenCalledTimes(3)
+})
+
+it('strips corroborated name annotations without dropping a genuine variant or an unsupported qualifier',()=>{
+ const packet:MenuPacket={restaurant:'Cơm Gà Hà',lines:[{
+  id:7,name:'CƠM GÀ',section:'COM - RICE',description:'Chicken rice\nКурица с рисом',
+  price:40000,priceText:null,currency:null,knownDrink:false,
+ }]}
+ for(const name of ['Cơm gà (chicken rice)','Cơm gà (các món cơm gà)']) {
+  expect(validateMenuClassification({specialty:{name,rows:[7]},items:[]},packet).specialty).toEqual({name:'Cơm gà',rows:[7]})
+ }
+ expect(validateMenuClassification({specialty:{name:'Cơm gà (chay)',rows:[7]},items:[]},packet).specialty).toBeNull()
+ const variant={restaurant:'Cơm gà (chay) Hoa',lines:[{...packet.lines[0],name:'Cơm gà (chay)'}]}
+ expect(validateMenuClassification({specialty:{name:'Cơm gà (chay)',rows:[7]},items:[]},variant).specialty)
+  .toEqual({name:'Cơm gà (chay)',rows:[7]})
+})
+
+it('grounds multilingual specialties in repeated dish descriptions rather than ingredient mentions',()=>{
+ const packet:MenuPacket={restaurant:'CƠM TẤM NGON',lines:[
+  ['Cơm sườn','Broken rice with grilled pork chop'],
+  ['Cơm gà nướng','Broken rice with grilled chicken'],
+  ['Canh khổ qua','Soup served with broken rice'],
+ ].map(([name,description],i)=>({
+  id:i+1,name,description,section:null,price:null,priceText:null,currency:null,knownDrink:false,
+ }))}
+ const result=(rows:number[],source_label='Broken rice')=>validateMenuClassification({
+  specialty:{name:'Cơm tấm',rows,source_label,photo_title:null},items:[],
+ },packet)
+ expect(result([1,2]).specialty).toEqual({name:'Cơm tấm',rows:[1,2],sourceLabel:'Broken rice'})
+ expect(result([1,3]).specialty).toBeNull()
+ expect(result([1,2],'Rice').specialty).toBeNull()
+ expect(result([1,2],'Plain noodles').specialty).toBeNull()
 })

@@ -7,19 +7,30 @@ réutilise la fin d'import, la réutilisation d'un menu et les droits actuels.
 
 Le serveur calcule une empreinte du menu utile, dans son ordre d'origine.
 L'identifiant Google, l'empreinte, le modèle et la version du contrat identifient
-une demande unique. Les dates du run et les URL des photos ne changent pas
-l'empreinte. Le cache est commun pour le même établissement Google. Les
+une demande unique. Les dates du run et la résolution des photos ne changent
+pas l'empreinte. Lorsque le classement utilise une photo, son identifiant
+source et les lignes associées font partie de l'empreinte. Le cache est commun
+pour le même établissement Google. Les
 associations et preuves restent publiées dans la portée autorisée du compte.
 Le modèle se règle côté serveur dans `private.menu_dish_ai_settings.model`.
 L'Edge Function Rainminer reçoit une action Cron dédiée via le jeton serveur
 existant. Les lectures de fiche et les recherches ne lancent aucun classement.
 
-Le contrat `menu-dish-ai-v8` traite en priorité la spécialité. Le serveur
+Le contrat `menu-dish-ai-v9` traite en priorité la spécialité. Le serveur
 vérifie les lignes sources, y compris leurs rubriques. Une spécialité peut
 être retenue quand le nom du restaurant concorde avec le menu ou quand le
 profil spécialisé est étayé par des preuves liées au même plat. Elle devient
 alors recherchable avec ou sans accents. Si elle reste indéterminée, la fiche
 indique « Spécialité à confirmer » après un classement réussi.
+
+Quand les lignes alimentaires sont dépourvues de rubriques, le worker peut
+transmettre une seule photo Rainminer déjà associée au menu dans la même
+requête de classement. Le titre cité doit concorder avec le nom du restaurant
+et être relié à au moins deux lignes distinctes de cette page. En cas de photo
+inaccessible, le worker envoie le menu texte. Les noms suivis d'une précision
+entre parenthèses sont normalisés uniquement quand cette précision répète le
+nom ou reprend une traduction présente dans une ligne citée. Le texte brut et
+les preuves sont conservés.
 
 Le serveur vérifie chaque citation. Une référence absente, dupliquée ou
 imprécise est consignée avec son motif et ne retire pas les autres preuves.
@@ -62,11 +73,11 @@ recherche SQL. Les captures mobiles utilisent les résultats SQL rejoués
 comme réponses locales aux lectures de l'interface, avec
 `npx --no-install playwright test --config artifacts/menu-dish-ai-v6-validation/playwright.config.ts`.
 
-Pour passer à v8 sur une installation v7, vérifier que la file est vide.
-Appliquer `20261126151340_route_menu_dish_ai_v8.sql`, qui suspend temporairement les nouvelles réservations,
+Pour passer à v9 sur une installation v8, vérifier que la file est vide.
+Appliquer `20261127070943_route_menu_dish_ai_v9.sql`, qui suspend temporairement les nouvelles réservations,
 puis publier `rainminer-menu` avec son helper `menu-dish-ai.ts`. Le client
-existant lit le même schéma. Une réponse v8 a priorité sur la v7 du même menu.
-Le prompt validé porte l’empreinte SHA-256 `8a325440c1cca83adfc670fa878d58fbac796e24a4628aad7508e15d026d896b`.
+existant lit le même schéma. Une réponse v9 compatible a priorité sur les
+résultats historiques du même menu.
 Le rejeu local et cette migration ne déclenchent aucun retraitement des menus
 existants.
 
