@@ -40,7 +40,7 @@ beforeAll(async()=>{
  await db.exec(readFileSync('supabase/migrations/20261028133850_google_maps_price_provenance.sql','utf8'));
  await db.exec(readFileSync('supabase/migrations/20261028151639_google_place_price_jobs.sql','utf8'));
  await db.exec(readFileSync('supabase/migrations/20261028164404_google_place_practical_metadata.sql','utf8'));
- await db.exec(readFileSync('supabase/migrations/20261127105336_resolve_place_price_build_before_start.sql','utf8'));
+ await db.exec(readFileSync('supabase/migrations/20261127111643_resolve_place_price_build_before_start.sql','utf8'));
 },60000);
 beforeEach(async()=>{vi.stubGlobal('fetch',vi.fn(()=>{throw Error('NETWORK_FORBIDDEN')}));await db.exec('begin;update private.google_place_price_config set enabled=true;');});
 afterEach(async()=>{await db.exec('rollback');expect(fetch).not.toHaveBeenCalled();vi.unstubAllGlobals();});afterAll(()=>db.close());

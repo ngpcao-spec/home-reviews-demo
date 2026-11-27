@@ -194,7 +194,7 @@ séparément lors de la reprise autorisée.
 
 ### Migration du contrôle de build
 
-Appliquer uniquement `20261127105336_resolve_place_price_build_before_start.sql`
+Appliquer uniquement `20261127111643_resolve_place_price_build_before_start.sql`
 et redéployer `process-google-place-price-jobs` pour ce correctif. Sauvegarder
 la définition de `public.advance_google_place_price_job(uuid,text,text,jsonb)`
 et l’état de la file avant intervention. Faire l’opération pendant une fenêtre
