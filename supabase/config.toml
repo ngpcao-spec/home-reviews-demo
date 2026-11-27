@@ -585,6 +585,9 @@ verify_jwt = false
 [functions.process-google-place-price-jobs]
 verify_jwt = false
 
+[functions.process-dish-image-jobs]
+verify_jwt = false
+
 [functions.rainminer-menu]
 verify_jwt = false # Authenticates in the handler.
 
