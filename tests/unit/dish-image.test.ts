@@ -9,7 +9,7 @@ let db:PGlite;
 const migration=(file:string)=>readFileSync('supabase/migrations/'+file,'utf8');
 const query=async<T>(sql:string,args:unknown[]=[]) => (await db.query<{value:T}>(sql,args)).rows[0]?.value;
 const claim=async()=>(await db.query<DishImageJob>('select * from public.claim_dish_image()')).rows[0]??null;
-const finish=(job:DishImageJob,error:string|null=null)=>query<boolean>('select public.finish_dish_image($1,$2,$3) value',[job.dish_id,job.generation_id,error]);
+const finish=(job:DishImageJob,error:string|null=null,receipt:unknown=null)=>query<boolean>('select public.finish_dish_image($1,$2,$3,$4) value',[job.dish_id,job.generation_id,error,receipt]);
 const row=(id:string)=>query<Record<string,unknown>>('select to_jsonb(i) value from private.dish_images i where dish_id=$1',[id]);
 const allow=async(ids:string[],cap=ids.length)=>db.query("update private.dish_image_settings set launches_enabled=true,project_url='https://fixture.supabase.co',allowed_dish_ids=$1,remaining_launches=$2",[ids,cap]);
 const stored=async(path:string)=>db.query("insert into storage.objects(bucket_id,name) values('dish-images',$1)",[path]);
@@ -23,7 +23,7 @@ beforeAll(async()=>{
  create table storage.objects(bucket_id text references storage.buckets(id),name text,primary key(bucket_id,name));
  alter table storage.objects enable row level security;`);
  await db.exec(migration('20261125141350_classify_saved_menus_with_ai.sql'));
- await db.exec(migration('20261127130411_shared_main_dish_images.sql'));
+ await db.exec(migration('20261127132010_shared_main_dish_images.sql'));
 },30000);
 afterAll(async()=>{await db?.close();});
 beforeEach(async()=>db.exec(`begin;
@@ -74,7 +74,8 @@ it('passes one simulated image through the worker for two restaurants with the s
  await publish('Bún bò','street_food',ORG2);
  await allow([id]);
  const webp=Buffer.from('UklGRiIAAABXRUJQVlA4TBYAAAAvAAAAEAcQ/Y/+ByKi/7YBAPwAoJZR','base64');
- const network=vi.fn<typeof fetch>().mockResolvedValue(Response.json({data:[{b64_json:webp.toString('base64')}]}));
+ const usage={input_tokens:120,output_tokens:823};
+ const network=vi.fn<typeof fetch>().mockResolvedValue(Response.json({data:[{b64_json:webp.toString('base64')}],usage}));
  const work=()=>processDishImage({claim,generate:name=>generateDishImage(name,'mock-key',network),
   upload:async(path,bytes)=>{expect(Buffer.from(bytes)).toEqual(webp);await stored(path);},finish});
  expect(await work()).toEqual({claimed:1,recorded:true});
@@ -85,6 +86,8 @@ it('passes one simulated image through the worker for two restaurants with the s
  expect(JSON.parse(String(options?.body))).toMatchObject({model:DISH_IMAGE_MODEL,n:1,size:'1024x1024',quality:'low',output_format:'webp',prompt:expect.stringContaining('Bún bò')});
  const image=await row(id);
  expect(image).toMatchObject({image_status:'ready',image_source:'ai_generated',prompt_version:'dish-image-v1',
+  generation_receipt:{prompt:expect.stringContaining('matte charcoal background'),model:DISH_IMAGE_MODEL,usage,
+   quality:'low',webp_bytes:webp.length,generation_ms:expect.any(Number)},
   image_url:expect.stringMatching(/^https:\/\/fixture[.]supabase[.]co\/storage\/v1\/object\/public\/dish-images\//)});
 });
 

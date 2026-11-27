@@ -1,6 +1,6 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.117.2';
 import {json} from '../_shared/cors.ts';
-import {DISH_IMAGE_BUCKET,generateDishImage,processDishImage,type DishImageJob} from '../_shared/dish-image.ts';
+import {DISH_IMAGE_BUCKET,DISH_IMAGE_MODEL,generateDishImage,processDishImage,type DishImageJob} from '../_shared/dish-image.ts';
 
 Deno.serve(async(request)=>{
   if(request.method!=='POST') return json({error:'METHOD_NOT_ALLOWED'},405);
@@ -12,6 +12,13 @@ Deno.serve(async(request)=>{
   const key=Deno.env.get('OPENAI_API_KEY')?.trim();
   if(!key) return json({error:'DISH_IMAGE_PROVIDER_UNCONFIGURED'},503);
   try {
+    if(new URL(request.url).searchParams.get('preflight')==='1'){
+      const model=await fetch('https://api.openai.com/v1/models/'+DISH_IMAGE_MODEL,{
+        headers:{Authorization:'Bearer '+key},redirect:'error',signal:AbortSignal.timeout(8000),
+      });
+      const available=model.ok&&(await model.json()).id===DISH_IMAGE_MODEL;
+      return json({model:DISH_IMAGE_MODEL,available,provider_status:model.status},available?200:503);
+    }
     const result=await processDishImage({
       claim:async()=>{
         const result=await admin.rpc('claim_dish_image');
@@ -25,8 +32,9 @@ Deno.serve(async(request)=>{
         });
         if(result.error) throw Error('DISH_IMAGE_STORAGE_UNCONFIRMED');
       },
-      finish:async(job,error)=>{
-        const result=await admin.rpc('finish_dish_image',{p_dish:job.dish_id,p_generation:job.generation_id,p_error:error});
+      finish:async(job,error,receipt)=>{
+        if(receipt) console.info('DISH_IMAGE_GENERATION_RECEIPT',{dish_id:job.dish_id,generation_id:job.generation_id,...receipt});
+        const result=await admin.rpc('finish_dish_image',{p_dish:job.dish_id,p_generation:job.generation_id,p_error:error,p_receipt:receipt});
         if(result.error) throw Error('DISH_IMAGE_FINISH_UNCONFIRMED');
         return result.data===true;
       },

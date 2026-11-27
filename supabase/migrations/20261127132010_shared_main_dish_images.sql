@@ -11,6 +11,7 @@ create table private.dish_images (
  started_at timestamptz,
  lease_until timestamptz,
  last_error text,
+ generation_receipt jsonb check(generation_receipt is null or jsonb_typeof(generation_receipt)='object'),
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now(),
  check ((image_url is null and image_storage_path is null and image_source is null and prompt_version is null)
@@ -90,7 +91,7 @@ on private.menu_dish_ai_targets for each row
 when (new.published_id is not null and (old.published_id,old.published_source_run)
  is distinct from (new.published_id,new.published_source_run)) execute function private.enqueue_published_dish_image();
 
-create function public.finish_dish_image(p_dish uuid,p_generation uuid,p_error text default null) returns boolean
+create function public.finish_dish_image(p_dish uuid,p_generation uuid,p_error text default null,p_receipt jsonb default null) returns boolean
 language plpgsql security definer set search_path='' as $$
 declare job private.dish_images; object_path text; project text;
 begin
@@ -102,7 +103,8 @@ begin
   if project is null then raise exception 'DISH_IMAGE_PROJECT_UNCONFIGURED'; end if;
   update private.dish_images set image_status='ready',image_storage_path=object_path,
    image_url=project||'/storage/v1/object/public/dish-images/'||object_path,
-   image_source='ai_generated',prompt_version='dish-image-v1',last_error=null,lease_until=null,updated_at=now()
+   image_source='ai_generated',prompt_version='dish-image-v1',generation_receipt=coalesce(p_receipt,job.generation_receipt),
+   last_error=null,lease_until=null,updated_at=now()
   where dish_id=p_dish;
   return true;
  end if;
@@ -110,7 +112,8 @@ begin
  if p_error not in ('DISH_IMAGE_OUTCOME_UNKNOWN','DISH_IMAGE_PROVIDER_REJECTED','DISH_IMAGE_INVALID_OUTPUT','DISH_IMAGE_STORAGE_UNCONFIRMED') then
   raise exception 'DISH_IMAGE_INVALID_ERROR';
  end if;
- update private.dish_images set image_status='failed',last_error=p_error,lease_until=null,updated_at=now() where dish_id=p_dish;
+ update private.dish_images set image_status='failed',last_error=p_error,lease_until=null,updated_at=now(),
+  generation_receipt=coalesce(p_receipt,job.generation_receipt) where dish_id=p_dish;
  return true;
 end;
 $$;
@@ -147,7 +150,8 @@ create function private.regenerate_dish_image(p_dish uuid,p_expected_generation 
 language plpgsql set search_path='' as $$
 begin
  if not private.dish_image_eligible(p_dish) then return false; end if;
- update private.dish_images set image_status='pending',generation_id=gen_random_uuid(),started_at=null,lease_until=null,last_error=null,updated_at=now()
+ update private.dish_images set image_status='pending',generation_id=gen_random_uuid(),started_at=null,lease_until=null,
+  last_error=null,generation_receipt=null,updated_at=now()
  where dish_id=p_dish and generation_id=p_expected_generation and image_url is not null
   and (image_status='ready' or (image_status='failed' and last_error='DISH_IMAGE_PROVIDER_REJECTED'));
  return found;
@@ -156,8 +160,8 @@ $$;
 
 revoke all on function private.dish_image_eligible(uuid,text),private.enqueue_dish_image(uuid,text),
  private.enqueue_published_dish_image(),private.regenerate_dish_image(uuid,uuid) from public,anon,authenticated,service_role;
-revoke all on function public.claim_dish_image(),public.finish_dish_image(uuid,uuid,text) from public,anon,authenticated;
-grant execute on function public.claim_dish_image(),public.finish_dish_image(uuid,uuid,text) to service_role;
+revoke all on function public.claim_dish_image(),public.finish_dish_image(uuid,uuid,text,jsonb) from public,anon,authenticated;
+grant execute on function public.claim_dish_image(),public.finish_dish_image(uuid,uuid,text,jsonb) to service_role;
 
 select cron.schedule('home-reviews-dish-image-worker','* * * * *',$cron$
  select net.http_post(
