@@ -11,7 +11,7 @@ begin
  perform pg_advisory_xact_lock(75302143);
  select * into strict c from private.rainminer_menu_config where singleton;
  if c.automatic_enabled or c.launches_enabled or c.first_test_job_id is not null then raise exception 'MENU_TEST_ALREADY_ARMED'; end if;
- if c.budget_limit_usd<>5 or c.per_run_limit_usd<>0.5 then raise exception 'MENU_TEST_LIMITS_MISMATCH'; end if;
+ if c.budget_limit_usd is distinct from 5 or c.per_run_limit_usd is distinct from 0.5 then raise exception 'MENU_TEST_LIMITS_MISMATCH'; end if;
  if nullif(btrim(current_setting('home.rainminer_billing_evidence',true)),'') is null then raise exception 'MENU_COST_CEILING_UNVERIFIED'; end if;
  if exists(select 1 from public.rainminer_menu_jobs where status in ('starting','running','unknown')) then raise exception 'MENU_ACTIVE_RUN_REQUIRES_RECONCILIATION'; end if;
  select * into strict e from public.establishments

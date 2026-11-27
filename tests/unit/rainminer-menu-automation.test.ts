@@ -200,6 +200,38 @@ it('atomically gates budget before POST, including a configuration change after 
  expect(answer.rows[0].v).toEqual({authorized:false,reason:'MENU_AUTOMATIC_DISABLED'})
  expect(fake.calls.filter(c=>c.method==='POST')).toHaveLength(1)
 })
+it('removes the aggregate gate without resetting receipts, weakening the per-run cap or charging twice',async()=>{
+ const isolated=await menuDatabase()
+ try {
+  await configureMenus(isolated,true,5)
+  const historical=await newImport(isolated,{old:true,place:PLACE+'A'})
+  await isolated.query(`insert into rainminer_menu_jobs(establishment_id,place_id,request_id,status,run_id,actual_cost_usd)
+   select $1,$2,gen_random_uuid(),'completed','historical-'||i,0.5 from generate_series(1,10) i`,[historical.est,PLACE+'A'])
+  const first=await newImport(isolated),second=await newImport(isolated,{org:ORG2,user:USER2})
+  await finalizeMenuImport(isolated,first);await finalizeMenuImport(isolated,second)
+  const worker=menuAdmin(isolated),fake=provider()
+  expect(await advanceRainminerMenu(worker,'synthetic',{fetch:fake.fetch})).toEqual({claimed:0})
+  expect(fake.calls).toHaveLength(0)
+  const receiptQuery="select to_jsonb(j) saved from rainminer_menu_jobs j where run_id like 'historical-%' order by run_id"
+  const receipts=(await isolated.query(receiptQuery)).rows
+
+  await isolated.exec(readFileSync('supabase/migrations/20261127141607_remove_rainminer_global_budget_limit.sql','utf8'))
+  expect((await isolated.query('select private.rainminer_launch_block(true) blocked')).rows[0].blocked).toBe('MENU_BUDGET_LIMIT')
+  await isolated.exec('update private.rainminer_menu_config set budget_limit_usd=null,billing_ceiling_evidence=null')
+  expect(await advanceRainminerMenu(worker,'synthetic',{fetch:fake.fetch})).toEqual({claimed:0})
+  expect(fake.calls).toHaveLength(0)
+  expect((await isolated.query('select private.rainminer_launch_block(true) blocked')).rows[0].blocked).toBe('MENU_COST_CEILING_UNVERIFIED')
+  await isolated.exec("update private.rainminer_menu_config set billing_ceiling_evidence='SIMULATED_PROVIDER_ONLY'")
+  await Promise.all([advanceRainminerMenu(worker,'synthetic',{fetch:fake.fetch}),advanceRainminerMenu(worker,'synthetic',{fetch:fake.fetch})])
+  const posts=fake.calls.filter(c=>c.method==='POST')
+  expect(posts).toHaveLength(1)
+  expect(new URL(posts[0].url).searchParams.get('maxTotalChargeUsd')).toBe('0.5')
+  expect((await isolated.query("select reserved_cost_usd from rainminer_menu_jobs where status='running'")).rows).toEqual([{reserved_cost_usd:'0.500000'}])
+  expect((await advanceRainminerMenu(worker,'synthetic',{fetch:fake.fetch})).status).toBe('completed')
+  expect((await isolated.query(receiptQuery)).rows).toEqual(receipts)
+  expect(Number((await isolated.query('select private.rainminer_budget_used() cost')).rows[0].cost)).toBeCloseTo(5.03)
+ } finally { await isolated.close() }
+},30000)
 it('manual request IDs survive double clicks and the original menu remains during an explicit refresh',async()=>{
  const a=await newImport(db);await finalizeMenuImport(db,a)
  const fake=provider();await advanceRainminerMenu(menuAdmin(db),'synthetic',{fetch:fake.fetch});await advanceRainminerMenu(menuAdmin(db),'synthetic',{fetch:fake.fetch})

@@ -71,7 +71,7 @@ La nouvelle configuration privée est initialement :
 `billing_ceiling_evidence=null`, `first_test_job_id=null`.
 Aucune dépense n'est autorisée par la migration.
 
-Le plafond global est **cumulatif depuis cette évolution**, pour les nouveaux
+Le compteur de dépenses est **cumulatif depuis cette évolution**, pour les nouveaux
 runs automatiques et manuels. Il ne se réinitialise pas chaque jour/mois. Avant
 POST, le serveur réserve atomiquement le plafond de chaque run. Une fois le run
 terminé, le coût communiqué dans un reçu terminal compatible remplace la réserve.
@@ -97,9 +97,11 @@ lancement. Ces montants ne sont pas un reçu réel de ce test.
 Sources : https://apify.com/rainminer/google-maps-menu-scraper et
 https://docs.apify.com/api/v2/actors-runs-post.
 
-Le plafond global autorisé est **5 USD**, partagé entre tous les établissements,
-organisations et demandes manuelles/automatiques. Une contrainte SQL interdit un
-plafond supérieur. Aucun renouvellement ni remise à zéro. Ne jamais effacer les
+Le pilote utilisait un plafond global de 5 USD. La migration
+`20261127141607_remove_rainminer_global_budget_limit.sql` rend ce plafond facultatif.
+En régime normal, `budget_limit_usd=null` retire le blocage cumulé. Un montant
+explicite permet de rétablir un plafond partagé. L’historique des coûts reste
+disponible et les réservations restent attachées aux runs. Ne jamais effacer les
 réservations ni remettre des jobs en queued pour libérer du budget.
 
 **Limite tarifaire constatée lors de la préparation** : la documentation Apify
