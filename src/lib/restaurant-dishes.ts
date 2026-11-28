@@ -5,11 +5,13 @@ export type DishAssociation=DishName & {parentName:string|null;status:'proposed'
 export type DishProfile={
  revision:number;shared:boolean;canEdit:boolean
  specialty:{id:string;name:string;status:'proposed'|'confirmed';origin:'automatic'|'manual';evidence:unknown}|null
+ nameSpecialtyProposal?:{name:string;nameEvidence:string;menuContext:'absent'|'incomplete'|'unusable'}|null
+ unverifiedSpecialty?:{name:string;basis:'menu'|'restaurant_name'}|null
  menuProfile?:'specialized'|'varied'|'unknown'|null
  restaurantType?:'street_food'|'family_dining'|'unknown'|null
  associations:DishAssociation[]
  unresolved:{name:string;section:string;sourceRow:number;runId:string;reason:string}[]
- classification?:{state:'queued'|'running'|'succeeded'|'failed';sourceRun:string;stale:boolean;specialtyNeedsConfirmation?:boolean}|null
+ classification?:{state:'queued'|'running'|'succeeded'|'failed';sourceRun:string|null;stale:boolean;specialtyNeedsConfirmation?:boolean}|null
 }
 export type DishMatch={establishmentId:string;name:string;dish:string;kind:'specialty'|'menu';status:'proposed'|'confirmed';stale?:boolean}
 export async function dishRpc<T>(name:string,args:Record<string,unknown>={}):Promise<T>{

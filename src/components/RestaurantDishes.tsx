@@ -68,12 +68,16 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
  }
  const safePhoto=(url?:string)=>url&&/^https:\/\/(?:[^/]+\.)?(?:googleusercontent\.com|google\.com)\//.test(url)?url:undefined
  const classification=profile?.classification
+ const nameProposal=profile?.specialty ? null : profile?.nameSpecialtyProposal
+ const unverified=profile?.specialty||nameProposal ? null : profile?.unverifiedSpecialty
  const awaiting=classification?.state==='queued'||classification?.state==='running'
  const other=profile?.unresolved.filter(row=>row.reason==='other')??[]
  const toReview=profile?.unresolved.filter(row=>row.reason!=='other')??[]
  return <section className="restaurant-dishes" aria-label={vi?'Đặc sản và món ăn':'Spécialité et plats'}>
   {profile?.specialty&&<p className="dish-specialty"><strong>{vi?'Đặc sản':'Spécialité'} : {profile.specialty.name}</strong><small>{status(profile.specialty.status)}</small></p>}
-  {!profile?.specialty&&classification?.specialtyNeedsConfirmation&&<p className="dish-hint">{vi?'Đặc sản cần xác nhận':'Spécialité à confirmer'}</p>}
+  {nameProposal&&<p className="dish-specialty"><strong>{vi?'Đặc sản đề xuất dựa trên tên quán':'Spécialité proposée d’après le nom'} : {nameProposal.name}</strong></p>}
+  {unverified&&<p className="dish-specialty"><strong>{vi?'Đặc sản đề xuất':'Spécialité proposée'} : {unverified.name}</strong><small>{vi?'Nguồn chưa được xác minh':'Source non vérifiée'}</small></p>}
+  {!profile?.specialty&&!nameProposal&&!unverified&&classification?.specialtyNeedsConfirmation&&<p className="dish-hint">{vi?'Đặc sản cần xác nhận':'Spécialité à confirmer'}</p>}
   {(profile?.menuProfile||profile?.restaurantType)&&<dl className="dish-facets">
    {profile.menuProfile&&<div><dt>{vi?'Thực đơn':'Carte'}</dt><dd>{menuProfileLabels[profile.menuProfile]?.[vi?1:0]}</dd></div>}
    {profile.restaurantType&&<div><dt>{vi?'Loại hình':'Type'}</dt><dd>{restaurantTypeLabels[profile.restaurantType]?.[vi?1:0]}</dd></div>}
@@ -108,6 +112,7 @@ export function RestaurantDishes({establishmentId,menuVersion}:{establishmentId:
     <button className="secondary-button" disabled={busy||!newName.trim()} onClick={()=>void save('add',null,true)}>{vi?'Thêm và xác nhận':'Ajouter et confirmer'}</button>
    </details>
    {profile.specialty&&<div className="dish-actions"><button className="secondary-button" disabled={busy} onClick={()=>void save('specialty',profile.specialty!.id)}>{vi?'Xác nhận đặc sản':'Confirmer la spécialité'}</button><button className="text-button" disabled={busy} onClick={()=>void save('specialty',null)}>{vi?'Không có đặc sản chính':'Aucune spécialité principale'}</button></div>}
+   {(nameProposal||unverified)&&<button className="text-button" disabled={busy} onClick={()=>void save('specialty',null)}>{vi?'Không có đặc sản chính':'Aucune spécialité principale'}</button>}
    <ul>{profile.associations.map(a=><li key={a.id}><strong>{a.name}</strong><small>{status(a.status)} · {a.origin==='manual'?(vi?'Thủ công':'Manuelle'):(vi?'Tự động':'Automatique')}</small>{a.parentName&&<small>{vi?'Biến thể của':'Variante de'} {a.parentName}</small>}<div className="dish-actions">{a.status==='proposed'&&<button className="text-button" disabled={busy} onClick={()=>void save('confirm',a.id)}>{vi?'Xác nhận':'Confirmer'}</button>}<button className="text-button" disabled={busy} onClick={()=>void save('remove',a.id)}>{vi?'Bỏ liên kết':'Retirer l’association'}</button><button className="text-button" disabled={busy} onClick={()=>void save('specialty',a.id)}>{vi?'Đặt làm đặc sản':'Définir comme spécialité'}</button></div></li>)}</ul>
   </div>}
   {error&&<div role="alert"><p>{error==='conflict'?(vi?'Thông tin đã thay đổi. Tải lại trước khi sửa.':'Ces associations ont changé. Rechargez-les avant de corriger.'):(vi?'Không thể tải hoặc lưu các món.':'Impossible de charger ou d’enregistrer les plats.')}</p><button className="text-button" onClick={()=>setRetry(x=>x+1)}>{vi?'Tải lại':'Recharger'}</button></div>}

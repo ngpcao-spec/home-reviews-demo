@@ -38,6 +38,16 @@ it.each(['fr','vi'] as const)('shows the published specialty, menu profile and r
  expect(screen.getByText(language==='fr'?'Familial':'Quán ăn gia đình')).toBeInTheDocument()
  expect(screen.queryByText(/specialized|family_dining/)).toBeNull()
 })
+it.each(['fr','vi'] as const)('shows only the name-based label and keeps the proposal out of the dishes in %s',async language=>{
+ mock.rpc.mockResolvedValue({data:{...profile,specialty:null,associations:[],
+  nameSpecialtyProposal:{name:'Cơm tấm',nameEvidence:'Cơm Tấm',menuContext:'absent'},
+  classification:{state:'succeeded',sourceRun:null,stale:false,specialtyNeedsConfirmation:true}},error:null})
+ draw(language)
+ await screen.findByText((language==='fr'?'Spécialité proposée d’après le nom':'Đặc sản đề xuất dựa trên tên quán')+' : Cơm tấm')
+ expect(screen.getByText(language==='fr'?'Plats et variantes (0)':'Món ăn và biến thể (0)')).toBeInTheDocument()
+ expect(screen.queryByText(language==='fr'?'Spécialité à confirmer':'Đặc sản cần xác nhận')).toBeNull()
+ expect(mock.rpc.mock.calls.map(call=>call[0])).toEqual(['read_restaurant_dishes'])
+})
 it('confirms with revision, blocks duplicate clicks and displays a confirmed result',async()=>{
  let finish!:(v:unknown)=>void
  mock.rpc.mockImplementation((name:string)=>name==='read_restaurant_dishes'?Promise.resolve({data:profile}):name==='list_dish_names'?Promise.resolve({data:[{id:'root',name:'Bánh căn'}]}):new Promise(r=>{finish=r}))
@@ -48,6 +58,15 @@ it('confirms with revision, blocks duplicate clicks and displays a confirmed res
  expect(mock.rpc.mock.calls.at(-1)![1]).toMatchObject({p_revision:1,p_dish:'root',p_action:'specialty'})
  finish({data:{...profile,revision:2,specialty:{...profile.specialty,status:'confirmed',origin:'manual'}}})
  await screen.findByText('Confirmée')
+})
+it.each(['fr','vi'] as const)('keeps a specialty without usable references visible and unverified in %s',async language=>{
+ mock.rpc.mockResolvedValue({data:{...profile,specialty:null,associations:[],
+  unverifiedSpecialty:{name:'Bánh căn',basis:'menu'},
+  classification:{state:'succeeded',sourceRun:'saved-run',stale:false,specialtyNeedsConfirmation:true}},error:null})
+ draw(language)
+ await screen.findByText(language==='fr'?'Spécialité proposée : Bánh căn':'Đặc sản đề xuất : Bánh căn')
+ expect(screen.getByText(language==='fr'?'Source non vérifiée':'Nguồn chưa được xác minh')).toBeInTheDocument()
+ expect(screen.getByText(language==='fr'?'Plats et variantes (0)':'Món ăn và biến thể (0)')).toBeInTheDocument()
 })
 it('hides the old restaurant during rapid changes and discards late responses',async()=>{
  let finish!:(v:unknown)=>void
