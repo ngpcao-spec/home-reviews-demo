@@ -16,40 +16,28 @@ Le modèle se règle côté serveur dans `private.menu_dish_ai_settings.model`.
 L'Edge Function Rainminer reçoit une action Cron dédiée via le jeton serveur
 existant. Les lectures de fiche et les recherches ne lancent aucun classement.
 
-Le contrat `menu-dish-ai-v10` traite en priorité la spécialité. Le serveur
-vérifie les lignes sources, y compris leurs rubriques. Une spécialité peut
-être retenue quand le nom du restaurant concorde avec le menu ou quand le
-profil spécialisé est étayé par des preuves liées au même plat. Elle devient
-alors recherchable avec ou sans accents. Si elle reste indéterminée, la fiche
-indique « Spécialité à confirmer » après un classement réussi.
+Le contrat `menu-dish-ai-v12` confie le choix du nom de la spécialité et sa
+provenance au modèle. Le serveur vérifie le format, les références existantes
+et les exclusions explicites du menu. Les références écartées sont
+journalisées. Une proposition sans preuve exploitable garde son nom et
+s’affiche avec une source non vérifiée. Seules les associations étayées par
+des lignes sont intégrées à la recherche des plats du menu.
 
-Si le nom du restaurant et la même rubrique de plats principaux désignent
-plusieurs plats complets distincts, le modèle choisit le premier de ces
-plats dans l'ordre de la rubrique. Un ordre incertain laisse la spécialité
-à confirmer.
+Une proposition d’après le nom cite un fragment de l’enseigne. Elle nécessite
+une preuve indépendante du type street food. Elle reste distincte des lignes
+de menu et des corrections manuelles. Helpeat la reçoit comme suggestion
+avec disponibilité non vérifiée, sans prix, variante ni garniture déduits.
 
 Quand les lignes alimentaires sont dépourvues de rubriques, le worker peut
-transmettre une seule photo Rainminer déjà associée au menu dans la même
-requête de classement. Le titre cité doit concorder avec le nom du restaurant
-et être relié à au moins deux lignes distinctes de cette page. En cas de photo
-inaccessible, le worker envoie le menu texte. Les noms suivis d'une précision
-entre parenthèses sont normalisés uniquement quand cette précision répète le
-nom ou reprend une traduction présente dans une ligne citée. Le texte brut et
-les preuves sont conservés.
+transmettre une seule photo Rainminer déjà associée au menu. En cas de photo
+inaccessible, le worker envoie le menu texte. La réponse brute et les preuves
+restent dans le stockage privé des traitements.
 
-Le serveur vérifie chaque citation. Une référence absente, dupliquée ou
-imprécise est consignée avec son motif et ne retire pas les autres preuves.
-Une ligne qui désigne une boisson, un supplément ou un plat distinct laisse
-la spécialité à confirmer si elle est citée comme preuve pour la spécialité
-proposée. Sans preuve suffisante, la spécialité reste aussi à confirmer.
-Le texte brut reçu sur une réponse HTTP réussie reste dans le stockage privé
-des traitements, avec le résultat validé et les motifs de rejet.
-
-Le profil de la carte (`menu_profile`) et le type de restaurant
-(`restaurant_type`) sont conservés séparément avec leurs citations. La fiche
-affiche les valeurs localisées du résultat publié, y compris lorsqu’un
-nouveau classement est en cours ou échoue. Le type de restaurant
-n'intervient pas dans la validation de la spécialité.
+Le profil de la carte et le type de restaurant sont conservés séparément
+avec leurs citations. La fiche affiche le résultat publié pendant un nouveau
+classement ou après un échec. Une proposition d’après le nom ou à source non
+vérifiée est affichée pour le traitement courant. Les modifications manuelles
+restent prioritaires.
 
 Un type positif doit citer des lignes existantes et admissibles du menu.
 Le modèle choisit le type, y compris une offre familiale déduite de plusieurs
@@ -70,28 +58,29 @@ associations proviennent du menu précédent.
 
 ## Vérification du correctif avant déploiement
 
-Le rejeu local utilise les réponses OpenAI intactes de Bún Bò Hương Giang,
-du scénario contrôlé au nom neutre, de Bánh Căn Tháng Năm et de Green Home.
-Lancer `npx --no-install vitest run artifacts/menu-dish-ai-v6-validation/live-replay.test.ts`
-depuis le checkout qui détient les reçus. PGlite exécute la publication et la
-recherche SQL. Les captures mobiles utilisent les résultats SQL rejoués
-comme réponses locales aux lectures de l'interface, avec
-`npx --no-install playwright test --config artifacts/menu-dish-ai-v6-validation/playwright.config.ts`.
+Le rejeu local lit les archives de réponses sans fournisseur. Exécuter
+`npm exec --no -- vitest run artifacts/menu-dish-ai-v11-live/replay-v12.test.ts --maxWorkers=1`
+depuis le checkout qui contient les reçus et la migration Helpeat. PGlite
+exécute les migrations, la publication et la projection du catalogue en
+environnement isolé. Le rejeu vérifie la conservation des décisions archivées.
+La qualité du prompt v12 nécessite un essai réel distinct.
 
-Pour passer à v10 sur une installation v9, vérifier que la file est vide.
-Appliquer `20261127094323_route_menu_dish_ai_v10.sql`, qui suspend temporairement les nouvelles réservations,
-puis publier `rainminer-menu` avec son helper `menu-dish-ai.ts`. Le client
-existant lit le même schéma. Une réponse v10 compatible a priorité sur les
-résultats historiques du même menu.
-Le rejeu local et cette migration ne déclenchent aucun retraitement des menus
-existants.
+La migration `20261128082838_ai_specialty_choice.sql` suit la migration v11
+`20261128082837_name_based_restaurant_specialty.sql` et requiert une file vide.
+Elle suspend les nouvelles réservations et conserve les résultats déjà
+publiés. Déployer le worker `rainminer-menu` compatible v12 pendant cette pause.
+La migration Helpeat `20261128082830_helpeat_name_specialty_candidates.sql`
+et les clients compatibles exposent la provenance avant l’activation.
 
-Après les contrôles, renseigner `enabled_since` avec l'heure d'activation
-et passer `enabled` à `true` dans la même transaction. Une réutilisation
+Après les contrôles, définir `model='gpt-5.4-mini-2026-03-17'`, renseigner
+`enabled_since` avec l'heure d'activation et passer `enabled` à `true` dans la
+même transaction. Le worker utilise l’effort `low` du pilote. Une réutilisation
 d'un menu antérieur ou une extraction au contenu utile identique à une
 version antérieure à l'activation ne crée pas de tâche IA. Un classement
-déjà publié et compatible reste réutilisable. Le retour arrière opérationnel
-consiste à remettre `enabled` à `false` sans retirer les résultats publiés.
+déjà publié et compatible reste réutilisable. Pour revenir à v10, suspendre
+les réservations, laisser finir les tâches en cours, rétablir le bundle
+`rainminer-menu` et les fonctions SQL sauvegardées, puis réactiver avec
+`gpt-5.4-nano-2026-03-17`. Conserver les résultats et les preuves publiés.
 
 ## Essai sur deux menus sauvegardés
 

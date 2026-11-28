@@ -19,6 +19,16 @@ beforeAll(async()=>{
  await db.exec(readFileSync('supabase/migrations/20261126151340_route_menu_dish_ai_v8.sql','utf8'))
  await db.exec(readFileSync('supabase/migrations/20261127070943_route_menu_dish_ai_v9.sql','utf8'))
  await db.exec(readFileSync('supabase/migrations/20261127094323_route_menu_dish_ai_v10.sql','utf8'))
+ for (const [file,table] of [
+  ['20261028151639_google_place_price_jobs.sql','google_place_price_jobs'],
+  ['20261028164404_google_place_practical_metadata.sql','google_place_profiles'],
+ ]) {
+  const sql=readFileSync('supabase/migrations/'+file,'utf8')
+  const createAt=sql.indexOf('create table private.'+table+'(')
+  await db.exec(sql.slice(createAt,sql.indexOf('\n);',createAt)+3))
+ }
+ await db.exec(readFileSync('supabase/migrations/20261128082837_name_based_restaurant_specialty.sql','utf8'))
+ await db.exec(readFileSync('supabase/migrations/20261128082838_ai_specialty_choice.sql','utf8'))
 },30000)
 afterAll(async()=>{await db?.close()})
 beforeEach(async()=>{await db.exec("begin;update private.menu_dish_ai_settings set enabled=true,enabled_since='1970-01-01'")})
@@ -69,6 +79,161 @@ const fakeAi=(result:unknown)=>{
  })
  return {call,run:()=>advanceMenuDishAi(workerRpc,'simulated-credential',call)}
 }
+
+const independentType={value:'street_food',name_evidence:null,rows:[]}
+const nameProposal=(name='Cơm tấm',menu_context='absent')=>({
+ basis:'restaurant_name',name,rows:[],name_evidence:name,menu_context,
+})
+const nameReply=(specialty:unknown)=>({specialty,menu_profile:unknownProfile,restaurant_type:independentType,items:[]})
+
+async function savePlaceCategory(id:string,place:string,label:string,profilePlace=place) {
+ const identity='cid-'+id
+ await db.query('update public.establishments set google_id=$2,initialized_at=now() where id=$1',[id,identity])
+ const receipt=await db.query<{id:string}>(`insert into private.google_place_price_jobs(
+  establishment_id,organization_id,google_id,place_id,google_maps_url,language,run_id)
+  select id,organization_id,google_id,place_id,'https://www.google.com/maps','vi','profile-'||id
+  from public.establishments where id=$1 returning id`,[id])
+ await db.query(`insert into private.google_place_profiles(establishment_id,organization_id,job_id,observed_at,profile)
+  select id,organization_id,$2,now(),$3 from public.establishments where id=$1`,[id,receipt.rows[0].id,
+   {identity:{place_id:profilePlace,cid:identity},categories:{raw:[label]},binding:{run_id:'profile-'+id}}])
+}
+
+it('publishes an absent-menu name proposal after independent saved street-food evidence, without exporting a dish',async()=>{
+ const place='ChIJNameOnly'
+ const id=await add('Cơm Tấm An Nhiên',place)
+ await db.query('select private.refresh_restaurant_dishes($1)',[id])
+ expect(await fakeAi(nameReply(nameProposal())).run()).toEqual({claimed:0})
+ await savePlaceCategory(id,place,'Street food restaurant')
+ const ai=fakeAi(nameReply(nameProposal()))
+ expect(await ai.run()).toEqual({claimed:1,status:'succeeded'})
+ const request=JSON.parse(String(ai.call.mock.calls[0][1]?.body))
+ expect(JSON.parse(request.input)).toMatchObject({restaurant:'Cơm Tấm An Nhiên',lines:[],
+  streetFoodEvidence:{source:'google_maps_category',label:'Street food restaurant'}})
+ expect(new Ajv().compile(request.text.format.schema)(nameReply(nameProposal()))).toBe(true)
+ await asUser()
+ const profile=await read(id)
+ expect(profile).toMatchObject({specialty:null,nameSpecialtyProposal:{name:'Cơm tấm',nameEvidence:'Cơm Tấm',menuContext:'absent'},
+  associations:[],restaurantType:'street_food',menuProfile:'unknown',classification:{state:'succeeded',sourceRun:null}})
+ expect(await search('com tam')).toEqual([])
+ expect((await db.query('select * from private.dish_menu_evidence')).rows).toEqual([])
+ expect((await db.query("select id from private.dish_names where key='com tam'")).rows).toEqual([])
+ expect((await db.query('select source_run,source_raw from private.menu_dish_ai_targets')).rows).toEqual([{source_run:null,source_raw:[]}])
+ // The live Helpeat reader selects its specialty and dishes exclusively through these associations.
+ const consumer=await db.query(`select d.name,p.specialty_id from private.menu_dish_ai_targets t
+  join private.menu_dish_ai_runs r on r.id=t.published_id and r.status='succeeded'
+  join private.restaurant_dishes a on a.scope=t.scope and a.enabled
+  join private.dish_names d on d.id=a.dish_id
+  left join private.restaurant_dish_profiles p on p.scope=t.scope
+  where t.establishment_id=$1 and r.result#>>'{restaurant_type,value}'='street_food'`,[id])
+ expect(consumer.rows).toEqual([])
+ await db.query('select private.refresh_restaurant_dishes($1)',[id])
+ expect((await read(id)).revision).toBe(profile.revision)
+ expect(await ai.run()).toEqual({claimed:0})
+ await asUser(USER2)
+ await expect(read(id)).rejects.toThrow('DISH_FORBIDDEN')
+})
+
+it('waits for an in-flight menu and uses place evidence after a terminal menu failure',async()=>{
+ const place='ChIJNoMenuAfterFailure'
+ const id=await add('Cơm Tấm An Nhiên',place)
+ const req=crypto.randomUUID()
+ await db.query("insert into public.rainminer_menu_jobs(establishment_id,place_id,request_id,status) values($1,$2,$3,'queued')",[id,place,req])
+ await savePlaceCategory(id,place,'Ẩm thực đường phố')
+ const ai=fakeAi(nameReply(nameProposal()))
+ expect(await ai.run()).toEqual({claimed:0})
+ await db.query("update public.rainminer_menu_jobs set status='failed' where request_id=$1",[req])
+ expect(await ai.run()).toEqual({claimed:1,status:'succeeded'})
+ await asUser()
+ expect((await read(id)).nameSpecialtyProposal).toMatchObject({name:'Cơm tấm',menuContext:'absent'})
+})
+
+it('can cite a previously published, menu-supported type when a later extraction has no lines',async()=>{
+ const place='ChIJPriorStreetType',restaurant='Cơm Tấm An Nhiên'
+ const id=await add(restaurant,place)
+ await save(id,place,'type-evidence-menu',[{placeId:place,placeName:restaurant,name:'Gỏi đu đủ',category:'Street food'}],[])
+ await fakeAi({...nameReply(null),restaurant_type:{value:'street_food',name_evidence:null,rows:[1]},
+  items:[item('dish',1,'Gỏi đu đủ')]}).run()
+ const prior=(await db.query<{id:string}>('select published_id id from private.menu_dish_ai_targets')).rows[0].id
+ await save(id,place,'empty-extraction',[],[])
+ const ai=fakeAi(nameReply(nameProposal()))
+ expect(await ai.run()).toEqual({claimed:1,status:'succeeded'})
+ expect(JSON.parse(JSON.parse(String(ai.call.mock.calls[0][1]?.body)).input)).toMatchObject({lines:[],
+  streetFoodEvidence:{source:'published_menu_type',reference:prior,historicalDishes:['Gỏi đu đủ']}})
+ await asUser()
+ expect(await read(id)).toMatchObject({nameSpecialtyProposal:{name:'Cơm tấm',menuContext:'absent'},specialty:null})
+ expect((await db.query("select source_row from private.dish_menu_evidence where run_id='empty-extraction'")).rows).toEqual([])
+})
+
+it('admits no absent-menu work for a generic category or mismatched place evidence',async()=>{
+ const place='ChIJWrongProfile'
+ const id=await add('Cơm Tấm An Nhiên',place)
+ const other=await add('Cơm Tấm Bình Minh','ChIJGenericCategory')
+ await savePlaceCategory(id,place,'Street food restaurant','ChIJSomewhereElse')
+ await savePlaceCategory(other,'ChIJGenericCategory','Restaurant')
+ expect(await fakeAi(nameReply(nameProposal())).run()).toEqual({claimed:0})
+ expect((await db.query('select * from private.menu_dish_ai_targets')).rows).toEqual([])
+})
+
+it('uses an incomplete menu without inserting an inferred plate or superseding a manual specialty',async()=>{
+ const place='ChIJNameIncomplete', restaurant='Cơm Tấm An Nhiên'
+ const id=await add(restaurant,place)
+ const raw=[{placeId:place,placeName:restaurant,name:'Sườn',category:'Món ăn',
+  description:'Street food stall – incomplete price list'}]
+ const response={...nameReply(nameProposal('Cơm tấm','incomplete')),
+  restaurant_type:{value:'street_food',name_evidence:null,rows:[1]},
+ }
+ await save(id,place,'partial-menu',raw,[])
+ expect(await fakeAi(response).run()).toEqual({claimed:1,status:'succeeded'})
+ await asUser()
+ const proposed=await read(id)
+ expect(proposed).toMatchObject({nameSpecialtyProposal:{nameEvidence:'Cơm Tấm',menuContext:'incomplete'},
+  specialty:null,associations:[],unresolved:[{name:'Sườn',sourceRow:1}]})
+ await db.query("select public.edit_restaurant_dishes($1,$2,'specialty',null,'Gỏi đu đủ')",[id,proposed.revision])
+ await save(id,place,'new-partial-menu',[{...raw[0],price:30000}],[])
+ expect(await fakeAi(response).run()).toEqual({claimed:1,status:'succeeded'})
+ expect(await read(id)).toMatchObject({specialty:{name:'Gỏi đu đủ',origin:'manual',status:'confirmed'},nameSpecialtyProposal:null})
+ expect(await search('com tam')).toEqual([])
+})
+
+it('retains the existing menu job when independent place evidence arrives later',async()=>{
+ const place='ChIJSameMenuAfterPlaceDetails', restaurant='Cơm Tấm An Nhiên'
+ const id=await add(restaurant,place)
+ const raw=[{placeId:place,placeName:restaurant,name:'Cơm tấm sườn',category:'Món chính'}]
+ await save(id,place,'same-menu',raw,[])
+ const ai=fakeAi({...nameReply({name:'Cơm tấm',rows:[1],source_label:null,photo_title:null}),restaurant_type:unknownType})
+ expect(await ai.run()).toEqual({claimed:1,status:'succeeded'})
+ await savePlaceCategory(id,place,'Street food restaurant')
+ expect(await ai.run()).toEqual({claimed:0})
+ await asUser()
+ expect(await read(id)).toMatchObject({specialty:{name:'Cơm tấm',evidence:{rows:[1]}},nameSpecialtyProposal:null})
+ expect(await search('com tam')).toMatchObject([{establishmentId:id,kind:'specialty'}])
+})
+
+it.each(['Quán An Nhiên','Cơm tấm và Bún chả Hoàng Mai'])('preserves the AI abstention for %s',restaurant=>{
+ const packet:MenuPacket={restaurant,lines:[],streetFoodEvidence:{source:'google_maps_category',reference:'saved',label:'Street food'}}
+ expect(validateMenuClassification(nameReply(null),packet)).toEqual({
+  ...nameReply(null),restaurant_type:{...independentType,independentEvidence:packet.streetFoodEvidence},
+ })
+})
+
+it('keeps the proposed name but requires provenance fields and independent type evidence for a name-only offer',()=>{
+ const line={id:1,name:'Bún chả',section:'Món chính',description:null,price:40000,currency:'VND',priceText:null,knownDrink:false}
+ const packet:MenuPacket={restaurant:'Cơm Tấm An Nhiên',lines:[line]}
+ const fromName={...nameReply(nameProposal('Cơm tấm','incomplete')),
+  restaurant_type:{value:'street_food',name_evidence:'Cơm Tấm',rows:[1]}}
+ expect(validateMenuClassification(fromName,packet)).toMatchObject({specialty:null,rejections:[{reason:'unverified_street_food'}]})
+ const verified={...packet,streetFoodEvidence:{source:'google_maps_category' as const,reference:'saved',label:'Street food'}}
+ for(const specialty of [
+  nameProposal('Cơm tấm','absent'),nameProposal('Cơm tấm','contradictory'),
+  {...nameProposal('Cơm tấm','incomplete'),rows:[1]},nameProposal('Bún chả','incomplete'),
+ ]) expect(validateMenuClassification(nameReply(specialty),verified)).not.toHaveProperty('nameSpecialtyProposal')
+ expect(validateMenuClassification(nameReply(null),verified)).not.toHaveProperty('nameSpecialtyProposal')
+ const grounded={...verified,lines:[{...line,name:'Cơm tấm sườn'}]}
+ expect(validateMenuClassification(nameReply(nameProposal('Cơm tấm','incomplete')),grounded))
+  .toMatchObject({nameSpecialtyProposal:{name:'Cơm tấm',menuContext:'incomplete'}})
+ expect(validateMenuClassification(nameReply({name:'Cơm tấm',rows:[1],source_label:null,photo_title:null}),grounded)
+  .specialty).toEqual({name:'Cơm tấm',rows:[1]})
+})
 
 it('recognizes a new Bún bò, shares a single AI call, retains raw data and accent-insensitive search',async()=>{
  expect((await db.query("select id from private.dish_names where key='bun bo'")).rowCount).toBe(0)
@@ -126,14 +291,23 @@ it('recognizes a new Bún bò, shares a single AI call, retains raw data and acc
  expect((await db.query('select raw from public.rainminer_menu_jobs where run_id=$1',[bun.runId])).rows[0].raw).toEqual(bun.raw)
 })
 
-it('uses menu headings to find Bánh căn, retains other rows and preserves manual decisions',async()=>{
+it.each(['menu','restaurant_name'])('preserves the declared Bánh căn provenance for a %s response',async basis=>{
  const id=await add(savedMenu.establishment,savedMenu.placeId)
  await asUser()
  await save(id,savedMenu.placeId,savedMenu.runId,savedMenu.raw,[2,3,4,16])
- const mislabeled={...banhResult,items:banhResult.items.map(entry=>entry.row===15?item('dish',15,'KHĂN LẠNH'):entry)}
+ const specialty=basis==='restaurant_name'
+  ? {...nameProposal('Bánh căn','incomplete'),rows:[1,5,6]} : banhResult.specialty
+ const mislabeled={...banhResult,specialty,items:banhResult.items.map(entry=>entry.row===15?item('dish',15,'KHĂN LẠNH'):entry)}
  expect(await fakeAi(mislabeled).run()).toEqual({claimed:1,status:'succeeded'})
  const original=await read(id)
+ if (basis==='restaurant_name') {
+  expect(original).toMatchObject({
+   specialty:null,nameSpecialtyProposal:null,unverifiedSpecialty:{name:'Bánh căn',basis:'restaurant_name'},
+  })
+  return
+ }
  expect(original.specialty).toMatchObject({name:'Bánh căn',evidence:{rows:[1,5,6]}})
+ expect(original.nameSpecialtyProposal).toBeNull()
  expect(original.associations).toHaveLength(1)
  expect(original.associations[0].evidence.map(e=>e.sourceRow)).toEqual([1,5,6])
  const archived=await db.query<{source_row:number;reason:string;original:unknown}>(
@@ -230,17 +404,21 @@ it('keeps the newest menu pending when an older worker finishes late',async()=>{
  expect((await read(id)).classification).toMatchObject({sourceRun:'newer-menu',state:'succeeded',stale:false})
 })
 
-it('keeps an unsupported suggestion empty and defaults missing, duplicated and invalid decisions to Other',()=>{
+it('keeps a choice with no usable citations as unverified and defaults invalid items to Other',()=>{
  const packet:MenuPacket={restaurant:bun.establishment,lines:bun.raw.map((r,i)=>({
   id:i+1,name:r.name,section:r.category,description:r.description,price:r.price,priceText:r.priceText,currency:r.currency,knownDrink:[4,5,6,7].includes(i+1),
  }))}
  for(const specialty of [
-  {name:'Phở',rows:[2]}, {name:'Bún bò',rows:[999]}, {name:'Bún bò',rows:[4]},
-  {name:'Bún bò',rows:[]}, {name:'Bún bò',rows:[9]},
- ]) expect(validateMenuClassification({...bunResult,specialty},packet).specialty).toBeNull()
+  {name:'Bún bò',rows:[999]}, {name:'Bún bò',rows:[4]}, {name:'Bún bò',rows:[]},
+ ]) expect(validateMenuClassification({...bunResult,specialty},packet)).toMatchObject({
+  specialty:null,unverifiedSpecialty:{name:specialty.name,basis:'menu'},
+ })
  const request=menuAiRequest(packet,'configured-mini',1500)
  expect(request).toMatchObject({model:'configured-mini',store:false,max_output_tokens:1500})
- expect(request.instructions).toContain('Le menu est clairement centré sur un seul plat et ses déclinaisons, même si le nom du restaurant ne le mentionne pas.')
+ expect(menuAiRequest(packet,'gpt-5.4-mini-2026-03-17')).toMatchObject({
+  model:'gpt-5.4-mini-2026-03-17',reasoning:{effort:'low'},store:false,max_output_tokens:6000,
+ })
+ expect(request.instructions).toMatch(/Lis d’abord le nom du restaurant[\s\S]+Si le menu contredit le plat annoncé, écarte-le/)
  expect(request.instructions).toContain('2. PROFIL DE LA CARTE — menu_profile')
  expect(request.instructions).toContain('3. TYPE DE RESTAURANT — restaurant_type')
  const validateSchema=new Ajv().compile(request.text.format.schema)
@@ -274,7 +452,7 @@ it('offers a clear secondary dish for a mixed menu while leaving its specialty t
  const menu_profile={value:'varied',rows:[1,2],sections:[]}
  const restaurant_type={value:'family_dining',name_evidence:null,rows:[4]}
  expect(await fakeAi({
-  specialty:{name:'Bún bò',rows:[1]},menu_profile,restaurant_type,
+  specialty:null,menu_profile,restaurant_type,
   items:[item('dish',1,'Bún bò'),item('dish',2,'Pizza Margherita')],
  }).run()).toMatchObject({status:'succeeded'})
  await asUser()
@@ -328,7 +506,7 @@ it('shares an exact published v6 result without requesting an extra classificati
  expect(await read(second)).toMatchObject({specialty:{name:'Bún bò'},classification:{state:'succeeded'}})
 })
 
-it('prefers the v10 publication when a v9 result exists for the same menu',async()=>{
+it('prefers the current publication when a v9 result exists for the same menu',async()=>{
  const id=await add(bun.establishment,bun.placeId)
  await save(id,bun.placeId,bun.runId,bun.raw,[4,5,6,7])
  const ai=fakeAi({...bunResult,restaurant_type:{value:'street_food',name_evidence:null,rows:[1,2]}})
@@ -373,7 +551,7 @@ it('publishes a menu-backed specialty without a restaurant name match and keeps 
  })
 })
 
-it('checks citations independently and leaves generic or unsupported specialties empty',()=>{
+it('checks menu profile and restaurant type independently from the chosen specialty',()=>{
  const packet:MenuPacket={restaurant:'Quán vỉa hè Hoa',lines:[
   {id:1,name:'Tôm thịt',section:'Bánh xèo',description:null,price:30000,currency:'VND',priceText:null,knownDrink:false},
   {id:2,name:'Trà đá',section:'Đồ uống',description:null,price:null,currency:'VND',priceText:null,knownDrink:true},
@@ -390,42 +568,58 @@ it('checks citations independently and leaves generic or unsupported specialties
   {value:'specialized',rows:[3],sections:[]},
   {value:'specialized',rows:[],sections:['Rubrique inventée']},
  ]) expect(validateMenuClassification({specialty,menu_profile:wrongProfile,restaurant_type:street,items:[]},packet))
-  .toMatchObject({specialty:null,menu_profile:unknownProfile,restaurant_type:street})
- const broadPacket={...packet,restaurant:'Nouilles Hoa',lines:[{...packet.lines[0],name:'Nouilles',section:'Nouilles'}]}
- expect(validateMenuClassification({specialty:{name:'Nouilles',rows:[1]},items:[]},broadPacket).specialty).toBeNull()
+  .toMatchObject({specialty,menu_profile:unknownProfile,restaurant_type:street})
  expect(validateMenuClassification({specialty,menu_profile,restaurant_type:{...street,rows:[99]},items:[]},packet))
   .toMatchObject({specialty,restaurant_type:unknownType})
 })
 
-it('retains enough specialty evidence and records non-support and explicit contradictions separately',()=>{
+it('retains enough specialty evidence and records each discarded citation',()=>{
  const packet:MenuPacket={restaurant:'Le Marché',lines:[
   {id:1,name:'Bánh xèo',section:'Carte',description:null,price:null,currency:null,priceText:null,knownDrink:false},
   {id:2,name:'Đặc biệt',section:'Carte',description:'Bánh xèo',price:null,currency:null,priceText:null,knownDrink:false},
   {id:3,name:'Trà đá',section:'Boissons',description:null,price:null,currency:null,priceText:null,knownDrink:true},
   {id:4,name:'Tom Yum',section:'Bánh xèo',description:null,price:null,currency:null,priceText:null,knownDrink:false},
+  {id:5,name:'Bánh xèo',section:'Gọi thêm',description:null,price:null,currency:null,priceText:null,knownDrink:false},
  ]}
  const proposed={
   menu_profile:{value:'specialized',rows:[1],sections:['Carte','Section inexistante']},
   restaurant_type:unknownType,items:[item('dish',4,'Tom Yum')],
  }
  expect(validateMenuClassification({...proposed,specialty:{name:'Bánh xèo',rows:[1,2,1,9]}},packet)).toMatchObject({
-  specialty:{name:'Bánh xèo',rows:[1]},
+  specialty:{name:'Bánh xèo',rows:[1,2]},
   menu_profile:{value:'specialized',rows:[1],sections:['Carte']},
   rejections:expect.arrayContaining([
    {field:'menu_profile',reason:'invalid_section',section:'Section inexistante'},
-   {field:'specialty',reason:'unusable_row',row:2},
    {field:'specialty',reason:'duplicate_reference',row:1},
    {field:'specialty',reason:'invalid_reference',row:9},
   ]),
  })
- for(const [row,reason] of [[3,'excluded_or_option'],[4,'different_dish']] as const) {
+ for(const row of [3,5]) {
   expect(validateMenuClassification({...proposed,specialty:{name:'Bánh xèo',rows:[1,row]}},packet)).toMatchObject({
-   specialty:null,rejections:expect.arrayContaining([{field:'specialty',reason,row}]),
+   specialty:{name:'Bánh xèo',rows:[1]},rejections:expect.arrayContaining([{field:'specialty',reason:'excluded_or_option',row}]),
   })
  }
- expect(validateMenuClassification({...proposed,specialty:{name:'Bánh xèo',rows:[2]}},packet)).toMatchObject({
-  specialty:null,rejections:expect.arrayContaining([{field:'specialty',reason:'insufficient_evidence'}]),
+ expect(validateMenuClassification({...proposed,specialty:{name:'Bánh xèo',rows:[3,5,9]}},packet)).toMatchObject({
+  specialty:null,unverifiedSpecialty:{name:'Bánh xèo',basis:'menu'},
+  rejections:expect.arrayContaining([{field:'specialty',reason:'insufficient_evidence'}]),
  })
+})
+
+it.each(['dish','other'] as const)('keeps Tuý Phong specialty and the available citations selected by the model (%s)',kind=>{
+ const lines:MenuPacket['lines']=[
+  {id:1,name:'BÁNH CUỐN TRUYỀN THỐNG',section:'BÁNH CUỐN TÚY PHONG',description:null,price:30000},
+  {id:12,name:'BÁNH CUỐN TRỨNG LÒNG ĐÀO',section:'BÁNH CUỐN TUÝ PHONG',description:null,price:35000},
+  {id:13,name:'BÁNH CUỐN TRỨNG CỦA',section:'BÁNH CUỐN TUÝ PHONG',description:'(THỊT NƯỚNG+CHẢ)',price:35000},
+  {id:14,name:'BÁNH ƯỚT TRUYỀN THỐNG',section:'BÁNH CUỐN TUÝ PHONG',description:null,price:30000},
+ ].map(line=>({...line,currency:'VND',priceText:null,knownDrink:false}))
+ const packet:MenuPacket={restaurant:'Bánh cuốn Tuý Phong-Nha Trang',lines}
+ const response={
+  specialty:{name:'Bánh cuốn',rows:[1,12,13,14]},
+  items:kind==='dish'?[item('dish',14,'BÁNH ƯỚT TRUYỀN THỐNG')]:[],
+ }
+ const valid=validateMenuClassification(response,packet)
+ expect(valid.specialty).toEqual({name:'Bánh cuốn',rows:[1,12,13,14]})
+ expect(valid.rejections).toBeUndefined()
 })
 
 it('only indexes complete names and keeps labels from explicit option sections in Other',async()=>{
@@ -505,7 +699,7 @@ it('uses an archived menu photo for missing context, preserves the raw rows and 
  expect(await search('com tam')).toMatchObject([{establishmentId:second,kind:'specialty'}])
 })
 
-it('requires corroborating photo evidence and falls back to text when the photo is unavailable',async()=>{
+it('keeps the specialty and drops the optional photo reference when unavailable',async()=>{
  const packet:MenuPacket={
   restaurant:'Quán Bánh xèo',
   lines:['Tôm thịt','Thập cẩm','Trà đá','Hải sản'].map((name,i)=>({
@@ -516,16 +710,16 @@ it('requires corroborating photo evidence and falls back to text when the photo 
  const specialty={name:'Bánh xèo',rows:[1,2],photo_title:'BÁNH XÈO'}
  const reply={specialty,menu_profile:unknownProfile,restaurant_type:unknownType,items:[]}
  expect(validateMenuClassification(reply,packet).specialty).toMatchObject({name:'Bánh xèo',rows:[1,2],photoTitle:'BÁNH XÈO'})
- for(const evidence of [
-  {...specialty,photo_title:null},{...specialty,photo_title:'MENU'},
-  {...specialty,rows:[1,3]},{...specialty,rows:[1,4]},{...specialty,rows:[1,1]},
- ]) expect(validateMenuClassification({...reply,specialty:evidence},packet).specialty).toBeNull()
- expect(validateMenuClassification(reply,{...packet,restaurant:'Le Marché'}).specialty).toBeNull()
+ expect(validateMenuClassification({...reply,specialty:{...specialty,rows:[1,3]}},packet).specialty)
+  .toMatchObject({name:'Bánh xèo',rows:[1]})
+ expect(validateMenuClassification(reply,{...packet,restaurant:'Le Marché'}).specialty)
+  .toMatchObject({name:'Bánh xèo',rows:[1,2]})
 
  const model=fakeAi(reply)
  const http=vi.fn(async(url:RequestInfo|URL,init?:RequestInit)=>String(url).startsWith('https://lh3.')
   ? new Response(null,{status:404}) : model.call(url,init))
- expect((await classifyMenuWithAi(packet,'gpt-5.4-nano','simulated-credential',http)).result.specialty).toBeNull()
+ expect((await classifyMenuWithAi(packet,'gpt-5.4-nano','simulated-credential',http)).result.specialty)
+  .toEqual({name:'Bánh xèo',rows:[1,2]})
  expect(http).toHaveBeenCalledTimes(2)
  expect(model.call).toHaveBeenCalledTimes(1)
  expect(typeof JSON.parse(String(model.call.mock.calls[0][1]?.body)).input).toBe('string')
@@ -534,21 +728,17 @@ it('requires corroborating photo evidence and falls back to text when the photo 
  expect(http).toHaveBeenCalledTimes(3)
 })
 
-it('strips corroborated name annotations without dropping a genuine variant or an unsupported qualifier',()=>{
+it('preserves the name chosen by the model without rewriting annotations',()=>{
  const packet:MenuPacket={restaurant:'Cơm Gà Hà',lines:[{
   id:7,name:'CƠM GÀ',section:'COM - RICE',description:'Chicken rice\nКурица с рисом',
   price:40000,priceText:null,currency:null,knownDrink:false,
  }]}
- for(const name of ['Cơm gà (chicken rice)','Cơm gà (các món cơm gà)']) {
-  expect(validateMenuClassification({specialty:{name,rows:[7]},items:[]},packet).specialty).toEqual({name:'Cơm gà',rows:[7]})
+ for(const name of ['Cơm gà (chicken rice)','Cơm gà (các món cơm gà)','Cơm gà (chay)']) {
+  expect(validateMenuClassification({specialty:{name,rows:[7]},items:[]},packet).specialty).toEqual({name,rows:[7]})
  }
- expect(validateMenuClassification({specialty:{name:'Cơm gà (chay)',rows:[7]},items:[]},packet).specialty).toBeNull()
- const variant={restaurant:'Cơm gà (chay) Hoa',lines:[{...packet.lines[0],name:'Cơm gà (chay)'}]}
- expect(validateMenuClassification({specialty:{name:'Cơm gà (chay)',rows:[7]},items:[]},variant).specialty)
-  .toEqual({name:'Cơm gà (chay)',rows:[7]})
 })
 
-it('grounds multilingual specialties in repeated dish descriptions rather than ingredient mentions',()=>{
+it('retains multilingual source labels without choosing an alternative specialty',()=>{
  const packet:MenuPacket={restaurant:'CƠM TẤM NGON',lines:[
   ['Cơm sườn','Broken rice with grilled pork chop'],
   ['Cơm gà nướng','Broken rice with grilled chicken'],
@@ -560,12 +750,10 @@ it('grounds multilingual specialties in repeated dish descriptions rather than i
   specialty:{name:'Cơm tấm',rows,source_label,photo_title:null},items:[],
  },packet)
  expect(result([1,2]).specialty).toEqual({name:'Cơm tấm',rows:[1,2],sourceLabel:'Broken rice'})
- expect(result([1,3]).specialty).toBeNull()
- expect(result([1,2],'Rice').specialty).toBeNull()
- expect(result([1,2],'Plain noodles').specialty).toBeNull()
+ expect(result([1,3]).specialty).toMatchObject({name:'Cơm tấm',rows:[1,3]})
 })
 
-it('sends the main dishes in their saved order and publishes the first concordant dish from a simulated response',async()=>{
+it('sends the main dishes in their saved order and publishes the model choice',async()=>{
  const place='ChIJordered-main-dishes'
  const restaurant='Bún Thịt Nướng - Nem Ninh Hoà CÔ PHƯỚC'
  const entries=[
@@ -594,7 +782,7 @@ it('sends the main dishes in their saved order and publishes the first concordan
  expect(await ai.run()).toEqual({claimed:1,status:'succeeded'})
  expect(ai.call).toHaveBeenCalledTimes(1)
  const request=JSON.parse(String(ai.call.mock.calls[0][1]?.body))
- expect(request.instructions).toContain("choisis le premier de ces plats dans l'ordre de cette rubrique")
+ expect(request.instructions).toMatch(/plusieurs plats sans dominante, cherche un plat que la structure du menu met clairement en avant/)
  const packet=JSON.parse(request.input) as MenuPacket
  expect(packet.lines.filter(line=>line.section==='Món chính').map(line=>line.id)).toEqual(mainRows)
  expect(packet.lines.slice(0,2).map(line=>line.name)).toEqual(['Bún thịt nướng','Nem phần Ninh Hòa'])

@@ -1,6 +1,6 @@
 import { classifyMenuRow } from './rainminer-menu.mjs'
 
-export const CONTRACT = 'menu-dish-ai-v10'
+export const CONTRACT = 'menu-dish-ai-v12'
 export const DEFAULT_MODEL = 'gpt-5.4-nano'
 export const MAX_OUTPUT_TOKENS = 6000
 
@@ -8,16 +8,26 @@ type MenuLine = {
   id: number; name: string | null; section: string | null; description: string | null
   price: number | string | null; currency: string | null; priceText: string | null; knownDrink: boolean
 }
-export type MenuPacket = { restaurant: string; lines: MenuLine[]; photo?: { url: string; rows: number[] } }
+type StreetFoodEvidence = {
+  source: 'google_maps_category' | 'published_menu_type'; reference: string; label: string; historicalDishes?: string[]
+}
+export type MenuPacket = {
+  restaurant: string; lines: MenuLine[]; photo?: { url: string; rows: number[] }; streetFoodEvidence?: StreetFoodEvidence
+}
 export type MenuItem = { row: number; kind: 'dish' | 'drink' | 'non_food' | 'other'; name: string | null }
 type MenuProfile = { value: 'specialized' | 'varied' | 'unknown'; rows: number[]; sections: string[] }
-type RestaurantType = { value: 'street_food' | 'family_dining' | 'unknown'; name_evidence: string | null; rows: number[] }
-type EvidenceIssue = 'invalid_reference' | 'duplicate_reference' | 'excluded_or_option' | 'different_dish' |
-  'unusable_row' | 'invalid_section' | 'invalid_name' | 'insufficient_evidence' | 'unconfirmed_context' |
-  'invalid_photo_evidence' | 'invalid_source_label'
+type RestaurantType = {
+  value: 'street_food' | 'family_dining' | 'unknown'; name_evidence: string | null; rows: number[]; independentEvidence?: StreetFoodEvidence
+}
+type NameSpecialtyProposal = { name: string; nameEvidence: string; menuContext: 'absent' | 'incomplete' | 'unusable' }
+type EvidenceIssue = 'invalid_reference' | 'duplicate_reference' | 'excluded_or_option' |
+  'unusable_row' | 'invalid_section' | 'invalid_name' | 'insufficient_evidence' |
+  'invalid_photo_evidence' | 'invalid_source_label' | 'invalid_name_evidence' | 'invalid_name_menu_context' | 'unverified_street_food'
 type RejectEvidence = (reason: EvidenceIssue, reference?: {row?:number; section?:string})=>void
 export type MenuClassification = {
   specialty: { name: string; rows: number[]; photoTitle?: string; sourceLabel?: string } | null
+  nameSpecialtyProposal?: NameSpecialtyProposal
+  unverifiedSpecialty?: { name: string; basis: 'menu' | 'restaurant_name' }
   menu_profile: MenuProfile
   restaurant_type: RestaurantType
   items: MenuItem[]
@@ -42,7 +52,6 @@ const genericMenuWords = new RegExp('(?:^| )(?:'+[
   'specia(?:l|le|ls|les|ux)|classi(?:c|cs|que|ques)|standard|normal|original|combo|menus?|portions?|selections?',
   'xs|xl|xxl|extras?|options?|supplements?|garnitures?|accompagnements?|de|du|la|le|the|and|et|va',
 ].join('|')+')(?= |$)','g')
-const broadFoodGroups = /^(?:nouilles?|noodles?|rice|riz|vermicell[ei]s?|soupes?|soups?|salades?|salads?|seafood|fruits de mer|desserts?|mi|bun|com|hai san|mon an)(?: (?:varies?|mixtes?|assortis?|mixed|thap cam|cac loai))?$/
 const hasDishName = (key: string) => /\p{L}{2}/u.test(key.replace(genericMenuWords,' '))
 const isOption = (line: MenuLine) => optionSection.test(dishKey(line.section??''))||optionPrefix.test(dishKey(line.name??''))
 
@@ -67,7 +76,11 @@ const strict = (properties: JsonObject) => ({type:'object',additionalProperties:
 const rowIds = {type:'array',items:{type:'integer'},description:'Identifiants des lignes du menu qui servent de preuve. Tableau vide en leur absence.'}
 export const MENU_SCHEMA = strict({
   specialty:{anyOf:[strict({name:{type:'string'},rows:rowIds,source_label:{type:['string','null']},
-    photo_title:{type:['string','null']}}),{type:'null'}]},
+    photo_title:{type:['string','null']}}),strict({
+      basis:{type:'string',enum:['restaurant_name']},name:{type:'string'},rows:rowIds,
+      name_evidence:{type:'string',description:'Fragment exact du nom du restaurant qui désigne le plat.'},
+      menu_context:{type:'string',enum:['absent','incomplete','unusable']},
+    }),{type:'null'}]},
   menu_profile:strict({
     value:{type:'string',enum:['specialized','varied','unknown']},
     rows:rowIds,
@@ -86,37 +99,41 @@ const INSTRUCTIONS = `Lis le nom du restaurant et le menu Rainminer complet : ru
 
 1. SPÉCIALITÉ PRINCIPALE — specialty
 
-Identifie d’abord la spécialité, indépendamment du classement des autres lignes.
+Lis d’abord le nom du restaurant. S’il désigne clairement un plat principal précis, retiens le nom vietnamien de base de ce plat dans specialty.name. Garde les mots et accents qui identifient le plat. Une carte variée peut avoir cette spécialité et relever de street_food. La présence d’autres plats complets n’annule pas la spécialité annoncée.
 
-Retiens un seul plat principal si :
-- Le nom du restaurant et le menu désignent clairement le même plat ; ou
-- Le menu est clairement centré sur un seul plat et ses déclinaisons, même si le nom du restaurant ne le mentionne pas.
+Si le menu étaye ce choix, utilise la forme étayée par le menu (sans basis). Cite dans specialty.rows uniquement les lignes directement pertinentes. Garde les libellés complets du menu comme preuves et le nom du plat de base dans specialty.name. Une rubrique dédiée peut fournir le contexte des déclinaisons, mais un autre plat, une boisson ou un supplément ne prouve pas la spécialité.
 
-Si plusieurs plats distincts nommés dans le nom du restaurant figurent comme plats complets dans la même rubrique de plats principaux, choisis le premier de ces plats dans l'ordre de cette rubrique. Ignore les variantes, les accompagnements, les suppléments et les boissons pour ce départage. Si l'ordre de présentation est incertain, laisse specialty à null. La position dans le nom du restaurant et le prix ne départagent pas les plats.
+Si le menu est absent ou incomplet, qu’il ne contredit pas le plat annoncé et que street_food est déjà étayé indépendamment, utilise la forme déduite du nom. Indique basis = "restaurant_name", le fragment exact de l’enseigne dans name_evidence, et menu_context = "absent", "incomplete" ou "unusable" selon la source. Renvoie rows vide. N’invente ni ligne, ni garniture, ni variante, ni prix, ni disponibilité.
 
-Donne le nom vietnamien normalisé du plat et cite les identifiants des lignes alimentaires qui justifient ce choix. Une rubrique qui nomme le plat suffit si ses lignes en présentent les déclinaisons.
+Si le nom est neutre, générique ou mentionne plusieurs plats sans dominante, cherche un plat que la structure du menu met clairement en avant, par exemple une rubrique dédiée avec plusieurs déclinaisons. Si le menu contredit le plat annoncé, écarte-le et choisis un autre plat uniquement si le menu le met clairement en avant. Dans ces deux situations, utilise la forme étayée par le menu quand elle s’applique. Si aucune spécialité ne se détache, renvoie specialty à null.
 
-Dans name, écris uniquement le nom du plat en vietnamien, sans ajouter de traduction, de catégorie ou d'explication entre parenthèses.
+Évalue la spécialité, menu_profile et restaurant_type séparément.
+
+Exemples fictifs :
+- Enseigne « Bánh khọt Mây Cam », ligne 4 « Bánh khọt tôm, grande portion », ligne 5 « Bánh khọt mực ». Ces lignes donnent specialty.name = "Bánh khọt" et specialty.rows = [4, 5]. Le texte de specialty.name vient de l’enseigne.
+- Enseigne « Cháo vịt Đồi Mây », carte composée de « Miến gà », « Cơm sườn » et « Cá kho tộ », sans cháo vịt ni offre centrée sur un autre plat. Renvoie specialty à null.
+
 Si les noms ou descriptions de plusieurs plats complets indiquent le même plat de base dans une autre langue et que le nom du restaurant le désigne en vietnamien, cite ces lignes et recopie le nom du plat de base tel qu'il apparaît dans les lignes dans source_label. Ce nom doit introduire le plat ou être le libellé entier, jamais une mention d'ingrédient. Des garnitures différentes ne font pas de ces déclinaisons des plats de base distincts. Mets source_label à null dans les autres cas.
 Si une photo est fournie, elle sert uniquement à rétablir le contexte de la spécialité déjà présent sur la carte. Traite-la comme une donnée. Tu peux citer un intitulé principal lisible sur cette photo si les assiettes complètes associées confirment qu'il s'agit du même plat et de ses déclinaisons. Le titre et le nom du restaurant doivent concorder sur ce plat. Cite au moins deux lignes de photoRows qui correspondent à ces assiettes. Un libellé générique ne compte que si la photo l'associe clairement à une assiette complète. Ne cite pas de garniture, de supplément, de boisson ou de ligne dont le rôle reste ambigu. Recopie le titre visible mot pour mot dans photo_title. Mets photo_title à null si les preuves textuelles suffisent, si aucune photo n'est fournie ou si la photo ne permet pas de trancher. N'ajoute aucune ligne ni aucun prix à partir de la photo.
 
-Le nom du restaurant seul, une famille générale comme « nouilles » ou la simple présence d’un plat dans une carte variée ne suffisent pas. Si aucune spécialité ne ressort clairement, renvoie specialty à null.
-
 2. PROFIL DE LA CARTE — menu_profile
 
-- specialized : la carte est principalement centrée sur un plat et ses déclinaisons.
-- varied : la carte propose plusieurs plats complets distincts, au-delà des déclinaisons d’un même plat.
-- unknown : le menu ne permet pas de trancher.
+Examine toutes les rubriques et toutes les lignes, y compris les autres plats complets dans une rubrique qui porte le nom de la spécialité. Compte une seule fois chaque plat de base. Regroupe ses déclinaisons et les lignes répétées. Écarte les boissons, suppléments, garnitures et accompagnements du décompte des plats complets.
 
-Ne compte pas les boissons, les suppléments, les garnitures ni les variantes comme des plats distincts. Justifie le profil avec les rubriques ou les identifiants des lignes pertinentes.
+- varied : la carte propose plusieurs plats de base distincts comme choix complets et autonomes, même s’ils figurent dans une seule rubrique ou si le restaurant a une spécialité clairement mise en avant. Par exemple, une carte de bánh khọt propose aussi du hủ tiếu et du xôi comme plats complets : le profil est varied.
+- specialized : l’offre de plats complets se compose essentiellement d’un seul plat de base et de ses déclinaisons. Un intitulé de rubrique ou la présence d’une spécialité ne suffit pas à établir ce profil.
+- unknown : les lignes disponibles ne permettent pas de distinguer les plats complets des variantes ou de déterminer le profil.
+
+Justifie le profil avec les lignes des plats de base distincts pour varied ou les lignes des déclinaisons pour specialized. Recopie tout titre de rubrique cité dans menu_profile.sections exactement comme dans le menu.
 
 3. TYPE DE RESTAURANT — restaurant_type
 
-Évalue le type à partir du nom et du menu, indépendamment de la spécialité et du profil de la carte. Applique cet ordre :
+Évalue le type séparément de la spécialité et du profil, à partir des sources disponibles. Une proposition déduite du nom ne constitue jamais une preuve du type. Applique cet ordre :
 
-- street_food : choisis ce type quand le nom du restaurant désigne un plat couramment proposé en restauration de rue et que le menu confirme que l’offre est centrée sur ce même plat et ses variantes. La mention « street food » n’est pas obligatoire. Cite les identifiants des lignes qui montrent que ce plat structure l’offre. Un prix bas, une carte courte, une mention marketing ou un plat de rue isolé dans une carte variée ne suffisent pas.
-- family_dining : si le type street_food n’est pas établi, choisis ce type lorsque le menu montre une offre explicitement familiale ou propose plusieurs plats complets distincts. Cite les lignes de l’offre familiale ou de plusieurs de ces plats. Les variantes, boissons et suppléments ne comptent pas comme des plats distincts.
-- unknown : choisis ce type lorsque les indices restent insuffisants ou contradictoires. Une carte spécialisée ne suffit pas à elle seule pour retenir street_food.
+- street_food : vérifie en premier si le nom et le menu décrivent une offre de restauration populaire organisée autour d’une ou de quelques spécialités. Un plat de restauration populaire annoncé dans le nom peut structurer l’offre lorsqu’il est mis en avant dans les rubriques ou proposé en plusieurs déclinaisons comme plats complets. Retiens alors street_food même si la carte est variée. Cite les lignes qui montrent cette place dans l’offre. Un prix bas, une carte courte, une mention marketing ou la présence isolée d’un plat de rue ne suffisent pas.
+- Lorsqu’une source streetFoodEvidence est fournie, elle documente séparément le type. Évalue sa cohérence avec la carte disponible. Les plats historiques de cette source donnent du contexte, notamment en cas de contradiction, et ne fournissent aucune ligne à citer dans le menu actuel. Sans ligne de menu à citer, renvoie rows vide et name_evidence à null. Le nom seul ne permet jamais d’établir le type. Pour une spécialité déduite du nom sans cette source, les lignes citées pour le type doivent documenter explicitement et indépendamment une offre de restauration de rue.
+- family_dining : examine ce type seulement si street_food n’est pas établi. Retiens-le si le menu présente une offre familiale explicite ou si l’étendue de la carte montre une offre organisée en plusieurs ensembles de plats complets distincts, sans spécialité populaire qui structure l’offre. Cite les lignes qui démontrent cette organisation ou l’offre familiale. La valeur varied décrit la diversité des plats et ne suffit pas à établir family_dining.
+- unknown : choisis ce type lorsque les indices restent insuffisants ou contradictoires. Le profil de la carte seul ne permet pas de déterminer le type.
 
 Justifie le type avec les identifiants des lignes du menu. Ne déduis ni le cadre, ni les équipements, ni la capacité d’accueil. Le type retenu ne doit modifier ni la spécialité ni le profil de la carte.
 
@@ -133,14 +150,15 @@ Chaque identifiant de ligne ne peut apparaître qu’une fois dans items. N’in
 
 export function menuAiRequest(packet: MenuPacket, model: string, outputLimit=MAX_OUTPUT_TOKENS, photoData?: string) {
   const menuText=JSON.stringify({restaurant:packet.restaurant,lines:packet.lines,
+    ...(packet.streetFoodEvidence ? {streetFoodEvidence:packet.streetFoodEvidence} : {}),
     ...(photoData&&packet.photo ? {photoRows:packet.photo.rows} : {})})
   const input=photoData&&packet.photo ? [{role:'user',content:[
     {type:'input_text',text:menuText},{type:'input_image',image_url:photoData,detail:'low'},
   ]}] : menuText
   return {model,store:false,max_output_tokens:outputLimit,
-    ...(model.startsWith('gpt-5.4-nano') ? {reasoning:{effort:'low'}} : {}),
     instructions:INSTRUCTIONS,input,
     text:{format:{type:'json_schema',name:'menu_dish_classification',strict:true,schema:MENU_SCHEMA}},
+    ...(/^gpt-5\.4-(?:nano|mini)(?:-|$)/.test(model) ? {reasoning:{effort:'low'}} : {}),
   }
 }
 
@@ -193,117 +211,81 @@ function readMenuProfile(value: unknown, sources: Map<number,MenuLine>, eligible
   return {value:profile.value,rows,sections:[...citedSections]}
 }
 
-function readRestaurantType(value: unknown, restaurant: string, eligible: Set<number>, reject: RejectEvidence): RestaurantType {
+function readRestaurantType(value: unknown, packet: MenuPacket, eligible: Set<number>, reject: RejectEvidence): RestaurantType {
   const fallback:RestaurantType={value:'unknown',name_evidence:null,rows:[]}
   const proposed=object(value)
   if (proposed?.value!=='street_food'&&proposed?.value!=='family_dining'&&proposed?.value!=='unknown') return fallback
   const rows=citedRows(proposed.rows,eligible)
   const nameEvidence=dishName(proposed.name_evidence)
-  if (!rows || (proposed.name_evidence!==null&&(!nameEvidence||!phrase(restaurant,nameEvidence)))) {
+  if (!rows || (proposed.name_evidence!==null&&(!nameEvidence||!phrase(packet.restaurant,nameEvidence)))) {
     reject('invalid_reference')
     return fallback
   }
-  if (proposed.value!=='unknown'&&!rows.length) {
+  const independentEvidence=proposed.value==='street_food' ? packet.streetFoodEvidence : undefined
+  if (proposed.value!=='unknown'&&!rows.length&&(!independentEvidence||nameEvidence!==null)) {
     reject('insufficient_evidence')
     return fallback
   }
-  return {value:proposed.value,name_evidence:nameEvidence,rows}
+  return {value:proposed.value,name_evidence:nameEvidence,rows,...(independentEvidence?{independentEvidence}:{})}
 }
 
-function normalizeSpecialtyName(name: string, citations: MenuLine[]): string {
-  const annotation=name.match(/^([^()]+)\s+\(([^()]+)\)$/u)
-  if (!annotation) return name
-  const base=annotation[1].trim()
-  const label=dishKey(base)
-  const aside=dishKey(annotation[2])
-  // Keep a genuine parenthesized variant if the full wording is on the menu.
-  if (citations.some(line=>phrase(line.name,name)||phrase(line.section,name))) return name
-  const repeatedLabel=aside.replace(/^(?:cac mon|mon) /u,'')===label
-  const confirmedTranslation=aside.includes(' ')&&citations.some(line=>
-    dishKey(line.name?.split('\n')[0]??'')===label&&
-    line.description?.split('\n').some(text=>dishKey(text)===aside))
-  return repeatedLabel||confirmedTranslation ? base : name
-}
+type SpecialtyChoice = Pick<MenuClassification, 'specialty' | 'nameSpecialtyProposal' | 'unverifiedSpecialty'>
 
-function declaresTranslatedDish(line: MenuLine, sourceLabel: string): boolean {
-  const base=dishKey(sourceLabel)
-  const labels=[line.name,line.description].flatMap(text=>text?.split('\n')??[])
-  return labels.some(text=>{
-    const key=dishKey(text)
-    return key===base||[' with ',' avec ',' kem '].some(connector=>key.startsWith(base+connector))
-  })
-}
-
-function readSpecialty(value:unknown, packet:MenuPacket, sources:Map<number,MenuLine>, profile:MenuProfile,
-  items:Map<number,MenuItem|null>, reject:RejectEvidence):MenuClassification['specialty'] {
-  if (value===null) return null
+function readSpecialtyChoice(value: unknown, packet: MenuPacket, type: RestaurantType,
+  sources: Map<number, MenuLine>, reject: RejectEvidence): SpecialtyChoice {
+  if (value===null) return {specialty:null}
   const proposed=object(value)
-  const proposedName=dishName(proposed?.name)
-  const citations=citedLines(proposed?.rows,sources,reject)
-  const name=proposedName&&normalizeSpecialtyName(proposedName,citations.filter(line=>!sourceExclusion(line)&&!isOption(line)))
-  if (!name||!hasDishName(dishKey(name))||broadFoodGroups.test(dishKey(name))) {
+  const name=dishName(proposed?.name)
+  if (!proposed||!name) {
     reject('invalid_name')
-    return null
+    return {specialty:null}
   }
-  const supportsDish=(line:MenuLine|undefined)=>
-    !!line?.name?.trim()&&(phrase(line.name,name)||phrase(line.section,name))
-  const nameMatches=phrase(packet.restaurant,name)
-  const photoTitle=dishName(proposed?.photo_title)
-  const visualEvidence=packet.photo&&nameMatches&&photoTitle&&phrase(photoTitle,name)
-    ? new Set(packet.photo.rows) : null
-  if (proposed?.photo_title!=null&&!visualEvidence) reject('invalid_photo_evidence')
-  const quotedLabel=dishName(proposed?.source_label)
-  const sourceLabel=nameMatches&&quotedLabel&&hasDishName(dishKey(quotedLabel))&&
-    !broadFoodGroups.test(dishKey(quotedLabel))&&!phrase(quotedLabel,name) ? quotedLabel : null
-  if (proposed?.source_label!=null&&!sourceLabel) reject('invalid_source_label')
+  const basis=proposed.basis==='restaurant_name'?'restaurant_name':'menu'
+  const unverified:SpecialtyChoice={specialty:null,unverifiedSpecialty:{name,basis}}
+  const citations=citedLines(proposed.rows,sources,reject)
+  if (basis==='restaurant_name') {
+    if (!Array.isArray(proposed.rows)||citations.length>0||
+        (proposed.menu_context!=='absent'&&proposed.menu_context!=='incomplete'&&proposed.menu_context!=='unusable')||
+        (proposed.menu_context==='absent')!==(packet.lines.length===0)) {
+      reject('invalid_name_menu_context')
+      return unverified
+    }
+    const fragment=dishName(proposed.name_evidence)?.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
+    const nameEvidence=fragment&&packet.restaurant.match(
+      new RegExp('(?:^|[^\\p{L}\\p{N}\\p{M}])('+fragment+')(?=$|[^\\p{L}\\p{N}\\p{M}])','iu'),
+    )?.[1]
+    if (!nameEvidence) {
+      reject('invalid_name_evidence')
+      return unverified
+    }
+    const independentlyCited=type.rows.some(id=>{
+      const line=sources.get(id)
+      return ['street food','restauration de rue','am thuc duong pho'].some(label=>
+        phrase(line?.section??null,label)||phrase(line?.description??null,label))
+    })
+    if (type.value!=='street_food'||(!type.independentEvidence&&!independentlyCited)) {
+      reject('unverified_street_food')
+      return unverified
+    }
+    return {specialty:null,nameSpecialtyProposal:{name,nameEvidence,menuContext:proposed.menu_context}}
+  }
+
   const rows:number[]=[]
-  const photoRows:MenuLine[]=[]
-  const translatedRows:MenuLine[]=[]
-  let contradictory=false
-  for(const line of citations) {
-    const kind=items.get(line.id)?.kind
-    if (sourceExclusion(line)||isOption(line)) {
-      reject('excluded_or_option',{row:line.id})
-      contradictory=true
-      continue
-    }
-    const label=dishKey(line.name??'')
-    const translatedEvidence=sourceLabel&&declaresTranslatedDish(line,sourceLabel)
-    if (label&&phrase(line.name,name)) rows.push(line.id)
-    else if (label&&(kind==='dish'||
-      (label===dishKey(line.section??'')&&hasDishName(label)&&!broadFoodGroups.test(label)))) {
-      // A separately identified dish cannot serve as evidence for this one.
-      reject('different_dish',{row:line.id})
-      contradictory=true
-    } else if (supportsDish(line)) rows.push(line.id)
-    else if (label&&(translatedEvidence||visualEvidence?.has(line.id))) {
-      if (kind==='drink'||kind==='non_food') {
-        reject('excluded_or_option',{row:line.id})
-        contradictory=true
-      } else if (translatedEvidence) translatedRows.push(line)
-      else photoRows.push(line)
-    }
-    else reject('unusable_row',{row:line.id})
+  for (const line of citations) {
+    if (sourceExclusion(line)||isOption(line)) reject('excluded_or_option',{row:line.id})
+    else if (!line.name?.trim()) reject('unusable_row',{row:line.id})
+    else rows.push(line.id)
   }
-  if (contradictory) return null
-  const photoSupportsDish=new Set(photoRows.map(line=>dishKey(line.name??''))).size>=2
-  if (photoSupportsDish) rows.push(...photoRows.map(line=>line.id))
-  else for(const line of photoRows) reject('unusable_row',{row:line.id})
-  const translationSupportsDish=new Set(translatedRows.map(line=>dishKey(line.name??''))).size>=2
-  if (translationSupportsDish) rows.push(...translatedRows.map(line=>line.id))
-  else for(const line of translatedRows) reject('unusable_row',{row:line.id})
   if (!rows.length) {
     reject('insufficient_evidence')
-    return null
+    return unverified
   }
-  const menuCenteredOnDish=profile.value==='specialized'&&
-    (profile.rows.some(id=>supportsDish(sources.get(id)))||profile.sections.some(section=>phrase(section,name)))
-  if (!nameMatches&&!menuCenteredOnDish) {
-    reject('unconfirmed_context')
-    return null
-  }
-  return {name,rows,...(photoSupportsDish&&photoTitle ? {photoTitle} : {}),
-    ...(translationSupportsDish&&sourceLabel ? {sourceLabel} : {})}
+  const photoTitle=dishName(proposed.photo_title)
+  const sourceLabel=dishName(proposed.source_label)
+  const hasPhotoReference=photoTitle&&rows.some(id=>packet.photo?.rows.includes(id))
+  if (proposed.photo_title!=null&&!hasPhotoReference) reject('invalid_photo_evidence')
+  if (proposed.source_label!=null&&!sourceLabel) reject('invalid_source_label')
+  return {specialty:{name,rows,...(hasPhotoReference?{photoTitle}:{}),...(sourceLabel?{sourceLabel}:{})}}
 }
 
 export function validateMenuClassification(value: unknown, packet: MenuPacket): MenuClassification {
@@ -318,7 +300,7 @@ export function validateMenuClassification(value: unknown, packet: MenuPacket): 
   const reject=(field:(typeof rejections)[number]['field']):RejectEvidence=>(reason,reference)=>
     {rejections.push({field,reason,...reference})}
   const menuProfile=readMenuProfile(root.menu_profile,sources,new Set(mainRows.map(line=>line.id)),sections,reject('menu_profile'))
-  const restaurantType=readRestaurantType(root.restaurant_type,packet.restaurant,new Set(foodRows.map(line=>line.id)),reject('restaurant_type'))
+  const restaurantType=readRestaurantType(root.restaurant_type,packet,new Set(foodRows.map(line=>line.id)),reject('restaurant_type'))
 
   const decisions=new Map<number,MenuItem|null>()
   for (const entry of Array.isArray(root.items)?root.items:[]) {
@@ -337,7 +319,8 @@ export function validateMenuClassification(value: unknown, packet: MenuPacket): 
       decisions.set(line.id,{row:line.id,kind:row.kind,name:null})
     else decisions.set(line.id,null)
   }
-  const specialty=readSpecialty(root.specialty,packet,sources,menuProfile,decisions,reject('specialty'))
+  const choice=readSpecialtyChoice(root.specialty,packet,restaurantType,sources,reject('specialty'))
+  const {specialty}=choice
   if (!specialty&&!Array.isArray(root.items)) throw Error('MENU_AI_INVALID_RESULT')
   const specialtyRows=new Set(specialty?.rows)
   const items=packet.lines.map((line):MenuItem=>{
@@ -346,7 +329,8 @@ export function validateMenuClassification(value: unknown, packet: MenuPacket): 
     if (specialty&&specialtyRows.has(line.id)) return {row:line.id,kind:'dish',name:specialty.name}
     return decisions.get(line.id)??{row:line.id,kind:'other',name:null}
   })
-  return {specialty,menu_profile:menuProfile,restaurant_type:restaurantType,items,...(rejections.length?{rejections}:{})}
+  return {...choice,menu_profile:menuProfile,restaurant_type:restaurantType,items,
+    ...(rejections.length?{rejections}:{})}
 }
 
 const photoUrl = /^https:\/\/lh[0-9]+\.googleusercontent\.com\/gps-cs-s\/[a-z0-9_-]+(?:=[a-z0-9-]+)?$/i
@@ -392,7 +376,7 @@ async function readMenuPhoto(url:string, http:typeof fetch):Promise<string|undef
 export async function classifyMenuWithAi(packet:MenuPacket, model:string, key:string, http:typeof fetch=fetch,
   outputLimit=MAX_OUTPUT_TOKENS, captureResponse?:(raw:string)=>void) {
   const photoData=packet.photo ? await readMenuPhoto(packet.photo.url,http) : undefined
-  const sentPacket=photoData ? packet : {restaurant:packet.restaurant,lines:packet.lines}
+  const sentPacket=photoData ? packet : {...packet,photo:undefined}
   const response=await http('https://api.openai.com/v1/responses',{
     method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
     body:JSON.stringify(menuAiRequest(sentPacket,model,outputLimit,photoData)),redirect:'error',signal:AbortSignal.timeout(80000),
